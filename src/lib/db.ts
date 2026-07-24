@@ -191,19 +191,14 @@ async function save(db: DBShape): Promise<void> {
   fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
 }
 
-// ===== المؤشرات التسعة الافتراضية =====
+// ===== المؤشرات السبعة الافتراضية =====
 const DEFAULT_INDICATORS: { name: string; unit: IndicatorUnit }[] = [
   { name: "نسبة الأجهزة العامة التي يتم قياس خدماتها", unit: "number" },
   { name: "نسبة الأجهزة ذات الأداء المنخفض التي تم عقد جلسات مراجعة لها", unit: "percent" },
-  { name: "نسبة التقارير الممتثلة لمعايير جودة ملاحظات الأداء", unit: "percent" },
   { name: "نسبة قابلية قياس مؤشرات المخرجات الوطنية", unit: "percent" },
   { name: "نسبة قابلية قياس الاستراتيجيات الوطنية المعتمدة من مجلس الوزراء", unit: "percent" },
   { name: "عدد الأجهزة العامة التي تم قياس استراتيجياتها المؤسسية", unit: "number" },
   { name: "نسبة التكليفات المباشرة المكتملة أو على المسار", unit: "percent" },
-  {
-    name: "نسبة وجودة وفعالية معالجة طلبات التغيير وتحديث سير التقدم للمؤشرات والمبادرات",
-    unit: "percent",
-  },
   { name: "نسبة إتمام الخطة الفردية للاحتياج التطويري", unit: "percent" },
 ];
 
@@ -215,13 +210,15 @@ const DEFAULT_SECTORS = [
 ];
 
 // ===== المستهدفات السنوية الافتراضية موزّعة على القطاعات =====
-// المفتاح: اسم القطاع · القيمة: { ترتيب المؤشر (1..9): المستهدف السنوي }
+// المفتاح: اسم القطاع · القيمة: { اسم المؤشر العددي: عدد الجهات المستهدف }
 // المؤشرات العددية تأخذ عدد الجهات لكل قطاع · وبقية المؤشرات النسبية تأخذ 100٪.
-const DEFAULT_TARGETS_BY_SECTOR: Record<string, Record<number, number>> = {
-  "قطاع الشؤون الحكومية": { 1: 16, 6: 8 },
-  "قطاع الخدمات الاجتماعية": { 1: 12, 6: 3 },
-  "قطاع البنية التحتية": { 1: 19, 6: 4 },
-  "قطاع المالي والاقتصادي": { 1: 15, 6: 4 },
+const IND_SERVICES = "نسبة الأجهزة العامة التي يتم قياس خدماتها";
+const IND_STRATEGIES = "عدد الأجهزة العامة التي تم قياس استراتيجياتها المؤسسية";
+const DEFAULT_TARGETS_BY_SECTOR: Record<string, Record<string, number>> = {
+  "قطاع الشؤون الحكومية": { [IND_SERVICES]: 16, [IND_STRATEGIES]: 8 },
+  "قطاع الخدمات الاجتماعية": { [IND_SERVICES]: 12, [IND_STRATEGIES]: 3 },
+  "قطاع البنية التحتية": { [IND_SERVICES]: 19, [IND_STRATEGIES]: 4 },
+  "قطاع المالي والاقتصادي": { [IND_SERVICES]: 15, [IND_STRATEGIES]: 4 },
 };
 
 
@@ -265,7 +262,7 @@ function seed(db: DBShape): DBShape {
     const targets: Record<string, number | number[]> = {};
     db.sectors.forEach((s) => {
       db.indicators.forEach((ind) => {
-        const perSector = DEFAULT_TARGETS_BY_SECTOR[s.name]?.[ind.order];
+        const perSector = DEFAULT_TARGETS_BY_SECTOR[s.name]?.[ind.name];
         if (typeof perSector === "number") {
           targets[targetKey(s.id, ind.id)] = perSector;
         } else if (ind.unit === "percent") {
