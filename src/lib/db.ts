@@ -193,7 +193,7 @@ async function save(db: DBShape): Promise<void> {
 
 // ===== المؤشرات التسعة الافتراضية =====
 const DEFAULT_INDICATORS: { name: string; unit: IndicatorUnit }[] = [
-  { name: "نسبة الأجهزة العامة التي يتم قياس خدماتها", unit: "percent" },
+  { name: "نسبة الأجهزة العامة التي يتم قياس خدماتها", unit: "number" },
   { name: "نسبة الأجهزة ذات الأداء المنخفض التي تم عقد جلسات مراجعة لها", unit: "percent" },
   { name: "نسبة التقارير الممتثلة لمعايير جودة ملاحظات الأداء", unit: "percent" },
   { name: "نسبة قابلية قياس مؤشرات المخرجات الوطنية", unit: "percent" },
@@ -213,6 +213,16 @@ const DEFAULT_SECTORS = [
   "قطاع المالي والاقتصادي",
   "قطاع الشؤون الحكومية",
 ];
+
+// ===== المستهدفات السنوية الافتراضية موزّعة على القطاعات =====
+// المفتاح: اسم القطاع · القيمة: { ترتيب المؤشر (1..9): المستهدف السنوي }
+// المؤشرات العددية تأخذ عدد الجهات لكل قطاع · وبقية المؤشرات النسبية تأخذ 100٪.
+const DEFAULT_TARGETS_BY_SECTOR: Record<string, Record<number, number>> = {
+  "قطاع الشؤون الحكومية": { 1: 16, 6: 8 },
+  "قطاع الخدمات الاجتماعية": { 1: 12, 6: 3 },
+  "قطاع البنية التحتية": { 1: 19, 6: 4 },
+  "قطاع المالي والاقتصادي": { 1: 15, 6: 4 },
+};
 
 
 // ===== التهيئة =====
@@ -249,6 +259,22 @@ function seed(db: DBShape): DBShape {
     }));
   }
   // لا تُنشأ أسابيع افتراضية — تُنشأ من التقويم عند إدخال البيانات
+
+  // المستهدفات السنوية الافتراضية لكل (قطاع|مؤشر) — تُهيّأ مرة واحدة إن لم تكن موجودة
+  if (!db.targets || Object.keys(db.targets).length === 0) {
+    const targets: Record<string, number | number[]> = {};
+    db.sectors.forEach((s) => {
+      db.indicators.forEach((ind) => {
+        const perSector = DEFAULT_TARGETS_BY_SECTOR[s.name]?.[ind.order];
+        if (typeof perSector === "number") {
+          targets[targetKey(s.id, ind.id)] = perSector;
+        } else if (ind.unit === "percent") {
+          targets[targetKey(s.id, ind.id)] = 100;
+        }
+      });
+    });
+    db.targets = targets;
+  }
 
   if (process.env.SEED_DEMO === "true" && db.measurements.length === 0) {
     db.sectors.forEach((s, si) =>
