@@ -43,29 +43,6 @@ interface Period {
   weekStart?: string;
 }
 
-const AR_MONTHS = [
-  "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
-  "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
-];
-function isoDate(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-function todayISO(): string {
-  return isoDate(new Date());
-}
-// حساب أسبوع التاريخ (يبدأ الأحد) وإرجاع تاريخ البداية واسم معروض بالتاريخ
-function weekOf(dateStr: string): { weekStart: string; label: string } {
-  const d = new Date(dateStr + "T00:00:00");
-  const start = new Date(d);
-  start.setDate(d.getDate() - d.getDay()); // الأحد
-  const end = new Date(start);
-  end.setDate(start.getDate() + 6); // السبت
-  const label =
-    start.getMonth() === end.getMonth()
-      ? `${start.getDate()}–${end.getDate()} ${AR_MONTHS[start.getMonth()]} ${start.getFullYear()}`
-      : `${start.getDate()} ${AR_MONTHS[start.getMonth()]} – ${end.getDate()} ${AR_MONTHS[end.getMonth()]} ${end.getFullYear()}`;
-  return { weekStart: isoDate(start), label };
-}
 interface Measurement {
   id: string;
   sectorId: string;
@@ -116,12 +93,6 @@ function tgtQuarter(refData: RefData, key: string, q: number): number | null {
 function tgtEff(refData: RefData, key: string, q: number): number | null {
   return refData.targetMode === "quarterly" ? tgtQuarter(refData, key, q) : tgtAnnual(refData, key);
 }
-// ربع تاريخ (1..4) من نص YYYY-MM-DD
-function quarterOfDate(dateStr: string): number {
-  const m = Number(dateStr.slice(5, 7)) - 1;
-  return Number.isFinite(m) ? Math.floor(m / 3) + 1 : 1;
-}
-
 const GAUGE_TRACK = "rgba(255,255,255,0.08)";
 
 export default function Dashboard({ me }: { me: Me }) {
@@ -230,7 +201,7 @@ export default function Dashboard({ me }: { me: Me }) {
             {t("النظرة العامة", "Overview")}
           </button>
           <button className={`tab ${tab === "weekly" ? "active" : ""}`} onClick={() => setTab("weekly")}>
-            {t("التحديث الأسبوعي", "Weekly Update")}
+            {t("تحديث المؤشرات", "KPI Update")}
           </button>
           <button className={`tab ${tab === "entry" ? "active" : ""}`} onClick={() => setTab("entry")}>
             {t("إدخال البيانات", "Data Entry")}
@@ -271,8 +242,36 @@ function visibleSectors(me: Me, refData: RefData): Sector[] {
 function activeIndicators(refData: RefData): Indicator[] {
   return refData.indicators.filter((i) => i.active);
 }
-function mkey(sectorId: string, indicatorId: string, periodId: string) {
-  return `${sectorId}|${indicatorId}|${periodId}`;
+// أحدث قياس لكل (قطاع×مؤشر) — القيمة التي أدخلها المستخدم آخر مرة (بغضّ النظر عن الفترة)
+function latestByCell(measurements: Measurement[]): Map<string, Measurement> {
+  const m = new Map<string, Measurement>();
+  for (const x of measurements) {
+    const k = tkey(x.sectorId, x.indicatorId);
+    const prev = m.get(k);
+    if (!prev || (x.updatedAt || "") > (prev.updatedAt || "")) m.set(k, x);
+  }
+  return m;
+}
+// المستهدف حسب النطاق: السنة → السنوي · ربع → مستهدف الربع
+function tgtForScope(refData: RefData, key: string, scopeQ: number | null): number | null {
+  return scopeQ == null ? tgtAnnual(refData, key) : tgtEff(refData, key, scopeQ);
+}
+// تنسيق تاريخ آخر تحديث
+function fmtDate(iso: string | undefined, lang: Lang): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleDateString(lang === "en" ? "en-US" : "ar-SA-u-nu-latn", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+// أحدث تاريخ تحديث عبر كل القياسات
+function lastUpdatedOf(measurements: Measurement[]): string {
+  let max = "";
+  for (const x of measurements) if ((x.updatedAt || "") > max) max = x.updatedAt || "";
+  return max;
 }
 
 /* ============ عدّاد نصف دائري (Gauge) ============ */
@@ -350,14 +349,8 @@ const SCOPES: { key: string; label: string; en: string; q: number | null }[] = [
   { key: "q3", label: "الربع الثالث", en: "Q3", q: 3 },
   { key: "q4", label: "الربع الرابع", en: "Q4", q: 4 },
 ];
-function periodQuarter(p: Period): number | null {
-  if (!p.weekStart) return null;
-  const m = Number(p.weekStart.slice(5, 7)) - 1;
-  return Number.isFinite(m) ? Math.floor(m / 3) + 1 : null;
-}
-
 function Overview({ me, refData }: { me: Me; refData: RefData }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const sectors = visibleSectors(me, refData);
   const indicators = activeIndicators(refData);
   const bands = refData.statuses;
@@ -380,41 +373,22 @@ function Overview({ me, refData }: { me: Me; refData: RefData }) {
     return () => clearInterval(t);
   }, [load]);
 
-  const mMap = useMemo(() => {
-    const m = new Map<string, Measurement>();
-    for (const x of measurements) m.set(mkey(x.sectorId, x.indicatorId, x.periodId), x);
-    return m;
-  }, [measurements]);
+  const latest = useMemo(() => latestByCell(measurements), [measurements]);
 
   const avg = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
 
-  // الأسابيع ضمن النطاق المختار (سنة أو ربع)
-  const scopeWeeks = useMemo(() => {
-    const q = SCOPES.find((x) => x.key === scope)?.q ?? null;
-    if (q == null) return refData.periods;
-    return refData.periods.filter((p) => periodQuarter(p) === q);
-  }, [scope, refData.periods]);
-
   const scopeQ = SCOPES.find((x) => x.key === scope)?.q ?? null;
-  // نسبة إنجاز (قطاع×مؤشر) = مجموع المنجز في النطاق ÷ المستهدف المطبّق
+  // نسبة إنجاز (قطاع×مؤشر) = المنجز (آخر قيمة مُدخلة) ÷ المستهدف المطبّق
   const achOf = useCallback(
     (sectorId: string, indId: string): number | null => {
       const key = tkey(sectorId, indId);
-      const target = scopeQ == null ? tgtAnnual(refData, key) : tgtEff(refData, key, scopeQ);
+      const target = tgtForScope(refData, key, scopeQ);
       if (!target || target <= 0) return null;
-      let sum = 0;
-      let has = false;
-      for (const p of scopeWeeks) {
-        const a = mMap.get(mkey(sectorId, indId, p.id))?.actual;
-        if (a != null) {
-          sum += a;
-          has = true;
-        }
-      }
-      return has ? (sum / target) * 100 : null;
+      const a = latest.get(key)?.actual;
+      return a != null ? (a / target) * 100 : null;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [mMap, scopeWeeks, refData.targets, refData.targetMode, scopeQ]
+    [latest, refData.targets, refData.targetMode, scopeQ]
   );
 
   const indData = useMemo(
@@ -450,24 +424,24 @@ function Overview({ me, refData }: { me: Me; refData: RefData }) {
   }
 
   function exportCsv() {
-    const header = ["القطاع", "المؤشر", "الوحدة", "الأسبوع", "المستهدف", "المحقق", "نسبة الإنجاز %"];
+    const header = ["القطاع", "المؤشر", "الوحدة", "المستهدف", "المنجز", "نسبة الإنجاز %", "آخر تحديث"];
     const rows: string[][] = [];
     for (const s of sectors)
-      for (const ind of indicators)
-        for (const p of scopeWeeks) {
-          const m = mMap.get(mkey(s.id, ind.id, p.id));
-          const tgt = tgtEff(refData, tkey(s.id, ind.id), periodQuarter(p) ?? 1);
-          const rr = evaluate(m?.actual, tgt, bands);
-          rows.push([
-            s.name,
-            ind.name,
-            ind.unit === "percent" ? "نسبة" : "عدد",
-            p.label,
-            tgt != null ? String(tgt) : "",
-            m?.actual != null ? String(m.actual) : "",
-            rr.achievement != null ? String(Math.round(rr.achievement)) : "",
-          ]);
-        }
+      for (const ind of indicators) {
+        const key = tkey(s.id, ind.id);
+        const m = latest.get(key);
+        const tgt = tgtForScope(refData, key, scopeQ);
+        const rr = evaluate(m?.actual, tgt, bands);
+        rows.push([
+          s.name,
+          ind.name,
+          ind.unit === "percent" ? "نسبة" : "عدد",
+          tgt != null ? String(tgt) : "",
+          m?.actual != null ? String(m.actual) : "",
+          rr.achievement != null ? String(Math.round(rr.achievement)) : "",
+          fmtDate(m?.updatedAt, lang),
+        ]);
+      }
     const csv = [header, ...rows]
       .map((r) => r.map((c) => (/[",\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c)).join(","))
       .join("\r\n");
@@ -564,8 +538,8 @@ function Overview({ me, refData }: { me: Me; refData: RefData }) {
         <IndicatorModal
           indicator={openIndicator}
           sectors={sectors}
-          periods={scopeWeeks}
-          mMap={mMap}
+          latest={latest}
+          scopeQ={scopeQ}
           bands={bands}
           refData={refData}
           onClose={() => setOpenIndicator(null)}
@@ -596,8 +570,8 @@ function Overview({ me, refData }: { me: Me; refData: RefData }) {
                 <SectorDetail
                   sector={s}
                   indicators={indicators}
-                  periods={scopeWeeks}
-                  mMap={mMap}
+                  latest={latest}
+                  scopeQ={scopeQ}
                   bands={bands}
                   refData={refData}
                 />
@@ -610,92 +584,30 @@ function Overview({ me, refData }: { me: Me; refData: RefData }) {
   );
 }
 
-function SectorDetail({
-  sector,
-  indicators,
-  periods,
-  mMap,
-  bands,
-  refData,
-}: {
-  sector: Sector;
-  indicators: Indicator[];
-  periods: Period[];
-  mMap: Map<string, Measurement>;
-  bands: Band[];
-  refData: RefData;
-}) {
-  const { t } = useT();
-  return (
-    <div className="sector-detail" style={{ overflowX: "auto" }}>
-      <table className="detail-table">
-        <thead>
-          <tr>
-            <th className="ind-col">{t("المؤشر", "KPI")}</th>
-            {periods.map((p) => (
-              <th key={p.id} colSpan={3}>
-                {p.label}
-              </th>
-            ))}
-          </tr>
-          <tr className="sub-head">
-            <th className="ind-col"></th>
-            {periods.map((p) => (
-              <SubHead key={p.id} />
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {indicators.map((ind, i) => (
-            <tr key={ind.id}>
-              <td className="ind-col">
-                <strong>KPI {i + 1}</strong> · {ind.name}{" "}
-                <span className="muted">({ind.unit === "percent" ? "%" : t("عدد", "num")})</span>
-              </td>
-              {periods.map((p) => {
-                const m = mMap.get(mkey(sector.id, ind.id, p.id));
-                const tgt = tgtEff(refData, tkey(sector.id, ind.id), periodQuarter(p) ?? 1);
-                const r = evaluate(m?.actual, tgt, bands);
-                return (
-                  <ValueCells
-                    key={p.id}
-                    target={fmtValue(tgt, ind.unit)}
-                    actual={fmtValue(m?.actual, ind.unit)}
-                    pct={r.achievement != null ? `${Math.round(r.achievement)}%` : "—"}
-                    bg={r.bg}
-                    color={r.color}
-                  />
-                );
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function SubHead() {
+function DetailHead() {
   const { t } = useT();
   return (
     <>
       <th className="mini">{t("مستهدف", "Target")}</th>
-      <th className="mini">{t("محقق", "Actual")}</th>
+      <th className="mini">{t("منجز", "Done")}</th>
       <th className="mini">{t("الإنجاز", "%")}</th>
+      <th className="mini">{t("آخر تحديث", "Last update")}</th>
     </>
   );
 }
 
-function ValueCells({
+function DetailCells({
   target,
   actual,
   pct,
+  updated,
   bg,
   color,
 }: {
   target: string;
   actual: string;
   pct: string;
+  updated: string;
   bg: string;
   color: string;
 }) {
@@ -706,28 +618,83 @@ function ValueCells({
       <td className="mini" style={{ background: bg, color, fontWeight: 700 }}>
         {pct}
       </td>
+      <td className="mini muted">{updated || "—"}</td>
     </>
+  );
+}
+
+function SectorDetail({
+  sector,
+  indicators,
+  latest,
+  scopeQ,
+  bands,
+  refData,
+}: {
+  sector: Sector;
+  indicators: Indicator[];
+  latest: Map<string, Measurement>;
+  scopeQ: number | null;
+  bands: Band[];
+  refData: RefData;
+}) {
+  const { t, lang } = useT();
+  return (
+    <div className="sector-detail" style={{ overflowX: "auto" }}>
+      <table className="detail-table">
+        <thead>
+          <tr className="sub-head">
+            <th className="ind-col">{t("المؤشر", "KPI")}</th>
+            <DetailHead />
+          </tr>
+        </thead>
+        <tbody>
+          {indicators.map((ind, i) => {
+            const key = tkey(sector.id, ind.id);
+            const m = latest.get(key);
+            const tgt = tgtForScope(refData, key, scopeQ);
+            const r = evaluate(m?.actual, tgt, bands);
+            return (
+              <tr key={ind.id}>
+                <td className="ind-col">
+                  <strong>KPI {i + 1}</strong> · {ind.name}{" "}
+                  <span className="muted">({ind.unit === "percent" ? "%" : t("عدد", "num")})</span>
+                </td>
+                <DetailCells
+                  target={fmtValue(tgt, ind.unit)}
+                  actual={fmtValue(m?.actual, ind.unit)}
+                  pct={r.achievement != null ? `${Math.round(r.achievement)}%` : "—"}
+                  updated={fmtDate(m?.updatedAt, lang)}
+                  bg={r.bg}
+                  color={r.color}
+                />
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
 function IndicatorModal({
   indicator,
   sectors,
-  periods,
-  mMap,
+  latest,
+  scopeQ,
   bands,
   refData,
   onClose,
 }: {
   indicator: Indicator & { num: number };
   sectors: Sector[];
-  periods: Period[];
-  mMap: Map<string, Measurement>;
+  latest: Map<string, Measurement>;
+  scopeQ: number | null;
   bands: Band[];
   refData: RefData;
   onClose: () => void;
 }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 920 }} onClick={(e) => e.stopPropagation()}>
@@ -736,7 +703,7 @@ function IndicatorModal({
             <div className="muted" style={{ fontSize: 12 }}>KPI {indicator.num}</div>
             <h3 style={{ margin: "4px 0 0" }}>{indicator.name}</h3>
             <div className="muted" style={{ fontSize: 13 }}>
-              {t("مقارنة التطور عبر الفترات", "Progress across periods")} ·{" "}
+              {t("المنجز مقابل المستهدف لكل قطاع", "Done vs target per sector")} ·{" "}
               {indicator.unit === "percent" ? t("نسبة %", "percent %") : t("عدد", "number")}
             </div>
           </div>
@@ -748,42 +715,31 @@ function IndicatorModal({
         <div className="sector-detail" style={{ overflowX: "auto", marginTop: 16, padding: 0 }}>
           <table className="detail-table">
             <thead>
-              <tr>
-                <th className="ind-col">{t("القطاع", "Sector")}</th>
-                {periods.map((p) => (
-                  <th key={p.id} colSpan={3}>
-                    {p.label}
-                  </th>
-                ))}
-              </tr>
               <tr className="sub-head">
-                <th className="ind-col"></th>
-                {periods.map((p) => (
-                  <SubHead key={p.id} />
-                ))}
+                <th className="ind-col">{t("القطاع", "Sector")}</th>
+                <DetailHead />
               </tr>
             </thead>
             <tbody>
-              {sectors.map((s) => (
-                <tr key={s.id}>
-                  <td className="ind-col">{s.name}</td>
-                  {periods.map((p) => {
-                    const m = mMap.get(mkey(s.id, indicator.id, p.id));
-                    const tgt = tgtEff(refData, tkey(s.id, indicator.id), periodQuarter(p) ?? 1);
-                    const r = evaluate(m?.actual, tgt, bands);
-                    return (
-                      <ValueCells
-                        key={p.id}
-                        target={fmtValue(tgt, indicator.unit)}
-                        actual={fmtValue(m?.actual, indicator.unit)}
-                        pct={r.achievement != null ? `${Math.round(r.achievement)}%` : "—"}
-                        bg={r.bg}
-                        color={r.color}
-                      />
-                    );
-                  })}
-                </tr>
-              ))}
+              {sectors.map((s) => {
+                const key = tkey(s.id, indicator.id);
+                const m = latest.get(key);
+                const tgt = tgtForScope(refData, key, scopeQ);
+                const r = evaluate(m?.actual, tgt, bands);
+                return (
+                  <tr key={s.id}>
+                    <td className="ind-col">{s.name}</td>
+                    <DetailCells
+                      target={fmtValue(tgt, indicator.unit)}
+                      actual={fmtValue(m?.actual, indicator.unit)}
+                      pct={r.achievement != null ? `${Math.round(r.achievement)}%` : "—"}
+                      updated={fmtDate(m?.updatedAt, lang)}
+                      bg={r.bg}
+                      color={r.color}
+                    />
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -792,18 +748,16 @@ function IndicatorModal({
   );
 }
 
-/* ============ التحديث الأسبوعي ============ */
+/* ============ تحديث حالة المؤشرات ============ */
 function TargetActualCell({
   target,
   actual,
-  week,
   bg,
   fg,
   strong,
 }: {
   target: number | null;
   actual: number;
-  week: number | null;
   bg: string;
   fg: string;
   strong?: boolean;
@@ -820,11 +774,6 @@ function TargetActualCell({
         <span className="ta-lbl">{t("منجز", "Done")}</span>
         <span className={"ta-val" + (strong ? " strong" : "")}>{fmtNum(actual)}</span>
       </div>
-      {week != null && week > 0 && (
-        <span className="ta-week" dir="ltr">
-          +{fmtNum(week)}
-        </span>
-      )}
     </div>
   );
 }
@@ -834,10 +783,6 @@ function WeeklyReview({ me, refData }: { me: Me; refData: RefData }) {
   const sectors = visibleSectors(me, refData);
   const indicators = activeIndicators(refData);
   const bands = refData.statuses;
-  const [date, setDate] = useState(todayISO());
-  const week = weekOf(date);
-  const period = refData.periods.find((p) => p.weekStart === week.weekStart);
-  const periodId = period?.id || "";
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
 
   const load = useCallback(async () => {
@@ -848,75 +793,53 @@ function WeeklyReview({ me, refData }: { me: Me; refData: RefData }) {
     load();
   }, [load]);
 
-  const mMap = useMemo(() => {
-    const m = new Map<string, Measurement>();
-    for (const x of measurements) m.set(mkey(x.sectorId, x.indicatorId, x.periodId), x);
-    return m;
-  }, [measurements]);
+  // أحدث قيمة لكل (قطاع×مؤشر) — المنجز كما أدخله المستخدم مباشرةً (بدون تراكم)
+  const latest = useMemo(() => latestByCell(measurements), [measurements]);
+  const lastUpdated = useMemo(() => lastUpdatedOf(measurements), [measurements]);
 
-  // الأسابيع حتى الأسبوع المختار (لحساب التراكمي) — الترتيب زمني حسب تاريخ البداية
-  const periodsSorted = useMemo(
-    () => [...refData.periods].sort((a, b) => a.order - b.order),
-    [refData.periods]
-  );
-  // ترتيب الأسبوع المختار زمنيًا (حتى لو لم يُنشأ له سجل بعد)
-  const curOrder = Math.floor(new Date(week.weekStart + "T00:00:00Z").getTime() / 86400000);
-  const selQ = quarterOfDate(week.weekStart); // ربع الأسبوع المختار
-  const quarterly = refData.targetMode === "quarterly";
-
-  // جهات هذا الأسبوع + التراكمي حتى الآن لكل (قطاع×مؤشر)
+  // صفوف المصفوفة: المستهدف السنوي · المنجز = آخر قيمة · الحالة حسب المنجز÷المستهدف
   const indRows = useMemo(() => {
-    // في الوضع الربعي: التراكمي ضمن نفس الربع فقط؛ وإلا كل الأسابيع حتى الآن
-    const weeksUpTo = periodsSorted.filter(
-      (p) => p.order <= curOrder && (!quarterly || (p.weekStart && quarterOfDate(p.weekStart) === selQ))
-    );
-    const cumOf = (sId: string, iId: string) =>
-      weeksUpTo.reduce((t, p) => {
-        const a = mMap.get(mkey(sId, iId, p.id))?.actual;
-        return a != null ? t + a : t;
-      }, 0);
     return indicators.map((ind, i) => {
       const perSector = sectors.map((s) => {
-        const target = tgtEff(refData, tkey(s.id, ind.id), selQ); // مستهدف الربع أو السنوي
-        const week = mMap.get(mkey(s.id, ind.id, periodId))?.actual ?? null; // جهات هذا الأسبوع
-        const cum = cumOf(s.id, ind.id); // التراكمي حتى الآن (ضمن الربع في الوضع الربعي)
-        const band = target && target > 0 ? bandOf((cum / target) * 100, bands) : null;
-        return { sector: s, week, cum, target, band };
+        const key = tkey(s.id, ind.id);
+        const target = tgtAnnual(refData, key);
+        const m = latest.get(key);
+        const done = m?.actual ?? null;
+        const band = target && target > 0 && done != null ? bandOf((done / target) * 100, bands) : null;
+        return { sector: s, done, target, band, updatedAt: m?.updatedAt };
       });
-      const weekSum = perSector.reduce((t, ps) => (ps.week != null ? t + ps.week : t), 0);
-      const cumSum = perSector.reduce((t, ps) => t + ps.cum, 0);
+      const doneSum = perSector.reduce((t, ps) => (ps.done != null ? t + ps.done : t), 0);
       const tgtSum = perSector.reduce((t, ps) => (ps.target != null ? t + ps.target : t), 0);
-      const rowBand = tgtSum > 0 ? bandOf((cumSum / tgtSum) * 100, bands) : null;
-      return { ind, num: i + 1, perSector, weekSum, cumSum, tgtSum, rowBand };
+      const rowBand = tgtSum > 0 ? bandOf((doneSum / tgtSum) * 100, bands) : null;
+      return { ind, num: i + 1, perSector, doneSum, tgtSum, rowBand };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [indicators, sectors, periodId, curOrder, mMap, bands, refData.targets, refData.targetMode, periodsSorted, selQ, quarterly]);
+  }, [indicators, sectors, latest, bands, refData.targets, refData.targetMode]);
 
-  // عدّ الخلايا حسب الحالة (التقدّم التراكمي)
+  // عدّ الخلايا حسب الحالة
   const bandCounts: Record<string, number> = {};
   for (const b of bands) bandCounts[b.label] = 0;
   for (const r of indRows)
     for (const ps of r.perSector) if (ps.band) bandCounts[ps.band.label] = (bandCounts[ps.band.label] || 0) + 1;
 
   // إجماليات
-  let weekTotal = 0;
-  let cumTotal = 0;
+  let doneTotal = 0;
   let tgtTotal = 0;
   for (const r of indRows) {
-    weekTotal += r.weekSum;
-    cumTotal += r.cumSum;
+    doneTotal += r.doneSum;
     tgtTotal += r.tgtSum;
   }
 
-  // أبرز إنجازات هذا الأسبوع (أعلى تغطية جهات هذا الأسبوع)
-  const weekWins: { indicator: string; sector: string; week: number; cum: number; target: number | null }[] = [];
-  for (const r of indRows)
-    for (const ps of r.perSector)
-      if (ps.week != null && ps.week > 0)
-        weekWins.push({ indicator: r.ind.name, sector: ps.sector.name, week: ps.week, cum: ps.cum, target: ps.target });
-  weekWins.sort((a, b) => b.week - a.week);
+  // آخر التحديثات (الأحدث أولًا)
+  const sVisible = new Set(sectors.map((s) => s.id));
+  const iActive = new Set(indicators.map((i) => i.id));
+  const numOf = new Map(indicators.map((ind, i) => [ind.id, i + 1]));
+  const nameOf = (id: string, arr: { id: string; name: string }[]) => arr.find((x) => x.id === id)?.name || "";
+  const recent = [...latest.values()]
+    .filter((m) => m.actual != null && sVisible.has(m.sectorId) && iActive.has(m.indicatorId))
+    .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""))
+    .slice(0, 12);
 
-  const periodLabel = week.label;
   const today = new Date().toLocaleDateString(lang === "en" ? "en-US" : "ar-SA-u-nu-latn", {
     weekday: "long",
     year: "numeric",
@@ -926,33 +849,29 @@ function WeeklyReview({ me, refData }: { me: Me; refData: RefData }) {
 
   const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
 
-  // تقرير PDF كامل (كل الفترات وكل التفاصيل) عبر نافذة طباعة
+  // تقرير PDF (المنجز مقابل المستهدف لكل قطاع×مؤشر) عبر نافذة طباعة
   function printPDF() {
-    const sections = refData.periods
-      .map((p) => {
-        const rows = sectors
-          .map((s) =>
-            indicators
-              .map((ind) => {
-                const m = mMap.get(mkey(s.id, ind.id, p.id));
-                const tgt = tgtEff(refData, tkey(s.id, ind.id), periodQuarter(p) ?? 1);
-                const r = evaluate(m?.actual, tgt, bands);
-                return `<tr>
-                  <td>${esc(s.name)}</td>
-                  <td>${esc(ind.name)}</td>
-                  <td class="c">${ind.unit === "percent" ? "نسبة" : "عدد"}</td>
-                  <td class="c">${tgt != null ? tgt : "—"}</td>
-                  <td class="c">${m?.actual != null ? m.actual : "—"}</td>
-                  <td class="c">${r.achievement != null ? Math.round(r.achievement) + "%" : "—"}</td>
-                  <td class="c" style="background:${r.bg};color:${r.color}">${r.label}</td>
-                </tr>`;
-              })
-              .join("")
-          )
-          .join("");
-        return `<h2>${esc(p.label)}</h2>
-          <table><thead><tr><th>القطاع</th><th>المؤشر</th><th>الوحدة</th><th>المستهدف</th><th>المحقق</th><th>الإنجاز</th><th>الحالة</th></tr></thead><tbody>${rows}</tbody></table>`;
-      })
+    const rows = sectors
+      .map((s) =>
+        indicators
+          .map((ind) => {
+            const key = tkey(s.id, ind.id);
+            const m = latest.get(key);
+            const tgt = tgtAnnual(refData, key);
+            const r = evaluate(m?.actual, tgt, bands);
+            return `<tr>
+              <td>${esc(s.name)}</td>
+              <td>${esc(ind.name)}</td>
+              <td class="c">${ind.unit === "percent" ? "نسبة" : "عدد"}</td>
+              <td class="c">${tgt != null ? tgt : "—"}</td>
+              <td class="c">${m?.actual != null ? m.actual : "—"}</td>
+              <td class="c">${r.achievement != null ? Math.round(r.achievement) + "%" : "—"}</td>
+              <td class="c" style="background:${r.bg};color:${r.color}">${r.label}</td>
+              <td class="c">${esc(fmtDate(m?.updatedAt, lang) || "—")}</td>
+            </tr>`;
+          })
+          .join("")
+      )
       .join("");
     const html = `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>تقرير الأداء</title>
       <style>
@@ -960,16 +879,15 @@ function WeeklyReview({ me, refData }: { me: Me; refData: RefData }) {
         body{padding:20px;color:#1a2233}
         h1{color:#0e3a5f;margin:0 0 2px;font-size:22px}
         .sub{color:#5b6b82;margin:0 0 14px;font-size:12px}
-        h2{color:#0e3a5f;font-size:15px;margin:18px 0 6px;border-right:4px solid #22a3c4;padding-right:8px}
         table{width:100%;border-collapse:collapse;margin-bottom:10px;font-size:11.5px}
         th,td{border:1px solid #d4dbe6;padding:5px 7px;text-align:right}
         th{background:#eef4f8}
         td.c{text-align:center}
-        @media print{h2{page-break-after:avoid}tr{page-break-inside:avoid}}
+        @media print{tr{page-break-inside:avoid}}
       </style></head><body>
       <h1>تقرير حالة المؤشرات — إدارة عمليات الأداء</h1>
-      <p class="sub">${esc(today)} · التراكمي/المستهدف: ${fmtNum(cumTotal)} / ${fmtNum(tgtTotal)}</p>
-      ${sections}
+      <p class="sub">${esc(today)} · المنجز/المستهدف: ${fmtNum(doneTotal)} / ${fmtNum(tgtTotal)}</p>
+      <table><thead><tr><th>القطاع</th><th>المؤشر</th><th>الوحدة</th><th>المستهدف</th><th>المنجز</th><th>الإنجاز</th><th>الحالة</th><th>آخر تحديث</th></tr></thead><tbody>${rows}</tbody></table>
       <script>window.onload=function(){window.print()}</script>
       </body></html>`;
     const w = window.open("", "_blank");
@@ -980,25 +898,25 @@ function WeeklyReview({ me, refData }: { me: Me; refData: RefData }) {
   }
 
   function exportExcel() {
-    const header = ["القطاع", "المؤشر", "الوحدة", "الفترة", "المستهدف", "المحقق", "نسبة الإنجاز %", "الحالة"];
+    const header = ["القطاع", "المؤشر", "الوحدة", "المستهدف", "المنجز", "نسبة الإنجاز %", "الحالة", "آخر تحديث"];
     const rows: string[][] = [];
     for (const s of sectors)
-      for (const ind of indicators)
-        for (const p of refData.periods) {
-          const m = mMap.get(mkey(s.id, ind.id, p.id));
-          const tgt = tgtEff(refData, tkey(s.id, ind.id), periodQuarter(p) ?? 1);
-          const r = evaluate(m?.actual, tgt, bands);
-          rows.push([
-            s.name,
-            ind.name,
-            ind.unit === "percent" ? "نسبة" : "عدد",
-            p.label,
-            tgt != null ? String(tgt) : "",
-            m?.actual != null ? String(m.actual) : "",
-            r.achievement != null ? String(Math.round(r.achievement)) : "",
-            r.label,
-          ]);
-        }
+      for (const ind of indicators) {
+        const key = tkey(s.id, ind.id);
+        const m = latest.get(key);
+        const tgt = tgtAnnual(refData, key);
+        const r = evaluate(m?.actual, tgt, bands);
+        rows.push([
+          s.name,
+          ind.name,
+          ind.unit === "percent" ? "نسبة" : "عدد",
+          tgt != null ? String(tgt) : "",
+          m?.actual != null ? String(m.actual) : "",
+          r.achievement != null ? String(Math.round(r.achievement)) : "",
+          r.label,
+          fmtDate(m?.updatedAt, lang),
+        ]);
+      }
     const csv = [header, ...rows]
       .map((r) => r.map((c) => (/[",\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c)).join(","))
       .join("\r\n");
@@ -1016,25 +934,17 @@ function WeeklyReview({ me, refData }: { me: Me; refData: RefData }) {
 
   return (
     <div>
-      {/* شريط العنوان للعرض الأسبوعي */}
+      {/* شريط العنوان */}
       <div className="weekly-banner">
         <div>
-          <div className="weekly-title">{t("التحديث الأسبوعي لحالة المؤشرات", "Weekly KPI Update")}</div>
-          <div className="weekly-date">{today} · {periodLabel}</div>
+          <div className="weekly-title">{t("تحديث حالة المؤشرات", "KPI Status Update")}</div>
+          <div className="weekly-date">
+            {lastUpdated
+              ? `${t("آخر تحديث:", "Last update:")} ${fmtDate(lastUpdated, lang)}`
+              : t("لا توجد تحديثات بعد", "No updates yet")}
+          </div>
         </div>
         <div className="weekly-actions">
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value || todayISO())}
-            style={{
-              background: "rgba(255,255,255,0.12)",
-              color: "#fff",
-              border: "1px solid rgba(255,255,255,0.25)",
-              borderRadius: 10,
-              padding: "8px 10px",
-            }}
-          />
           <button className="btn btn-sm btn-ghost" onClick={load}>{t("تحديث", "Refresh")}</button>
           <button className="btn btn-sm" onClick={printPDF}>🖨 {t("حفظ PDF", "Save PDF")}</button>
           <button className="btn btn-sm" onClick={exportExcel}>⬇ Excel</button>
@@ -1044,18 +954,10 @@ function WeeklyReview({ me, refData }: { me: Me; refData: RefData }) {
       {/* ملخص سريع */}
       <div className="kpis" style={{ marginTop: 14 }}>
         <div className="kpi">
-          <div className="v" style={{ color: "#22d3ee" }}>{fmtNum(weekTotal)}</div>
-          <div className="l">{t("جهات غُطّيت هذا الأسبوع", "Covered this week")}</div>
-        </div>
-        <div className="kpi">
           <div className="v" style={{ color: "#a78bfa" }} dir="ltr">
-            {fmtNum(cumTotal)} / {fmtNum(tgtTotal)}
+            {fmtNum(doneTotal)} / {fmtNum(tgtTotal)}
           </div>
-          <div className="l">
-            {quarterly
-              ? t("التراكمي / مستهدف الربع", "Cumulative / Quarter target")
-              : t("التراكمي / المستهدف السنوي", "Cumulative / Annual target")}
-          </div>
+          <div className="l">{t("المنجز / المستهدف السنوي", "Done / Annual target")}</div>
         </div>
         {bands.map((b) => (
           <div className="kpi" key={b.label}>
@@ -1071,8 +973,8 @@ function WeeklyReview({ me, refData }: { me: Me; refData: RefData }) {
           {t("المستهدف والمنجز لكل قطاع", "Target & Done per Sector")}
           <span className="muted" style={{ fontSize: 12, fontWeight: 400, marginRight: 8 }}>
             {t(
-              "(المنجَز: الإجمالي التراكمي حتى نهاية الأسبوع المحدَّد · القيمة +N: عدد الجهات المُغطّاة خلال الأسبوع)",
-              "(Done: cumulative total up to the selected week · +N: entities covered during this week)"
+              "(المنجَز: الإجمالي المُدخَل مباشرةً · المستهدف: سنوي)",
+              "(Done: the value entered directly · Target: annual)"
             )}
           </span>
         </h2>
@@ -1096,21 +998,14 @@ function WeeklyReview({ me, refData }: { me: Me; refData: RefData }) {
                   const c = cellOf(ps.band);
                   return (
                     <td key={ps.sector.id}>
-                      <TargetActualCell
-                        target={ps.target}
-                        actual={ps.cum}
-                        week={ps.week}
-                        bg={c.bg}
-                        fg={c.fg}
-                      />
+                      <TargetActualCell target={ps.target} actual={ps.done ?? 0} bg={c.bg} fg={c.fg} />
                     </td>
                   );
                 })}
                 <td>
                   <TargetActualCell
                     target={r.tgtSum > 0 ? r.tgtSum : null}
-                    actual={r.cumSum}
-                    week={r.weekSum}
+                    actual={r.doneSum}
                     bg={cellOf(r.rowBand).bg}
                     fg={cellOf(r.rowBand).fg}
                     strong
@@ -1122,32 +1017,26 @@ function WeeklyReview({ me, refData }: { me: Me; refData: RefData }) {
         </table>
       </div>
 
-      {/* أبرز إنجازات هذا الأسبوع */}
+      {/* آخر التحديثات */}
       <div className="card" style={{ marginTop: 16 }}>
-        <h2 className="section-title" style={{ color: "#22c55e" }}>
-          {t("أبرز إنجازات هذا الأسبوع", "This week's highlights")} ({weekWins.length})
+        <h2 className="section-title">
+          {t("آخر التحديثات", "Latest updates")} ({recent.length})
         </h2>
-        {weekWins.length === 0 ? (
-          <div className="muted">{t("لم تُسجّل أي جهات مُغطّاة في هذا الأسبوع بعد.", "No entities covered this week yet.")}</div>
+        {recent.length === 0 ? (
+          <div className="muted">{t("لم تُسجّل أي بيانات بعد.", "No data recorded yet.")}</div>
         ) : (
           <div className="weak-grid">
-            {weekWins.slice(0, 12).map((w, i) => (
+            {recent.map((m, i) => (
               <div key={i} className="weak-item" style={{ borderRightColor: "#22c55e" }}>
                 <span className="weak-pct" style={{ color: "#22c55e" }} dir="ltr">
-                  {fmtNum(w.week)}
+                  {fmtNum(m.actual ?? 0)}
                 </span>
                 <div>
-                  <div className="weak-ind">{w.sector}</div>
+                  <div className="weak-ind">{nameOf(m.sectorId, sectors)}</div>
                   <div className="muted" style={{ fontSize: 12 }}>
-                    {w.indicator}
-                    {w.target != null && (
-                      <>
-                        {" · "}
-                        <span dir="ltr">
-                          {t("التراكمي", "cum")} {fmtNum(w.cum)}/{fmtNum(w.target)}
-                        </span>
-                      </>
-                    )}
+                    <span>KPI {numOf.get(m.indicatorId)}</span> · {nameOf(m.indicatorId, indicators)}
+                    {" · "}
+                    <span>{fmtDate(m.updatedAt, lang)}</span>
                   </div>
                 </div>
               </div>
@@ -1161,35 +1050,41 @@ function WeeklyReview({ me, refData }: { me: Me; refData: RefData }) {
 
 /* ============ إدخال البيانات ============ */
 function DataEntry({ me, refData, reload }: { me: Me; refData: RefData; reload: () => void }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const sectors = visibleSectors(me, refData);
   const indicators = activeIndicators(refData);
   const bands = refData.statuses;
   const [sectorId, setSectorId] = useState(sectors[0]?.id || "");
-  const [date, setDate] = useState(todayISO());
-  const week = weekOf(date);
-  const period = refData.periods.find((p) => p.weekStart === week.weekStart);
-  const periodId = period?.id || "";
   const [vals, setVals] = useState<Record<string, string>>({}); // المنجز فقط
+  const [updated, setUpdated] = useState<Record<string, string>>({}); // آخر تحديث لكل مؤشر
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const entryQ = quarterOfDate(week.weekStart);
-  const targetOf = (indId: string): number | null => tgtEff(refData, tkey(sectorId, indId), entryQ);
+  const targetOf = (indId: string): number | null => tgtAnnual(refData, tkey(sectorId, indId));
 
   const loadVals = useCallback(async () => {
-    if (!sectorId || !periodId) {
+    if (!sectorId) {
       setVals({});
+      setUpdated({});
       return;
     }
-    const d = await fetch(`/api/measurements?sectorId=${sectorId}&periodId=${periodId}`).then((r) => r.json());
-    const map: Record<string, string> = {};
+    const d = await fetch(`/api/measurements?sectorId=${sectorId}`).then((r) => r.json());
+    // أحدث قيمة لكل مؤشر (بغضّ النظر عن الفترة)
+    const byInd = new Map<string, Measurement>();
     for (const m of (d.measurements || []) as Measurement[]) {
-      map[m.indicatorId] = m.actual != null ? String(m.actual) : "";
+      const prev = byInd.get(m.indicatorId);
+      if (!prev || (m.updatedAt || "") > (prev.updatedAt || "")) byInd.set(m.indicatorId, m);
+    }
+    const map: Record<string, string> = {};
+    const upd: Record<string, string> = {};
+    for (const [iid, m] of byInd) {
+      map[iid] = m.actual != null ? String(m.actual) : "";
+      upd[iid] = m.updatedAt || "";
     }
     setVals(map);
-  }, [sectorId, periodId]);
+    setUpdated(upd);
+  }, [sectorId]);
 
   useEffect(() => {
     loadVals();
@@ -1199,15 +1094,16 @@ function DataEntry({ me, refData, reload }: { me: Me; refData: RefData; reload: 
     setVals((s) => ({ ...s, [indId]: v }));
   }
 
-  async function ensurePeriodId(): Promise<string> {
-    if (periodId) return periodId;
+  // فترة واحدة ثابتة تُخزَّن فيها القيم الحالية (تُنشأ مرة واحدة إن لم توجد)
+  async function ensureCurrentPeriodId(): Promise<string> {
+    if (refData.periods.length > 0) return refData.periods[0].id;
     const res = await fetch("/api/periods", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ label: week.label, weekStart: week.weekStart }),
+      body: JSON.stringify({ label: "التحديث" }),
     });
     const d = await res.json();
-    if (!res.ok || !d.period) throw new Error(d.error || "تعذّر إنشاء الأسبوع");
+    if (!res.ok || !d.period) throw new Error(d.error || "تعذّر التهيئة");
     return d.period.id as string;
   }
 
@@ -1216,9 +1112,8 @@ function DataEntry({ me, refData, reload }: { me: Me; refData: RefData; reload: 
     setMsg("");
     setLoading(true);
     try {
-      // تأكيد وجود الأسبوع (يُنشأ تلقائيًا من التاريخ إن لم يكن موجودًا)
-      const pid = await ensurePeriodId();
-      // المنجز لهذا الأسبوع فقط (المستهدف ثابت من شاشة المستهدفات)
+      const pid = await ensureCurrentPeriodId();
+      // المنجز = القيمة المُدخَلة مباشرةً (المستهدف ثابت من شاشة المستهدفات)
       const items = indicators.map((ind) => ({
         sectorId,
         indicatorId: ind.id,
@@ -1236,6 +1131,7 @@ function DataEntry({ me, refData, reload }: { me: Me; refData: RefData; reload: 
       else {
         setMsg("تم الحفظ بنجاح ✓");
         reload();
+        loadVals();
       }
     } catch (e) {
       setErr(e instanceof Error ? e.message : "تعذّر الحفظ");
@@ -1257,11 +1153,11 @@ function DataEntry({ me, refData, reload }: { me: Me; refData: RefData; reload: 
 
   return (
     <div className="card">
-      <h2 className="section-title">{t("إدخال المنجَز الأسبوعي", "Weekly Data Entry")}</h2>
+      <h2 className="section-title">{t("إدخال المنجَز", "Data Entry")}</h2>
       <p className="muted" style={{ marginTop: -8, marginBottom: 14 }}>
         {t(
-          "يُرجى تحديد القطاع وتاريخ الأسبوع، ثم إدخال عدد الجهات المنجَزة خلال الأسبوع لكل مؤشر. علمًا بأن المستهدف يُضبط من تبويب «المستهدفات» ويبقى ثابتًا.",
-          "Select the sector and week date, then enter the number of entities completed during the week for each KPI. The target is set in the Targets tab and remains fixed."
+          "يُرجى تحديد القطاع، ثم إدخال القيمة الإجمالية المنجَزة لكل مؤشر (القيمة التراكمية الحالية تُدخَل كرقم مباشر). علمًا بأن المستهدف يُضبط من تبويب «المستهدفات» ويبقى ثابتًا.",
+          "Select the sector, then enter the total achieved value for each KPI (enter the current cumulative value directly as a number). The target is set in the Targets tab and remains fixed."
         )}
       </p>
       <div className="row" style={{ marginBottom: 18 }}>
@@ -1274,16 +1170,6 @@ function DataEntry({ me, refData, reload }: { me: Me; refData: RefData; reload: 
               </option>
             ))}
           </select>
-        </div>
-        <div>
-          <label>{t("اختر تاريخًا (يحدّد الأسبوع)", "Pick a date (sets the week)")}</label>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value || todayISO())} />
-          <div className="muted" style={{ fontSize: 12, marginTop: 5 }}>
-            {t("الأسبوع:", "Week:")} <strong style={{ color: "var(--text)" }}>{week.label}</strong>
-            {!period && (
-              <span style={{ color: "#22c55e" }}> · {t("(سيُنشأ هذا الأسبوع تلقائيًا عند الحفظ)", "(this week is created on save)")}</span>
-            )}
-          </div>
         </div>
       </div>
 
@@ -1314,7 +1200,7 @@ function DataEntry({ me, refData, reload }: { me: Me; refData: RefData; reload: 
                   />
                 </div>
                 <div className="ec-box">
-                  <label>{t("المنجز", "Done")}</label>
+                  <label>{t("المنجز (القيمة التراكمية)", "Done (cumulative value)")}</label>
                   <input
                     type="number"
                     min="0"
@@ -1329,6 +1215,11 @@ function DataEntry({ me, refData, reload }: { me: Me; refData: RefData; reload: 
                 <span className="badge" style={{ background: r.bg, color: r.color }}>
                   {r.achievement != null ? `${Math.round(r.achievement)}% · ${r.label}` : t("لم يُعبّأ", "Not filled")}
                 </span>
+                {updated[ind.id] && (
+                  <span className="muted" style={{ fontSize: 11, marginInlineStart: 8 }}>
+                    {t("آخر تحديث:", "Last update:")} {fmtDate(updated[ind.id], lang)}
+                  </span>
+                )}
               </div>
             </div>
           );

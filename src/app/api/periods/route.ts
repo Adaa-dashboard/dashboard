@@ -13,11 +13,7 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: "غير مصرّح" }, { status: 401 });
   const { label, weekStart } = await req.json().catch(() => ({}));
   if (!label || !String(label).trim()) {
-    return NextResponse.json({ error: "أدخل اسم الأسبوع" }, { status: 400 });
-  }
-  // الإضافة اليدوية (بدون تاريخ) لمدير الإدارة فقط؛ الأسابيع بالتاريخ متاحة لكل من يُدخل البيانات
-  if (!weekStart && user.role !== "admin") {
-    return NextResponse.json({ error: "غير مصرّح" }, { status: 403 });
+    return NextResponse.json({ error: "أدخل اسمًا" }, { status: 400 });
   }
   const period = await createPeriod(String(label), weekStart ? String(weekStart) : undefined);
   return NextResponse.json({ ok: true, period });
