@@ -5,12 +5,13 @@
 -- ===========================================================
 
 -- ------------------------- المستخدمون والصلاحيات -------------------------
--- role: 'editor' = مُدخِل بيانات (إضافة/تعديل/حذف)
+-- role: 'owner'  = مالك الداشبورد — كل الصلاحيات + تعديل العناوين
+--       'editor' = مُدخِل بيانات — إضافة/تعديل/حذف البيانات
 --       'viewer' = عرض فقط (الإدارة)
 create table if not exists public.profiles (
   id         uuid primary key references auth.users (id) on delete cascade,
   full_name  text not null,
-  role       text not null default 'viewer' check (role in ('editor', 'viewer')),
+  role       text not null default 'viewer' check (role in ('owner', 'editor', 'viewer')),
   created_at timestamptz not null default now()
 );
 
@@ -32,7 +33,7 @@ create trigger on_auth_user_created
 -- دالة مساعدة: هل المستخدم الحالي مُدخِل بيانات؟
 create or replace function public.is_editor()
 returns boolean language sql stable security definer set search_path = public as $$
-  select exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'editor');
+  select exists (select 1 from public.profiles p where p.id = auth.uid() and p.role in ('owner', 'editor'));
 $$;
 
 -- ------------------------- الهيكل التنظيمي -------------------------

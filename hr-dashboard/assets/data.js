@@ -212,8 +212,15 @@
       return this.current();
     },
 
-    demoSignIn(name, role) {
-      const u = { name: name || "مستخدم تجريبي", role: role || "editor", demo: true };
+    // دخول بالوضع المحلي: الاسم + رمز الدخول (يحدّد الصلاحية)
+    demoSignIn(name, code) {
+      const codes = CFG.ACCESS_CODES || {};
+      let role = null;
+      for (const r of ["owner", "editor", "viewer"]) {
+        if (codes[r] && String(code).trim() === String(codes[r])) { role = r; break; }
+      }
+      if (!role) throw new Error("رمز الدخول غير صحيح");
+      const u = { name: (name || "").trim() || "مستخدم", role: role, demo: true };
       sessionStorage.setItem("adaa_hr_user", JSON.stringify(u));
       return u;
     },

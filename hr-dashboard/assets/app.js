@@ -23,7 +23,9 @@
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
   const db = () => DB.cache;
-  const canEdit = () => state.user && state.user.role === "editor";
+  const canEdit = () => state.user && (state.user.role === "editor" || state.user.role === "owner");
+  const canEditTitles = () => state.user && state.user.role === "owner";
+  const ROLE_LABEL = { owner: "مالك الداشبورد", editor: "مُدخِل بيانات", viewer: "عرض فقط" };
 
   const ICONS = {
     home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/>',
@@ -410,7 +412,7 @@
     const monthOpts = `<option value="0">كل الأشهر</option>` + MONTHS_FULL.map((m, i) =>
       `<option value="${i + 1}" ${Number(state.filters.month) === i + 1 ? "selected" : ""}>${m}</option>`).join("");
 
-    const editBtn = canEdit() ? `<button class="btn btn-g" onclick="APP.toggleEdit()">${icon("pen")} تعديل العناوين</button>` : "";
+    const editBtn = canEditTitles() ? `<button class="btn btn-g" onclick="APP.toggleEdit()">${icon("pen")} تعديل العناوين</button>` : "";
     const today = new Date();
     const dateTxt = `${today.getDate()} ${MONTHS_FULL[today.getMonth()]} ${today.getFullYear()}`;
 
@@ -421,7 +423,7 @@
           <div class="ttl"><img class="hlogo" src="assets/adaa-logo.png" alt="أداء"><div class="div"></div>
             <div><h1>${esc(title)}</h1><div class="crumb">${esc(CFG.ORG_NAME || "")}</div></div></div>
           <div class="who"><div class="meta"><div class="nm">${esc(state.user.name)}</div>
-            <div class="rl">${state.user.role === "editor" ? "مُدخِل بيانات" : "عرض فقط"}</div></div>
+            <div class="rl">${ROLE_LABEL[state.user.role] || ""}</div></div>
             <div class="av">${esc((state.user.name || "?").trim()[0])}</div>
             <button class="iact logout" title="تسجيل الخروج" onclick="APP.logout()">${icon("logout")}</button></div>
         </div>
@@ -596,6 +598,7 @@
 
   /* ---------------- تعديل العناوين ---------------- */
   function toggleEdit() {
+    if (!canEditTitles()) return;
     state.edit = !state.edit;
     document.body.classList.toggle("edit", state.edit);
     document.querySelectorAll(".ttl-edit, .chead h1, .dhead h3").forEach((el) => {
@@ -652,18 +655,29 @@
       <div class="login-wrap"><div class="login-card">
         <img src="assets/adaa-logo.png" alt="أداء" class="login-logo">
         <h2>متابعة إدارة استقطاب المواهب</h2>
-        <p class="login-sub">${demo ? "وضع تجريبي — أدخل اسمك للدخول" : "سجّل الدخول بحساب المركز"}</p>
+        <p class="login-sub">${demo ? "أدخل اسمك ورمز الدخول" : "سجّل الدخول بحساب المركز"}</p>
         ${msg ? `<div class="login-err">${esc(msg)}</div>` : ""}
         ${demo ? `
-          <div class="fld2 full"><label>الاسم</label><input class="inp" id="dname" placeholder="مثال: أحمد الغانم"></div>
-          <div class="fld2 full"><label>الصلاحية</label><select class="inp" id="drole">
-            <option value="editor">مُدخِل بيانات</option><option value="viewer">عرض فقط (الإدارة)</option></select></div>
+          <div class="fld2 full"><label>الاسم</label>
+            <input class="inp" id="dname" placeholder="مثال: أحمد الغانم" autocomplete="name"></div>
+          <div class="fld2 full"><label>رمز الدخول</label>
+            <input class="inp code-inp" id="dcode" type="tel" inputmode="numeric" maxlength="8"
+              placeholder="••••" autocomplete="one-time-code"></div>
           <button class="btn btn-p login-btn" onclick="APP.demoLogin()">دخول</button>`
         : `
-          <div class="fld2 full"><label>البريد الإلكتروني</label><input class="inp" id="email" type="email" placeholder="name@adaa.gov.sa"></div>
-          <div class="fld2 full"><label>كلمة المرور</label><input class="inp" id="pass" type="password" placeholder="••••••••"></div>
+          <div class="fld2 full"><label>البريد الإلكتروني</label>
+            <input class="inp" id="email" type="email" placeholder="name@adaa.gov.sa" autocomplete="username"></div>
+          <div class="fld2 full"><label>كلمة المرور</label>
+            <input class="inp" id="pass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
           <button class="btn btn-p login-btn" onclick="APP.login()">تسجيل الدخول</button>`}
       </div></div>`;
+    const first = document.getElementById(demo ? "dname" : "email");
+    if (first) {
+      first.focus();
+      document.querySelectorAll(".login-card .inp").forEach((el) => {
+        el.addEventListener("keydown", (e) => { if (e.key === "Enter") (demo ? APP.demoLogin() : APP.login()); });
+      });
+    }
   }
 
   /* ---------------- الواجهة العامة ---------------- */
@@ -674,9 +688,10 @@
     toggleEdit, saveTitles, openForm, saveForm, closeForm, removeRow,
     async demoLogin() {
       const name = document.getElementById("dname").value.trim();
-      const role = document.getElementById("drole").value;
-      if (!name) return alert("فضلًا أدخل الاسم");
-      state.user = AUTH.demoSignIn(name, role);
+      const code = document.getElementById("dcode").value.trim();
+      if (!name) return loginScreen("فضلًا أدخل الاسم");
+      if (!code) return loginScreen("فضلًا أدخل رمز الدخول");
+      try { state.user = AUTH.demoSignIn(name, code); } catch (e) { return loginScreen(e.message); }
       await boot();
     },
     async login() {
