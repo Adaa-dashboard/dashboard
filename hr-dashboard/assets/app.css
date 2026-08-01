@@ -1,0 +1,64 @@
+/* ===== إضافات التطبيق فوق التصميم الأساسي ===== */
+
+.boot{color:#fff;text-align:center;padding:80px;font-family:"Noto Sans Arabic",sans-serif}
+
+/* شاشة الدخول */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.login-card{background:#fff;border-radius:26px;padding:34px 30px;width:min(430px,100%);
+  box-shadow:0 30px 70px rgba(0,30,26,.35);text-align:center}
+.login-logo{height:64px;width:auto;margin-bottom:14px}
+.login-card h2{margin:0 0 4px;font-size:19px;color:var(--g-900)}
+.login-sub{font-size:12.5px;color:var(--muted);margin:0 0 20px}
+.login-card .fld2{text-align:right;margin-bottom:14px}
+.login-err{background:#fbe4e4;color:#b23434;border-radius:11px;padding:10px 14px;font-size:12.5px;margin-bottom:14px}
+.login-btn{width:100%;justify-content:center;margin-top:6px}
+
+/* حقول الإدخال الحقيقية */
+input.inp,select.inp{width:100%;background:#f7fbfa;border:1px solid var(--line);border-radius:11px;
+  padding:11px 13px;font-size:13px;color:var(--ink);font-family:"Noto Sans Arabic",sans-serif;min-height:44px;outline:none}
+input.inp:focus,select.inp:focus{border-color:var(--g-500);background:#fff}
+select.inp{appearance:none;background-image:none}
+
+/* فلاتر الشريط العلوي */
+.sel-wrap{position:relative;cursor:pointer}
+.sel-wrap select{appearance:none;border:none;background:transparent;font-family:"Noto Sans Arabic",sans-serif;
+  font-size:13px;font-weight:700;color:var(--g-800);cursor:pointer;outline:none;padding-inline-end:4px;max-width:190px}
+.sel-wrap svg{pointer-events:none}
+
+/* زر الخروج */
+.iact.logout{display:inline-flex;margin-inline-start:4px}
+
+/* رسالة فراغ */
+.empty{padding:26px;text-align:center;color:var(--muted);font-size:13px}
+
+/* تنبيه سريع */
+.toast{position:fixed;bottom:24px;right:50%;transform:translate(50%,20px);background:var(--g-900);color:#fff;
+  padding:12px 22px;border-radius:14px;font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:90;
+  font-family:"Noto Sans Arabic",sans-serif;box-shadow:0 16px 36px rgba(0,0,0,.3)}
+.toast.show{opacity:1;transform:translate(50%,0)}
+
+/* حاوية النموذج */
+#formSheet{background:#fff;border-radius:22px;width:min(720px,100%);max-height:88vh;overflow:auto}
+
+/* عناوين قابلة للتحرير */
+.ttl-edit{outline:none}
+
+@media (max-width:1100px){
+  .mrow{grid-template-columns:1fr!important}
+  .vgrid{grid-template-columns:1fr}
+  .dgrid{grid-template-columns:repeat(2,1fr)}
+  .d3{grid-template-columns:1fr}
+}
+@media (max-width:700px){
+  .shell{padding:12px}
+  .board{border-radius:20px}
+  .rail{flex:0 0 62px}
+  .content{padding:18px 16px 22px}
+  .dgrid{grid-template-columns:1fr}
+  .frm{grid-template-columns:1fr}
+  .cbars{overflow-x:auto}
+}
+
+/* روابط البطاقات بدون تسطير */
+a.tcard,a.tcard *{text-decoration:none}
+a.tcard .v{color:var(--g-900)}
