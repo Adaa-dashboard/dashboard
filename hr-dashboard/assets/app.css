@@ -1,0 +1,170 @@
+/* ===== إضافات التطبيق فوق التصميم الأساسي ===== */
+
+.boot{color:#fff;text-align:center;padding:80px;font-family:"Noto Sans Arabic",sans-serif}
+
+/* شاشة الدخول */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.login-card{background:#fff;border-radius:26px;padding:34px 30px;width:min(430px,100%);
+  box-shadow:0 30px 70px rgba(0,30,26,.35);text-align:center}
+.login-logo{height:64px;width:auto;margin-bottom:14px}
+.login-card h2{margin:0 0 4px;font-size:19px;color:var(--g-900)}
+.login-sub{font-size:12.5px;color:var(--muted);margin:0 0 20px}
+.login-card .fld2{text-align:right;margin-bottom:14px}
+.login-err{background:#fbe4e4;color:#b23434;border-radius:11px;padding:10px 14px;font-size:12.5px;margin-bottom:14px}
+.login-btn{width:100%;justify-content:center;margin-top:6px}
+.code-inp{letter-spacing:.5em;text-align:center;font-size:19px!important;font-weight:800;font-family:"Noto Kufi Arabic",sans-serif}
+
+/* حقول الإدخال الحقيقية */
+input.inp,select.inp{width:100%;background:#f7fbfa;border:1px solid var(--line);border-radius:11px;
+  padding:11px 13px;font-size:13px;color:var(--ink);font-family:"Noto Sans Arabic",sans-serif;min-height:44px;outline:none}
+input.inp:focus,select.inp:focus{border-color:var(--g-500);background:#fff}
+input.inp:focus-visible,select.inp:focus-visible,.btn:focus-visible,.ptab:focus-visible{outline:2px solid var(--g-600);outline-offset:2px}
+select.inp{appearance:none;background-image:none}
+
+/* فلاتر الشريط العلوي */
+.sel-wrap{position:relative;cursor:pointer}
+.sel-wrap select{appearance:none;border:none;background:transparent;font-family:"Noto Sans Arabic",sans-serif;
+  font-size:13px;font-weight:700;color:var(--g-800);cursor:pointer;outline:none;padding-inline-end:4px;max-width:190px}
+.sel-wrap svg{pointer-events:none}
+
+/* أزرار التعديل والحذف — ظاهرة دائمًا لمن يملك الصلاحية */
+.iact{display:inline-flex}
+.iact.logout{margin-inline-start:4px}
+
+/* رسالة فراغ */
+.empty{padding:26px;text-align:center;color:var(--muted);font-size:13px}
+
+/* تنبيه سريع */
+.toast{position:fixed;bottom:24px;right:50%;transform:translate(50%,20px);background:var(--g-900);color:#fff;
+  padding:12px 22px;border-radius:14px;font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:90;
+  font-family:"Noto Sans Arabic",sans-serif;box-shadow:0 16px 36px rgba(0,0,0,.3)}
+.toast.show{opacity:1;transform:translate(50%,0)}
+
+/* حاوية النموذج */
+#formSheet{background:#fff;border-radius:22px;width:min(720px,100%);max-height:88vh;overflow:auto}
+
+/* عناوين قابلة للتحرير */
+.ttl-edit{outline:none}
+
+/* منع تمدّد البطاقات مع محتواها (يسبب تجاوزًا أفقيًا) */
+.vgrid>*,.vhost>*,.panel,.panel .body,.donut-wrap{min-width:0;max-width:100%}
+
+/* روابط البطاقات بدون تسطير */
+a.tcard,a.tcard *{text-decoration:none}
+a.tcard .v{color:var(--g-900)}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ============ الأجهزة اللوحية ============ */
+@media (max-width:1100px){
+  .mrow{grid-template-columns:1fr!important}
+  .vgrid{grid-template-columns:1fr}
+  .dgrid{grid-template-columns:repeat(2,1fr)}
+  .d3{grid-template-columns:1fr}
+  .panel.side-panel{order:-1}
+  .hero-circle{width:170px;height:170px}
+  .hero-n{font-size:56px}
+}
+
+/* ============ الجوال ============ */
+@media (max-width:760px){
+  .shell{padding:0}
+  .board{border-radius:0;min-height:100vh;flex-direction:column;box-shadow:none}
+
+  /* شريط التنقّل يصبح سفليًا ثابتًا */
+  .rail{flex:0 0 auto;width:100%;flex-direction:row;justify-content:space-around;
+    padding:8px 6px calc(8px + env(safe-area-inset-bottom));gap:2px;
+    position:fixed;bottom:0;right:0;left:0;z-index:40;
+    border-radius:18px 18px 0 0;box-shadow:0 -8px 24px rgba(0,0,0,.22)}
+  .rail a{width:52px;height:46px;border-radius:12px}
+  .rail a svg{width:22px;height:22px}
+  .rail a .tip{display:none}
+
+  .content{padding:16px 14px 96px}
+
+  /* الترويسة */
+  .chead{flex-direction:column;align-items:stretch;gap:12px;margin-bottom:14px}
+  .ttl{gap:10px}
+  .ttl .hlogo{height:40px}
+  .ttl .div{height:34px}
+  .chead h1{font-size:18px}
+  .chead .crumb{font-size:11px}
+  .who{justify-content:flex-end}
+
+  /* الفلاتر */
+  .toolbar{gap:8px;margin-bottom:14px}
+  .tb{padding:9px 12px;font-size:12px;flex:1 1 46%;justify-content:space-between}
+  .toolbar .sp{display:none}
+  .toolbar .btn{flex:1 1 100%;justify-content:center}
+  .sel-wrap select{max-width:100%;flex:1}
+
+  /* التبويبات: تمرير أفقي */
+  .ptabs{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;scrollbar-width:none}
+  .ptabs::-webkit-scrollbar{display:none}
+  .ptab{flex:0 0 auto;padding:9px 16px;font-size:12.5px}
+
+  /* البطاقات العلوية */
+  .tcards{grid-template-columns:repeat(2,1fr);gap:10px}
+  .tcard{padding:12px}
+  .tcard .v{font-size:19px}
+  .tcard .l{font-size:10.5px}
+
+  /* اللوحات والرسوم */
+  .panel{padding:15px;border-radius:16px}
+  .p-h h3{font-size:14.5px}
+  .donut-wrap{flex-direction:column;gap:12px}
+  .donut-wrap svg{max-width:82%;height:auto}
+  .legend{flex-direction:row;flex-wrap:wrap;justify-content:center;gap:8px 16px;font-size:12px;max-width:100%}
+  .panel .body{overflow:hidden}
+  .cbars{overflow-x:auto;gap:8px;padding-bottom:6px;justify-content:flex-start}
+  .cb{min-width:62px}
+  .cb .cbl{font-size:10px}
+  .ring-wrap svg{max-width:100%;height:auto}
+  .hero-circle{width:150px;height:150px;border-width:8px}
+  .hero-n{font-size:46px}
+
+  /* بطاقات الأشخاص */
+  .plist{padding:12px}
+  .prow{flex-direction:column;align-items:stretch;gap:10px;padding:14px}
+  .pav{width:38px;height:38px;flex:0 0 38px}
+  .pid{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:10px}
+  .prow>.pav{display:none}
+  .pmeta{gap:8px 14px}
+  .mi{min-width:calc(50% - 8px)}
+  .pend{margin-inline-start:0;display:flex;justify-content:space-between;align-items:center;
+    border-top:1px dashed var(--line);padding-top:10px}
+
+  /* الجداول والعناوين */
+  .tbl-h{flex-direction:column;align-items:stretch;gap:10px;padding:14px}
+  .tbl-h .hact{justify-content:space-between}
+  .tbl-h .btn{flex:1;justify-content:center}
+
+  /* مراحل التوظيف */
+  .sumrow{gap:8px}
+  .sum{min-width:calc(50% - 8px);padding:10px}
+  .sum .n{font-size:18px}
+  .acc .head{flex-wrap:wrap;gap:8px;padding:12px}
+  .acc .pos{flex:1 1 100%;order:3}
+  .stepper{overflow-x:auto;padding-bottom:8px;gap:4px}
+  .step{min-width:74px}
+  .step .t{font-size:9.5px}
+
+  /* القطاعات */
+  .dgrid{grid-template-columns:1fr}
+  .dchips{gap:6px}
+  .dchip{font-size:11px;padding:5px 10px}
+  .dhead{flex-direction:column;align-items:stretch;gap:10px}
+  .crumbs{font-size:11.5px}
+  .crumbs a,.crumbs .cur{padding:5px 10px}
+
+  /* النماذج */
+  .mask{padding:0;align-items:flex-end}
+  #formSheet{border-radius:22px 22px 0 0;max-height:92vh;width:100%}
+  .frm{grid-template-columns:1fr}
+  .sheet-f .btn{flex:1;justify-content:center}
+
+  /* شريط تحرير العناوين */
+  .editbar{left:12px;right:12px;transform:none;bottom:82px;flex-wrap:wrap;justify-content:center;font-size:12px}
+  .toast{bottom:86px}
+  .foot{padding-bottom:80px}
+}
