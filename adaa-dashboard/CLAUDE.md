@@ -25,7 +25,10 @@
   - يستخدم supabase-js v2 من CDN مع anon key (موجود في الملف)
   - الجداول: `monthly_actuals`, `detail_cols`, `detail_rows` (RLS معطّل)
   - **مهم:** REST API المباشر يرجع 403 "Host not in allowlist" — يجب استخدام supabase-js client فقط (دالة `sbFetch` تترجم مسارات REST لاستدعاءات client)
-- **Netlify** للنشر: `https://creative-mousse-9d49bb.netlify.app` — الرفع بالسحب والإفلات (drag & drop)، الرابط ثابت
+- **النشر:**
+  - **GitHub Pages** (تلقائي): `https://sultanaalarjani.github.io/-/adaa-dashboard/` — يُحدَّث مع كل push إلى `main`
+  - **Netlify** (يدوي): `https://creative-mousse-9d49bb.netlify.app` — الرفع بالسحب والإفلات (drag & drop)، الرابط ثابت
+  - `index.html` في هذا المجلد مجرد تحويل إلى `project-dashboard.html` (لأن GitHub Pages يبحث عن `index.html`)
 - XLSX.js من CDN لاستيراد Excel
 
 ## المتغيرات الرئيسية في الكود
@@ -71,5 +74,6 @@
 
 ## سير العمل
 1. عدّل `project-dashboard.html`
-2. تحقق: استخرج الـ `<script>` واختبره بـ `node --check`
-3. المستخدم يرفع الملف يدوياً على Netlify (سحب وإفلات)
+2. تحقق: `./check.sh` (يستخرج الـ `<script>` ويختبره بـ `node --check`)
+3. `git commit` ثم `git push` — الدمج في `main` ينشر تلقائياً على GitHub Pages
+4. (اختياري) رفع يدوي على Netlify بالسحب والإفلات
