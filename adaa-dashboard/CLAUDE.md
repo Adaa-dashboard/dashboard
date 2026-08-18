@@ -23,13 +23,24 @@
 - **Supabase** للحفظ السحابي:
   - URL: `https://dgmakuenllpuzuupmeuf.supabase.co`
   - يستخدم supabase-js v2 من CDN مع anon key (موجود في الملف)
-  - الجداول: `monthly_actuals`, `detail_cols`, `detail_rows` (RLS معطّل)
+  - الجداول: `monthly_actuals`, `detail_cols`, `detail_rows`, `profiles`
+  - **RLS مفعّل** — المخطط في `supabase/schema.sql` (يُشغَّل مرة واحدة من SQL Editor)
+    - القراءة: لكل من سجّل دخوله (`authenticated`)
+    - الكتابة/الحذف: لمن دوره `owner` أو `editor` فقط (دالة `is_editor()`)
+    - الزائر غير المسجَّل (`anon`) لا يملك أي سياسة ⇒ لا يقرأ ولا يكتب
   - **مهم:** REST API المباشر يرجع 403 "Host not in allowlist" — يجب استخدام supabase-js client فقط (دالة `sbFetch` تترجم مسارات REST لاستدعاءات client)
 - **النشر:**
   - **GitHub Pages** (تلقائي): `https://sultanaalarjani.github.io/-/adaa-dashboard/` — يُحدَّث مع كل push إلى `main`
   - **Netlify** (يدوي): `https://creative-mousse-9d49bb.netlify.app` — الرفع بالسحب والإفلات (drag & drop)، الرابط ثابت
   - `index.html` في هذا المجلد مجرد تحويل إلى `project-dashboard.html` (لأن GitHub Pages يبحث عن `index.html`)
 - XLSX.js من CDN لاستيراد Excel
+
+## تسجيل الدخول
+- شاشة الدخول `#auth-gate` تغطي الصفحة **افتراضياً** (fail-closed) — تُخفى فقط بعد التحقق من الجلسة
+- `authInit()` تعمل عند `load`: إن وُجدت جلسة ⇒ `authOnSignedIn()` ⇒ `loadFromCloud()`، وإلا تبقى الشاشة
+- `currentRole` يُقرأ من جدول `profiles`؛ دور `viewer` يضيف `body.view-only` (يخفي أزرار الحفظ ويعطّل خلايا التعديل)
+- `sbErr()` تترجم أخطاء RLS إلى رسالة عربية واضحة بدل الفشل الصامت
+- المستخدمون يُنشأون من Supabase → Authentication → Users (لا يوجد تسجيل ذاتي)، ويصلون بدور `viewer` افتراضياً
 
 ## المتغيرات الرئيسية في الكود
 - `MP` — خطة الكميات الشهرية {شهر: [م1,م2,م3,م4]}
