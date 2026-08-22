@@ -425,6 +425,23 @@ body.is-admin #settings-btn{display:inline-flex;}
 button.paid-badge{cursor:pointer;}
 .pb-on {background:#e8f3ec;color:#155c35;}
 .pb-off{background:#fff4dc;color:#8a6100;}
+/* تنبيهات التأخير */
+.al-box{border-radius:var(--r);border:1px solid;padding:12px 16px;margin-bottom:14px;box-shadow:var(--shadow);}
+.al-red  {background:#fff6f6;border-color:#f0c9c9;}
+.al-ok   {background:#f4faf6;border-color:#cfe3d7;}
+.al-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px;}
+.al-title{font-size:.85rem;font-weight:800;color:#9b1c1c;}
+.al-ok .al-title{color:#155c35;}
+.al-count{background:#9b1c1c;color:#fff;border-radius:20px;padding:2px 11px;font-size:.68rem;font-weight:800;}
+.al-list{display:flex;flex-direction:column;gap:6px;}
+.al-item{display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--border);
+  border-radius:8px;padding:7px 11px;flex-wrap:wrap;}
+.al-days{border-radius:6px;padding:2px 9px;font-size:.63rem;font-weight:800;white-space:nowrap;}
+.al-d-late{background:#fde8e8;color:#9b1c1c;}
+.al-d-today{background:#fff4dc;color:#8a6100;}
+.al-name{font-size:.72rem;font-weight:700;color:var(--g1);flex:1;min-width:150px;}
+.al-meta{font-size:.62rem;color:var(--muted);white-space:nowrap;}
+.al-tag{background:#eef4f0;color:#2f5a43;border-radius:5px;padding:1px 7px;font-size:.6rem;font-weight:700;white-space:nowrap;}
 /* ملخص حالات الاستراتيجيات */
 .st-summary{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
 .st-kpi{flex:1;min-width:110px;border-radius:9px;padding:8px 12px;border:1px solid;}
@@ -674,6 +691,7 @@ body.view-only #view-only-bar{display:block;}
 
 
   <div class="proj-progress" id="proj-progress"></div>
+  <div id="alerts-box"></div>
 
   <!-- Month comparison + chart + detail (combined) -->
   <div class="month-section">
@@ -1514,7 +1532,7 @@ function renderProgress(){
     <div class="pp-title">📊 نسبة تقدم المشروع الإجمالية</div>
     <span class="pp-badge ${badgeClass}">${status} ${gap>=0?'+':''}${gap.toFixed(1)}%</span>
   </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
     <div style="text-align:center;background:var(--bg);border-radius:8px;padding:9px;border:1px solid var(--border);">
       <div style="font-size:1.35rem;font-weight:800;color:${badgeClass==='red'?'var(--red)':badgeClass==='yellow'?'#ca8a04':'var(--g4)'};">${oa.toFixed(1)}%</div>
       <div style="font-size:.62rem;color:var(--muted);margin-top:1px;">التقدم الفعلي للمشروع</div>
@@ -1524,11 +1542,68 @@ function renderProgress(){
       <div style="font-size:.62rem;color:var(--muted);margin-top:1px;">المستهدف حتى ${MN[curM-1]}</div>
     </div>
   </div>
-  <div class="pp-track">
-    <div class="pp-plan" style="background:rgba(26,79,138,.2);width:${Math.min(100,op).toFixed(1)}%;"></div>
-    <div class="pp-actual" style="background:${badgeClass==='red'?'var(--red)':badgeClass==='yellow'?'#ca8a04':'var(--g4)'};width:${Math.min(100,oa).toFixed(1)}%;"></div>
-  </div>
-  <div class="pp-labels"><span>0%</span><span style="color:var(--blue)">مخطط: ${op.toFixed(1)}%</span><span>100%</span></div>`;
+  `;
+}
+
+// صياغة عربية سليمة لعدد الأيام
+function arDays(n){
+  if(n === 1) return 'يوم واحد';
+  if(n === 2) return 'يومان';
+  if(n >= 3 && n <= 10) return n + ' أيام';
+  return n + ' يوماً';
+}
+
+// كل بند تجاوز موعد تسليمه المخطط ولم يُستلم بعد — أو مستحق اليوم
+function collectAlerts(){
+  const today = new Date(); today.setHours(0,0,0,0);
+  const DAY = 86400000, out = [];
+  TRACKED.forEach(idx=>{
+    if(!isTracked(idx)) return;
+    (detRows[idx] || []).forEach(r=>{
+      const plan = pDate(r[D_PLAN]), recv = pDate(r[D_RECV]);
+      if(recv || !plan) return;                    // استُلم، أو لا يوجد موعد مخطط
+      const days = Math.round((today - plan) / DAY);
+      if(days < 0) return;                         // لم يحن موعده بعد
+      out.push({idx, name: r[0] || '—', plan: r[D_PLAN], days});
+    });
+  });
+  return out.sort((a,b)=>b.days - a.days);
+}
+
+function renderAlerts(){
+  const el = document.getElementById('alerts-box');
+  if(!el) return;
+  const list = collectAlerts();
+
+  if(!list.length){
+    el.innerHTML = `<div class="al-box al-ok"><div class="al-head">
+      <div class="al-title">✅ لا توجد مخرجات متأخرة</div>
+      <span class="al-meta">كل البنود ضمن مواعيدها المخططة</span>
+    </div></div>`;
+    return;
+  }
+
+  const late = list.filter(a=>a.days > 0).length;
+  el.innerHTML = `<div class="al-box al-red">
+    <div class="al-head">
+      <div class="al-title">🔔 تنبيهات التأخير</div>
+      <span class="al-count">${list.length}</span>
+    </div>
+    <div class="al-list">${list.map(a=>{
+      const today0 = a.days === 0;
+      return `<div class="al-item">
+        <span class="al-days ${today0?'al-d-today':'al-d-late'}">
+          ${today0 ? 'مستحق اليوم' : 'متأخر ' + arDays(a.days)}
+        </span>
+        <span class="al-tag">${OI[a.idx]} ${esc(ON_S[a.idx])}</span>
+        <span class="al-name">${esc(a.name)}</span>
+        <span class="al-meta">موعد التسليم المخطط: ${esc(a.plan)}</span>
+      </div>`;
+    }).join('')}</div>
+    ${late ? `<div class="al-meta" style="margin-top:8px;">
+      يتجدد العدّاد يومياً حتى تُسجَّل «تاريخ الاستلام من الشركة» في صفحة التفاصيل.
+    </div>` : ''}
+  </div>`;
 }
 
 function renderKPI(){
@@ -1791,6 +1866,8 @@ function renderTable(){
 function renderDash(){
   buildTabs();
   renderProgress();
+  recalcStrategies();
+  renderAlerts();
   renderCmp();
   renderFin();
   renderTable();
