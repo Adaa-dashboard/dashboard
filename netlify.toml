@@ -1,0 +1,10 @@
+# نشر ثابت للوحة متابعة المشروع.
+# المستودع يحتوي أيضاً مشروع Next.js لا علاقة له باللوحة،
+# لذلك نمنع Netlify من محاولة بنائه وننشر الملفات كما هي.
+
+[build]
+  publish = "."
+  command = "echo 'static site — no build step'"
+
+[build.environment]
+  NETLIFY_NEXT_PLUGIN_SKIP = "true"
