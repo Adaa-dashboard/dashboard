@@ -204,6 +204,15 @@ textarea.cell-input{display:block;resize:none;overflow:hidden;line-height:1.55;m
   white-space:pre-wrap;overflow-wrap:anywhere;}
 .detail-tbl td{vertical-align:middle;max-width:240px;}
 .detail-tbl td:first-child,.detail-tbl thead th:first-child{min-width:180px;}
+textarea.th-input{display:block;resize:none;overflow:hidden;line-height:1.5;
+  white-space:pre-wrap;overflow-wrap:anywhere;min-height:26px;}
+.det-filter{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
+.det-filter input,.det-filter select{padding:6px 10px;border:1px solid var(--border);
+  border-radius:7px;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.7rem;
+  background:var(--card);color:var(--text);outline:none;}
+.det-filter input{flex:1;min-width:150px;}
+.det-filter input:focus,.det-filter select:focus{border-color:var(--g5);}
+#det-count{font-size:.65rem;color:var(--muted);font-weight:700;}
 .detail-tbl thead th{vertical-align:middle;}
 .cell-input:focus{background:rgba(41,163,97,.07);}
 .td-del{background:none;border:none;color:var(--muted);cursor:pointer;padding:6px 8px;font-size:.78rem;transition:all .15s;white-space:nowrap;}
@@ -841,8 +850,16 @@ body.view-only #view-only-bar{display:block;}
         <button class="d-btn d-btn-del-col" onclick="delLastCol()">− عمود</button>
         <button class="d-btn d-btn-add" onclick="addRow()">+ صف</button>
         <button class="d-btn" style="background:#f0e6ff;color:#7c3aed;border:1px solid #c4b5fd;" onclick="pasteTable()">📋 لصق جدول</button>
-        <label class="d-btn d-btn-xl" style="cursor:pointer">📥 استيراد Excel<input type="file" accept=".xlsx,.xls,.csv" onchange="importXL(event)"></label>
+        <button class="d-btn d-btn-xl" onclick="exportDetXL()">⬇️ تصدير Excel</button>
+        <label class="d-btn d-btn-xl" style="cursor:pointer">⬆️ رفع Excel (دمج)<input type="file" accept=".xlsx,.xls,.csv" onchange="importXL(event)"></label>
       </div>
+    </div>
+    <div class="det-filter">
+      <input id="det-q" placeholder="🔍 بحث…" oninput="renderDetTable()">
+      <select id="det-col" onchange="renderDetTable()"></select>
+      <select id="det-stat" onchange="renderDetTable()" style="display:none"></select>
+      <button class="d-btn" onclick="detClearFilter()">مسح</button>
+      <span id="det-count"></span>
     </div>
     <div id="det-lock"></div>
     <div id="strat-top"></div>
@@ -1220,16 +1237,46 @@ async function loadFromCloud(){
 }
 
 // حفظ تفاصيل مخرج
+// الترتيب هنا مقصود: نُدرج الجديد أولاً ثم نحذف القديم بمعرّفاته.
+// الطريقة السابقة (حذف ثم إدراج) كانت تفقد كل الصفوف إن فشل الإدراج.
 async function saveDetailToCloud(idx){
-  // حفظ الأعمدة
-  await sbFetch('detail_cols', 'POST', [{output_idx:idx, cols:detCols[idx]}]);
-  // حذف الصفوف القديمة وإعادة الإدراج
-  await sbFetch('detail_rows?output_idx=eq.'+idx, 'DELETE');
-  if(detRows[idx].length>0){
-    const newRows = detRows[idx].map((row,ri)=>({output_idx:idx,row_data:row,row_order:ri}));
-    await sbFetch('detail_rows', 'POST', newRows);
+  const sb = getSB();
+  if(!sb){ showSyncStatus('⚠️ تعذّر الاتصال — لم يُحفظ'); return; }
+  if(!can('edit:details:' + (idx + 1))){
+    showSyncStatus('🚫 صلاحيتك لا تسمح بتعديل هذا المخرج');
+    return;
   }
-  showSyncStatus('✅ تم حفظ تفاصيل المخرج '+(idx+1));
+  showSyncStatus('⏳ جارٍ الحفظ…');
+  try{
+    const {error: cErr} = await sb.from('detail_cols')
+      .upsert([{output_idx: idx, cols: detCols[idx]}], {onConflict: 'output_idx'});
+    if(cErr) throw cErr;
+
+    // معرّفات الصفوف الحالية قبل أي تغيير
+    const {data: oldRows, error: gErr} = await sb.from('detail_rows')
+      .select('id').eq('output_idx', idx);
+    if(gErr) throw gErr;
+
+    if(detRows[idx].length){
+      const payload = detRows[idx].map((row, ri)=>({output_idx: idx, row_data: row, row_order: ri}));
+      const {error: iErr} = await sb.from('detail_rows').insert(payload);
+      if(iErr) throw iErr;                    // فشل الإدراج ⇒ لم يُحذف شيء
+    }
+
+    if(oldRows && oldRows.length){
+      const {error: dErr} = await sb.from('detail_rows')
+        .delete().in('id', oldRows.map(r=>r.id));
+      if(dErr) throw dErr;
+    }
+    showSyncStatus('✅ تم حفظ تفاصيل ' + ON_S[idx]);
+  }catch(e){ sbErr(e); }
+}
+
+// مؤقّت منفصل لكل مخرج — كان مشتركاً فيضيع حفظ عند التنقل السريع
+function saveDetSoon(idx){
+  window._detSaveT = window._detSaveT || {};
+  clearTimeout(window._detSaveT[idx]);
+  window._detSaveT[idx] = setTimeout(()=>saveDetailToCloud(idx), 1200);
 }
 
 function showSyncStatus(msg){
@@ -2192,19 +2239,21 @@ function renderDetTable(){
   // Header
   document.getElementById('detail-thead').innerHTML=`<tr>
     ${cols.map((c,ci)=>`<th><div class="th-wrap">
-      <input class="th-input" value="${c}" placeholder="عنوان العمود" onchange="detCols[activeDetail][${ci}]=this.value;clearTimeout(window._detSave);window._detSave=setTimeout(()=>saveDetailToCloud(activeDetail),1500)">
+      <textarea class="th-input" rows="1" placeholder="عنوان العمود" oninput="autoGrow(this)" onchange="detCols[activeDetail][${ci}]=this.value;saveDetSoon(activeDetail)">${esc(c)}</textarea>
       <button class="th-del" onclick="delCol(${ci})" title="حذف العمود">×</button>
     </div></th>`).join('')}
     <th style="background:var(--g2);padding:6px 8px;font-size:.6rem;color:rgba(255,255,255,.6)">حذف</th>
   </tr>`;
   // Body
-  document.getElementById('detail-tbody').innerHTML=rows.map((row,ri)=>`
+  detFillFilters(cols, tracked);
+  const shown = detFilterRows(rows, cS);
+  document.getElementById('detail-tbody').innerHTML=shown.map(([row,ri])=>`
     <tr>${cols.map((_,ci)=>{
       if(activeDetail===1 && ci===cT){
         const v=row[ci]||'';
         const opts=[...new Set([...M2_TYPES, v].filter(Boolean))]
           .map(o=>`<option ${o===v?'selected':''}>${esc(o)}</option>`).join('');
-        return `<td><select class="cell-input" onchange="detRows[activeDetail][${ri}][${ci}]=this.value;clearTimeout(window._detSave);window._detSave=setTimeout(()=>saveDetailToCloud(activeDetail),1500)"><option value=""></option>${opts}</select></td>`;
+        return `<td><select class="cell-input" onchange="detRows[activeDetail][${ri}][${ci}]=this.value;saveDetSoon(activeDetail)"><option value=""></option>${opts}</select></td>`;
       }
       if(tracked && ci===cS){
         const v=row[ci]||'';
@@ -2215,7 +2264,7 @@ function renderDetTable(){
         const cls = isNaN(n) ? '' : n>0 ? 'st-d-late' : n<0 ? 'st-d-early' : 'st-d-zero';
         return `<td><span class="st-days ${cls}">${esc(v)||'—'}</span></td>`;
       }
-      return `<td><textarea class="cell-input" rows="1" placeholder="—" oninput="autoGrow(this)" onchange="detRows[activeDetail][${ri}][${ci}]=this.value;clearTimeout(window._detSave);window._detSave=setTimeout(()=>saveDetailToCloud(activeDetail),1500)">${esc(row[ci]||'')}</textarea></td>`;
+      return `<td><textarea class="cell-input" rows="1" placeholder="—" oninput="autoGrow(this)" onchange="detRows[activeDetail][${ri}][${ci}]=this.value;saveDetSoon(activeDetail)">${esc(row[ci]||'')}</textarea></td>`;
     }).join('')}
     <td><button class="td-del" onclick="delRow(${ri})">🗑️</button></td>
     </tr>`).join('');
@@ -2228,6 +2277,65 @@ function renderDetTable(){
 function autoGrow(el){
   el.style.height = 'auto';
   el.style.height = el.scrollHeight + 'px';
+}
+
+// ═══ فلترة جدول التفاصيل ═══
+function detFillFilters(cols, tracked){
+  const colSel = document.getElementById('det-col');
+  const sig = cols.join('~');
+  if(colSel.dataset.sig !== sig){
+    const prev = colSel.value;
+    colSel.innerHTML = '<option value="-1">كل الأعمدة</option>' +
+      cols.map((c,i)=>`<option value="${i}">${esc(c)}</option>`).join('');
+    colSel.value = [...colSel.options].some(o=>o.value===prev) ? prev : '-1';
+    colSel.dataset.sig = sig;
+  }
+  const stSel = document.getElementById('det-stat');
+  stSel.style.display = tracked ? '' : 'none';
+  if(tracked && stSel.dataset.filled !== '1'){
+    stSel.innerHTML = '<option value="">كل الحالات</option>' +
+      ST_ORDER.map(([n])=>`<option>${n}</option>`).join('');
+    stSel.dataset.filled = '1';
+  }
+  if(!tracked) stSel.value = '';
+}
+
+function detFilterRows(rows, cS){
+  const q  = (document.getElementById('det-q').value || '').trim().toLowerCase();
+  const ci = parseInt(document.getElementById('det-col').value, 10);
+  const st = document.getElementById('det-stat').value || '';
+  const out = [];
+  rows.forEach((row, ri)=>{
+    if(st && cS >= 0 && String(row[cS] || '') !== st) return;
+    if(q){
+      const hay = (ci >= 0 ? String(row[ci] || '') : row.join(' ')).toLowerCase();
+      if(!hay.includes(q)) return;
+    }
+    out.push([row, ri]);
+  });
+  document.getElementById('det-count').textContent =
+    out.length === rows.length ? rows.length + ' صف' : out.length + ' من ' + rows.length;
+  return out;
+}
+
+function detClearFilter(){
+  document.getElementById('det-q').value = '';
+  document.getElementById('det-col').value = '-1';
+  document.getElementById('det-stat').value = '';
+  renderDetTable();
+}
+
+// ═══ تصدير الجدول إلى Excel ═══
+function exportDetXL(){
+  if(typeof XLSX === 'undefined'){ alert('مكتبة Excel لم تُحمَّل — تحقق من الاتصال'); return; }
+  const cols = detCols[activeDetail], rows = detRows[activeDetail];
+  const aoa = [cols.slice(), ...rows.map(r => cols.map((_, ci)=> r[ci] == null ? '' : String(r[ci])))];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = cols.map(c => ({wch: Math.min(40, Math.max(12, String(c).length + 8))}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'م' + (activeDetail + 1));
+  XLSX.writeFile(wb, 'تفاصيل-' + ON_S[activeDetail] + '.xlsx');
+  showSyncStatus('⬇️ عدّل الملف ثم ارفعه من «رفع Excel (دمج)»');
 }
 
 function addRow(){
@@ -2259,28 +2367,81 @@ function delLastCol(){
   renderDetTable();
 }
 
+// دمج لا استبدال: العناوين تبقى كما هي، والموجود يُحدَّث، والجديد يُضاف، بلا تكرار
 function importXL(e){
-  const file=e.target.files[0]; if(!file)return;
-  const reader=new FileReader();
-  reader.onload=ev=>{
+  const file = e.target.files[0]; if(!file) return;
+  const idx = activeDetail;
+  if(!can('edit:details:' + (idx + 1))){
+    showSyncStatus('🚫 صلاحيتك لا تسمح بتعديل هذا المخرج'); e.target.value=''; return;
+  }
+  const isCsv = file.name.toLowerCase().endsWith('.csv');
+  const reader = new FileReader();
+
+  reader.onload = async ev => {
     try{
-      let rows=[];
-      if(file.name.endsWith('.csv')){
-        rows=ev.target.result.split('\n').map(r=>r.split(',').map(c=>c.trim().replace(/^"|"$/g,'')));
-      } else {
-        const wb=XLSX.read(ev.target.result,{type:'binary'});
-        const ws=wb.Sheets[wb.SheetNames[0]];
-        rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      let rows = [];
+      if(isCsv){
+        rows = ev.target.result.split(/\r?\n/).map(r => r.split(',').map(c => c.trim().replace(/^"|"$/g, '')));
+      }else{
+        if(typeof XLSX === 'undefined'){ alert('مكتبة Excel لم تُحمَّل — تحقق من الاتصال'); return; }
+        const wb = XLSX.read(ev.target.result, {type:'binary'});
+        rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:'', raw:false});
       }
-      if(rows.length===0)return;
-      // First row = headers
-      detCols[activeDetail]=rows[0].map(c=>String(c));
-      detRows[activeDetail]=rows.slice(1).filter(r=>r.some(c=>c!=='')).map(r=>rows[0].map((_,ci)=>String(r[ci]||'')));
+      rows = rows.filter(r => r && r.some(c => String(c).trim() !== ''));
+      if(rows.length < 2){ alert('الملف فارغ أو ليس فيه صفوف بيانات تحت العناوين'); return; }
+
+      const norm = t => String(t == null ? '' : t).replace(/\s+/g, ' ').trim().toLowerCase();
+      const cols = detCols[idx];
+      const head = rows[0].map(norm);
+
+      // كل عمود في الملف ← رقم العمود المقابل في الجدول (بالاسم)، و-1 = يُتجاهَل
+      const map = head.map(h => cols.findIndex(c => norm(c) === h));
+      if(map.every(m => m < 0)){
+        alert('عناوين الملف لا تطابق أعمدة الجدول.\nنزّل القالب من زر «تصدير Excel» وعدّل عليه ثم ارفعه.');
+        return;
+      }
+
+      const keyCol = map.indexOf(0);   // أي عمود في الملف يقابل العمود الأول (المفتاح)
+      if(keyCol < 0){
+        alert('الملف لا يحتوي عمود «' + cols[0] + '» — وهو المفتاح الذي نطابق به الصفوف.');
+        return;
+      }
+
+      const seen = new Map();
+      detRows[idx].forEach((r, i)=>{ const k = norm(r[0]); if(k && !seen.has(k)) seen.set(k, i); });
+
+      let upd = 0, add = 0, skipped = 0;
+      rows.slice(1).forEach(fr => {
+        const key = norm(fr[keyCol]);
+        if(!key){ skipped++; return; }
+        let ri = seen.get(key);
+        if(ri === undefined){
+          ri = detRows[idx].length;
+          detRows[idx].push(cols.map(()=>''));
+          seen.set(key, ri);
+          add++;
+        }else upd++;
+        map.forEach((tc, fc)=>{
+          if(tc < 0) return;
+          const v = String(fr[fc] == null ? '' : fr[fc]).trim();
+          if(v !== '') detRows[idx][ri][tc] = v;    // الخلية الفارغة في الملف لا تمسح الموجود
+        });
+      });
+
+      recalcTracked(idx);
       renderDetTable();
-    }catch(err){alert('خطأ في قراءة الملف: '+err.message);}
+      const ignored = map.filter(m => m < 0).length;
+      showSyncStatus('✅ حُدِّث ' + upd + ' · أُضيف ' + add +
+        (skipped ? ' · تُخطّي ' + skipped : '') +
+        (ignored ? ' · تُجوهل ' + ignored + ' عمود' : ''));
+      await saveDetailToCloud(idx);
+    }catch(err){
+      console.error(err);
+      alert('خطأ في قراءة الملف: ' + err.message);
+    }finally{ e.target.value = ''; }
   };
-  file.name.endsWith('.csv')?reader.readAsText(file):reader.readAsBinaryString(file);
-  e.target.value='';
+
+  isCsv ? reader.readAsText(file) : reader.readAsBinaryString(file);
 }
 
 // ═══════════════════════════════════════════════════════════
