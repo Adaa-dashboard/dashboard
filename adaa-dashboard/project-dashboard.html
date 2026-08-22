@@ -420,6 +420,38 @@ body.is-admin #settings-btn{display:inline-flex;}
   padding:4px 10px;border-radius:6px;font-size:.63rem;font-weight:700;cursor:pointer;
   font-family:'IBM Plex Sans Arabic',sans-serif;}
 .plan-btn:hover{background:rgba(255,255,255,.2);}
+.paid-badge{display:inline-block;border:none;border-radius:5px;padding:1px 7px;
+  font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.6rem;font-weight:800;}
+button.paid-badge{cursor:pointer;}
+.pb-on {background:#e8f3ec;color:#155c35;}
+.pb-off{background:#fff4dc;color:#8a6100;}
+/* ملخص حالات الاستراتيجيات */
+.st-summary{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+.st-kpi{flex:1;min-width:110px;border-radius:9px;padding:8px 12px;border:1px solid;}
+.st-kpi .n{font-size:1.25rem;font-weight:800;line-height:1.1;}
+.st-kpi .t{font-size:.63rem;font-weight:700;opacity:.85;}
+.st-done{background:#eaf6ee;border-color:#bfe0cc;color:#155c35;}
+.st-prog{background:#e9eefb;border-color:#c3d0f0;color:#1e40af;}
+.st-late{background:#fdeaea;border-color:#f2c2c2;color:#9b1c1c;}
+.st-hold{background:#f3f1ea;border-color:#ddd8c6;color:#7a6a2f;}
+/* خلية الحالة داخل الجدول */
+.st-chip{display:inline-block;border-radius:5px;padding:2px 8px;font-size:.62rem;font-weight:800;white-space:nowrap;}
+.st-days{font-size:.64rem;font-weight:700;}
+.st-d-late {color:#9b1c1c;}
+.st-d-early{color:#155c35;}
+.st-d-zero {color:var(--muted);}
+/* القوائم الجانبية والدليل */
+.st-boxes{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px;}
+.st-box{background:#f7faf8;border:1px solid var(--border);border-radius:10px;padding:11px 13px;}
+.st-box h4{margin:0 0 7px;font-size:.7rem;color:var(--g1);font-weight:800;}
+.st-box ul{margin:0;padding-inline-start:16px;font-size:.67rem;line-height:1.9;color:#3d5a49;}
+.st-box .empty{font-size:.65rem;color:var(--muted);}
+.st-box textarea{width:100%;min-height:64px;border:1px solid var(--border);border-radius:7px;
+  padding:6px 8px;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.66rem;line-height:1.7;resize:vertical;}
+.st-legend{margin-top:12px;background:#fbfcfb;border:1px dashed var(--border);border-radius:9px;
+  padding:9px 12px;font-size:.63rem;color:var(--muted);line-height:2;}
+.st-legend b{color:var(--g1);}
+@media(max-width:760px){.st-boxes{grid-template-columns:1fr;}}
 body.no-plan .plan-tools label.plan-btn{display:none;}
 body.no-plan #payment-view .edit-cell{pointer-events:none;color:#5c7a68!important;}
 /* تبويبات نافذة الإعدادات */
@@ -740,12 +772,14 @@ body.view-only #view-only-bar{display:block;}
       </div>
     </div>
     <div id="det-lock"></div>
+    <div id="strat-top"></div>
     <div class="detail-tbl-wrap">
       <table class="detail-tbl" id="detail-tbl">
         <thead id="detail-thead"></thead>
         <tbody id="detail-tbody"></tbody>
       </table>
     </div>
+    <div id="strat-bottom"></div>
     <div class="xl-drop" id="xl-drop" onclick="document.querySelector('#details-view input[type=file]').click()"
       ondragover="event.preventDefault();this.classList.add('drag')"
       ondragleave="this.classList.remove('drag')"
@@ -943,7 +977,7 @@ async function sbFetch(path, method='GET', body=null){
       return true;
     }
     else if(method==='POST'){
-      const {error} = await sb.from(table).upsert(body, {onConflict: (table==='monthly_actuals'||table==='plan_months')?'month_num':table==='detail_cols'?'output_idx':'id'});
+      const {error} = await sb.from(table).upsert(body, {onConflict: (table==='monthly_actuals'||table==='plan_months')?'month_num':table==='detail_cols'?'output_idx':table==='app_settings'?'key':'id'});
       if(error){ sbErr(error); return null; }
       return true;
     }
@@ -1082,6 +1116,12 @@ async function loadFromCloud(){
         actualPay[m-1] = r.actual_pay==null ? null : Number(r.actual_pay);
       });
     }
+    // قوائم الاستراتيجيات
+    const st = await sbFetch('app_settings?select=*');
+    if(st && st.length){
+      const row = st.find(r=>r.key==='strategy_lists');
+      if(row && row.value) stratLists = Object.assign(stratLists, row.value);
+    }
     // تحميل التفاصيل - الأعمدة
     const cols = await sbFetch('detail_cols?select=*');
     if(cols && cols.length>0){
@@ -1096,6 +1136,7 @@ async function loadFromCloud(){
       // للمخرجات التي لا صفوف فيها - ابق الافتراضي
       DEFAULT_ROWS.forEach((d,i)=>{ if(detRows[i].length===0) detRows[i]=d.map(r=>[...r]); });
     }
+    recalcStrategies();
     renderDash();
     showSyncStatus('✅ تم التزامن – '+new Date().toLocaleTimeString('ar'));
   } catch(e){
@@ -1646,6 +1687,22 @@ function renderDetail(){
 // ═══════════════════════════════════════════════════════════
 // FINANCIAL STRIP
 // ═══════════════════════════════════════════════════════════
+// شارة حالة صرف الشهر — قابلة للنقر لمن يملك edit:plan
+function paidBadge(m){
+  const on = !!paidMonths[m-1];
+  const txt = on ? '✅ تم الصرف' : '⬜ لم يتم الصرف';
+  const cls = 'paid-badge ' + (on ? 'pb-on' : 'pb-off');
+  return can('edit:plan')
+    ? `<button class="${cls}" onclick="togglePaidM(${m})" title="اضغط لتغيير الحالة">${txt}</button>`
+    : `<span class="${cls}">${txt}</span>`;
+}
+
+function togglePaidM(m){
+  paidMonths[m-1] = !paidMonths[m-1];
+  savePlanMonth(m);
+  renderFin(); renderPay();
+}
+
 function renderFin(){
   // Monthly planned payment (current month only)
   const planMonth = mPay(curM, true) * 1.15;
@@ -1667,7 +1724,7 @@ function renderFin(){
     <div class="fin-card" style="border-top:3px solid var(--g4)">
       <div class="fn-lbl">الصرف الفعلي للشهر ${curM}</div>
       <div class="fn-val" style="color:var(--g3)">${f(actMonth,2)} <small style="font-size:.55rem;color:var(--muted)">ر.س</small></div>
-      <div class="fn-sub">شامل الضريبة 15%</div>
+      <div class="fn-sub">شامل الضريبة 15% · ${paidBadge(curM)}</div>
     </div>
     <div class="fin-card" style="border-top:3px solid var(--g2)">
       <div class="fn-lbl">الصرف التراكمي حتى الشهر ${curM}</div>
@@ -1774,6 +1831,7 @@ function renderMonthlyTable(){
 // DETAILS VIEW (fully editable + Excel import)
 // ═══════════════════════════════════════════════════════════
 function renderDetails(){
+  if(activeDetail === 0) recalcStrategies();
   // Tabs
   document.getElementById('detail-tabs').innerHTML=ON_S.map((n,i)=>`
     <button class="d-tab ${i===activeDetail?'on':''}" onclick="switchDet(${i})">${OI[i]} ${n}</button>`).join('');
@@ -1829,6 +1887,100 @@ function detDrop(e,idx){
 
 function switchDet(i){activeDetail=i;renderDetails();}
 
+// ═══════════════════════════════════════════════════════════
+// م1 — الاستراتيجيات: حساب تلقائي للحالة والأيام + ملخص وقوائم
+// ═══════════════════════════════════════════════════════════
+const D_STAT = 2, D_PLAN = 5, D_RECV = 6, D_DAYS = 7;
+const ST_ORDER = [
+  ['مكتمل',      'st-done'],
+  ['قيد التنفيذ','st-prog'],
+  ['متأخر',      'st-late'],
+  ['معلق',       'st-hold']
+];
+const ST_CLS = Object.fromEntries(ST_ORDER);
+
+let stratLists = {
+  pending:  ['استراتيجية وزارة السياحة', 'استراتيجية وزارة العدل'],
+  upcoming: ['استراتيجية وزارة الحج والعمرة', 'استراتيجية وطنية مقاولين']
+};
+
+// يقبل 2026-04-13 أو 13/04/2026؛ وأي نص آخر (لايوجد، لم يتم التحديد) = لا تاريخ
+function pDate(v){
+  const t = String(v == null ? '' : v).trim();
+  let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if(m) return new Date(+m[1], +m[2]-1, +m[3]);
+  m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(m) return new Date(+m[3], +m[2]-1, +m[1]);
+  return null;
+}
+
+// الحالة والأيام يُحسبان من التواريخ — لا يُكتبان يدوياً
+function recalcStrategies(){
+  const rows = detRows[0];
+  if(!rows) return;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const DAY = 86400000;
+  rows.forEach(r=>{
+    while(r.length < 10) r.push('');
+    const plan = pDate(r[D_PLAN]), recv = pDate(r[D_RECV]);
+    if(recv)            r[D_STAT] = 'مكتمل';
+    else if(!plan)      r[D_STAT] = 'معلق';
+    else if(plan < today) r[D_STAT] = 'متأخر';
+    else                r[D_STAT] = 'قيد التنفيذ';
+
+    if(plan && recv)       r[D_DAYS] = String(Math.round((recv - plan) / DAY));
+    else if(plan && !recv) r[D_DAYS] = String(Math.round((today - plan) / DAY));
+    else                   r[D_DAYS] = '';
+  });
+}
+
+function renderStrategyExtras(){
+  const top = document.getElementById('strat-top');
+  const bot = document.getElementById('strat-bottom');
+  if(activeDetail !== 0){ top.innerHTML = ''; bot.innerHTML = ''; return; }
+
+  const rows = detRows[0] || [];
+  top.innerHTML = '<div class="st-summary">' + ST_ORDER.map(([name, cls])=>{
+    const n = rows.filter(r => r[D_STAT] === name).length;
+    return `<div class="st-kpi ${cls}"><div class="n">${n}</div><div class="t">${name}</div></div>`;
+  }).join('') + '</div>';
+
+  const editable = can('edit:details:1');
+  const box = (title, key, hint) => {
+    const items = stratLists[key] || [];
+    const body = editable
+      ? `<textarea onchange="stratListSave('${key}', this.value)"
+           placeholder="${hint}\nسطر لكل استراتيجية">${esc(items.join('\n'))}</textarea>`
+      : (items.length
+          ? '<ul>' + items.map(x=>`<li>${esc(x)}</li>`).join('') + '</ul>'
+          : '<div class="empty">لا يوجد</div>');
+    return `<div class="st-box"><h4>${title}</h4>${body}</div>`;
+  };
+
+  bot.innerHTML = `
+    <div class="st-boxes">
+      ${box('📥 وصلت للمركز ولم تُرسل للشركة بعد', 'pending',  'مثال: استراتيجية وزارة السياحة')}
+      ${box('🔜 استراتيجيات قادمة (متوقعة)',        'upcoming', 'مثال: استراتيجية وزارة الحج والعمرة')}
+    </div>
+    <div class="st-legend">
+      <b>دليل الحالات:</b>
+      <b style="color:#155c35">مكتمل</b> تم استلام الاستراتيجية من الشركة ·
+      <b style="color:#1e40af">قيد التنفيذ</b> لم يحن موعد التسليم المخطط بعد ·
+      <b style="color:#9b1c1c">متأخر</b> تجاوز التاريخ المخطط ولم يتم الاستلام ·
+      <b style="color:#7a6a2f">معلق</b> بانتظار تحديد الموعد المخطط
+      <br>عمودا «الحالة» و«الأيام» يُحسبان تلقائياً من التواريخ — يكفي تحديث تاريخي التسليم المخطط والاستلام.
+      الأيام — للمستلَمة: موجب = تأخير عن المخطط، سالب = تسليم مبكر.
+      وللتي لم تُستلم: موجب = أيام تأخير حتى اليوم، سالب = أيام متبقية للموعد.
+    </div>`;
+}
+
+async function stratListSave(key, text){
+  stratLists[key] = text.split('\n').map(x=>x.trim()).filter(Boolean);
+  await sbFetch('app_settings', 'POST',
+    [{key:'strategy_lists', value: stratLists, updated_at: new Date().toISOString()}]);
+  showSyncStatus('✅ تم حفظ القائمة');
+}
+
 function renderDetTable(){
   const cols=detCols[activeDetail];
   const rows=detRows[activeDetail];
@@ -1842,10 +1994,22 @@ function renderDetTable(){
   </tr>`;
   // Body
   document.getElementById('detail-tbody').innerHTML=rows.map((row,ri)=>`
-    <tr>${cols.map((_,ci)=>`<td><input class="cell-input" value="${row[ci]||''}" onchange="detRows[activeDetail][${ri}][${ci}]=this.value;clearTimeout(window._detSave);window._detSave=setTimeout(()=>saveDetailToCloud(activeDetail),1500)" placeholder="—"></td>`).join('')}
+    <tr>${cols.map((_,ci)=>{
+      if(activeDetail===0 && ci===D_STAT){
+        const v=row[ci]||'';
+        return `<td><span class="st-chip ${ST_CLS[v]||''}">${esc(v)||'—'}</span></td>`;
+      }
+      if(activeDetail===0 && ci===D_DAYS){
+        const v=row[ci]||'', n=parseFloat(v);
+        const cls = isNaN(n) ? '' : n>0 ? 'st-d-late' : n<0 ? 'st-d-early' : 'st-d-zero';
+        return `<td><span class="st-days ${cls}">${esc(v)||'—'}</span></td>`;
+      }
+      return `<td><input class="cell-input" value="${row[ci]||''}" onchange="detRows[activeDetail][${ri}][${ci}]=this.value;clearTimeout(window._detSave);window._detSave=setTimeout(()=>saveDetailToCloud(activeDetail),1500)" placeholder="—"></td>`;
+    }).join('')}
     <td><button class="td-del" onclick="delRow(${ri})">🗑️</button></td>
     </tr>`).join('');
   gateDet();
+  renderStrategyExtras();
 }
 
 function addRow(){
@@ -2180,10 +2344,9 @@ function generateReport(){
     <div class="r-fin-grid" style="grid-template-columns:repeat(4,1fr)">
       <div class="r-fin-card" style="border-top:3px solid #1a4f8a"><div class="r-fin-lbl">الصرف المخطط للشهر ${MN[curM-1]}</div><div class="r-fin-val" style="color:#1a4f8a">${f(planMonth,2)} ر.س</div><div class="r-fin-sub">شامل الضريبة 15%</div></div>
       <div class="r-fin-card" style="border-top:3px solid #1e7a48"><div class="r-fin-lbl">الصرف الفعلي المدفوع – ${MN[curM-1]}
-        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:.62rem;margin-top:4px;">
-          <input type="checkbox" class="pay-check" ${paidMonths[curM-1]?'checked':''} onchange="togglePaid(this.checked)">
-          <span>${paidMonths[curM-1]?'✅ تم الصرف':'⬜ لم يُصرف بعد'}</span>
-        </label></div><div class="r-fin-val" style="color:#1e7a48">${f(actMonth,2)} ر.س</div><div class="r-fin-sub">شامل الضريبة 15%</div></div>
+        <div style="font-size:.62rem;margin-top:4px;font-weight:700;color:${paidMonths[curM-1]?'#1e7a48':'#9b7b00'}">
+          ${paidMonths[curM-1]?'✅ تم الصرف':'⬜ لم يتم الصرف'}
+        </div></div><div class="r-fin-val" style="color:#1e7a48">${f(actMonth,2)} ر.س</div><div class="r-fin-sub">شامل الضريبة 15%</div></div>
       <div class="r-fin-card" style="border-top:3px solid #0d3d22"><div class="r-fin-lbl">الصرف التراكمي حتى ${MN[curM-1]}</div><div class="r-fin-val" style="color:#0d3d22">${f(cumAct,2)} ر.س</div><div class="r-fin-sub">شامل الضريبة 15%</div></div>
       <div class="r-fin-card" style="border-top:3px solid #c9a020"><div class="r-fin-lbl">إجمالي قيمة العقد</div><div class="r-fin-val" style="color:#c9a020">${f(totalContract,2)} ر.س</div><div class="r-fin-sub">شامل الضريبة 15%</div></div>
     </div>`;

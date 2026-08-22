@@ -329,6 +329,29 @@ create policy "plan_delete" on public.plan_months for delete to authenticated
   using (public.has_scope('edit:plan'));
 
 -- ----------------------------------------------------------
+-- 6.6) إعدادات عامة (قوائم الاستراتيجيات القادمة وغيرها)
+--      صلاحية التعديل: edit:details:1
+-- ----------------------------------------------------------
+create table if not exists public.app_settings (
+  key        text primary key,
+  value      jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.app_settings enable row level security;
+
+drop policy if exists "set_read"   on public.app_settings;
+drop policy if exists "set_write"  on public.app_settings;
+drop policy if exists "set_update" on public.app_settings;
+
+create policy "set_read"   on public.app_settings for select to authenticated
+  using (public.has_scope('view'));
+create policy "set_write"  on public.app_settings for insert to authenticated
+  with check (public.has_scope('edit:details:1'));
+create policy "set_update" on public.app_settings for update to authenticated
+  using (public.has_scope('edit:details:1')) with check (public.has_scope('edit:details:1'));
+
+-- ----------------------------------------------------------
 -- 7) سجل التعديلات — من عدّل، ماذا، ومتى
 --    يُكتب من داخل قاعدة البيانات (triggers) فلا يمكن للواجهة تجاوزه
 -- ----------------------------------------------------------
