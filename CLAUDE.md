@@ -35,9 +35,11 @@
   - `app_users` بلا أي سياسة ⇒ لا يُقرأ من الواجهة؛ كل وصول عبر دوال `security definer`
   - **مهم:** REST API المباشر يرجع 403 "Host not in allowlist" — يجب استخدام supabase-js client فقط (دالة `sbFetch` تترجم مسارات REST لاستدعاءات client)
 - **النشر:**
-  - **GitHub Pages** (تلقائي): `https://sultanaalarjani.github.io/-/adaa-dashboard/` — يُحدَّث مع كل push إلى `main`
-  - **Netlify** (يدوي): `https://creative-mousse-9d49bb.netlify.app` — الرفع بالسحب والإفلات (drag & drop)، الرابط ثابت
-  - `index.html` في هذا المجلد مجرد تحويل إلى `project-dashboard.html` (لأن GitHub Pages يبحث عن `index.html`)
+  - **GitHub Pages** (تلقائي): `https://sultanaalarjani.github.io/adaa-project/` — يُحدَّث مع كل push إلى `main`
+  - ملفات اللوحة في **جذر المستودع** ليكون الرابط قصيراً (كانت في مجلد `adaa-dashboard/`)
+  - `index.html` في الجذر تحويل إلى `project-dashboard.html` (لأن GitHub Pages يبحث عن `index.html`)
+  - لوحة استقطاب المواهب تبقى على `/hr-dashboard/`
+  - ~~Netlify~~ لم تعد مستخدمة — نسختها لا تعرف تسجيل الدخول وسترفضها سياسات RLS
 - XLSX.js من CDN لاستيراد Excel
 
 ## الدخول والصلاحيات
@@ -164,6 +166,16 @@
 - تصدير/استيراد JSON (`exportData`/`importDataFile`)
 - تقرير PDF يُولَّد في تبويب جديد (`generateReport`) بغلاف هوية أداء
 
+## التجاوب (Responsive)
+- `.main` بلا `max-width` — يملأ عرض الشاشة (كان محدوداً بـ 1440px)
+- `@media(min-width:1600px)` يكبّر الخطوط والحشو على الشاشات العريضة
+- `@media(max-width:1100px)` عمودان · `@media(max-width:820px)` عمود واحد لكل الشبكات
+- على الجوال: الشريط العلوي يلتف، شريط التنقل يمرّر أفقياً، و`body{overflow-x:clip}`
+  يمنع التمرير الأفقي للصفحة (استُخدم `clip` لا `hidden` حتى لا يكسر `position:sticky`)
+- جداول التفاصيل: `min-width:960px` داخل حاوية تمرّر أفقياً
+  — `.detail-tbl-wrap` كان فيه `overflow:hidden` يلغي `overflow-x:auto` فمنع التمرير
+- خلايا التفاصيل `<textarea rows=1>` مع `autoGrow()` بدل `<input>` — تلتف على أكثر من سطر
+
 ## هوية أداء البصرية
 - الأخضر الداكن: `#0d3d22` / المتوسط: `#155c35`, `#1e7a48`, `#29a361`
 - الذهبي: `#c9a020`
@@ -179,4 +191,3 @@
 1. عدّل `project-dashboard.html`
 2. تحقق: `./check.sh` (يستخرج الـ `<script>` ويختبره بـ `node --check`)
 3. `git commit` ثم `git push` — الدمج في `main` ينشر تلقائياً على GitHub Pages
-4. (اختياري) رفع يدوي على Netlify بالسحب والإفلات

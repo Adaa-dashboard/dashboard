@@ -59,9 +59,10 @@
 - **الجداول:** monthly_actuals, detail_cols, detail_rows, plan_months, app_users, code_sessions, audit_log
 - **الإعداد:** شغّل `supabase/setup.sql` مرة واحدة، وفعّل Anonymous Sign-Ins
 
-## Netlify (استضافة الموقع)
-- **الرابط الحالي:** https://creative-mousse-9d49bb.netlify.app
-- **الحساب:** sultanaalarjani (GitHub)
+## الاستضافة
+- **GitHub Pages:** https://sultanaalarjani.github.io/adaa-project/
+- ملفات اللوحة في جذر المستودع، وتُنشر تلقائياً مع كل دمج في `main`
+- Netlify لم تعد مستخدمة
 
 ## هيكل الداشبورد
 ### الصفحات

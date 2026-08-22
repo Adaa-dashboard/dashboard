@@ -3,63 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>لوحات أداء</title>
+<title>لوحة متابعة المشروع | أداء</title>
+<meta http-equiv="refresh" content="0; url=./project-dashboard.html">
 <style>
-  :root{
-    --dark:#0d3d22; --mid:#155c35; --acc:#1e7a48; --gold:#c9a020;
-    --ink:#eaf5ee; --muted:#b9d6c5;
-  }
-  *{box-sizing:border-box}
-  body{
-    margin:0; min-height:100vh; padding:40px 24px;
-    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:36px;
-    background:linear-gradient(135deg,var(--mid),var(--dark));
-    color:var(--ink);
-    font-family:"IBM Plex Sans Arabic","Noto Sans Arabic",system-ui,sans-serif;
-  }
-  header{text-align:center}
-  h1{margin:0 0 8px; font-size:clamp(24px,4vw,34px); letter-spacing:.5px}
-  header p{margin:0; color:var(--muted); font-size:15px}
-  .grid{
-    display:grid; gap:20px; width:100%; max-width:840px;
-    grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
-  }
-  a.card{
-    display:block; text-decoration:none; color:inherit;
-    background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14);
-    border-radius:16px; padding:24px 22px;
-    transition:transform .15s ease, background .15s ease, border-color .15s ease;
-  }
-  a.card:hover,a.card:focus-visible{
-    transform:translateY(-3px); background:rgba(255,255,255,.12); border-color:var(--gold);
-  }
-  a.card:focus-visible{outline:2px solid var(--gold); outline-offset:3px}
-  .card h2{margin:0 0 10px; font-size:19px; color:#fff}
-  .card p{margin:0 0 16px; font-size:14px; line-height:1.7; color:var(--muted)}
-  .go{font-size:13px; font-weight:700; color:var(--gold)}
-  footer{color:var(--muted); font-size:13px; text-align:center}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,#155c35,#0d3d22);color:#eaf5ee;
+    font-family:"IBM Plex Sans Arabic",system-ui,sans-serif;text-align:center;padding:24px}
+  a{color:#c9a020;font-weight:700}
 </style>
 </head>
 <body>
-  <header>
-    <h1>لوحات أداء</h1>
-    <p>اختر اللوحة التي تريد فتحها</p>
-  </header>
-
-  <nav class="grid">
-    <a class="card" href="./adaa-dashboard/">
-      <h2>لوحة متابعة المشروع</h2>
-      <p>دعم وتفعيل قياس وإدارة أداء الاستراتيجيات الوطنية والأداء المؤسسي — المخطط مقابل المنجز، الصرف المالي، وتفاصيل المخرجات.</p>
-      <span class="go">فتح اللوحة ←</span>
-    </a>
-
-    <a class="card" href="./hr-dashboard/">
-      <h2>متابعة استقطاب المواهب</h2>
-      <p>مؤشرات إدارة استقطاب المواهب ومتابعة المستهدفات مقابل المنجز.</p>
-      <span class="go">فتح اللوحة ←</span>
-    </a>
-  </nav>
-
-  <footer>مركز أداء</footer>
+  <div>
+    <p>جارٍ فتح لوحة متابعة المشروع…</p>
+    <p><a href="./project-dashboard.html">اضغط هنا إذا لم تُفتح تلقائيًا</a></p>
+  </div>
 </body>
 </html>
