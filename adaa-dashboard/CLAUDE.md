@@ -23,15 +23,15 @@
 - **Supabase** للحفظ السحابي:
   - URL: `https://dgmakuenllpuzuupmeuf.supabase.co`
   - يستخدم supabase-js v2 من CDN مع anon key (موجود في الملف)
-  - الجداول: `monthly_actuals`, `detail_cols`, `detail_rows`, `access_codes`, `code_sessions`
-  - **RLS مفعّل** — المخطط في `supabase/access-codes.sql` (يُشغَّل من SQL Editor)
-    - الدخول **برمز** لا بحساب شخصي — يتطلب تفعيل Anonymous Sign-Ins في Supabase
+  - الجداول: `monthly_actuals`, `detail_cols`, `detail_rows`, `app_users`, `code_sessions`
+  - **RLS مفعّل** — كل الإعداد في ملف واحد: `supabase/setup.sql` (يُشغَّل من SQL Editor، idempotent)
+    - الدخول باسم مستخدم + رمز — يتطلب تفعيل Anonymous Sign-Ins في Supabase
     - القراءة: يحتاج صلاحية `view`
     - المنجز الشهري: يحتاج `edit:monthly`
     - تفاصيل مخرج: يحتاج `edit:details:N` — السياسة تقارن `output_idx + 1` بالصلاحية
-    - `admin` يفتح كل شيء
-    - الزائر بلا رمز لا يملك أي صلاحية ⇒ لا يقرأ ولا يكتب
-  - `supabase/schema.sql` = النظام القديم (حساب لكل شخص) — متروك للمرجع، وملف الرموز يحذف بقاياه
+    - `admin` يفتح كل شيء + نافذة الإعدادات
+    - الزائر بلا دخول لا يملك أي صلاحية ⇒ لا يقرأ ولا يكتب
+  - `app_users` بلا أي سياسة ⇒ لا يُقرأ من الواجهة؛ كل وصول عبر دوال `security definer`
   - **مهم:** REST API المباشر يرجع 403 "Host not in allowlist" — يجب استخدام supabase-js client فقط (دالة `sbFetch` تترجم مسارات REST لاستدعاءات client)
 - **النشر:**
   - **GitHub Pages** (تلقائي): `https://sultanaalarjani.github.io/-/adaa-dashboard/` — يُحدَّث مع كل push إلى `main`
@@ -39,23 +39,32 @@
   - `index.html` في هذا المجلد مجرد تحويل إلى `project-dashboard.html` (لأن GitHub Pages يبحث عن `index.html`)
 - XLSX.js من CDN لاستيراد Excel
 
-## الدخول بالرمز
-- شاشة الدخول `#auth-gate` تغطي الصفحة **افتراضياً** (fail-closed) — حقل واحد: الرمز
-- `authSignIn()`: `signInAnonymously()` ثم `rpc('redeem_code', {p_code})` — الرمز يُتحقَّق منه في الخادم (bcrypt) ولا يُخزَّن في الواجهة
-- `authInit()` عند `load`: جلسة موجودة ⇒ يقرأ `code_sessions` ⇒ `startApp(scopes)` ⇒ `loadFromCloud()`
+## الدخول والصلاحيات
+- شاشة الدخول `#auth-gate` تغطي الصفحة **افتراضياً** (fail-closed) — حقلان: اسم المستخدم + الرمز
+- `authSignIn()`: `signInAnonymously()` ثم `rpc('login', {p_username, p_code})`
+  - الرمز مُجزّأ bcrypt في `app_users.code_hash`، والتحقق داخل الخادم — لا يُخزَّن في الواجهة
+  - اسم المستخدم يُوحَّد بـ `norm_user()` (حروف صغيرة، بلا مسافات طرفية)
+- `authInit()` عند `load`: جلسة موجودة ⇒ يقرأ `code_sessions` ⇒ `startApp(name, scopes)` ⇒ `loadFromCloud()`
 - `myScopes` + `can(scope)` تحكمان الواجهة:
   - بلا أي صلاحية تعديل ⇒ `body.view-only`
-  - بلا `edit:monthly` ⇒ `body.no-monthly` (يعطّل مدخلات المنجز و`edit-cell`)
-  - `gateDet()` تُستدعى في نهاية `renderDetTable()` وتقفل الجدول حسب `edit:details:N` (`body.det-locked`)
-- `sbErr()` تترجم رفض RLS إلى رسالة عربية بدل الفشل الصامت
-- **الواجهة تجميلية فقط** — الحماية الحقيقية في سياسات RLS؛ لا تعتمد على إخفاء الأزرار
+  - بلا `edit:monthly` ⇒ `body.no-monthly`
+  - `gateDet()` في نهاية `renderDetTable()` تقفل الجدول حسب `edit:details:N` (`body.det-locked`)
+  - `admin` ⇒ `body.is-admin` يُظهر زر ⚙️
+- **الواجهة تجميلية فقط** — الحماية الحقيقية في RLS؛ لا تعتمد على إخفاء الأزرار
 
-### إدارة الرموز (من SQL Editor)
-```sql
-select public.set_code('اسم الرمز', 'الرمز', array['view','edit:details:1']);
-select label, scopes, active from public.access_codes order by id;
-select public.revoke_code('اسم الرمز');
-```
+## نافذة الإعدادات ⚙️ (للمدير فقط)
+- `openSettings()` / `suLoad()` / `suEdit()` / `suSave()` / `suDelete()` / `suReset()`
+- تستدعي دوال `security definer` تتحقق داخلياً من `has_scope('admin')`:
+  - `admin_list_users()` — لا تُرجع أي رمز
+  - `admin_save_user(p_username,p_name,p_code,p_scopes,p_active)` — `p_code` فارغ = أبقِ الرمز
+  - `admin_delete_user(p_username)`
+- حمايات: لا يمكن حذف آخر مدير نشط ولا إزالة صلاحية `admin` منه
+- تعديل الصلاحيات يحدّث `code_sessions` فوراً؛ إيقاف الحساب يُنهي جلساته
+- أول مدير يُنشأ من SQL Editor: `select public.bootstrap_admin('user','code','الاسم');`
+  (الدالة محجوبة عن `authenticated` و`anon`)
+
+### الصلاحيات
+`view` · `edit:monthly` · `edit:details:1..4` · `admin` — معرّفة في `SCOPE_LIST` بالكود وفي `setup.sql`
 
 ### غير محمي بـ RLS (محلي فقط، لا يُحفظ سحابياً)
 `MP` (المخطط)، `INV` (الفواتير)، `paidMonths`، `actualPay` — تُحفظ فقط عبر تصدير JSON.

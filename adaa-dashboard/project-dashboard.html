@@ -396,6 +396,25 @@ body.det-locked .dt-btns{display:none!important;}
 #det-lock{display:none;background:#fff6e0;border:1px solid #e8d08a;color:#7a5c00;
   padding:7px 10px;border-radius:8px;font-size:.68rem;font-weight:700;margin-bottom:10px;}
 body.det-locked #det-lock{display:block;}
+/* زر الإعدادات — للمدير فقط */
+#settings-btn{display:none;}
+body.is-admin #settings-btn{display:inline-flex;}
+/* لوحة إدارة المستخدمين */
+.su-tbl{width:100%;border-collapse:collapse;font-size:.68rem;margin-bottom:6px;}
+.su-tbl th{background:#0d3d22;color:#fff;padding:6px 8px;text-align:right;font-weight:700;}
+.su-tbl td{padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.su-tbl tr:hover td{background:#f0fdf4;}
+.su-scope{display:inline-block;background:#e8f3ec;color:#155c35;border-radius:5px;
+  padding:1px 6px;margin:1px 2px 1px 0;font-size:.6rem;font-weight:700;}
+.su-off{opacity:.5;}
+.su-act{background:none;border:none;cursor:pointer;font-size:.8rem;padding:0 3px;}
+.su-field{display:block;margin-bottom:8px;}
+.su-field label{display:block;font-size:.66rem;color:var(--muted);margin-bottom:3px;font-weight:700;}
+.su-field input[type=text],.su-field input[type=password]{width:100%;padding:7px 10px;
+  border:1px solid var(--border);border-radius:7px;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.72rem;}
+.su-checks{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;margin:4px 0 10px;}
+.su-checks label{display:flex;align-items:center;gap:5px;font-size:.66rem;cursor:pointer;font-weight:600;}
+#su-msg{font-size:.68rem;font-weight:700;min-height:16px;margin-bottom:6px;}
 #view-only-bar{display:none;background:#c9a020;color:#20200a;text-align:center;
   padding:5px;font-size:.68rem;font-weight:700;}
 body.view-only #view-only-bar{display:block;}
@@ -408,14 +427,58 @@ body.view-only #view-only-bar{display:block;}
   <form class="auth-card" onsubmit="event.preventDefault();authSignIn();">
     <div style="font-size:2rem">🔐</div>
     <h2>لوحة متابعة المشروع</h2>
-    <p class="auth-sub">أدخل رمز الدخول الخاص بك</p>
-    <input id="auth-code" type="password" autocomplete="one-time-code" placeholder="رمز الدخول" required>
+    <p class="auth-sub">أدخل اسم المستخدم والرمز</p>
+    <input id="auth-user" type="text" autocomplete="username" placeholder="اسم المستخدم / رقم الجوال" required>
+    <input id="auth-code" type="password" autocomplete="current-password" placeholder="الرمز" required>
     <button class="auth-go" id="auth-btn" type="submit">دخول</button>
     <div id="auth-msg"></div>
   </form>
 </div>
 
 <div id="view-only-bar">👁️ وضع العرض فقط — لا تملك صلاحية تعديل البيانات</div>
+
+<!-- SETTINGS MODAL -->
+<div id="settings-modal" style="display:none" class="overlay" onclick="if(event.target===this)closeSettings()">
+  <div class="modal-box" style="max-width:660px;width:94%;text-align:right;">
+    <h2>⚙️ المستخدمون والصلاحيات</h2>
+    <div id="su-msg"></div>
+    <div style="max-height:34vh;overflow:auto;margin-bottom:12px;">
+      <table class="su-tbl"><thead><tr>
+        <th>اسم المستخدم</th><th>الصلاحيات</th><th style="width:70px">الحالة</th><th style="width:58px"></th>
+      </tr></thead><tbody id="su-tbody"></tbody></table>
+    </div>
+
+    <div style="border-top:1px solid var(--border);padding-top:12px;">
+      <div style="font-size:.74rem;font-weight:800;color:var(--g1);margin-bottom:8px;" id="su-form-title">➕ إضافة مستخدم</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div class="su-field">
+          <label>اسم المستخدم (اسم أو جوال أو يوزر)</label>
+          <input type="text" id="su-username" placeholder="مثال: omar أو 0501234567">
+        </div>
+        <div class="su-field">
+          <label>الاسم الظاهر (اختياري)</label>
+          <input type="text" id="su-name" placeholder="عمر العتيق">
+        </div>
+      </div>
+      <div class="su-field">
+        <label>الرمز <span id="su-code-hint" style="font-weight:400"></span></label>
+        <input type="text" id="su-code" placeholder="رمز الدخول">
+      </div>
+      <div class="su-field"><label>الصلاحيات</label>
+        <div class="su-checks" id="su-checks"></div>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:.68rem;font-weight:700;margin-bottom:10px;">
+        <input type="checkbox" id="su-active" checked> الحساب مفعّل
+      </label>
+      <div style="display:flex;gap:8px;">
+        <button class="save-btn" style="flex:1;border-radius:7px;" onclick="suSave()">💾 حفظ</button>
+        <button class="d-btn" style="flex:0 0 auto;" onclick="suReset()">إلغاء</button>
+      </div>
+    </div>
+
+    <button class="modal-close" onclick="closeSettings()">إغلاق</button>
+  </div>
+</div>
 
 <!-- TEAM MODAL -->
 <div id="team-modal" style="display:none" class="overlay" onclick="if(event.target===this)closeTeam()">
@@ -453,6 +516,7 @@ body.view-only #view-only-bar{display:block;}
   <div style="display:flex;align-items:center;gap:6px;margin:0 6px;">
     <button class="duration-btn" onclick="editProjectDuration()" id="duration-lbl">15 شهر ✏️</button>
   </div>
+  <button class="act-btn" id="settings-btn" onclick="openSettings()" title="المستخدمون والصلاحيات" style="background:rgba(255,255,255,.1);color:rgba(255,255,255,.75);border:1px solid rgba(255,255,255,.15);">⚙️</button>
   <div id="user-chip">
     <div><div class="u-name" id="user-name">—</div><div class="u-role" id="user-role">—</div></div>
     <button class="u-out" onclick="authSignOut()" title="تسجيل الخروج">⏻</button>
@@ -893,16 +957,29 @@ function showSyncStatus(msg){
 }
 
 // تحميل البيانات عند فتح الصفحة
-// تحميل البيانات بعد التحقق من الرمز
+// تحميل البيانات بعد التحقق من الدخول
 window.addEventListener('load', ()=>{ setTimeout(authInit, 300); });
 
-// ═══ الدخول بالرمز والصلاحيات ═══
-let myScopes = [];
+// ═══ الدخول والصلاحيات ═══
+const SCOPE_LIST = [
+  ['view',           'مشاهدة اللوحة'],
+  ['edit:monthly',   'تعديل المنجز الشهري'],
+  ['edit:details:1', 'تفاصيل م1 — الاستراتيجيات'],
+  ['edit:details:2', 'تفاصيل م2 — المؤشرات'],
+  ['edit:details:3', 'تفاصيل م3 — التوثيق'],
+  ['edit:details:4', 'تفاصيل م4 — الطلبات'],
+  ['admin',          'مدير — كل شيء + الإعدادات']
+];
+const SCOPE_AR = Object.fromEntries(SCOPE_LIST);
+
+let myScopes = [], myName = '';
 const can = s => myScopes.includes('admin') || myScopes.includes(s);
 const canAnyEdit = () => can('edit:monthly') || [1,2,3,4].some(n=>can('edit:details:'+n));
+const esc = t => String(t==null?'':t).replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 function scopeSummary(){
-  if(myScopes.includes('admin')) return 'كل الصلاحيات';
+  if(myScopes.includes('admin')) return 'مدير — كل الصلاحيات';
   const parts = [];
   if(can('edit:monthly')) parts.push('الشهري');
   [1,2,3,4].forEach(n=>{ if(can('edit:details:'+n)) parts.push('م'+n); });
@@ -921,9 +998,9 @@ function sbErr(e){
   console.error(e);
   const m = (e && e.message) || '';
   if(/row-level security|permission denied|policy/i.test(m))
-    showSyncStatus('🚫 رمزك لا يسمح بهذا التعديل');
+    showSyncStatus('🚫 صلاحيتك لا تسمح بهذا التعديل');
   else if(/JWT|jwt|not authenticated|Invalid|token/i.test(m))
-    showSyncStatus('🔒 انتهت الجلسة — أدخل الرمز من جديد');
+    showSyncStatus('🔒 انتهت الجلسة — سجّل الدخول من جديد');
   else showSyncStatus('❌ خطأ: ' + m);
 }
 
@@ -932,16 +1009,18 @@ async function authInit(){
   if(!sb){ authShow(); authMsg('تعذّر الاتصال بالخادم', true); return; }
   const {data:{session}} = await sb.auth.getSession();
   if(!session){ authShow(); return; }
-  const {data} = await sb.from('code_sessions').select('scopes').eq('user_id', session.user.id).maybeSingle();
-  if(data && data.scopes && data.scopes.length) startApp(data.scopes);
+  const {data} = await sb.from('code_sessions').select('username,scopes')
+    .eq('user_id', session.user.id).maybeSingle();
+  if(data && data.scopes && data.scopes.length) startApp(data.username, data.scopes);
   else authShow();
 }
 
 async function authSignIn(){
   const sb = getSB();
   if(!sb){ authMsg('تعذّر الاتصال بالخادم', true); return; }
-  const code = document.getElementById('auth-code').value.trim();
-  if(!code){ authMsg('اكتب الرمز أولاً', true); return; }
+  const user = document.getElementById('auth-user').value.trim();
+  const code = document.getElementById('auth-code').value;
+  if(!user || !code){ authMsg('اكتب اسم المستخدم والرمز', true); return; }
   const btn = document.getElementById('auth-btn');
   btn.disabled = true; authMsg('⏳ جارٍ التحقق…');
   try{
@@ -950,21 +1029,23 @@ async function authSignIn(){
       const {error} = await sb.auth.signInAnonymously();
       if(error){ authMsg('❌ تعذّر بدء الجلسة: ' + error.message, true); return; }
     }
-    const {data:scopes, error} = await sb.rpc('redeem_code', {p_code: code});
+    const {data:res, error} = await sb.rpc('login', {p_username: user, p_code: code});
     if(error){ authMsg('❌ ' + error.message, true); return; }
-    if(!scopes || !scopes.length){ authMsg('❌ رمز غير صحيح أو موقوف', true); return; }
+    if(!res){ authMsg('❌ اسم المستخدم أو الرمز غير صحيح', true); return; }
     document.getElementById('auth-code').value = '';
-    startApp(scopes);
+    startApp(res.name || res.username, res.scopes);
   } finally { btn.disabled = false; }
 }
 
-function startApp(scopes){
+function startApp(name, scopes){
   myScopes = scopes || [];
-  document.getElementById('user-name').textContent = 'رمز دخول';
+  myName = name || '';
+  document.getElementById('user-name').textContent = myName;
   document.getElementById('user-role').textContent = scopeSummary();
   document.getElementById('user-chip').style.display = 'flex';
   document.body.classList.toggle('view-only', !canAnyEdit());
   document.body.classList.toggle('no-monthly', !can('edit:monthly'));
+  document.body.classList.toggle('is-admin', myScopes.includes('admin'));
   authMsg(''); authHide();
   loadFromCloud();
 }
@@ -975,7 +1056,7 @@ async function authSignOut(){
   location.reload();
 }
 
-// قفل جدول التفاصيل إن كان الرمز لا يسمح بتعديل هذا المخرج
+// قفل جدول التفاصيل إن كانت الصلاحية لا تشمل هذا المخرج
 function gateDet(){
   const ok = can('edit:details:' + (activeDetail + 1));
   document.body.classList.toggle('det-locked', !ok);
@@ -984,7 +1065,102 @@ function gateDet(){
   document.querySelectorAll('#detail-thead .th-del, #detail-tbody .td-del')
     .forEach(el => el.style.display = ok ? '' : 'none');
   const l = document.getElementById('det-lock');
-  if(l) l.textContent = '🔒 رمزك لا يسمح بتعديل تفاصيل ' + ON_S[activeDetail] + ' — عرض فقط';
+  if(l) l.textContent = 'صلاحيتك لا تشمل تعديل تفاصيل ' + ON_S[activeDetail] + ' — عرض فقط';
+}
+
+// ═══════════════════════════════════════════════════════════
+// SETTINGS — إدارة المستخدمين (للمدير فقط)
+// ═══════════════════════════════════════════════════════════
+let suEditing = null;
+
+function suMsg(t, err){
+  const e = document.getElementById('su-msg');
+  e.textContent = t || '';
+  e.style.color = err ? '#c0392b' : '#155c35';
+}
+
+function openSettings(){
+  document.getElementById('settings-modal').style.display = 'flex';
+  document.getElementById('su-checks').innerHTML = SCOPE_LIST.map(([k,label])=>
+    `<label><input type="checkbox" class="su-ck" value="${k}"> ${label}</label>`).join('');
+  suReset();
+  suLoad();
+}
+function closeSettings(){ document.getElementById('settings-modal').style.display = 'none'; }
+
+async function suLoad(){
+  const sb = getSB(); if(!sb) return;
+  const {data, error} = await sb.rpc('admin_list_users');
+  const tb = document.getElementById('su-tbody');
+  if(error){ suMsg('❌ ' + error.message, true); tb.innerHTML = ''; return; }
+  if(!data || !data.length){ tb.innerHTML = '<tr><td colspan="4">لا يوجد مستخدمون بعد</td></tr>'; return; }
+  tb.innerHTML = data.map(u=>`
+    <tr class="${u.active?'':'su-off'}">
+      <td><b>${esc(u.username)}</b>${u.display_name?'<br><span style="font-size:.6rem;color:var(--muted)">'+esc(u.display_name)+'</span>':''}</td>
+      <td>${(u.scopes||[]).map(sc=>`<span class="su-scope">${esc(SCOPE_AR[sc]||sc)}</span>`).join('')}</td>
+      <td>${u.active?'✅ مفعّل':'⛔ موقوف'}</td>
+      <td style="white-space:nowrap">
+        <button class="su-act" title="تعديل" onclick="suEdit('${esc(u.username)}')">✏️</button>
+        <button class="su-act" title="حذف"   onclick="suDelete('${esc(u.username)}')">🗑️</button>
+      </td>
+    </tr>`).join('');
+  window._suUsers = data;
+}
+
+function suReset(){
+  suEditing = null;
+  document.getElementById('su-form-title').textContent = '➕ إضافة مستخدم';
+  document.getElementById('su-username').value = '';
+  document.getElementById('su-username').disabled = false;
+  document.getElementById('su-name').value = '';
+  document.getElementById('su-code').value = '';
+  document.getElementById('su-code-hint').textContent = '(مطلوب)';
+  document.getElementById('su-active').checked = true;
+  document.querySelectorAll('.su-ck').forEach(c => c.checked = (c.value === 'view'));
+  suMsg('');
+}
+
+function suEdit(username){
+  const u = (window._suUsers || []).find(x => x.username === username);
+  if(!u) return;
+  suEditing = username;
+  document.getElementById('su-form-title').textContent = '✏️ تعديل: ' + username;
+  document.getElementById('su-username').value = u.username;
+  document.getElementById('su-username').disabled = true;
+  document.getElementById('su-name').value = u.display_name || '';
+  document.getElementById('su-code').value = '';
+  document.getElementById('su-code-hint').textContent = '(اتركه فارغاً لإبقاء الرمز الحالي)';
+  document.getElementById('su-active').checked = !!u.active;
+  document.querySelectorAll('.su-ck').forEach(c => c.checked = (u.scopes||[]).includes(c.value));
+  suMsg('');
+}
+
+async function suSave(){
+  const sb = getSB(); if(!sb) return;
+  const username = suEditing || document.getElementById('su-username').value.trim();
+  const name     = document.getElementById('su-name').value.trim();
+  const code     = document.getElementById('su-code').value;
+  const active   = document.getElementById('su-active').checked;
+  const scopes   = [...document.querySelectorAll('.su-ck:checked')].map(c => c.value);
+  if(!username){ suMsg('اسم المستخدم مطلوب', true); return; }
+  if(!suEditing && !code){ suMsg('الرمز مطلوب للمستخدم الجديد', true); return; }
+  if(!scopes.length){ suMsg('اختر صلاحية واحدة على الأقل', true); return; }
+  suMsg('⏳ جارٍ الحفظ…');
+  const {error} = await sb.rpc('admin_save_user', {
+    p_username: username, p_name: name, p_code: code, p_scopes: scopes, p_active: active
+  });
+  if(error){ suMsg('❌ ' + error.message, true); return; }
+  suMsg('✅ تم الحفظ');
+  suReset(); suLoad();
+}
+
+async function suDelete(username){
+  if(!confirm('حذف المستخدم "' + username + '" نهائياً؟')) return;
+  const sb = getSB(); if(!sb) return;
+  const {error} = await sb.rpc('admin_delete_user', {p_username: username});
+  if(error){ suMsg('❌ ' + error.message, true); return; }
+  suMsg('✅ تم الحذف');
+  suReset(); suLoad();
 }
 
 // ═══════════════════════════════════════════════════════════
