@@ -297,6 +297,38 @@ end;
 $$;
 
 -- ----------------------------------------------------------
+-- 6.5) خطة الكميات والفواتير — كانت محفوظة في المتصفح فقط
+--      صلاحية التعديل: edit:plan
+-- ----------------------------------------------------------
+create table if not exists public.plan_months (
+  month_num  int primary key,
+  m1 int not null default 0,
+  m2 int not null default 0,
+  m3 int not null default 0,
+  m4 int not null default 0,
+  inv_ex     numeric(14,2) not null default 0,   -- الفاتورة بدون ضريبة
+  paid       boolean not null default false,
+  actual_pay numeric(14,2),                      -- null = يُحسب تلقائياً
+  updated_at timestamptz not null default now()
+);
+
+alter table public.plan_months enable row level security;
+
+drop policy if exists "plan_read"   on public.plan_months;
+drop policy if exists "plan_insert" on public.plan_months;
+drop policy if exists "plan_update" on public.plan_months;
+drop policy if exists "plan_delete" on public.plan_months;
+
+create policy "plan_read"   on public.plan_months for select to authenticated
+  using (public.has_scope('view'));
+create policy "plan_insert" on public.plan_months for insert to authenticated
+  with check (public.has_scope('edit:plan'));
+create policy "plan_update" on public.plan_months for update to authenticated
+  using (public.has_scope('edit:plan')) with check (public.has_scope('edit:plan'));
+create policy "plan_delete" on public.plan_months for delete to authenticated
+  using (public.has_scope('edit:plan'));
+
+-- ----------------------------------------------------------
 -- 7) سجل التعديلات — من عدّل، ماذا، ومتى
 --    يُكتب من داخل قاعدة البيانات (triggers) فلا يمكن للواجهة تجاوزه
 -- ----------------------------------------------------------
@@ -390,6 +422,12 @@ begin
                on public.monthly_actuals for each row execute function public.audit_row()';
   end if;
 
+  if to_regclass('public.plan_months') is not null then
+    execute 'drop trigger if exists audit_plan on public.plan_months';
+    execute 'create trigger audit_plan after insert or update or delete
+               on public.plan_months for each row execute function public.audit_row()';
+  end if;
+
   foreach t in array array['detail_cols', 'detail_rows'] loop
     if to_regclass('public.' || t) is null then continue; end if;
 
@@ -455,6 +493,7 @@ revoke all on function public.audit_prune(int) from public, anon, authenticated;
 -- الصلاحيات المتاحة:
 --   view            مشاهدة اللوحة
 --   edit:monthly    تعديل المنجز الشهري
+--   edit:plan       تعديل خطة الكميات والفواتير
 --   edit:details:1  تفاصيل م1 — مراجعة الاستراتيجيات
 --   edit:details:2  تفاصيل م2 — قياس المؤشرات
 --   edit:details:3  تفاصيل م3 — التزام التوثيق

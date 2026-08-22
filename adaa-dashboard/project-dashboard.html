@@ -415,6 +415,13 @@ body.is-admin #settings-btn{display:inline-flex;}
 .su-checks{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;margin:4px 0 10px;}
 .su-checks label{display:flex;align-items:center;gap:5px;font-size:.66rem;cursor:pointer;font-weight:600;}
 #su-msg{font-size:.68rem;font-weight:700;min-height:16px;margin-bottom:6px;}
+.plan-tools{display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+.plan-btn{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.2);
+  padding:4px 10px;border-radius:6px;font-size:.63rem;font-weight:700;cursor:pointer;
+  font-family:'IBM Plex Sans Arabic',sans-serif;}
+.plan-btn:hover{background:rgba(255,255,255,.2);}
+body.no-plan .plan-tools label.plan-btn{display:none;}
+body.no-plan #payment-view .edit-cell{pointer-events:none;color:#5c7a68!important;}
 /* تبويبات نافذة الإعدادات */
 .su-tabs{display:flex;gap:6px;margin-bottom:12px;border-bottom:1px solid var(--border);}
 .su-tab{background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;
@@ -554,7 +561,7 @@ body.view-only #view-only-bar{display:block;}
     <button class="nav-btn"   onclick="openTeam()">👥 فريق المشروع</button>
   </div>
   <div style="display:flex;align-items:center;gap:6px;margin:0 6px;">
-    <button class="duration-btn" onclick="editProjectDuration()" id="duration-lbl">15 شهر ✏️</button>
+    <button class="duration-btn" onclick="editProjectDuration()" id="duration-lbl">18 شهر ✏️</button>
   </div>
   <button class="act-btn" id="settings-btn" onclick="openSettings()" title="المستخدمون والصلاحيات" style="background:rgba(255,255,255,.1);color:rgba(255,255,255,.75);border:1px solid rgba(255,255,255,.15);">⚙️</button>
   <div id="user-chip">
@@ -655,7 +662,7 @@ body.view-only #view-only-bar{display:block;}
 
   <!-- Main table -->
   <div class="tbl-sec">
-    <div class="tbl-bar"><h3>📋 جدول المتابعة الشهري – 15 شهراً</h3><span>القيم بالريال السعودي</span>
+    <div class="tbl-bar"><h3 id="main-tbl-title">📋 جدول المتابعة الشهري</h3><span>القيم بالريال السعودي</span>
   <div style="display:flex;gap:6px;align-items:center;">
     <span style="font-size:.58rem;color:rgba(255,255,255,.4)">شامل VAT 15%</span>
     <label style="background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.2);padding:4px 10px;border-radius:6px;font-size:.65rem;font-weight:600;cursor:pointer;">
@@ -753,7 +760,15 @@ body.view-only #view-only-bar{display:block;}
 <div id="payment-view" class="view">
   <div class="pay-kpis" id="pay-kpis"></div>
   <div class="tbl-sec">
-    <div class="tbl-bar"><h3>💰 جدول خطة الصرف – 15 فاتورة</h3><span>القيم بالريال السعودي</span></div>
+    <div class="tbl-bar"><h3 id="pay-tbl-title">💰 جدول خطة الصرف</h3>
+      <div class="plan-tools">
+        <button class="plan-btn" onclick="exportMPlan()">⬇️ تحميل قالب Excel</button>
+        <label class="plan-btn" style="cursor:pointer">⬆️ رفع الخطة المحدّثة
+          <input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="importMPlan(event)">
+        </label>
+        <span style="font-size:.58rem;color:rgba(255,255,255,.45)">أو عدّل الخلايا مباشرة</span>
+      </div>
+    </div>
     <div class="tbl-scroll"><table class="main-tbl">
       <thead><tr><th>#</th><th>موعد الاستحقاق</th><th>م1</th><th>م2</th><th>م3</th><th>م4</th><th>بدون ضريبة</th><th>ضريبة 15%</th><th>شامل الضريبة</th><th>صرف فعلي (شامل الضريبة)</th><th>الحالة</th></tr></thead>
       <tbody id="pay-tbody"></tbody><tfoot id="pay-tfoot"></tfoot>
@@ -796,7 +811,7 @@ body.view-only #view-only-bar{display:block;}
 // ═══════════════════════════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════
-let projectMonths=15;
+let projectMonths=18;
 
 function editProjectDuration(){
   const v=prompt('أدخل مدة المشروع بالأشهر (1-24):',projectMonths);
@@ -804,7 +819,8 @@ function editProjectDuration(){
   const n=parseInt(v);
   if(isNaN(n)||n<1||n>24){alert('قيمة غير صحيحة');return;}
   projectMonths=n;
-  while(acts.length<n)acts.push([0,0,0,0]);
+  padPlan();
+  document.getElementById('duration-lbl').textContent=n+' شهر ✏️';
   acts=acts.slice(0,n);
   renderDash();
   showSyncStatus('✅ تم تحديث مدة المشروع إلى '+n+' شهر');
@@ -814,11 +830,12 @@ const MP={
   1:[4,13,51,0],2:[3,2,1,1],3:[3,17,3,1],4:[6,17,121,2],
   5:[3,12,15,3],6:[3,12,15,4],7:[3,40,270,4],8:[5,12,15,1],
   9:[5,12,15,1],10:[4,50,260,1],11:[5,11,15,1],12:[5,10,15,2],
-  13:[5,50,265,0],14:[5,9,15,0],15:[5,9,15,0]
+  13:[5,50,265,0],14:[5,9,15,0],15:[5,9,15,0],
+  16:[0,0,0,0],17:[0,0,0,0],18:[0,0,0,0]
 };
-const INV=[396384, 422400, 459936, 967392, 801792, 974112, 1237152, 620160, 620160, 818016, 617760, 787680, 731040, 440640, 440640];
-const INV_M=["نهاية الشهر الأول","نهاية الشهر الثاني","نهاية الشهر الثالث","نهاية الشهر الرابع","نهاية الشهر الخامس","نهاية الشهر السادس","نهاية الشهر السابع","نهاية الشهر الثامن","نهاية الشهر التاسع","نهاية الشهر العاشر","نهاية الشهر الحادي عشر","نهاية الشهر الثاني عشر","نهاية الشهر الثالث عشر","نهاية الشهر الرابع عشر","نهاية الشهر الخامس عشر"];
-const TGT=[60,290,1230,22],WTS=[.3158,.1976,.1860,.3005],UP=[81490.90,2399.35,767.79,172311.84];
+const INV=[396384, 422400, 459936, 967392, 801792, 974112, 1237152, 620160, 620160, 818016, 617760, 787680, 731040, 440640, 440640, 0, 0, 0];
+const INV_M=["نهاية الشهر الأول","نهاية الشهر الثاني","نهاية الشهر الثالث","نهاية الشهر الرابع","نهاية الشهر الخامس","نهاية الشهر السادس","نهاية الشهر السابع","نهاية الشهر الثامن","نهاية الشهر التاسع","نهاية الشهر العاشر","نهاية الشهر الحادي عشر","نهاية الشهر الثاني عشر","نهاية الشهر الثالث عشر","نهاية الشهر الرابع عشر","نهاية الشهر الخامس عشر","نهاية الشهر السادس عشر","نهاية الشهر السابع عشر","نهاية الشهر الثامن عشر"];
+const TGT=[60,290,1230,22],WTS=[.3158,.1976,.1860,.3005],UP=[81504,2400,768,172320];
 const CLR=['#0d3d22','#155c35','#1e7a48','#29a361'];
 const MN=['أبريل 2026','مايو 2026','يونيو 2026','يوليو 2026','أغسطس 2026','سبتمبر 2026','أكتوبر 2026','نوفمبر 2026','ديسمبر 2026','يناير 2027','فبراير 2027','مارس 2027','أبريل 2027','مايو 2027','يونيو 2027','يوليو 2027','أغسطس 2027','سبتمبر 2027'];
 const ON=['المخرج الأول – مراجعة وتقييم الاستراتيجيات الواردة للمركز','المخرج الثاني – تقييم قابلية قياس بطاقات المؤشرات والمبادرات','المخرج الثالث – تقييم التزام الجهات بمعايير التوثيق','المخرج الرابع – تنفيذ الطلبات الواردة على المركز'];
@@ -839,13 +856,26 @@ let acts=[
   [4,13,51,0],[3,2,1,1],[3,17,3,1],[6,17,121,2],
   [0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],
   [0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],
+  [0,0,0,0],[0,0,0,0],[0,0,0,0],
   [0,0,0,0],[0,0,0,0],[0,0,0,0]
 ];
 let team={pm:'عمر العتيق',t1:'لمى المبدل',t2:'سلطانه العرجاني'};
 let detCols=DEFAULT_COLS.map(c=>[...c]);
 let detRows=DEFAULT_ROWS.map(r=>r.map(row=>[...row]));
 let activeDetail=0;
-let paidMonths=Array(15).fill(false);
+let paidMonths=Array(18).fill(false);
+let actualPay=Array(18).fill(null);
+
+// توسيع كل المصفوفات لتغطي projectMonths (تُستدعى أيضاً عند تغيير المدة)
+function padPlan(){
+  for(let m=1;m<=projectMonths;m++) if(!MP[m]) MP[m]=[0,0,0,0];
+  while(INV.length   < projectMonths) INV.push(0);
+  while(INV_M.length < projectMonths) INV_M.push('نهاية الشهر '+(INV_M.length+1));
+  while(acts.length  < projectMonths) acts.push([0,0,0,0]);
+  while(paidMonths.length < projectMonths) paidMonths.push(false);
+  while(actualPay.length  < projectMonths) actualPay.push(null);
+}
+padPlan();
 
 // ═══════════════════════════════════════════════════════════
 // HELPERS
@@ -913,7 +943,7 @@ async function sbFetch(path, method='GET', body=null){
       return true;
     }
     else if(method==='POST'){
-      const {error} = await sb.from(table).upsert(body, {onConflict: table==='monthly_actuals'?'month_num':table==='detail_cols'?'output_idx':'id'});
+      const {error} = await sb.from(table).upsert(body, {onConflict: (table==='monthly_actuals'||table==='plan_months')?'month_num':table==='detail_cols'?'output_idx':'id'});
       if(error){ sbErr(error); return null; }
       return true;
     }
@@ -932,9 +962,97 @@ async function sbFetch(path, method='GET', body=null){
 // حفظ بيانات شهر واحد
 function togglePaid(checked){
   paidMonths[curM-1]=checked;
-  saveMonthToCloud(curM);
+  savePlanMonth(curM);
   renderFin();
   showSyncStatus(checked?'✅ تم تسجيل الصرف للشهر '+MN[curM-1]:'⬜ تم إلغاء');
+}
+
+// ═══ خطة الكميات والفواتير — حفظ سحابي ═══
+async function savePlanMonth(m){
+  const q = MP[m] || [0,0,0,0];
+  await sbFetch('plan_months', 'POST', [{
+    month_num: m, m1:q[0], m2:q[1], m3:q[2], m4:q[3],
+    inv_ex: INV[m-1] || 0,
+    paid: !!paidMonths[m-1],
+    actual_pay: actualPay[m-1],
+    updated_at: new Date().toISOString()
+  }]);
+  showSyncStatus('✅ تم حفظ خطة ' + MN[m-1]);
+}
+
+// حفظ مؤجَّل عند التعديل المتتابع على الخلايا
+function savePlanSoon(m){
+  clearTimeout(window['_plan'+m]);
+  window['_plan'+m] = setTimeout(()=>savePlanMonth(m), 1200);
+}
+
+// حفظ كل الأشهر دفعة واحدة (بعد رفع ملف Excel)
+async function savePlanAll(){
+  const rows = [];
+  for(let m=1; m<=projectMonths; m++){
+    const q = MP[m] || [0,0,0,0];
+    rows.push({month_num:m, m1:q[0], m2:q[1], m3:q[2], m4:q[3],
+               inv_ex: INV[m-1]||0, paid: !!paidMonths[m-1],
+               actual_pay: actualPay[m-1], updated_at: new Date().toISOString()});
+  }
+  await sbFetch('plan_months', 'POST', rows);
+  showSyncStatus('✅ تم حفظ الخطة سحابياً');
+}
+
+// ⬇️ تحميل قالب Excel بالخطة الحالية
+function exportMPlan(){
+  if(typeof XLSX === 'undefined'){ alert('مكتبة Excel لم تُحمَّل — تحقق من الاتصال'); return; }
+  const head = ['الشهر','اسم الشهر','موعد الاستحقاق','كمية م1','كمية م2','كمية م3','كمية م4','الفاتورة بدون الضريبة'];
+  const body = [];
+  for(let m=1; m<=projectMonths; m++){
+    const q = MP[m] || [0,0,0,0];
+    body.push([m, MN[m-1]||'', INV_M[m-1]||'', q[0], q[1], q[2], q[3], INV[m-1]||0]);
+  }
+  const ws = XLSX.utils.aoa_to_sheet([head, ...body]);
+  ws['!cols'] = [{wch:6},{wch:14},{wch:26},{wch:9},{wch:9},{wch:9},{wch:9},{wch:20}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'خطة الكميات');
+  XLSX.writeFile(wb, 'خطة-الكميات-والفواتير.xlsx');
+  showSyncStatus('⬇️ عدّل الملف ثم ارفعه من زر «رفع الخطة المحدّثة»');
+}
+
+// ⬆️ رفع الملف المعدَّل وتحديث الخطة
+function importMPlan(e){
+  const file = e.target.files && e.target.files[0];
+  if(!file) return;
+  if(!can('edit:plan')){ showSyncStatus('🚫 صلاحيتك لا تسمح بتعديل الخطة'); e.target.value=''; return; }
+  if(typeof XLSX === 'undefined'){ alert('مكتبة Excel لم تُحمَّل — تحقق من الاتصال'); e.target.value=''; return; }
+
+  const rd = new FileReader();
+  rd.onload = async ev => {
+    try{
+      const wb = XLSX.read(ev.target.result, {type:'binary'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      const num = v => { const n = parseFloat(String(v).replace(/[^0-9.\-]/g,'')); return isNaN(n)?null:n; };
+
+      let n = 0;
+      rows.forEach(r=>{
+        const m = num(r[0]);
+        if(m === null || m < 1 || m > projectMonths) return;   // تخطَّ العناوين وأي سطر خارج المدة
+        const q = [num(r[3]), num(r[4]), num(r[5]), num(r[6])];
+        if(q.every(v => v === null) && num(r[7]) === null) return;
+        MP[m] = q.map(v => Math.max(0, Math.round(v || 0)));
+        const inv = num(r[7]);
+        if(inv !== null) INV[m-1] = inv;
+        n++;
+      });
+
+      if(!n){ alert('لم أجد صفوفاً صالحة. استخدم القالب من زر «تحميل قالب Excel».'); return; }
+      renderDash(); renderPay();
+      showSyncStatus('✅ تم تحديث ' + n + ' شهراً — جارٍ الحفظ…');
+      await savePlanAll();
+    }catch(err){
+      console.error(err);
+      alert('تعذّرت قراءة الملف: ' + err.message);
+    }finally{ e.target.value = ''; }
+  };
+  rd.readAsBinaryString(file);
 }
 
 async function saveMonthToCloud(m){
@@ -951,6 +1069,18 @@ async function loadFromCloud(){
     const rows = await sbFetch('monthly_actuals?select=*&order=month_num');
     if(rows && rows.length>0){
       rows.forEach(r=>{ acts[r.month_num-1]=[r.m1||0,r.m2||0,r.m3||0,r.m4||0]; });
+    }
+    // تحميل خطة الكميات والفواتير
+    const plan = await sbFetch('plan_months?select=*&order=month_num');
+    if(plan && plan.length>0){
+      plan.forEach(r=>{
+        const m = r.month_num;
+        if(m < 1 || m > projectMonths) return;
+        MP[m] = [r.m1||0, r.m2||0, r.m3||0, r.m4||0];
+        INV[m-1] = Number(r.inv_ex)||0;
+        paidMonths[m-1] = !!r.paid;
+        actualPay[m-1] = r.actual_pay==null ? null : Number(r.actual_pay);
+      });
     }
     // تحميل التفاصيل - الأعمدة
     const cols = await sbFetch('detail_cols?select=*');
@@ -1004,6 +1134,7 @@ window.addEventListener('load', ()=>{ setTimeout(authInit, 300); });
 const SCOPE_LIST = [
   ['view',           'مشاهدة اللوحة'],
   ['edit:monthly',   'تعديل المنجز الشهري'],
+  ['edit:plan',      'تعديل خطة الكميات والفواتير'],
   ['edit:details:1', 'تفاصيل م1 — الاستراتيجيات'],
   ['edit:details:2', 'تفاصيل م2 — المؤشرات'],
   ['edit:details:3', 'تفاصيل م3 — التوثيق'],
@@ -1022,6 +1153,7 @@ function scopeSummary(){
   if(myScopes.includes('admin')) return 'مدير — كل الصلاحيات';
   const parts = [];
   if(can('edit:monthly')) parts.push('الشهري');
+  if(can('edit:plan')) parts.push('الخطة');
   [1,2,3,4].forEach(n=>{ if(can('edit:details:'+n)) parts.push('م'+n); });
   return parts.length ? 'تعديل: ' + parts.join('، ') : 'عرض فقط';
 }
@@ -1085,6 +1217,7 @@ function startApp(name, scopes){
   document.getElementById('user-chip').style.display = 'flex';
   document.body.classList.toggle('view-only', !canAnyEdit());
   document.body.classList.toggle('no-monthly', !can('edit:monthly'));
+  document.body.classList.toggle('no-plan', !can('edit:plan'));
   document.body.classList.toggle('is-admin', myScopes.includes('admin'));
   authMsg(''); authHide();
   loadFromCloud();
@@ -1569,6 +1702,7 @@ function renderPB(){
 // ═══════════════════════════════════════════════════════════
 function renderTable(){
   let tPl=0,tAc=0,tPP=0,tAP=0;
+  document.getElementById('main-tbl-title').textContent='📋 جدول المتابعة الشهري – '+projectMonths+' شهراً';
   document.getElementById('main-tbody').innerHTML=Array.from({length:projectMonths},(_,idx)=>{
     const m=idx+1, pl=MP[m], ac=acts[idx];
     const pp=mPlanPct(m), ap=mActPct(m), gap=ap-pp, ppay=mPay(m,true), apay=mPay(m,false);
@@ -1576,10 +1710,10 @@ function renderTable(){
     const isPast=m<curM, isCur=m===curM;
     const chip=isPast&&ap>=pp?'<span class="chip chip-ok">✅ متقدم</span>':isPast&&ap<pp?'<span class="chip chip-bh">⚠️ متأخر</span>':isCur?'<span class="chip chip-cur">⏳ الحالي</span>':'<span class="chip chip-nd">🔜 قادم</span>';
     return`<tr class="${isCur?'cur-row':''}"><td>${MN[idx]}</td>
-      <td style="padding:0"><input class="edit-cell" style="color:#4aaed4;width:44px" value="${pl[0]}" onchange="MP[m][0]=parseInt(this.value)||0;renderTable();renderDash();" title="تعديل المخطط"></td><td style="padding:0"><input class="edit-cell" style="color:${CLR[0]};font-weight:700;width:44px" value="${ac[0]}" onchange="acts[idx][0]=parseInt(this.value)||0;saveMonthToCloud(m);renderTable();renderDash();" title="تعديل الفعلي"></td>
-      <td style="padding:0"><input class="edit-cell" style="color:#4aaed4;width:44px" value="${pl[1]}" onchange="MP[m][1]=parseInt(this.value)||0;renderTable();renderDash();" title="تعديل المخطط"></td><td style="padding:0"><input class="edit-cell" style="color:${CLR[1]};font-weight:700;width:44px" value="${ac[1]}" onchange="acts[idx][1]=parseInt(this.value)||0;saveMonthToCloud(m);renderTable();renderDash();" title="تعديل الفعلي"></td>
-      <td style="padding:0"><input class="edit-cell" style="color:#4aaed4;width:44px" value="${pl[2]}" onchange="MP[m][2]=parseInt(this.value)||0;renderTable();renderDash();" title="تعديل المخطط"></td><td style="padding:0"><input class="edit-cell" style="color:${CLR[2]};font-weight:700;width:44px" value="${ac[2]}" onchange="acts[idx][2]=parseInt(this.value)||0;saveMonthToCloud(m);renderTable();renderDash();" title="تعديل الفعلي"></td>
-      <td style="padding:0"><input class="edit-cell" style="color:#4aaed4;width:44px" value="${pl[3]}" onchange="MP[m][3]=parseInt(this.value)||0;renderTable();renderDash();" title="تعديل المخطط"></td><td style="padding:0"><input class="edit-cell" style="color:${CLR[3]};font-weight:700;width:44px" value="${ac[3]}" onchange="acts[idx][3]=parseInt(this.value)||0;saveMonthToCloud(m);renderTable();renderDash();" title="تعديل الفعلي"></td>
+      <td style="padding:0"><input class="edit-cell" style="color:#4aaed4;width:44px" value="${pl[0]}" onchange="MP[m][0]=parseInt(this.value)||0;savePlanSoon(m);renderTable();renderDash();" title="تعديل المخطط"></td><td style="padding:0"><input class="edit-cell" style="color:${CLR[0]};font-weight:700;width:44px" value="${ac[0]}" onchange="acts[idx][0]=parseInt(this.value)||0;saveMonthToCloud(m);renderTable();renderDash();" title="تعديل الفعلي"></td>
+      <td style="padding:0"><input class="edit-cell" style="color:#4aaed4;width:44px" value="${pl[1]}" onchange="MP[m][1]=parseInt(this.value)||0;savePlanSoon(m);renderTable();renderDash();" title="تعديل المخطط"></td><td style="padding:0"><input class="edit-cell" style="color:${CLR[1]};font-weight:700;width:44px" value="${ac[1]}" onchange="acts[idx][1]=parseInt(this.value)||0;saveMonthToCloud(m);renderTable();renderDash();" title="تعديل الفعلي"></td>
+      <td style="padding:0"><input class="edit-cell" style="color:#4aaed4;width:44px" value="${pl[2]}" onchange="MP[m][2]=parseInt(this.value)||0;savePlanSoon(m);renderTable();renderDash();" title="تعديل المخطط"></td><td style="padding:0"><input class="edit-cell" style="color:${CLR[2]};font-weight:700;width:44px" value="${ac[2]}" onchange="acts[idx][2]=parseInt(this.value)||0;saveMonthToCloud(m);renderTable();renderDash();" title="تعديل الفعلي"></td>
+      <td style="padding:0"><input class="edit-cell" style="color:#4aaed4;width:44px" value="${pl[3]}" onchange="MP[m][3]=parseInt(this.value)||0;savePlanSoon(m);renderTable();renderDash();" title="تعديل المخطط"></td><td style="padding:0"><input class="edit-cell" style="color:${CLR[3]};font-weight:700;width:44px" value="${ac[3]}" onchange="acts[idx][3]=parseInt(this.value)||0;saveMonthToCloud(m);renderTable();renderDash();" title="تعديل الفعلي"></td>
       <td style="color:var(--blue)">${fp(pp)}</td>
       <td style="color:var(--g4);font-weight:700">${fp(ap)}</td>
       <td style="color:${gap>=0?'var(--g5)':'var(--red)'};font-weight:700">${gap>=0?'+':''}${fp(gap)}</td>
@@ -1771,6 +1905,7 @@ function importXL(e){
 // PAYMENT VIEW
 // ═══════════════════════════════════════════════════════════
 function renderPay(){
+  document.getElementById('pay-tbl-title').textContent='💰 جدول خطة الصرف – '+projectMonths+' فاتورة';
   let totEx=INV.reduce((a,b)=>a+b,0), totAct=0;
   for(let m=1;m<=curM;m++) totAct+=mPay(m,false);
   document.getElementById('pay-kpis').innerHTML=`
@@ -1783,11 +1918,11 @@ function renderPay(){
     tV+=vat;tT+=total;tA+=apay;
     const chip=m<curM?'<span class="chip chip-ok">✅ مستحق</span>':m===curM?'<span class="chip chip-cur">⏳ الحالي</span>':'<span class="chip chip-nd">🔜 قادم</span>';
     return`<tr class="${m===curM?'cur-row':''}"><td>${m}</td><td style="text-align:right">${INV_M[idx]}</td>
-      <td style="padding:0"><input class="edit-cell" style="width:40px" value="${MP[m][0]}" onchange="MP[${m}][0]=parseInt(this.value)||0;renderPay()"></td><td style="padding:0"><input class="edit-cell" style="width:44px" value="${MP[m][1]}" onchange="MP[${m}][1]=parseInt(this.value)||0;renderPay()"></td><td style="padding:0"><input class="edit-cell" style="width:50px" value="${MP[m][2]}" onchange="MP[${m}][2]=parseInt(this.value)||0;renderPay()"></td><td style="padding:0"><input class="edit-cell" style="width:40px" value="${MP[m][3]}" onchange="MP[${m}][3]=parseInt(this.value)||0;renderPay()"></td>
-      <td>${f(ex,2)}</td><td>${f(vat,2)}</td><td style="font-weight:700;color:var(--g2)">${f(total,2)}</td>
+      <td style="padding:0"><input class="edit-cell" style="width:40px" value="${MP[m][0]}" onchange="MP[${m}][0]=parseInt(this.value)||0;savePlanSoon(${m});renderPay()"></td><td style="padding:0"><input class="edit-cell" style="width:44px" value="${MP[m][1]}" onchange="MP[${m}][1]=parseInt(this.value)||0;savePlanSoon(${m});renderPay()"></td><td style="padding:0"><input class="edit-cell" style="width:50px" value="${MP[m][2]}" onchange="MP[${m}][2]=parseInt(this.value)||0;savePlanSoon(${m});renderPay()"></td><td style="padding:0"><input class="edit-cell" style="width:40px" value="${MP[m][3]}" onchange="MP[${m}][3]=parseInt(this.value)||0;savePlanSoon(${m});renderPay()"></td>
+      <td style="padding:0"><input class="edit-cell" style="width:88px" value="${ex}" onchange="INV[${idx}]=parseFloat(this.value)||0;savePlanSoon(${m});renderPay()" title="الفاتورة بدون ضريبة"></td><td>${f(vat,2)}</td><td style="font-weight:700;color:var(--g2)">${f(total,2)}</td>
       <td style="font-weight:700;color:var(--g4)">${f(apay,2)}</td><td>${chip}</td></tr>`;
   }).join('');
-  document.getElementById('pay-tfoot').innerHTML=`<tr><td colspan="6">الإجمالي</td><td>${f(INV.reduce((a,b)=>a+b,0),2)}</td><td>${f(tV,2)}</td><td>${f(tT,2)}</td><td>${f(tA,2)}</td><td>15 فاتورة</td></tr>`;
+  document.getElementById('pay-tfoot').innerHTML=`<tr><td colspan="6">الإجمالي</td><td>${f(INV.reduce((a,b)=>a+b,0),2)}</td><td>${f(tV,2)}</td><td>${f(tT,2)}</td><td>${f(tA,2)}</td><td>${projectMonths} فاتورة</td></tr>`;
 }
 
 // ═══════════════════════════════════════════════════════════
