@@ -396,7 +396,7 @@ body.det-locked .dt-btns{display:none!important;}
 #det-lock{display:none;background:#fff6e0;border:1px solid #e8d08a;color:#7a5c00;
   padding:7px 10px;border-radius:8px;font-size:.68rem;font-weight:700;margin-bottom:10px;}
 body.det-locked #det-lock{display:block;}
-/* زر الإعدادات — للمدير فقط */
+/* زر الإعدادات — لصاحب الصلاحية الكاملة فقط */
 #settings-btn{display:none;}
 body.is-admin #settings-btn{display:inline-flex;}
 /* لوحة إدارة المستخدمين */
@@ -1202,7 +1202,7 @@ const SCOPE_LIST = [
   ['edit:details:2', 'تفاصيل م2 — المؤشرات'],
   ['edit:details:3', 'تفاصيل م3 — التوثيق'],
   ['edit:details:4', 'تفاصيل م4 — الطلبات'],
-  ['admin',          'مدير — كل شيء + الإعدادات']
+  ['admin',          'صلاحية كاملة — كل شيء + الإعدادات']
 ];
 const SCOPE_AR = Object.fromEntries(SCOPE_LIST);
 
@@ -1213,7 +1213,7 @@ const esc = t => String(t==null?'':t).replace(/[&<>"']/g, c =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 function scopeSummary(){
-  if(myScopes.includes('admin')) return 'مدير — كل الصلاحيات';
+  if(myScopes.includes('admin')) return 'صلاحية كاملة';
   const parts = [];
   if(can('edit:monthly')) parts.push('الشهري');
   if(can('edit:plan')) parts.push('الخطة');
@@ -1305,7 +1305,7 @@ function gateDet(){
 }
 
 // ═══════════════════════════════════════════════════════════
-// SETTINGS — إدارة المستخدمين (للمدير فقط)
+// SETTINGS — إدارة المستخدمين (لصاحب الصلاحية الكاملة فقط)
 // ═══════════════════════════════════════════════════════════
 let suEditing = null;
 

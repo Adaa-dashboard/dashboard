@@ -30,7 +30,7 @@
     - القراءة: يحتاج صلاحية `view`
     - المنجز الشهري: يحتاج `edit:monthly`
     - تفاصيل مخرج: يحتاج `edit:details:N` — السياسة تقارن `output_idx + 1` بالصلاحية
-    - `admin` يفتح كل شيء + نافذة الإعدادات
+    - `admin` = صلاحية كاملة: كل شيء + نافذة الإعدادات (ليست «مدير المشروع»)
     - الزائر بلا دخول لا يملك أي صلاحية ⇒ لا يقرأ ولا يكتب
   - `app_users` بلا أي سياسة ⇒ لا يُقرأ من الواجهة؛ كل وصول عبر دوال `security definer`
   - **مهم:** REST API المباشر يرجع 403 "Host not in allowlist" — يجب استخدام supabase-js client فقط (دالة `sbFetch` تترجم مسارات REST لاستدعاءات client)
@@ -53,15 +53,15 @@
   - `admin` ⇒ `body.is-admin` يُظهر زر ⚙️
 - **الواجهة تجميلية فقط** — الحماية الحقيقية في RLS؛ لا تعتمد على إخفاء الأزرار
 
-## نافذة الإعدادات ⚙️ (للمدير فقط)
+## نافذة الإعدادات ⚙️ (لصاحب صلاحية `admin` فقط)
 - `openSettings()` / `suLoad()` / `suEdit()` / `suSave()` / `suDelete()` / `suReset()`
 - تستدعي دوال `security definer` تتحقق داخلياً من `has_scope('admin')`:
   - `admin_list_users()` — لا تُرجع أي رمز
   - `admin_save_user(p_username,p_name,p_code,p_scopes,p_active)` — `p_code` فارغ = أبقِ الرمز
   - `admin_delete_user(p_username)`
-- حمايات: لا يمكن حذف آخر مدير نشط ولا إزالة صلاحية `admin` منه
+- حمايات: لا يمكن حذف آخر حساب نشط بصلاحية `admin` ولا سحبها منه
 - تعديل الصلاحيات يحدّث `code_sessions` فوراً؛ إيقاف الحساب يُنهي جلساته
-- أول مدير يُنشأ من SQL Editor: `select public.bootstrap_admin('user','code','الاسم');`
+- أول حساب `admin` يُنشأ من SQL Editor: `select public.bootstrap_admin('user','code','الاسم');`
   (الدالة محجوبة عن `authenticated` و`anon`)
 
 ### الصلاحيات
@@ -73,7 +73,7 @@
 - `detail_cols`/`detail_rows`: triggers **على مستوى الجملة** بجداول انتقالية (`audit_detail_old/new`)
   — لأن الحفظ يحذف كل الصفوف ويعيد إدراجها، والتسجيل صفّاً صفّاً يغرق السجل
 - يسجَّل أيضاً: `LOGIN` من دالة `login()`، و`USER_SAVE`/`USER_DELETE` من دوال الإدارة
-- القراءة: `audit_recent(p_limit)` — تتحقق من `has_scope('admin')`؛ وسياسة RLS تحصر القراءة بالمدير
+- القراءة: `audit_recent(p_limit)` — تتحقق من `has_scope('admin')`؛ وسياسة RLS تحصرها بصاحب الصلاحية الكاملة
 - التنظيف: `select public.audit_prune(180);` من SQL Editor (محجوبة عن العملاء)
 - الواجهة: تبويب داخل نافذة ⚙️ — `suTab()` / `auLoad()` / `auWhat()` / `auChange()`
 

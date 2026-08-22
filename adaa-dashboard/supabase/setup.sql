@@ -153,13 +153,13 @@ begin
   if not public.has_scope('admin') then raise exception 'forbidden'; end if;
   if v_user = '' then raise exception 'اسم المستخدم مطلوب'; end if;
 
-  -- لا تسمحي بإزالة آخر مدير نشط
+  -- لا تسمحي بإزالة آخر حساب نشط بصلاحية كاملة
   if exists (select 1 from public.app_users
              where username = v_user and 'admin' = any(scopes) and active)
      and not ('admin' = any(p_scopes) and p_active)
      and (select count(*) from public.app_users
           where 'admin' = any(scopes) and active) <= 1 then
-    raise exception 'لا يمكن إزالة آخر مدير — عيّني مديراً آخر أولاً';
+    raise exception 'لا يمكن سحب الصلاحية الكاملة من آخر حساب يملكها — امنحيها لحساب آخر أولاً';
   end if;
 
   if exists (select 1 from public.app_users where username = v_user) then
@@ -207,7 +207,7 @@ begin
              where username = v_user and 'admin' = any(scopes) and active)
      and (select count(*) from public.app_users
           where 'admin' = any(scopes) and active) <= 1 then
-    raise exception 'لا يمكن حذف آخر مدير';
+    raise exception 'لا يمكن حذف آخر حساب بصلاحية كاملة';
   end if;
 
   insert into public.audit_log (username, tbl, op, row_key)
@@ -224,7 +224,7 @@ grant execute on function public.admin_list_users()                          to 
 grant execute on function public.admin_save_user(text,text,text,text[],boolean) to authenticated;
 grant execute on function public.admin_delete_user(text)                     to authenticated;
 
--- إنشاء أول مدير من SQL Editor فقط (لا يُستدعى من اللوحة)
+-- إنشاء أول حساب بصلاحية كاملة من SQL Editor فقط (لا يُستدعى من اللوحة)
 create or replace function public.bootstrap_admin(p_username text, p_code text, p_name text default null)
 returns void language plpgsql security definer set search_path = public, extensions as $$
 begin
@@ -472,7 +472,7 @@ begin
 end;
 $$;
 
--- قراءة السجل (للمدير فقط)
+-- قراءة السجل (لصاحب الصلاحية الكاملة فقط)
 create or replace function public.audit_recent(p_limit int default 200)
 returns table (
   at timestamptz, username text, tbl text, op text,
@@ -506,9 +506,9 @@ $$;
 revoke all on function public.audit_prune(int) from public, anon, authenticated;
 
 -- ===========================================================
--- الخطوة الأخيرة — أنشئي أول مدير (غيّري الاسم والرمز):
+-- الخطوة الأخيرة — أنشئي أول حساب بصلاحية كاملة (غيّري الاسم والرمز):
 --
---   select public.bootstrap_admin('sultana', 'رمز-قوي-هنا', 'سلطانه العرجاني');
+--   select public.bootstrap_admin('salarjani', 'رمز-قوي-هنا', 'سلطانه العرجاني');
 --
 -- بعدها ادخلي اللوحة بهذا الاسم والرمز، واضغطي ⚙️ الإعدادات
 -- لإضافة بقية الأشخاص وتحديد صلاحية كل واحد — بدون SQL.
@@ -521,5 +521,5 @@ revoke all on function public.audit_prune(int) from public, anon, authenticated;
 --   edit:details:2  تفاصيل م2 — قياس المؤشرات
 --   edit:details:3  تفاصيل م3 — التزام التوثيق
 --   edit:details:4  تفاصيل م4 — الطلبات الواردة
---   admin           كل الصلاحيات + إدارة المستخدمين
+--   admin           صلاحية كاملة: كل شيء + إدارة المستخدمين
 -- ===========================================================
