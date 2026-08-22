@@ -60,9 +60,9 @@
 - **الإعداد:** شغّل `supabase/setup.sql` مرة واحدة، وفعّل Anonymous Sign-Ins
 
 ## الاستضافة
-- **GitHub Pages:** https://sultanaalarjani.github.io/adaa-project/
-- ملفات اللوحة في جذر المستودع، وتُنشر تلقائياً مع كل دمج في `main`
-- Netlify لم تعد مستخدمة
+- **الرابط المعتمد:** https://adaa-project.netlify.app
+- Netlify مربوط بمستودع GitHub — ينشر تلقائياً مع كل دمج في `main`
+- ملفات اللوحة في مجلد `site/` (قاعدة البناء في `netlify.toml`)
 
 ## هيكل الداشبورد
 ### الصفحات

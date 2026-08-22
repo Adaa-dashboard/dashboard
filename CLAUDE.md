@@ -35,11 +35,17 @@
   - `app_users` بلا أي سياسة ⇒ لا يُقرأ من الواجهة؛ كل وصول عبر دوال `security definer`
   - **مهم:** REST API المباشر يرجع 403 "Host not in allowlist" — يجب استخدام supabase-js client فقط (دالة `sbFetch` تترجم مسارات REST لاستدعاءات client)
 - **النشر:**
-  - **GitHub Pages** (تلقائي): `https://sultanaalarjani.github.io/adaa-project/` — يُحدَّث مع كل push إلى `main`
-  - ملفات اللوحة في **جذر المستودع** ليكون الرابط قصيراً (كانت في مجلد `adaa-dashboard/`)
-  - `index.html` في الجذر تحويل إلى `project-dashboard.html` (لأن GitHub Pages يبحث عن `index.html`)
+  - **الرابط المعتمد:** `https://adaa-project.netlify.app` — Netlify مربوط بالمستودع،
+    ينشر تلقائياً مع كل دمج في `main`. اختير لأنه لا يتضمن اسم المستخدم في الرابط
+    (GitHub Pages يفرض `<username>.github.io` للمستودعات الشخصية)
+  - ملفات اللوحة في مجلد **`site/`** وحده — **لا تضع فيه `package.json` أبداً**:
+    المستودع يحتوي مشروع Next.js لا علاقة له باللوحة، وكان Netlify يكتشفه ويحاول
+    بناءه فيفشل النشر بـ "Failed Due To Plugin Error". جعل `site/` قاعدة البناء
+    (`base` في `netlify.toml`) يمنع اكتشاف أي إطار عمل من الأساس — وهو الحل الذي
+    نجح؛ `NETLIFY_NEXT_PLUGIN_SKIP` لم يكفِ
+  - `index.html` في الجذر تحويل إلى `./site/` · و`site/index.html` تحويل إلى اللوحة
+  - **GitHub Pages** نسخة احتياطية على `https://sultanaalarjani.github.io/<repo>/`
   - لوحة استقطاب المواهب تبقى على `/hr-dashboard/`
-  - ~~Netlify~~ لم تعد مستخدمة — نسختها لا تعرف تسجيل الدخول وسترفضها سياسات RLS
 - XLSX.js من CDN لاستيراد Excel
 
 ## الدخول والصلاحيات
@@ -188,6 +194,6 @@
 4. اختبر دائماً بـ `node --check` بعد أي تعديل على الـ JS
 
 ## سير العمل
-1. عدّل `project-dashboard.html`
-2. تحقق: `./check.sh` (يستخرج الـ `<script>` ويختبره بـ `node --check`)
+1. عدّل `site/project-dashboard.html`
+2. تحقق: `./check.sh` من جذر المستودع (يقرأ `site/project-dashboard.html`)
 3. `git commit` ثم `git push` — الدمج في `main` ينشر تلقائياً على GitHub Pages
