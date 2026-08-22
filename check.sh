@@ -3,7 +3,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")"
-FILE=project-dashboard.html
+FILE=site/project-dashboard.html
 
 # أول <script> بلا src هو كتلة الكود الرئيسية
 START=$(grep -n '^<script>$' "$FILE" | head -1 | cut -d: -f1)
