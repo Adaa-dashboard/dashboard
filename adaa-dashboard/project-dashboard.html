@@ -415,6 +415,25 @@ body.is-admin #settings-btn{display:inline-flex;}
 .su-checks{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;margin:4px 0 10px;}
 .su-checks label{display:flex;align-items:center;gap:5px;font-size:.66rem;cursor:pointer;font-weight:600;}
 #su-msg{font-size:.68rem;font-weight:700;min-height:16px;margin-bottom:6px;}
+/* تبويبات نافذة الإعدادات */
+.su-tabs{display:flex;gap:6px;margin-bottom:12px;border-bottom:1px solid var(--border);}
+.su-tab{background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;
+  padding:6px 12px;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.72rem;
+  font-weight:700;color:var(--muted);}
+.su-tab.on{color:var(--g1);border-bottom-color:var(--g3);}
+.su-pane{display:none;}
+.su-pane.on{display:block;}
+.au-tbl{width:100%;border-collapse:collapse;font-size:.64rem;}
+.au-tbl th{background:#0d3d22;color:#fff;padding:5px 7px;text-align:right;font-weight:700;
+  position:sticky;top:0;}
+.au-tbl td{padding:5px 7px;border-bottom:1px solid var(--border);vertical-align:top;}
+.au-when{white-space:nowrap;color:var(--muted);direction:ltr;text-align:right;}
+.au-who{font-weight:700;white-space:nowrap;}
+.au-op{display:inline-block;border-radius:5px;padding:1px 6px;font-size:.58rem;font-weight:700;}
+.au-op-add{background:#e8f3ec;color:#155c35;}
+.au-op-upd{background:#fff4dc;color:#8a6100;}
+.au-op-del{background:#fde8e8;color:#9b1c1c;}
+.au-op-in {background:#e8eefb;color:#1e40af;}
 #view-only-bar{display:none;background:#c9a020;color:#20200a;text-align:center;
   padding:5px;font-size:.68rem;font-weight:700;}
 body.view-only #view-only-bar{display:block;}
@@ -439,40 +458,61 @@ body.view-only #view-only-bar{display:block;}
 
 <!-- SETTINGS MODAL -->
 <div id="settings-modal" style="display:none" class="overlay" onclick="if(event.target===this)closeSettings()">
-  <div class="modal-box" style="max-width:660px;width:94%;text-align:right;">
-    <h2>⚙️ المستخدمون والصلاحيات</h2>
-    <div id="su-msg"></div>
-    <div style="max-height:34vh;overflow:auto;margin-bottom:12px;">
-      <table class="su-tbl"><thead><tr>
-        <th>اسم المستخدم</th><th>الصلاحيات</th><th style="width:70px">الحالة</th><th style="width:58px"></th>
-      </tr></thead><tbody id="su-tbody"></tbody></table>
+  <div class="modal-box" style="max-width:700px;width:95%;text-align:right;">
+    <div class="su-tabs">
+      <button class="su-tab on" id="su-tab-users" onclick="suTab('users')">⚙️ المستخدمون</button>
+      <button class="su-tab"    id="su-tab-audit" onclick="suTab('audit')">📜 سجل التعديلات</button>
     </div>
 
-    <div style="border-top:1px solid var(--border);padding-top:12px;">
-      <div style="font-size:.74rem;font-weight:800;color:var(--g1);margin-bottom:8px;" id="su-form-title">➕ إضافة مستخدم</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div class="su-field">
-          <label>اسم المستخدم (اسم أو جوال أو يوزر)</label>
-          <input type="text" id="su-username" placeholder="مثال: omar أو 0501234567">
+    <!-- المستخدمون -->
+    <div class="su-pane on" id="su-pane-users">
+      <div id="su-msg"></div>
+      <div style="max-height:30vh;overflow:auto;margin-bottom:12px;">
+        <table class="su-tbl"><thead><tr>
+          <th>اسم المستخدم</th><th>الصلاحيات</th><th style="width:70px">الحالة</th><th style="width:58px"></th>
+        </tr></thead><tbody id="su-tbody"></tbody></table>
+      </div>
+
+      <div style="border-top:1px solid var(--border);padding-top:12px;">
+        <div style="font-size:.74rem;font-weight:800;color:var(--g1);margin-bottom:8px;" id="su-form-title">➕ إضافة مستخدم</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div class="su-field">
+            <label>اسم المستخدم (اسم أو جوال أو يوزر)</label>
+            <input type="text" id="su-username" placeholder="مثال: omar أو 0501234567">
+          </div>
+          <div class="su-field">
+            <label>الاسم الظاهر (اختياري)</label>
+            <input type="text" id="su-name" placeholder="عمر العتيق">
+          </div>
         </div>
         <div class="su-field">
-          <label>الاسم الظاهر (اختياري)</label>
-          <input type="text" id="su-name" placeholder="عمر العتيق">
+          <label>الرمز <span id="su-code-hint" style="font-weight:400"></span></label>
+          <input type="text" id="su-code" placeholder="رمز الدخول">
+        </div>
+        <div class="su-field"><label>الصلاحيات</label>
+          <div class="su-checks" id="su-checks"></div>
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:.68rem;font-weight:700;margin-bottom:10px;">
+          <input type="checkbox" id="su-active" checked> الحساب مفعّل
+        </label>
+        <div style="display:flex;gap:8px;">
+          <button class="save-btn" style="flex:1;border-radius:7px;" onclick="suSave()">💾 حفظ</button>
+          <button class="d-btn" style="flex:0 0 auto;" onclick="suReset()">إلغاء</button>
         </div>
       </div>
-      <div class="su-field">
-        <label>الرمز <span id="su-code-hint" style="font-weight:400"></span></label>
-        <input type="text" id="su-code" placeholder="رمز الدخول">
+    </div>
+
+    <!-- سجل التعديلات -->
+    <div class="su-pane" id="su-pane-audit">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div id="au-msg" style="font-size:.68rem;font-weight:700;color:var(--muted);"></div>
+        <button class="d-btn" onclick="auLoad()">🔄 تحديث</button>
       </div>
-      <div class="su-field"><label>الصلاحيات</label>
-        <div class="su-checks" id="su-checks"></div>
-      </div>
-      <label style="display:flex;align-items:center;gap:6px;font-size:.68rem;font-weight:700;margin-bottom:10px;">
-        <input type="checkbox" id="su-active" checked> الحساب مفعّل
-      </label>
-      <div style="display:flex;gap:8px;">
-        <button class="save-btn" style="flex:1;border-radius:7px;" onclick="suSave()">💾 حفظ</button>
-        <button class="d-btn" style="flex:0 0 auto;" onclick="suReset()">إلغاء</button>
+      <div style="max-height:52vh;overflow:auto;">
+        <table class="au-tbl"><thead><tr>
+          <th style="width:82px">الوقت</th><th style="width:90px">المستخدم</th>
+          <th style="width:62px">العملية</th><th>ماذا</th><th>التغيير</th>
+        </tr></thead><tbody id="au-tbody"></tbody></table>
       </div>
     </div>
 
@@ -1083,8 +1123,79 @@ function openSettings(){
   document.getElementById('settings-modal').style.display = 'flex';
   document.getElementById('su-checks').innerHTML = SCOPE_LIST.map(([k,label])=>
     `<label><input type="checkbox" class="su-ck" value="${k}"> ${label}</label>`).join('');
+  suTab('users');
   suReset();
   suLoad();
+}
+
+function suTab(which){
+  ['users','audit'].forEach(t=>{
+    document.getElementById('su-pane-'+t).classList.toggle('on', t===which);
+    document.getElementById('su-tab-'+t).classList.toggle('on', t===which);
+  });
+  if(which==='audit') auLoad();
+}
+
+// ═══ سجل التعديلات ═══
+const AU_OP = {
+  INSERT:['إضافة','au-op-add'], UPDATE:['تعديل','au-op-upd'], DELETE:['حذف','au-op-del'],
+  LOGIN:['دخول','au-op-in'], USER_SAVE:['مستخدم','au-op-upd'], USER_DELETE:['حذف','au-op-del']
+};
+
+function auTime(iso){
+  const d = new Date(iso), p = n => String(n).padStart(2,'0');
+  return p(d.getDate())+'/'+p(d.getMonth()+1)+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
+
+function auWhat(r){
+  if(r.tbl === '(دخول)')      return 'تسجيل دخول';
+  if(r.tbl === '(مستخدمون)')  return 'إدارة المستخدم: ' + (r.row_key || '');
+  if(r.tbl === 'monthly_actuals'){
+    const m = parseInt(r.row_key, 10);
+    return 'المنجز الشهري — ' + (MN[m-1] || ('شهر ' + r.row_key));
+  }
+  const what = r.tbl === 'detail_cols' ? 'أعمدة التفاصيل' : 'صفوف التفاصيل';
+  return what + ' — م' + (r.row_key || '?');
+}
+
+function auChange(r){
+  if(r.tbl === 'monthly_actuals' && r.op === 'UPDATE' && r.old_data && r.new_data){
+    const out = [];
+    ['m1','m2','m3','m4'].forEach((k,i)=>{
+      const a = r.old_data[k], b = r.new_data[k];
+      if(a !== b) out.push('م'+(i+1)+': '+(a==null?0:a)+' → '+(b==null?0:b));
+    });
+    return out.length ? out.join(' · ') : '—';
+  }
+  const n = (r.new_data && r.new_data.rows) ?? (r.old_data && r.old_data.rows);
+  if(n != null) return n + ' صف';
+  if(r.tbl === '(مستخدمون)' && r.new_data){
+    const sc = (r.new_data.scopes || []).length;
+    return sc + ' صلاحية' + (r.new_data.code_changed ? ' · تغيّر الرمز' : '')
+              + (r.new_data.active === false ? ' · موقوف' : '');
+  }
+  return '—';
+}
+
+async function auLoad(){
+  const sb = getSB(); if(!sb) return;
+  const msg = document.getElementById('au-msg');
+  const tb  = document.getElementById('au-tbody');
+  msg.textContent = '⏳ جارٍ التحميل…';
+  const {data, error} = await sb.rpc('audit_recent', {p_limit: 300});
+  if(error){ msg.textContent = '❌ ' + error.message; tb.innerHTML = ''; return; }
+  if(!data || !data.length){ msg.textContent = 'السجل فارغ'; tb.innerHTML = ''; return; }
+  msg.textContent = 'آخر ' + data.length + ' عملية';
+  tb.innerHTML = data.map(r=>{
+    const [lbl, cls] = AU_OP[r.op] || [r.op, ''];
+    return `<tr>
+      <td class="au-when">${esc(auTime(r.at))}</td>
+      <td class="au-who">${esc(r.username)}</td>
+      <td><span class="au-op ${cls}">${esc(lbl)}</span></td>
+      <td>${esc(auWhat(r))}</td>
+      <td>${esc(auChange(r))}</td>
+    </tr>`;
+  }).join('');
 }
 function closeSettings(){ document.getElementById('settings-modal').style.display = 'none'; }
 

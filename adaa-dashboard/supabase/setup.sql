@@ -99,6 +99,9 @@ begin
 
   update public.app_users set last_login = now() where id = u.id;
 
+  insert into public.audit_log (username, tbl, op)
+  values (u.username, '(دخول)', 'LOGIN');
+
   return jsonb_build_object(
     'username', u.username,
     'name',     coalesce(u.display_name, u.username),
@@ -185,6 +188,11 @@ begin
   delete from public.code_sessions cs
    using public.app_users u
    where u.username = v_user and cs.app_user_id = u.id and not u.active;
+
+  insert into public.audit_log (username, tbl, op, row_key, new_data)
+  values (public.cur_username(), '(مستخدمون)', 'USER_SAVE', v_user,
+          jsonb_build_object('scopes', p_scopes, 'active', p_active,
+                             'code_changed', coalesce(p_code, '') <> ''));
 end;
 $$;
 
@@ -201,6 +209,9 @@ begin
           where 'admin' = any(scopes) and active) <= 1 then
     raise exception 'لا يمكن حذف آخر مدير';
   end if;
+
+  insert into public.audit_log (username, tbl, op, row_key)
+  values (public.cur_username(), '(مستخدمون)', 'USER_DELETE', v_user);
 
   delete from public.app_users where username = v_user;
 end;
@@ -284,6 +295,154 @@ begin
   end loop;
 end;
 $$;
+
+-- ----------------------------------------------------------
+-- 7) سجل التعديلات — من عدّل، ماذا، ومتى
+--    يُكتب من داخل قاعدة البيانات (triggers) فلا يمكن للواجهة تجاوزه
+-- ----------------------------------------------------------
+create table if not exists public.audit_log (
+  id        bigint generated always as identity primary key,
+  at        timestamptz not null default now(),
+  username  text        not null,
+  tbl       text        not null,
+  op        text        not null,
+  row_key   text,
+  old_data  jsonb,
+  new_data  jsonb
+);
+
+create index if not exists audit_log_at_idx on public.audit_log (at desc);
+
+alter table public.audit_log enable row level security;
+
+drop policy if exists "audit_read_admin" on public.audit_log;
+create policy "audit_read_admin" on public.audit_log
+  for select to authenticated
+  using (public.has_scope('admin'));
+
+-- اسم المستخدم الحالي (للاستخدام داخل الـ triggers والدوال)
+create or replace function public.cur_username()
+returns text language sql stable security definer set search_path = public as $$
+  select coalesce(
+    (select username from public.code_sessions where user_id = auth.uid()),
+    '(غير معروف)');
+$$;
+
+-- سجل صفّي — للمنجز الشهري (15 صفاً فقط، تغييراته قليلة)
+create or replace function public.audit_row()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_old jsonb; v_new jsonb; v_key text;
+begin
+  if TG_OP <> 'INSERT' then v_old := to_jsonb(OLD); end if;
+  if TG_OP <> 'DELETE' then v_new := to_jsonb(NEW); end if;
+
+  -- لا تسجّل تحديثاً لم يغيّر شيئاً فعلياً
+  if TG_OP = 'UPDATE' and (v_old - 'updated_at') = (v_new - 'updated_at') then
+    return NEW;
+  end if;
+
+  v_key := coalesce(v_new, v_old) ->> 'month_num';
+
+  insert into public.audit_log (username, tbl, op, row_key, old_data, new_data)
+  values (public.cur_username(), TG_TABLE_NAME, TG_OP, v_key, v_old, v_new);
+
+  if TG_OP = 'DELETE' then return OLD; else return NEW; end if;
+end;
+$$;
+
+-- سجل مُجمَّع — لجداول التفاصيل (تُحفظ بحذف الصفوف وإعادة إدراجها،
+-- فالتسجيل صفّاً صفّاً يغرق السجل بمئات الأسطر لكل حفظة)
+create or replace function public.audit_detail_old()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_idx text; v_n int;
+begin
+  select string_agg(distinct (output_idx + 1)::text, '، '), count(*)
+    into v_idx, v_n from old_rows;
+  if coalesce(v_n, 0) = 0 then return null; end if;
+  insert into public.audit_log (username, tbl, op, row_key, old_data)
+  values (public.cur_username(), TG_TABLE_NAME, TG_OP, v_idx,
+          jsonb_build_object('rows', v_n));
+  return null;
+end;
+$$;
+
+create or replace function public.audit_detail_new()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare v_idx text; v_n int;
+begin
+  select string_agg(distinct (output_idx + 1)::text, '، '), count(*)
+    into v_idx, v_n from new_rows;
+  if coalesce(v_n, 0) = 0 then return null; end if;
+  insert into public.audit_log (username, tbl, op, row_key, new_data)
+  values (public.cur_username(), TG_TABLE_NAME, TG_OP, v_idx,
+          jsonb_build_object('rows', v_n));
+  return null;
+end;
+$$;
+
+-- تركيب الـ triggers
+do $$
+declare t text;
+begin
+  if to_regclass('public.monthly_actuals') is not null then
+    execute 'drop trigger if exists audit_ma on public.monthly_actuals';
+    execute 'create trigger audit_ma after insert or update or delete
+               on public.monthly_actuals for each row execute function public.audit_row()';
+  end if;
+
+  foreach t in array array['detail_cols', 'detail_rows'] loop
+    if to_regclass('public.' || t) is null then continue; end if;
+
+    execute format('drop trigger if exists audit_%s_del on public.%I', t, t);
+    execute format('create trigger audit_%s_del after delete on public.%I
+                      referencing old table as old_rows
+                      for each statement execute function public.audit_detail_old()', t, t);
+
+    execute format('drop trigger if exists audit_%s_ins on public.%I', t, t);
+    execute format('create trigger audit_%s_ins after insert on public.%I
+                      referencing new table as new_rows
+                      for each statement execute function public.audit_detail_new()', t, t);
+
+    execute format('drop trigger if exists audit_%s_upd on public.%I', t, t);
+    execute format('create trigger audit_%s_upd after update on public.%I
+                      referencing new table as new_rows
+                      for each statement execute function public.audit_detail_new()', t, t);
+  end loop;
+end;
+$$;
+
+-- قراءة السجل (للمدير فقط)
+create or replace function public.audit_recent(p_limit int default 200)
+returns table (
+  at timestamptz, username text, tbl text, op text,
+  row_key text, old_data jsonb, new_data jsonb
+)
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.has_scope('admin') then raise exception 'forbidden'; end if;
+  return query
+    select a.at, a.username, a.tbl, a.op, a.row_key, a.old_data, a.new_data
+    from public.audit_log a
+    order by a.at desc
+    limit least(greatest(coalesce(p_limit, 200), 1), 1000);
+end;
+$$;
+
+revoke all on function public.audit_recent(int) from public, anon;
+grant execute on function public.audit_recent(int) to authenticated;
+
+-- تنظيف السجل القديم (من SQL Editor عند الحاجة)
+create or replace function public.audit_prune(p_days int default 180)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare n bigint;
+begin
+  delete from public.audit_log where at < now() - (p_days || ' days')::interval;
+  get diagnostics n = row_count;
+  return n;
+end;
+$$;
+
+revoke all on function public.audit_prune(int) from public, anon, authenticated;
 
 -- ===========================================================
 -- الخطوة الأخيرة — أنشئي أول مدير (غيّري الاسم والرمز):

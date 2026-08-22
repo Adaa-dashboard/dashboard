@@ -66,6 +66,16 @@
 ### الصلاحيات
 `view` · `edit:monthly` · `edit:details:1..4` · `admin` — معرّفة في `SCOPE_LIST` بالكود وفي `setup.sql`
 
+## سجل التعديلات 📜
+- جدول `audit_log` — يُكتب من **triggers داخل قاعدة البيانات**، فالواجهة لا تستطيع تجاوزه أو تزويره
+- `monthly_actuals`: trigger صفّي (`audit_row`) يسجّل القيم قبل/بعد ويتجاهل التحديثات التي لم تغيّر شيئاً
+- `detail_cols`/`detail_rows`: triggers **على مستوى الجملة** بجداول انتقالية (`audit_detail_old/new`)
+  — لأن الحفظ يحذف كل الصفوف ويعيد إدراجها، والتسجيل صفّاً صفّاً يغرق السجل
+- يسجَّل أيضاً: `LOGIN` من دالة `login()`، و`USER_SAVE`/`USER_DELETE` من دوال الإدارة
+- القراءة: `audit_recent(p_limit)` — تتحقق من `has_scope('admin')`؛ وسياسة RLS تحصر القراءة بالمدير
+- التنظيف: `select public.audit_prune(180);` من SQL Editor (محجوبة عن العملاء)
+- الواجهة: تبويب داخل نافذة ⚙️ — `suTab()` / `auLoad()` / `auWhat()` / `auChange()`
+
 ### غير محمي بـ RLS (محلي فقط، لا يُحفظ سحابياً)
 `MP` (المخطط)، `INV` (الفواتير)، `paidMonths`، `actualPay` — تُحفظ فقط عبر تصدير JSON.
 
