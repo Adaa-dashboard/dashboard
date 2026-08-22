@@ -1209,6 +1209,7 @@ async function loadFromCloud(){
       // للمخرجات التي لا صفوف فيها - ابق الافتراضي
       DEFAULT_ROWS.forEach((d,i)=>{ if(detRows[i].length===0) detRows[i]=d.map(r=>[...r]); });
     }
+    TRACKED.forEach(migrateStatusLast);
     recalcStrategies();
     renderDash();
     showSyncStatus('✅ تم التزامن – '+new Date().toLocaleTimeString('ar'));
@@ -1624,12 +1625,13 @@ function collectAlerts(){
   const DAY = 86400000, out = [];
   TRACKED.forEach(idx=>{
     if(!isTracked(idx)) return;
+    const cP = dcol(idx,'plan'), cR = dcol(idx,'recv');
     (detRows[idx] || []).forEach(r=>{
-      const plan = pDate(r[D_PLAN]), recv = pDate(r[D_RECV]);
+      const plan = pDate(r[cP]), recv = pDate(r[cR]);
       if(recv || !plan) return;                    // استُلم، أو لا يوجد موعد مخطط
       const days = Math.round((today - plan) / DAY);
       if(days < 0) return;                         // لم يحن موعده بعد
-      out.push({idx, name: r[0] || '—', plan: r[D_PLAN], days});
+      out.push({idx, name: r[0] || '—', plan: r[cP], days});
     });
   });
   return out.sort((a,b)=>b.days - a.days);
@@ -2040,16 +2042,42 @@ function switchDet(i){activeDetail=i;renderDetails();}
 // ═══════════════════════════════════════════════════════════
 // م1 — الاستراتيجيات: حساب تلقائي للحالة والأيام + ملخص وقوائم
 // ═══════════════════════════════════════════════════════════
-const D_STAT = 2, D_PLAN = 5, D_RECV = 6, D_DAYS = 7;
 // المخرجات التي تتبع نمط «الإرسال ← المخطط ← الاستلام» بحساب تلقائي للحالة والأيام
 const TRACKED = [0, 1];
 // أنواع البنود في م2
 const M2_TYPES = ['مؤشر', 'مبادرة', 'ملف مؤشرات', 'ملف مبادرات'];
-// لا تحسب إن غُيّر ترتيب الأعمدة — الحساب يعتمد على المواقع
+
+// موقع العمود يُستنتج من عنوانه، فيمكن إعادة ترتيب الأعمدة بحرية
+function dcol(idx, key){
+  const cols = detCols[idx] || [];
+  for(let i = 0; i < cols.length; i++){
+    const c = String(cols[i] || '');
+    if(key === 'stat' && c.includes('الحالة'))   return i;
+    if(key === 'days' && c.includes('الأيام'))   return i;
+    if(key === 'plan' && c.includes('المخطط'))   return i;
+    if(key === 'recv' && c.includes('الاستلام')) return i;
+    if(key === 'type' && c.trim() === 'النوع')   return i;
+  }
+  return -1;
+}
+
 const isTracked = i => TRACKED.includes(i)
-  && (detCols[i]||[]).length >= 8
-  && String(detCols[i][D_STAT]||'').includes('الحالة')
-  && String(detCols[i][D_DAYS]||'').includes('الأيام');
+  && dcol(i,'stat') >= 0 && dcol(i,'days') >= 0
+  && dcol(i,'plan') >= 0 && dcol(i,'recv') >= 0;
+
+// «الحالة» تُعرض في آخر الجدول — تنقل العمود وقيمه لمن لديه بيانات بالترتيب القديم
+function migrateStatusLast(idx){
+  const cols = detCols[idx];
+  if(!cols) return false;
+  const i = dcol(idx, 'stat');
+  if(i < 0 || i === cols.length - 1) return false;
+  cols.push(cols.splice(i, 1)[0]);
+  (detRows[idx] || []).forEach(r=>{
+    while(r.length < cols.length) r.push('');
+    r.push(r.splice(i, 1)[0]);
+  });
+  return true;
+}
 const ST_ORDER = [
   ['مكتمل',      'st-done'],
   ['قيد التنفيذ','st-prog'],
@@ -2079,20 +2107,21 @@ function recalcStrategies(){ TRACKED.forEach(recalcTracked); }
 function recalcTracked(idx){
   const rows = detRows[idx];
   if(!rows || !isTracked(idx)) return;
+  const cS = dcol(idx,'stat'), cP = dcol(idx,'plan'), cR = dcol(idx,'recv'), cD = dcol(idx,'days');
   const width = (detCols[idx]||[]).length;
   const today = new Date(); today.setHours(0,0,0,0);
   const DAY = 86400000;
   rows.forEach(r=>{
     while(r.length < width) r.push('');
-    const plan = pDate(r[D_PLAN]), recv = pDate(r[D_RECV]);
-    if(recv)            r[D_STAT] = 'مكتمل';
-    else if(!plan)      r[D_STAT] = 'معلق';
-    else if(plan < today) r[D_STAT] = 'متأخر';
-    else                r[D_STAT] = 'قيد التنفيذ';
+    const plan = pDate(r[cP]), recv = pDate(r[cR]);
+    if(recv)              r[cS] = 'مكتمل';
+    else if(!plan)        r[cS] = 'معلق';
+    else if(plan < today) r[cS] = 'متأخر';
+    else                  r[cS] = 'قيد التنفيذ';
 
-    if(plan && recv)       r[D_DAYS] = String(Math.round((recv - plan) / DAY));
-    else if(plan && !recv) r[D_DAYS] = String(Math.round((today - plan) / DAY));
-    else                   r[D_DAYS] = '';
+    if(plan && recv)       r[cD] = String(Math.round((recv - plan) / DAY));
+    else if(plan && !recv) r[cD] = String(Math.round((today - plan) / DAY));
+    else                   r[cD] = '';
   });
 }
 
@@ -2102,8 +2131,9 @@ function renderStrategyExtras(){
   if(!isTracked(activeDetail)){ top.innerHTML = ''; bot.innerHTML = ''; return; }
 
   const rows = detRows[activeDetail] || [];
+  const cS = dcol(activeDetail, 'stat');
   top.innerHTML = '<div class="st-summary">' + ST_ORDER.map(([name, cls])=>{
-    const n = rows.filter(r => r[D_STAT] === name).length;
+    const n = rows.filter(r => r[cS] === name).length;
     return `<div class="st-kpi ${cls}"><div class="n">${n}</div><div class="t">${name}</div></div>`;
   }).join('') + '</div>';
 
@@ -2157,6 +2187,8 @@ async function stratListSave(key, text){
 function renderDetTable(){
   const cols=detCols[activeDetail];
   const rows=detRows[activeDetail];
+  const tracked=isTracked(activeDetail);
+  const cS=dcol(activeDetail,'stat'), cD=dcol(activeDetail,'days'), cT=dcol(activeDetail,'type');
   // Header
   document.getElementById('detail-thead').innerHTML=`<tr>
     ${cols.map((c,ci)=>`<th><div class="th-wrap">
@@ -2168,17 +2200,17 @@ function renderDetTable(){
   // Body
   document.getElementById('detail-tbody').innerHTML=rows.map((row,ri)=>`
     <tr>${cols.map((_,ci)=>{
-      if(activeDetail===1 && ci===1){
+      if(activeDetail===1 && ci===cT){
         const v=row[ci]||'';
         const opts=[...new Set([...M2_TYPES, v].filter(Boolean))]
           .map(o=>`<option ${o===v?'selected':''}>${esc(o)}</option>`).join('');
         return `<td><select class="cell-input" onchange="detRows[activeDetail][${ri}][${ci}]=this.value;clearTimeout(window._detSave);window._detSave=setTimeout(()=>saveDetailToCloud(activeDetail),1500)"><option value=""></option>${opts}</select></td>`;
       }
-      if(isTracked(activeDetail) && ci===D_STAT){
+      if(tracked && ci===cS){
         const v=row[ci]||'';
         return `<td><span class="st-chip ${ST_CLS[v]||''}">${esc(v)||'—'}</span></td>`;
       }
-      if(isTracked(activeDetail) && ci===D_DAYS){
+      if(tracked && ci===cD){
         const v=row[ci]||'', n=parseFloat(v);
         const cls = isNaN(n) ? '' : n>0 ? 'st-d-late' : n<0 ? 'st-d-early' : 'st-d-zero';
         return `<td><span class="st-days ${cls}">${esc(v)||'—'}</span></td>`;
@@ -2750,6 +2782,8 @@ ${pagesHTML}
 // ═══════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════
+TRACKED.forEach(migrateStatusLast);
+recalcStrategies();
 renderDash();
 </script>
 </body>
