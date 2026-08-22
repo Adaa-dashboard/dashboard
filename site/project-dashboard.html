@@ -190,26 +190,34 @@ table.main-tbl{width:100%;border-collapse:collapse;}
 .d-btn-xl:hover{background:var(--g3);color:#fff;}
 .detail-tbl-wrap{overflow-x:auto;overflow-y:hidden;border:1px solid var(--border);border-radius:10px;}
 .detail-tbl{width:100%;border-collapse:collapse;min-width:960px;}
-.detail-tbl thead th{background:var(--g2);color:#fff;padding:0 0 5px;white-space:normal;vertical-align:top;}
+.detail-tbl thead th{background:var(--g2);color:#fff;padding:0;white-space:normal;
+  vertical-align:middle;text-align:center;}
+.detail-tbl thead tr.th-titles th{padding:4px 6px 2px;vertical-align:bottom;}
+.detail-tbl thead tr.th-filters th{padding:0 6px 6px;vertical-align:top;}
+.detail-tbl thead th.th-actions{width:44px;font-size:.6rem;color:rgba(255,255,255,.6);padding:6px 8px;}
+.th-nofilter{display:block;font-size:.55rem;color:rgba(255,255,255,.25);}
 .th-wrap{display:flex;align-items:center;gap:0;}
-.th-input{background:transparent;border:none;color:#fff;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.68rem;font-weight:600;padding:8px 10px;outline:none;width:100%;text-align:right;cursor:text;}
+.th-input{background:transparent;border:none;color:#fff;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.68rem;font-weight:600;padding:6px 4px;outline:none;width:100%;text-align:center;cursor:text;}
 .th-input::placeholder{color:rgba(255,255,255,.4);}
 .th-del{background:rgba(255,255,255,.12);border:none;color:rgba(255,255,255,.6);cursor:pointer;padding:6px 7px;font-size:.75rem;border-right:1px solid rgba(255,255,255,.1);transition:all .15s;flex-shrink:0;}
 .th-del:hover{background:rgba(220,38,38,.6);color:#fff;}
 .detail-tbl tbody tr{border-bottom:1px solid var(--border);transition:background .12s;}
 .detail-tbl tbody tr:hover{background:rgba(41,163,97,.04);}
 .detail-tbl td{padding:0;}
-.cell-input{width:100%;padding:6px 10px;border:none;background:transparent;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.7rem;outline:none;text-align:right;transition:background .12s;min-width:80px;}
-textarea.cell-input{display:block;resize:none;overflow:hidden;line-height:1.55;min-height:30px;
-  white-space:pre-wrap;overflow-wrap:anywhere;}
-.detail-tbl td{vertical-align:middle;max-width:240px;}
+.cell-input{width:100%;padding:6px 10px;border:none;background:transparent;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.7rem;outline:none;text-align:center;transition:background .12s;min-width:80px;}
+textarea.cell-input{display:block;resize:none;overflow:hidden;line-height:1.6;min-height:34px;
+  white-space:pre-wrap;overflow-wrap:anywhere;text-align:center;padding:7px 8px;}
+.detail-tbl td{vertical-align:middle;max-width:240px;text-align:center;padding:2px 4px;}
+.detail-tbl td>*{margin-inline:auto;}
+.detail-tbl tbody tr{height:46px;}
+.detail-tbl select.cell-input{text-align:center;text-align-last:center;}
 .detail-tbl td:first-child,.detail-tbl thead th:first-child{min-width:180px;}
 textarea.th-input{display:block;resize:none;overflow:hidden;line-height:1.5;
   white-space:pre-wrap;overflow-wrap:anywhere;min-height:26px;}
 .det-filter{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
 #det-count{font-size:.68rem;color:var(--g1);font-weight:800;}
 /* فلتر لكل عمود داخل رأس الجدول */
-.th-filter{width:100%;margin-top:4px;padding:3px 5px;border-radius:5px;
+.th-filter{width:100%;margin:0;padding:3px 5px;border-radius:5px;text-align:center;text-align-last:center;
   border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.12);color:#fff;
   font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.58rem;outline:none;cursor:pointer;}
 .th-filter option{color:#173d29;background:#fff;}
@@ -684,8 +692,6 @@ body.view-only #view-only-bar{display:block;}
   </div>
   <div class="tb-actions">
     <button class="act-btn" style="background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.15);" onclick="loadFromCloud()" title="تحديث من السحابة">🔄 تزامن</button>
-    <button onclick="exportData()" class="act-btn" style="background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.15);font-size:.65rem;">📤 تصدير</button>
-    <label class="act-btn" style="background:rgba(255,255,255,.1);color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.15);cursor:pointer;font-size:.65rem;">📥 استيراد<input type="file" accept=".json" style="display:none" onchange="importDataFile(event)"></label>
     <span class="date-tag" id="today-lbl"></span>
     <button class="act-btn btn-pdf" onclick="exportPDF()">📄 تصدير PDF</button>
   </div>
@@ -2235,12 +2241,15 @@ function renderDetTable(){
   const tracked=isTracked(activeDetail);
   const cS=dcol(activeDetail,'stat'), cD=dcol(activeDetail,'days'), cT=dcol(activeDetail,'type');
   // Header
-  document.getElementById('detail-thead').innerHTML=`<tr>
+  document.getElementById('detail-thead').innerHTML=`<tr class="th-titles">
     ${cols.map((c,ci)=>`<th><div class="th-wrap">
       <textarea class="th-input" rows="1" placeholder="عنوان العمود" oninput="autoGrow(this)" onchange="detCols[activeDetail][${ci}]=this.value;saveDetSoon(activeDetail)">${esc(c)}</textarea>
       <button class="th-del" onclick="delCol(${ci})" title="حذف العمود">×</button>
-    </div>${thFilter(rows, ci)}</th>`).join('')}
-    <th style="background:var(--g2);padding:6px 8px;font-size:.6rem;color:rgba(255,255,255,.6)">حذف</th>
+    </div></th>`).join('')}
+    <th rowspan="2" class="th-actions">حذف</th>
+  </tr>
+  <tr class="th-filters">
+    ${cols.map((c,ci)=>`<th>${thFilter(rows, ci) || '<span class="th-nofilter">—</span>'}</th>`).join('')}
   </tr>`;
   // Body
   const shown = detFilterRows(rows);
