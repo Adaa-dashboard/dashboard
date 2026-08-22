@@ -388,6 +388,14 @@ input[type=file]{display:none;}
 /* وضع العرض فقط (دور viewer) */
 body.view-only .save-btn{display:none!important;}
 body.view-only .edit-cell{pointer-events:none;color:#5c7a68!important;}
+/* تقييد حسب صلاحيات الرمز */
+body.no-monthly .mi-input{pointer-events:none;opacity:.55;}
+body.no-monthly #monthly-view .save-btn{display:none!important;}
+body.no-monthly .edit-cell{pointer-events:none;color:#5c7a68!important;}
+body.det-locked .dt-btns{display:none!important;}
+#det-lock{display:none;background:#fff6e0;border:1px solid #e8d08a;color:#7a5c00;
+  padding:7px 10px;border-radius:8px;font-size:.68rem;font-weight:700;margin-bottom:10px;}
+body.det-locked #det-lock{display:block;}
 #view-only-bar{display:none;background:#c9a020;color:#20200a;text-align:center;
   padding:5px;font-size:.68rem;font-weight:700;}
 body.view-only #view-only-bar{display:block;}
@@ -400,12 +408,10 @@ body.view-only #view-only-bar{display:block;}
   <form class="auth-card" onsubmit="event.preventDefault();authSignIn();">
     <div style="font-size:2rem">🔐</div>
     <h2>لوحة متابعة المشروع</h2>
-    <p class="auth-sub">هذه اللوحة خاصة بفريق المشروع — يُرجى تسجيل الدخول</p>
-    <input id="auth-email" type="email" autocomplete="username" placeholder="البريد الإلكتروني" required>
-    <input id="auth-pass" type="password" autocomplete="current-password" placeholder="كلمة المرور" required>
-    <button class="auth-go" id="auth-btn" type="submit">تسجيل الدخول</button>
+    <p class="auth-sub">أدخل رمز الدخول الخاص بك</p>
+    <input id="auth-code" type="password" autocomplete="one-time-code" placeholder="رمز الدخول" required>
+    <button class="auth-go" id="auth-btn" type="submit">دخول</button>
     <div id="auth-msg"></div>
-    <button class="auth-link" type="button" onclick="authReset()">نسيت كلمة المرور؟</button>
   </form>
 </div>
 
@@ -622,6 +628,7 @@ body.view-only #view-only-bar{display:block;}
         <label class="d-btn d-btn-xl" style="cursor:pointer">📥 استيراد Excel<input type="file" accept=".xlsx,.xls,.csv" onchange="importXL(event)"></label>
       </div>
     </div>
+    <div id="det-lock"></div>
     <div class="detail-tbl-wrap">
       <table class="detail-tbl" id="detail-tbl">
         <thead id="detail-thead"></thead>
@@ -886,12 +893,21 @@ function showSyncStatus(msg){
 }
 
 // تحميل البيانات عند فتح الصفحة
-// تحميل البيانات بعد التحقق من تسجيل الدخول
+// تحميل البيانات بعد التحقق من الرمز
 window.addEventListener('load', ()=>{ setTimeout(authInit, 300); });
 
-// ═══ AUTH — تسجيل الدخول والصلاحيات ═══
-const ROLE_AR = {owner:'مالك اللوحة', editor:'مُدخِل بيانات', viewer:'عرض فقط'};
-let currentUser = null, currentRole = 'viewer';
+// ═══ الدخول بالرمز والصلاحيات ═══
+let myScopes = [];
+const can = s => myScopes.includes('admin') || myScopes.includes(s);
+const canAnyEdit = () => can('edit:monthly') || [1,2,3,4].some(n=>can('edit:details:'+n));
+
+function scopeSummary(){
+  if(myScopes.includes('admin')) return 'كل الصلاحيات';
+  const parts = [];
+  if(can('edit:monthly')) parts.push('الشهري');
+  [1,2,3,4].forEach(n=>{ if(can('edit:details:'+n)) parts.push('م'+n); });
+  return parts.length ? 'تعديل: ' + parts.join('، ') : 'عرض فقط';
+}
 
 function authMsg(t, err){
   const e = document.getElementById('auth-msg');
@@ -905,9 +921,9 @@ function sbErr(e){
   console.error(e);
   const m = (e && e.message) || '';
   if(/row-level security|permission denied|policy/i.test(m))
-    showSyncStatus('🚫 لا تملك صلاحية التعديل');
+    showSyncStatus('🚫 رمزك لا يسمح بهذا التعديل');
   else if(/JWT|jwt|not authenticated|Invalid|token/i.test(m))
-    showSyncStatus('🔒 انتهت الجلسة — سجّل الدخول من جديد');
+    showSyncStatus('🔒 انتهت الجلسة — أدخل الرمز من جديد');
   else showSyncStatus('❌ خطأ: ' + m);
 }
 
@@ -915,38 +931,40 @@ async function authInit(){
   const sb = getSB();
   if(!sb){ authShow(); authMsg('تعذّر الاتصال بالخادم', true); return; }
   const {data:{session}} = await sb.auth.getSession();
-  if(session && session.user) await authOnSignedIn(session.user);
+  if(!session){ authShow(); return; }
+  const {data} = await sb.from('code_sessions').select('scopes').eq('user_id', session.user.id).maybeSingle();
+  if(data && data.scopes && data.scopes.length) startApp(data.scopes);
   else authShow();
 }
 
 async function authSignIn(){
   const sb = getSB();
   if(!sb){ authMsg('تعذّر الاتصال بالخادم', true); return; }
-  const email = document.getElementById('auth-email').value.trim();
-  const password = document.getElementById('auth-pass').value;
+  const code = document.getElementById('auth-code').value.trim();
+  if(!code){ authMsg('اكتب الرمز أولاً', true); return; }
   const btn = document.getElementById('auth-btn');
   btn.disabled = true; authMsg('⏳ جارٍ التحقق…');
-  const {data, error} = await sb.auth.signInWithPassword({email, password});
-  btn.disabled = false;
-  if(error){
-    authMsg(/Invalid login/i.test(error.message||'')
-      ? '❌ البريد أو كلمة المرور غير صحيحة'
-      : '❌ ' + error.message, true);
-    return;
-  }
-  document.getElementById('auth-pass').value = '';
-  await authOnSignedIn(data.user);
+  try{
+    const {data:{session}} = await sb.auth.getSession();
+    if(!session){
+      const {error} = await sb.auth.signInAnonymously();
+      if(error){ authMsg('❌ تعذّر بدء الجلسة: ' + error.message, true); return; }
+    }
+    const {data:scopes, error} = await sb.rpc('redeem_code', {p_code: code});
+    if(error){ authMsg('❌ ' + error.message, true); return; }
+    if(!scopes || !scopes.length){ authMsg('❌ رمز غير صحيح أو موقوف', true); return; }
+    document.getElementById('auth-code').value = '';
+    startApp(scopes);
+  } finally { btn.disabled = false; }
 }
 
-async function authOnSignedIn(user){
-  currentUser = user;
-  const sb = getSB();
-  const {data:prof} = await sb.from('profiles').select('full_name,role').eq('id', user.id).maybeSingle();
-  currentRole = (prof && prof.role) || 'viewer';
-  document.getElementById('user-name').textContent = (prof && prof.full_name) || user.email;
-  document.getElementById('user-role').textContent = ROLE_AR[currentRole] || currentRole;
+function startApp(scopes){
+  myScopes = scopes || [];
+  document.getElementById('user-name').textContent = 'رمز دخول';
+  document.getElementById('user-role').textContent = scopeSummary();
   document.getElementById('user-chip').style.display = 'flex';
-  document.body.classList.toggle('view-only', currentRole === 'viewer');
+  document.body.classList.toggle('view-only', !canAnyEdit());
+  document.body.classList.toggle('no-monthly', !can('edit:monthly'));
   authMsg(''); authHide();
   loadFromCloud();
 }
@@ -957,12 +975,16 @@ async function authSignOut(){
   location.reload();
 }
 
-async function authReset(){
-  const sb = getSB();
-  const email = document.getElementById('auth-email').value.trim();
-  if(!email){ authMsg('اكتب بريدك أولاً ثم اضغط هنا', true); return; }
-  const {error} = await sb.auth.resetPasswordForEmail(email, {redirectTo: location.href});
-  authMsg(error ? ('❌ ' + error.message) : '✉️ أُرسلت رسالة إعادة تعيين كلمة المرور', !!error);
+// قفل جدول التفاصيل إن كان الرمز لا يسمح بتعديل هذا المخرج
+function gateDet(){
+  const ok = can('edit:details:' + (activeDetail + 1));
+  document.body.classList.toggle('det-locked', !ok);
+  document.querySelectorAll('#detail-thead input, #detail-tbody input')
+    .forEach(el => el.disabled = !ok);
+  document.querySelectorAll('#detail-thead .th-del, #detail-tbody .td-del')
+    .forEach(el => el.style.display = ok ? '' : 'none');
+  const l = document.getElementById('det-lock');
+  if(l) l.textContent = '🔒 رمزك لا يسمح بتعديل تفاصيل ' + ON_S[activeDetail] + ' — عرض فقط';
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1402,6 +1424,7 @@ function renderDetTable(){
     <tr>${cols.map((_,ci)=>`<td><input class="cell-input" value="${row[ci]||''}" onchange="detRows[activeDetail][${ri}][${ci}]=this.value;clearTimeout(window._detSave);window._detSave=setTimeout(()=>saveDetailToCloud(activeDetail),1500)" placeholder="—"></td>`).join('')}
     <td><button class="td-del" onclick="delRow(${ri})">🗑️</button></td>
     </tr>`).join('');
+  gateDet();
 }
 
 function addRow(){

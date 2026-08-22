@@ -23,11 +23,15 @@
 - **Supabase** للحفظ السحابي:
   - URL: `https://dgmakuenllpuzuupmeuf.supabase.co`
   - يستخدم supabase-js v2 من CDN مع anon key (موجود في الملف)
-  - الجداول: `monthly_actuals`, `detail_cols`, `detail_rows`, `profiles`
-  - **RLS مفعّل** — المخطط في `supabase/schema.sql` (يُشغَّل مرة واحدة من SQL Editor)
-    - القراءة: لكل من سجّل دخوله (`authenticated`)
-    - الكتابة/الحذف: لمن دوره `owner` أو `editor` فقط (دالة `is_editor()`)
-    - الزائر غير المسجَّل (`anon`) لا يملك أي سياسة ⇒ لا يقرأ ولا يكتب
+  - الجداول: `monthly_actuals`, `detail_cols`, `detail_rows`, `access_codes`, `code_sessions`
+  - **RLS مفعّل** — المخطط في `supabase/access-codes.sql` (يُشغَّل من SQL Editor)
+    - الدخول **برمز** لا بحساب شخصي — يتطلب تفعيل Anonymous Sign-Ins في Supabase
+    - القراءة: يحتاج صلاحية `view`
+    - المنجز الشهري: يحتاج `edit:monthly`
+    - تفاصيل مخرج: يحتاج `edit:details:N` — السياسة تقارن `output_idx + 1` بالصلاحية
+    - `admin` يفتح كل شيء
+    - الزائر بلا رمز لا يملك أي صلاحية ⇒ لا يقرأ ولا يكتب
+  - `supabase/schema.sql` = النظام القديم (حساب لكل شخص) — متروك للمرجع، وملف الرموز يحذف بقاياه
   - **مهم:** REST API المباشر يرجع 403 "Host not in allowlist" — يجب استخدام supabase-js client فقط (دالة `sbFetch` تترجم مسارات REST لاستدعاءات client)
 - **النشر:**
   - **GitHub Pages** (تلقائي): `https://sultanaalarjani.github.io/-/adaa-dashboard/` — يُحدَّث مع كل push إلى `main`
@@ -35,12 +39,26 @@
   - `index.html` في هذا المجلد مجرد تحويل إلى `project-dashboard.html` (لأن GitHub Pages يبحث عن `index.html`)
 - XLSX.js من CDN لاستيراد Excel
 
-## تسجيل الدخول
-- شاشة الدخول `#auth-gate` تغطي الصفحة **افتراضياً** (fail-closed) — تُخفى فقط بعد التحقق من الجلسة
-- `authInit()` تعمل عند `load`: إن وُجدت جلسة ⇒ `authOnSignedIn()` ⇒ `loadFromCloud()`، وإلا تبقى الشاشة
-- `currentRole` يُقرأ من جدول `profiles`؛ دور `viewer` يضيف `body.view-only` (يخفي أزرار الحفظ ويعطّل خلايا التعديل)
-- `sbErr()` تترجم أخطاء RLS إلى رسالة عربية واضحة بدل الفشل الصامت
-- المستخدمون يُنشأون من Supabase → Authentication → Users (لا يوجد تسجيل ذاتي)، ويصلون بدور `viewer` افتراضياً
+## الدخول بالرمز
+- شاشة الدخول `#auth-gate` تغطي الصفحة **افتراضياً** (fail-closed) — حقل واحد: الرمز
+- `authSignIn()`: `signInAnonymously()` ثم `rpc('redeem_code', {p_code})` — الرمز يُتحقَّق منه في الخادم (bcrypt) ولا يُخزَّن في الواجهة
+- `authInit()` عند `load`: جلسة موجودة ⇒ يقرأ `code_sessions` ⇒ `startApp(scopes)` ⇒ `loadFromCloud()`
+- `myScopes` + `can(scope)` تحكمان الواجهة:
+  - بلا أي صلاحية تعديل ⇒ `body.view-only`
+  - بلا `edit:monthly` ⇒ `body.no-monthly` (يعطّل مدخلات المنجز و`edit-cell`)
+  - `gateDet()` تُستدعى في نهاية `renderDetTable()` وتقفل الجدول حسب `edit:details:N` (`body.det-locked`)
+- `sbErr()` تترجم رفض RLS إلى رسالة عربية بدل الفشل الصامت
+- **الواجهة تجميلية فقط** — الحماية الحقيقية في سياسات RLS؛ لا تعتمد على إخفاء الأزرار
+
+### إدارة الرموز (من SQL Editor)
+```sql
+select public.set_code('اسم الرمز', 'الرمز', array['view','edit:details:1']);
+select label, scopes, active from public.access_codes order by id;
+select public.revoke_code('اسم الرمز');
+```
+
+### غير محمي بـ RLS (محلي فقط، لا يُحفظ سحابياً)
+`MP` (المخطط)، `INV` (الفواتير)، `paidMonths`، `actualPay` — تُحفظ فقط عبر تصدير JSON.
 
 ## المتغيرات الرئيسية في الكود
 - `MP` — خطة الكميات الشهرية {شهر: [م1,م2,م3,م4]}
