@@ -1512,20 +1512,16 @@ function renderProgress(){
   if(!el)return;
   el.innerHTML=`<div class="pp-header">
     <div class="pp-title">📊 نسبة تقدم المشروع الإجمالية</div>
-    <span class="pp-badge ${badgeClass}">${status}</span>
+    <span class="pp-badge ${badgeClass}">${status} ${gap>=0?'+':''}${gap.toFixed(1)}%</span>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;">
-    <div style="text-align:center;background:var(--bg);border-radius:8px;padding:8px;">
-      <div style="font-size:1.3rem;font-weight:800;color:${badgeClass==='red'?'var(--red)':badgeClass==='yellow'?'#ca8a04':'var(--g4)'};">${oa.toFixed(1)}%</div>
-      <div style="font-size:.62rem;color:var(--muted);">الإنجاز الفعلي</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+    <div style="text-align:center;background:var(--bg);border-radius:8px;padding:9px;border:1px solid var(--border);">
+      <div style="font-size:1.35rem;font-weight:800;color:${badgeClass==='red'?'var(--red)':badgeClass==='yellow'?'#ca8a04':'var(--g4)'};">${oa.toFixed(1)}%</div>
+      <div style="font-size:.62rem;color:var(--muted);margin-top:1px;">التقدم الفعلي للمشروع</div>
     </div>
-    <div style="text-align:center;background:var(--bg);border-radius:8px;padding:8px;">
-      <div style="font-size:1.3rem;font-weight:800;color:var(--blue);">${op.toFixed(1)}%</div>
-      <div style="font-size:.62rem;color:var(--muted);">المخطط حتى الآن</div>
-    </div>
-    <div style="text-align:center;background:var(--bg);border-radius:8px;padding:8px;">
-      <div style="font-size:1.3rem;font-weight:800;color:${gap>=0?'var(--g4)':'var(--red)'};">${gap>=0?'+':''}${gap.toFixed(1)}%</div>
-      <div style="font-size:.62rem;color:var(--muted);">الفجوة</div>
+    <div style="text-align:center;background:var(--bg);border-radius:8px;padding:9px;border:1px solid var(--border);">
+      <div style="font-size:1.35rem;font-weight:800;color:var(--blue);">${op.toFixed(1)}%</div>
+      <div style="font-size:.62rem;color:var(--muted);margin-top:1px;">المستهدف حتى ${MN[curM-1]}</div>
     </div>
   </div>
   <div class="pp-track">
@@ -1794,6 +1790,7 @@ function renderTable(){
 // ═══════════════════════════════════════════════════════════
 function renderDash(){
   buildTabs();
+  renderProgress();
   renderCmp();
   renderFin();
   renderTable();
