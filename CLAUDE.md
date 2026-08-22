@@ -35,11 +35,14 @@
   - `app_users` بلا أي سياسة ⇒ لا يُقرأ من الواجهة؛ كل وصول عبر دوال `security definer`
   - **مهم:** REST API المباشر يرجع 403 "Host not in allowlist" — يجب استخدام supabase-js client فقط (دالة `sbFetch` تترجم مسارات REST لاستدعاءات client)
 - **النشر:**
-  - **GitHub Pages** (تلقائي): `https://sultanaalarjani.github.io/adaa-project/` — يُحدَّث مع كل push إلى `main`
-  - ملفات اللوحة في **جذر المستودع** ليكون الرابط قصيراً (كانت في مجلد `adaa-dashboard/`)
-  - `index.html` في الجذر تحويل إلى `project-dashboard.html` (لأن GitHub Pages يبحث عن `index.html`)
+  - **الرابط المعتمد:** `https://adaa-project.netlify.app` — Netlify مربوط بالمستودع،
+    ينشر تلقائياً مع كل دمج في `main`. اختير لأنه لا يتضمن اسم المستخدم في الرابط
+    (GitHub Pages يفرض `<username>.github.io` للمستودعات الشخصية)
+  - إعداد النشر في `netlify.toml`: نشر ثابت من الجذر بلا بناء، مع تخطي إضافة Next.js
+  - **GitHub Pages** يبقى عاملاً كنسخة احتياطية على `https://sultanaalarjani.github.io/<repo>/`
+  - ملفات اللوحة في **جذر المستودع** (كانت في مجلد `adaa-dashboard/`)
+  - `index.html` في الجذر تحويل إلى `project-dashboard.html`
   - لوحة استقطاب المواهب تبقى على `/hr-dashboard/`
-  - ~~Netlify~~ لم تعد مستخدمة — نسختها لا تعرف تسجيل الدخول وسترفضها سياسات RLS
 - XLSX.js من CDN لاستيراد Excel
 
 ## الدخول والصلاحيات
