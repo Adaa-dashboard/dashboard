@@ -35,9 +35,11 @@
   - `app_users` بلا أي سياسة ⇒ لا يُقرأ من الواجهة؛ كل وصول عبر دوال `security definer`
   - **مهم:** REST API المباشر يرجع 403 "Host not in allowlist" — يجب استخدام supabase-js client فقط (دالة `sbFetch` تترجم مسارات REST لاستدعاءات client)
 - **النشر:**
-  - **GitHub Pages** (تلقائي): `https://sultanaalarjani.github.io/-/adaa-dashboard/` — يُحدَّث مع كل push إلى `main`
-  - **Netlify** (يدوي): `https://creative-mousse-9d49bb.netlify.app` — الرفع بالسحب والإفلات (drag & drop)، الرابط ثابت
-  - `index.html` في هذا المجلد مجرد تحويل إلى `project-dashboard.html` (لأن GitHub Pages يبحث عن `index.html`)
+  - **GitHub Pages** (تلقائي): `https://sultanaalarjani.github.io/adaa-project/` — يُحدَّث مع كل push إلى `main`
+  - ملفات اللوحة في **جذر المستودع** ليكون الرابط قصيراً (كانت في مجلد `adaa-dashboard/`)
+  - `index.html` في الجذر تحويل إلى `project-dashboard.html` (لأن GitHub Pages يبحث عن `index.html`)
+  - لوحة استقطاب المواهب تبقى على `/hr-dashboard/`
+  - ~~Netlify~~ لم تعد مستخدمة — نسختها لا تعرف تسجيل الدخول وسترفضها سياسات RLS
 - XLSX.js من CDN لاستيراد Excel
 
 ## الدخول والصلاحيات
@@ -189,4 +191,3 @@
 1. عدّل `project-dashboard.html`
 2. تحقق: `./check.sh` (يستخرج الـ `<script>` ويختبره بـ `node --check`)
 3. `git commit` ثم `git push` — الدمج في `main` ينشر تلقائياً على GitHub Pages
-4. (اختياري) رفع يدوي على Netlify بالسحب والإفلات
