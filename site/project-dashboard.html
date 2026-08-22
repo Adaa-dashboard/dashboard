@@ -190,7 +190,7 @@ table.main-tbl{width:100%;border-collapse:collapse;}
 .d-btn-xl:hover{background:var(--g3);color:#fff;}
 .detail-tbl-wrap{overflow-x:auto;overflow-y:hidden;border:1px solid var(--border);border-radius:10px;}
 .detail-tbl{width:100%;border-collapse:collapse;min-width:960px;}
-.detail-tbl thead th{background:var(--g2);color:#fff;padding:0;white-space:nowrap;}
+.detail-tbl thead th{background:var(--g2);color:#fff;padding:0 0 5px;white-space:normal;vertical-align:top;}
 .th-wrap{display:flex;align-items:center;gap:0;}
 .th-input{background:transparent;border:none;color:#fff;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.68rem;font-weight:600;padding:8px 10px;outline:none;width:100%;text-align:right;cursor:text;}
 .th-input::placeholder{color:rgba(255,255,255,.4);}
@@ -206,13 +206,14 @@ textarea.cell-input{display:block;resize:none;overflow:hidden;line-height:1.55;m
 .detail-tbl td:first-child,.detail-tbl thead th:first-child{min-width:180px;}
 textarea.th-input{display:block;resize:none;overflow:hidden;line-height:1.5;
   white-space:pre-wrap;overflow-wrap:anywhere;min-height:26px;}
-.det-filter{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
-.det-filter input,.det-filter select{padding:6px 10px;border:1px solid var(--border);
-  border-radius:7px;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.7rem;
-  background:var(--card);color:var(--text);outline:none;}
-.det-filter input{flex:1;min-width:150px;}
-.det-filter input:focus,.det-filter select:focus{border-color:var(--g5);}
-#det-count{font-size:.65rem;color:var(--muted);font-weight:700;}
+.det-filter{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
+#det-count{font-size:.68rem;color:var(--g1);font-weight:800;}
+/* فلتر لكل عمود داخل رأس الجدول */
+.th-filter{width:100%;margin-top:4px;padding:3px 5px;border-radius:5px;
+  border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.12);color:#fff;
+  font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.58rem;outline:none;cursor:pointer;}
+.th-filter option{color:#173d29;background:#fff;}
+.th-filter.on{background:var(--gold);color:#20200a;font-weight:800;border-color:var(--gold);}
 .detail-tbl thead th{vertical-align:middle;}
 .cell-input:focus{background:rgba(41,163,97,.07);}
 .td-del{background:none;border:none;color:var(--muted);cursor:pointer;padding:6px 8px;font-size:.78rem;transition:all .15s;white-space:nowrap;}
@@ -854,12 +855,9 @@ body.view-only #view-only-bar{display:block;}
         <label class="d-btn d-btn-xl" style="cursor:pointer">⬆️ رفع Excel (دمج)<input type="file" accept=".xlsx,.xls,.csv" onchange="importXL(event)"></label>
       </div>
     </div>
-    <div class="det-filter">
-      <input id="det-q" placeholder="🔍 بحث…" oninput="renderDetTable()">
-      <select id="det-col" onchange="renderDetTable()"></select>
-      <select id="det-stat" onchange="renderDetTable()" style="display:none"></select>
-      <button class="d-btn" onclick="detClearFilter()">مسح</button>
+    <div class="det-filter" id="det-filter-bar" style="display:none">
       <span id="det-count"></span>
+      <button class="d-btn" onclick="clearColFilters()">✕ مسح الفلاتر</button>
     </div>
     <div id="det-lock"></div>
     <div id="strat-top"></div>
@@ -2241,12 +2239,11 @@ function renderDetTable(){
     ${cols.map((c,ci)=>`<th><div class="th-wrap">
       <textarea class="th-input" rows="1" placeholder="عنوان العمود" oninput="autoGrow(this)" onchange="detCols[activeDetail][${ci}]=this.value;saveDetSoon(activeDetail)">${esc(c)}</textarea>
       <button class="th-del" onclick="delCol(${ci})" title="حذف العمود">×</button>
-    </div></th>`).join('')}
+    </div>${thFilter(rows, ci)}</th>`).join('')}
     <th style="background:var(--g2);padding:6px 8px;font-size:.6rem;color:rgba(255,255,255,.6)">حذف</th>
   </tr>`;
   // Body
-  detFillFilters(cols, tracked);
-  const shown = detFilterRows(rows, cS);
+  const shown = detFilterRows(rows);
   document.getElementById('detail-tbody').innerHTML=shown.map(([row,ri])=>`
     <tr>${cols.map((_,ci)=>{
       if(activeDetail===1 && ci===cT){
@@ -2268,7 +2265,8 @@ function renderDetTable(){
     }).join('')}
     <td><button class="td-del" onclick="delRow(${ri})">🗑️</button></td>
     </tr>`).join('');
-  document.querySelectorAll('#detail-tbody textarea.cell-input').forEach(autoGrow);
+  document.querySelectorAll('#detail-tbody textarea.cell-input, #detail-thead textarea.th-input')
+    .forEach(autoGrow);
   gateDet();
   renderStrategyExtras();
 }
@@ -2279,50 +2277,54 @@ function autoGrow(el){
   el.style.height = el.scrollHeight + 'px';
 }
 
-// ═══ فلترة جدول التفاصيل ═══
-function detFillFilters(cols, tracked){
-  const colSel = document.getElementById('det-col');
-  const sig = cols.join('~');
-  if(colSel.dataset.sig !== sig){
-    const prev = colSel.value;
-    colSel.innerHTML = '<option value="-1">كل الأعمدة</option>' +
-      cols.map((c,i)=>`<option value="${i}">${esc(c)}</option>`).join('');
-    colSel.value = [...colSel.options].some(o=>o.value===prev) ? prev : '-1';
-    colSel.dataset.sig = sig;
-  }
-  const stSel = document.getElementById('det-stat');
-  stSel.style.display = tracked ? '' : 'none';
-  if(tracked && stSel.dataset.filled !== '1'){
-    stSel.innerHTML = '<option value="">كل الحالات</option>' +
-      ST_ORDER.map(([n])=>`<option>${n}</option>`).join('');
-    stSel.dataset.filled = '1';
-  }
-  if(!tracked) stSel.value = '';
+// ═══ فلترة بالعناوين: قائمة اختيار داخل رأس كل عمود ═══
+const detColFilter = [{}, {}, {}, {}];      // لكل مخرج: {رقم العمود: القيمة المختارة}
+
+function setColFilter(ci, val){
+  const f = detColFilter[activeDetail];
+  if(val) f[ci] = val; else delete f[ci];
+  renderDetTable();
 }
 
-function detFilterRows(rows, cS){
-  const q  = (document.getElementById('det-q').value || '').trim().toLowerCase();
-  const ci = parseInt(document.getElementById('det-col').value, 10);
-  const st = document.getElementById('det-stat').value || '';
+function clearColFilters(){
+  detColFilter[activeDetail] = {};
+  renderDetTable();
+}
+
+// خيارات العمود = القيم الموجودة فيه فعلاً
+function colOptions(rows, ci){
+  const seen = new Set();
+  rows.forEach(r=>{ const v = String(r[ci] == null ? '' : r[ci]).trim(); if(v) seen.add(v); });
+  return [...seen].sort((a,b)=>a.localeCompare(b,'ar'));
+}
+
+function thFilter(rows, ci){
+  const cur = detColFilter[activeDetail][ci] || '';
+  const opts = colOptions(rows, ci)
+    .map(v=>`<option ${v===cur?'selected':''}>${esc(v)}</option>`).join('');
+  if(!opts) return '';
+  return `<select class="th-filter ${cur?'on':''}" title="فلترة حسب هذا العمود"
+            onchange="setColFilter(${ci}, this.value)">
+            <option value="">الكل</option>${opts}</select>`;
+}
+
+function detFilterRows(rows){
+  const f = detColFilter[activeDetail];
+  const keys = Object.keys(f);
   const out = [];
   rows.forEach((row, ri)=>{
-    if(st && cS >= 0 && String(row[cS] || '') !== st) return;
-    if(q){
-      const hay = (ci >= 0 ? String(row[ci] || '') : row.join(' ')).toLowerCase();
-      if(!hay.includes(q)) return;
+    for(const k of keys){
+      if(String(row[k] == null ? '' : row[k]).trim() !== f[k]) return;
     }
     out.push([row, ri]);
   });
-  document.getElementById('det-count').textContent =
-    out.length === rows.length ? rows.length + ' صف' : out.length + ' من ' + rows.length;
+  const bar = document.getElementById('det-filter-bar');
+  if(keys.length){
+    bar.style.display = 'flex';
+    document.getElementById('det-count').textContent =
+      'عرض ' + out.length + ' من ' + rows.length + ' صف';
+  }else bar.style.display = 'none';
   return out;
-}
-
-function detClearFilter(){
-  document.getElementById('det-q').value = '';
-  document.getElementById('det-col').value = '-1';
-  document.getElementById('det-stat').value = '';
-  renderDetTable();
 }
 
 // ═══ تصدير الجدول إلى Excel ═══
