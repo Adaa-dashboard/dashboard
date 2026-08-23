@@ -389,11 +389,21 @@ textarea.th-input{display:block;resize:none;overflow:hidden;line-height:1.5;
 input[type=file]{display:none;}
 /* ═══ AUTH GATE ═══ */
 #auth-gate{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;
-  background:linear-gradient(135deg,#155c35,#0d3d22);padding:24px;}
-.auth-card{width:100%;max-width:360px;background:#fff;border-radius:16px;padding:30px 26px;
+  background:linear-gradient(135deg,#155c35,#0d3d22);padding:24px;overflow:auto;}
+/* توهّج خفيف بألوان الهوية خلف البطاقة */
+#auth-gate::before{content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(circle at 18% 12%,rgba(41,163,97,.38),transparent 46%),
+             radial-gradient(circle at 86% 84%,rgba(201,160,32,.20),transparent 44%);}
+.auth-card{position:relative;width:100%;max-width:360px;background:#fff;border-radius:18px;padding:26px 26px 24px;
   box-shadow:0 18px 50px rgba(0,0,0,.35);text-align:center;}
-.auth-card h2{margin:14px 0 4px;font-size:1.05rem;color:#0d3d22;}
-.auth-card .auth-sub{margin:0 0 20px;font-size:.72rem;color:#7a9e87;line-height:1.6;}
+/* شعار أداء أعلى شاشة الدخول */
+.auth-logo{display:block;width:132px;height:auto;margin:0 auto 4px;}
+.auth-rule{width:52px;height:3px;margin:14px auto 12px;border-radius:2px;
+  background:linear-gradient(90deg,var(--gold,#c9a020),#29a361);}
+.auth-card h2{margin:0 0 4px;font-size:1.05rem;color:#0d3d22;}
+.auth-card .auth-sub{margin:0 0 18px;font-size:.7rem;color:#7a9e87;line-height:1.7;}
+.auth-foot{margin-top:16px;padding-top:12px;border-top:1px solid #eef4f0;
+  font-size:.62rem;color:#a8c2b3;letter-spacing:.02em;}
 .auth-card input{width:100%;padding:10px 12px;margin-bottom:10px;border:1px solid #d7e5dc;border-radius:9px;
   font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.78rem;outline:none;}
 .auth-card input:focus{border-color:#29a361;box-shadow:0 0 0 3px rgba(41,163,97,.12);}
@@ -587,13 +597,15 @@ body.view-only #view-only-bar{display:block;}
 <!-- ═══ شاشة تسجيل الدخول ═══ -->
 <div id="auth-gate">
   <form class="auth-card" onsubmit="event.preventDefault();authSignIn();">
-    <div style="font-size:2rem">🔐</div>
+    <img class="auth-logo" src="data:image/png;base64,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" alt="مركز أداء">
+    <div class="auth-rule"></div>
     <h2>لوحة متابعة المشروع</h2>
-    <p class="auth-sub">أدخل اسم المستخدم والرمز</p>
+    <p class="auth-sub">دعم وتفعيل قياس وإدارة أداء<br>الاستراتيجيات الوطنية والأداء المؤسسي</p>
     <input id="auth-user" type="text" autocomplete="username" placeholder="اسم المستخدم / رقم الجوال" required>
     <input id="auth-code" type="password" autocomplete="current-password" placeholder="الرمز" required>
     <button class="auth-go" id="auth-btn" type="submit">دخول</button>
     <div id="auth-msg"></div>
+    <div class="auth-foot">مركز قياس أداء الأجهزة العامة — أداء</div>
   </form>
 </div>
 
