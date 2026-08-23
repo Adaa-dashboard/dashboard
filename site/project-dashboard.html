@@ -214,6 +214,14 @@ textarea.cell-input{display:block;resize:none;overflow:hidden;line-height:1.6;mi
 .detail-tbl td>*{margin-inline:auto;}
 .detail-tbl tbody tr{height:46px;}
 .detail-tbl select.cell-input{text-align:center;text-align-last:center;}
+/* خلايا التاريخ: نص بصيغة YYYY-MM-DD ثابتة.
+   لا نستخدم input[type=date] لأنه يعرض التاريخ بلغة المتصفح (mm/dd/yyyy مثلاً)
+   فيختلف الشكل بين جهاز وآخر وعن ملف الإكسل والتقرير. */
+input.cell-date{min-height:34px;direction:ltr;text-align:center;letter-spacing:.03em;
+  font-variant-numeric:tabular-nums;}
+input.cell-date::placeholder{color:#c9d8cf;letter-spacing:0;font-size:.62rem;}
+/* قيمة ليست تاريخاً (لا يوجد · لم يُحدَّد) — تُميَّز بلون تنبيه ولا تُمسح */
+input.cell-date.not-a-date{background:#fff7ed;color:#9a5b00;font-weight:600;}
 .detail-tbl td:first-child,.detail-tbl thead th:first-child{min-width:180px;}
 textarea.th-input{display:block;resize:none;overflow:hidden;line-height:1.5;
   white-space:pre-wrap;overflow-wrap:anywhere;min-height:26px;}
@@ -1287,6 +1295,10 @@ async function loadFromCloud(){
     }
     TRACKED.forEach(ensureTrackedCols);
     TRACKED.forEach(migrateStatusLast);
+    // توحيد صيغ التواريخ القديمة مرة واحدة، وحفظ التصحيح لمن يملك الصلاحية
+    normalizeAllDates().forEach(i=>{
+      if(can('edit:details:' + (i + 1))) saveDetailToCloud(i);
+    });
     recalcStrategies();
     renderDash();
     // لو كان المستخدم في صفحة التفاصيل لحظة اكتمال التزامن، أعِد رسمها
@@ -1457,7 +1469,9 @@ async function authSignOut(){
 function gateDet(){
   const ok = can('edit:details:' + (activeDetail + 1));
   document.body.classList.toggle('det-locked', !ok);
-  document.querySelectorAll('#detail-thead input, #detail-tbody input')
+  // الفلاتر في الرأس تبقى شغّالة للجميع — يُقفل ما يعدّل البيانات فقط
+  document.querySelectorAll('#detail-thead textarea, #detail-tbody input,' +
+                            '#detail-tbody textarea, #detail-tbody select')
     .forEach(el => el.disabled = !ok);
   document.querySelectorAll('#detail-thead .th-del, #detail-tbody .td-del')
     .forEach(el => el.style.display = ok ? '' : 'none');
@@ -2109,6 +2123,8 @@ async function pasteTable(){
     detSnap(activeDetail);
     detCols[activeDetail]=rows[0].map(c=>c.trim());
     detRows[activeDetail]=rows.slice(1).filter(r=>r.some(c=>c.trim())).map(r=>rows[0].map((_,ci)=>(r[ci]||'').trim()));
+    normalizeDetDates(activeDetail);
+    recalcTracked(activeDetail);
     saveDetailToCloud(activeDetail);
     renderDetTable();
     showSyncStatus('✅ تم لصق '+detRows[activeDetail].length+' صف');
@@ -2126,6 +2142,8 @@ async function pasteTable(){
           detSnap(activeDetail);
           detCols[activeDetail]=rows[0].map(c=>c.trim());
           detRows[activeDetail]=rows.slice(1).filter(r=>r.some(c=>c.trim())).map(r=>rows[0].map((_,ci)=>(r[ci]||'').trim()));
+          normalizeDetDates(activeDetail);
+          recalcTracked(activeDetail);
           saveDetailToCloud(activeDetail);
           renderDetTable();
           showSyncStatus('✅ تم لصق '+detRows[activeDetail].length+' صف');
@@ -2235,6 +2253,83 @@ let stratLists = {
   upcoming: ['استراتيجية وزارة الحج والعمرة', 'استراتيجية وطنية مقاولين']
 };
 
+// ═══════════════════════════════════════════════════════════
+// توحيد صيغة التواريخ — الصيغة المعتمدة: YYYY-MM-DD
+// ═══════════════════════════════════════════════════════════
+// كل ما يدخل الجدول (كتابة يدوية · لصق · رفع Excel) يمرّ من هنا،
+// فلا تتراكم صيغ مختلفة في العمود الواحد.
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const AR_DIGITS = /[\u0660-\u0669\u06F0-\u06F9]/g;
+
+// عمود تاريخ = عنوانه يحوي «تاريخ» (الإرسال · المخطط · الاستلام)
+function isDateCol(idx, ci){
+  return String((detCols[idx] || [])[ci] || '').includes('تاريخ');
+}
+
+const iso = (y, m, d) => {
+  const dt = new Date(y, m - 1, d);
+  // ترفض 31/02 وأمثالها بدل أن تنزلق لشهر تالٍ
+  if(dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) return null;
+  return y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+};
+
+// يُرجع YYYY-MM-DD، أو النص كما هو إن لم يكن تاريخاً (لا يوجد · لم يتم التحديد)
+function normDate(v){
+  if(v instanceof Date && !isNaN(v))
+    return iso(v.getFullYear(), v.getMonth() + 1, v.getDate()) || '';
+
+  let t = String(v == null ? '' : v)
+    .replace(AR_DIGITS, c => String(c.charCodeAt(0) & 0xF))   // ٠١٢ ← 012
+    .replace(/[\u200e\u200f]/g, '')                            // علامات الاتجاه
+    .trim();
+  if(!t) return '';
+
+  let m;
+  // 2026-04-13 أو 2026/4/13 (وقد يتبعها وقت)
+  if((m = t.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})(?:[T ].*)?$/)))
+    return iso(+m[1], +m[2], +m[3]) || t;
+
+  // 13/04/2026 — اليوم أولاً (المتعارف عليه محلياً)، إلا إذا تجاوز الأول 12 فهو يوم قطعاً
+  if((m = t.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2}|\d{4})$/))){
+    let y = +m[3]; if(y < 100) y += 2000;
+    let a = +m[1], b = +m[2];
+    if(a > 12 && b <= 12) return iso(y, b, a) || t;   // يوم/شهر
+    if(b > 12 && a <= 12) return iso(y, a, b) || t;   // شهر/يوم
+    return iso(y, b, a) || t;                          // الافتراضي: يوم/شهر
+  }
+
+  // الرقم التسلسلي لإكسل (1900-03-01 فما بعد)
+  if(/^\d{5}(\.\d+)?$/.test(t)){
+    const n = Math.floor(+t);
+    if(n >= 20000 && n <= 80000){
+      const d = new Date(Date.UTC(1899, 11, 30) + n * 86400000);
+      return iso(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate()) || t;
+    }
+  }
+  return t;    // نص غير تاريخ — يبقى كما هو حتى لا تضيع المعلومة
+}
+
+// توحيد كل خلايا أعمدة التاريخ في مخرج — تُرجع true إن تغيّر شيء
+function normalizeDetDates(idx){
+  const cols = detCols[idx] || [], rows = detRows[idx] || [];
+  const dc = cols.map((_, ci) => ci).filter(ci => isDateCol(idx, ci));
+  if(!dc.length) return false;
+  let changed = false;
+  rows.forEach(r=>{
+    dc.forEach(ci=>{
+      const before = r[ci] == null ? '' : r[ci];
+      const after  = normDate(before);
+      if(after !== before){ r[ci] = after; changed = true; }
+    });
+  });
+  return changed;
+}
+
+// تُرجع أرقام المخرجات التي تغيّرت فعلاً
+function normalizeAllDates(){
+  return [0,1,2,3].filter(i => normalizeDetDates(i));
+}
+
 // يقبل 2026-04-13 أو 13/04/2026؛ وأي نص آخر (لايوجد، لم يتم التحديد) = لا تاريخ
 function pDate(v){
   const t = String(v == null ? '' : v).trim();
@@ -2251,6 +2346,7 @@ function recalcStrategies(){ TRACKED.forEach(recalcTracked); }
 function recalcTracked(idx){
   const rows = detRows[idx];
   if(!rows || !isTracked(idx)) return;
+  normalizeDetDates(idx);     // الحساب يبدأ من صيغة موحّدة دائماً
   const cS = dcol(idx,'stat'), cP = dcol(idx,'plan'), cR = dcol(idx,'recv'), cD = dcol(idx,'days');
   const width = (detCols[idx]||[]).length;
   const today = new Date(); today.setHours(0,0,0,0);
@@ -2359,6 +2455,7 @@ function stLegend(){
       <b style="color:#9b1c1c">متأخر</b> تجاوز التاريخ المخطط ولم يتم الاستلام ·
       <b style="color:#7a6a2f">معلق</b> بانتظار تحديد الموعد المخطط
       <br>عمودا «الحالة» و«الأيام» يُحسبان تلقائياً من التواريخ — يكفي تحديث تاريخَي التسليم المخطط والاستلام الفعلي.
+      <br>صيغة التواريخ موحّدة <b dir="ltr">YYYY-MM-DD</b> — اكتبها بأي صيغة (13/04/2026 · 2026-4-13 · ١٣/٠٤/٢٠٢٦) وتُحوَّل تلقائياً، وكذلك ما يأتي من ملف Excel.
       الأيام — للمستلَمة: موجب = تأخير عن المخطط، سالب = تسليم مبكر.
       وللتي لم تُستلم: موجب = أيام تأخير حتى اليوم، سالب = أيام متبقية للموعد.
     </div>`;
@@ -2406,6 +2503,16 @@ function renderDetTable(){
         const v=row[ci]||'', n=parseFloat(v);
         const cls = isNaN(n) ? '' : n>0 ? 'st-d-late' : n<0 ? 'st-d-early' : 'st-d-zero';
         return `<td><span class="st-days ${cls}">${esc(v)||'—'}</span></td>`;
+      }
+      // عمود تاريخ: الصيغة المعروضة هي المحفوظة نفسها (YYYY-MM-DD)،
+      // وأي صيغة تُكتب تتحوّل إليها عند الخروج من الخلية.
+      if(isDateCol(activeDetail, ci)){
+        const v = row[ci] || '';
+        const bad = v !== '' && !ISO_DATE.test(v);
+        return `<td><input class="cell-input cell-date${bad ? ' not-a-date' : ''}" dir="ltr"
+                  placeholder="YYYY-MM-DD" value="${esc(v)}"
+                  title="اكتب التاريخ بأي صيغة (13/04/2026 · 2026-4-13) ويُوحَّد تلقائياً"
+                  onchange="cellEdit(${ri}, ${ci}, this.value)"></td>`;
       }
       return `<td><textarea class="cell-input" rows="1" placeholder="—" oninput="autoGrow(this)" onchange="cellEdit(${ri}, ${ci}, this.value)">${esc(row[ci]||'')}</textarea></td>`;
     }).join('')}
@@ -2467,11 +2574,16 @@ async function detUndoLast(){
 
 // تعديل خلية أو عنوان عمود — اللقطة تُؤخذ قبل الكتابة
 function cellEdit(ri, ci, val){
-  if(detRows[activeDetail][ri] === undefined) return;
-  if(detRows[activeDetail][ri][ci] === val) return;
-  detSnap(activeDetail);
-  detRows[activeDetail][ri][ci] = val;
-  saveDetSoon(activeDetail);
+  const idx = activeDetail;
+  if(detRows[idx][ri] === undefined) return;
+  const dateCol = isDateCol(idx, ci);
+  if(dateCol) val = normDate(val);          // أي صيغة تُكتب أو تُلصق تتحوّل لـ YYYY-MM-DD
+  if(detRows[idx][ri][ci] === val) return;
+  detSnap(idx);
+  detRows[idx][ri][ci] = val;
+  saveDetSoon(idx);
+  // تغيير تاريخ يغيّر «الحالة» و«الأيام» — أعِد الحساب والرسم فوراً
+  if(dateCol && isTracked(idx)){ recalcTracked(idx); renderDetTable(); }
 }
 function headEdit(ci, val){
   if(detCols[activeDetail][ci] === val) return;
@@ -2619,6 +2731,27 @@ function delLastCol(){
   saveDetSoon(activeDetail);
 }
 
+// قراءة ورقة إكسل خلية خلية.
+// خلايا التاريخ (t==='d') تُؤخذ من كائن Date مباشرة لا من نصها المعروض،
+// لأن صيغة العرض في الملف قد تكون mm/dd/yyyy فتُقرأ 05/01 كـ 5 يناير بدل 1 مايو.
+function sheetAOA(ws){
+  if(!ws || !ws['!ref']) return [];
+  const R = XLSX.utils.decode_range(ws['!ref']);
+  const out = [];
+  for(let r = R.s.r; r <= R.e.r; r++){
+    const row = [];
+    for(let c = R.s.c; c <= R.e.c; c++){
+      const cell = ws[XLSX.utils.encode_cell({r, c})];
+      if(!cell){ row.push(''); continue; }
+      if(cell.t === 'd')      row.push(normDate(cell.v));
+      else if(cell.w != null) row.push(cell.w);
+      else                    row.push(cell.v == null ? '' : cell.v);
+    }
+    out.push(row);
+  }
+  return out;
+}
+
 // الرفع: اختيار الورقة والطريقة (دمج أو استبدال كامل)
 let impState = null;
 
@@ -2640,11 +2773,8 @@ function importXL(e){
           .map(r => r.split(',').map(c => c.trim().replace(/^"|"$/g, '')))}];
       }else{
         if(typeof XLSX === 'undefined'){ alert('مكتبة Excel لم تُحمَّل — تحقق من الاتصال'); return; }
-        const wb = XLSX.read(ev.target.result, {type:'binary'});
-        sheets = wb.SheetNames.map(n => ({
-          name: n,
-          aoa: XLSX.utils.sheet_to_json(wb.Sheets[n], {header:1, defval:'', raw:false})
-        }));
+        const wb = XLSX.read(ev.target.result, {type:'binary', cellDates:true});
+        sheets = wb.SheetNames.map(n => ({name: n, aoa: sheetAOA(wb.Sheets[n])}));
       }
       sheets.forEach(sh => { sh.aoa = sh.aoa.filter(r => r && r.some(c => String(c).trim() !== '')); });
       sheets = sheets.filter(sh => sh.aoa.length >= 2);
@@ -2689,6 +2819,7 @@ async function impRun(){
       String(r[ci] == null ? '' : r[ci]).trim()));
     ensureTrackedCols(idx);
     migrateStatusLast(idx);
+    normalizeDetDates(idx);
     recalcTracked(idx);
     detColFilter[idx] = {}; detLateOnly[idx] = false;
     renderDetTable();
@@ -2749,6 +2880,7 @@ async function impRun(){
     });
   });
 
+  normalizeDetDates(idx);
   recalcTracked(idx);
   renderDetTable();
   const ignored = map.filter(m => m < 0).length;
@@ -3259,6 +3391,7 @@ ${pagesHTML}
 // ═══════════════════════════════════════════════════════════
 TRACKED.forEach(ensureTrackedCols);
 TRACKED.forEach(migrateStatusLast);
+normalizeAllDates();
 recalcStrategies();
 renderDash();
 </script>
