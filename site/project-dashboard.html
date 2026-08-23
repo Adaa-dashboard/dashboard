@@ -204,6 +204,13 @@ table.main-tbl{width:100%;border-collapse:collapse;}
 .th-input::placeholder{color:rgba(255,255,255,.4);}
 .th-del{background:rgba(255,255,255,.12);border:none;color:rgba(255,255,255,.6);cursor:pointer;padding:6px 7px;font-size:.75rem;border-right:1px solid rgba(255,255,255,.1);transition:all .15s;flex-shrink:0;}
 .th-del:hover{background:rgba(220,38,38,.6);color:#fff;}
+/* زر ترتيب الصفوف حسب هذا العمود */
+.th-sort{background:rgba(255,255,255,.08);border:none;color:rgba(255,255,255,.5);cursor:pointer;
+  padding:6px 6px;font-size:.7rem;line-height:1;transition:all .15s;flex-shrink:0;
+  border-right:1px solid rgba(255,255,255,.1);}
+.th-sort:hover{background:rgba(255,255,255,.22);color:#fff;}
+.th-sort.on{background:var(--gold,#c9a020);color:#0d3d22;font-weight:700;}
+body.det-locked .th-del{display:none;}
 .detail-tbl tbody tr{border-bottom:1px solid var(--border);transition:background .12s;}
 .detail-tbl tbody tr:hover{background:rgba(41,163,97,.04);}
 .detail-tbl td{padding:0;}
@@ -1295,10 +1302,9 @@ async function loadFromCloud(){
     }
     TRACKED.forEach(ensureTrackedCols);
     TRACKED.forEach(migrateStatusLast);
-    // توحيد صيغ التواريخ القديمة مرة واحدة، وحفظ التصحيح لمن يملك الصلاحية
-    normalizeAllDates().forEach(i=>{
-      if(can('edit:details:' + (i + 1))) saveDetailToCloud(i);
-    });
+    // توحيد صيغ التواريخ القديمة ثم الترتيب (أقدم أولاً)، وحفظ التصحيح مرة واحدة
+    const fixed = new Set([...normalizeAllDates(), ...autoSortAll()]);
+    fixed.forEach(i=>{ if(can('edit:details:' + (i + 1))) saveDetailToCloud(i); });
     recalcStrategies();
     renderDash();
     // لو كان المستخدم في صفحة التفاصيل لحظة اكتمال التزامن، أعِد رسمها
@@ -2124,6 +2130,8 @@ async function pasteTable(){
     detCols[activeDetail]=rows[0].map(c=>c.trim());
     detRows[activeDetail]=rows.slice(1).filter(r=>r.some(c=>c.trim())).map(r=>rows[0].map((_,ci)=>(r[ci]||'').trim()));
     normalizeDetDates(activeDetail);
+    detSort[activeDetail] = undefined;
+    autoSort(activeDetail);
     recalcTracked(activeDetail);
     saveDetailToCloud(activeDetail);
     renderDetTable();
@@ -2143,6 +2151,8 @@ async function pasteTable(){
           detCols[activeDetail]=rows[0].map(c=>c.trim());
           detRows[activeDetail]=rows.slice(1).filter(r=>r.some(c=>c.trim())).map(r=>rows[0].map((_,ci)=>(r[ci]||'').trim()));
           normalizeDetDates(activeDetail);
+          detSort[activeDetail] = undefined;
+          autoSort(activeDetail);
           recalcTracked(activeDetail);
           saveDetailToCloud(activeDetail);
           renderDetTable();
@@ -2456,6 +2466,7 @@ function stLegend(){
       <b style="color:#7a6a2f">معلق</b> بانتظار تحديد الموعد المخطط
       <br>عمودا «الحالة» و«الأيام» يُحسبان تلقائياً من التواريخ — يكفي تحديث تاريخَي التسليم المخطط والاستلام الفعلي.
       <br>صيغة التواريخ موحّدة <b dir="ltr">YYYY-MM-DD</b> — اكتبها بأي صيغة (13/04/2026 · 2026-4-13 · ١٣/٠٤/٢٠٢٦) وتُحوَّل تلقائياً، وكذلك ما يأتي من ملف Excel.
+      <br>الجدول مرتَّب من <b>الأقدم إلى الأحدث</b> حسب أول عمود تاريخ. زر <b>⇅</b> في رأس أي عمود يرتّب عليه: تصاعدي ← تنازلي ← بلا ترتيب.
       الأيام — للمستلَمة: موجب = تأخير عن المخطط، سالب = تسليم مبكر.
       وللتي لم تُستلم: موجب = أيام تأخير حتى اليوم، سالب = أيام متبقية للموعد.
     </div>`;
@@ -2474,11 +2485,18 @@ function renderDetTable(){
   const tracked=isTracked(activeDetail);
   const cS=dcol(activeDetail,'stat'), cD=dcol(activeDetail,'days'), cT=dcol(activeDetail,'type');
   // Header
+  const st = detSort[activeDetail];
   document.getElementById('detail-thead').innerHTML=`<tr class="th-titles">
-    ${cols.map((c,ci)=>`<th><div class="th-wrap">
+    ${cols.map((c,ci)=>{
+      const on = st && st.ci === ci;
+      const ico = !on ? '⇅' : st.dir === 1 ? '▲' : '▼';
+      const tip = !on ? 'ترتيب حسب هذا العمود'
+                : st.dir === 1 ? 'مرتَّب تصاعدياً — اضغط للعكس' : 'مرتَّب تنازلياً — اضغط للإلغاء';
+      return `<th><div class="th-wrap">
+      <button class="th-sort${on ? ' on' : ''}" onclick="setSort(${ci})" title="${tip}">${ico}</button>
       <textarea class="th-input" rows="1" placeholder="عنوان العمود" oninput="autoGrow(this)" onchange="headEdit(${ci}, this.value)">${esc(c)}</textarea>
       <button class="th-del" onclick="delCol(${ci})" title="حذف العمود">×</button>
-    </div></th>`).join('')}
+    </div></th>`;}).join('')}
     <th rowspan="2" class="th-actions">حذف</th>
   </tr>
   <tr class="th-filters">
@@ -2545,7 +2563,8 @@ function detSnap(idx){
     cols: detCols[idx].slice(),
     rows: detRows[idx].map(r => r.slice()),
     filt: Object.assign({}, detColFilter[idx]),
-    late: detLateOnly[idx]
+    late: detLateOnly[idx],
+    sort: detSort[idx] ? {ci: detSort[idx].ci, dir: detSort[idx].dir} : detSort[idx]
   });
   if(detUndo[idx].length > UNDO_MAX) detUndo[idx].shift();
   undoBtnSync();
@@ -2567,6 +2586,7 @@ async function detUndoLast(){
   detRows[idx] = snap.rows;
   detColFilter[idx] = snap.filt;
   detLateOnly[idx] = snap.late;
+  detSort[idx] = snap.sort;
   renderDetTable();
   showSyncStatus('↩️ تم التراجع عن آخر تغيير');
   await saveDetailToCloud(idx);
@@ -2582,8 +2602,12 @@ function cellEdit(ri, ci, val){
   detSnap(idx);
   detRows[idx][ri][ci] = val;
   saveDetSoon(idx);
+  // تعديل عمود الترتيب يعيد الصف لموضعه الصحيح
+  const st = detSort[idx];
+  const resort = st && st.ci === ci && applySort(idx);
   // تغيير تاريخ يغيّر «الحالة» و«الأيام» — أعِد الحساب والرسم فوراً
-  if(dateCol && isTracked(idx)){ recalcTracked(idx); renderDetTable(); }
+  if(dateCol && isTracked(idx)) recalcTracked(idx);
+  if(resort || (dateCol && isTracked(idx))) renderDetTable();
 }
 function headEdit(ci, val){
   if(detCols[activeDetail][ci] === val) return;
@@ -2609,6 +2633,88 @@ document.addEventListener('keydown', e => {
 const detColFilter = [{}, {}, {}, {}];      // لكل مخرج: {رقم العمود: القيمة المختارة}
 const detLateOnly  = [false, false, false, false];   // اقتصار على ما سُلِّم بعد الموعد
 const detShown     = [null, null, null, null];       // الصفوف المعروضة بعد الفلترة
+
+// ═══════════════════════════════════════════════════════════
+// ترتيب الصفوف — الافتراضي: أقدم تاريخ أولاً في كل المخرجات
+// ═══════════════════════════════════════════════════════════
+// undefined = لم يُحدَّد بعد (يأخذ الافتراضي) · null = ألغاه المستخدم
+const detSort = [undefined, undefined, undefined, undefined];
+
+// أول عمود تاريخ في الجدول — هو محور الترتيب الطبيعي لكل مخرج
+function firstDateCol(idx){
+  const cols = detCols[idx] || [];
+  for(let i = 0; i < cols.length; i++) if(isDateCol(idx, i)) return i;
+  return -1;
+}
+
+const isNumCol = (idx, ci) => {
+  const c = String((detCols[idx] || [])[ci] || '');
+  return c.includes('العدد') || c.includes('أيام');
+};
+
+// الفارغ وغير التاريخ («لايوجد») يذهبان لآخر الجدول في الاتجاهين
+function cmpCell(a, b, kind){
+  a = String(a == null ? '' : a).trim();
+  b = String(b == null ? '' : b).trim();
+  if(kind === 'date'){
+    const da = pDate(a), db = pDate(b);
+    if(!da && !db) return 0;
+    if(!da) return Infinity;          // علامة «أخيراً دائماً»
+    if(!db) return -Infinity;
+    return da - db;
+  }
+  if(!a && !b) return 0;
+  if(!a) return Infinity;
+  if(!b) return -Infinity;
+  if(kind === 'num'){
+    const na = parseFloat(a), nb = parseFloat(b);
+    if(!isNaN(na) && !isNaN(nb)) return na - nb;
+  }
+  return a.localeCompare(b, 'ar');
+}
+
+// ترتيب detRows نفسها (لا العرض فقط) ليصل الترتيب للإكسل والتقرير والسحابة
+function applySort(idx){
+  let st = detSort[idx];
+  const rows = detRows[idx];
+  if(st && st.ci >= (detCols[idx] || []).length){ detSort[idx] = undefined; st = undefined; }
+  if(!st || !rows || !rows.length) return false;
+  const kind = isDateCol(idx, st.ci) ? 'date' : isNumCol(idx, st.ci) ? 'num' : 'text';
+  const before = rows.slice();
+  rows.sort((r1, r2)=>{                 // ترتيب JS مستقر: المتساوي يبقى بترتيبه
+    const c = cmpCell(r1[st.ci], r2[st.ci], kind);
+    if(c === Infinity || c === -Infinity) return c > 0 ? 1 : -1;   // الفارغ أخيراً
+    return c * st.dir;
+  });
+  return before.some((r, i) => r !== rows[i]);
+}
+
+// يطبّق الافتراضي (أقدم تاريخ أولاً) على من لم يُحدَّد له ترتيب بعد
+function autoSort(idx){
+  if(detSort[idx] === undefined){
+    const ci = firstDateCol(idx);
+    detSort[idx] = ci >= 0 ? {ci, dir: 1} : null;
+  }
+  return applySort(idx);
+}
+function autoSortAll(){ return [0,1,2,3].filter(autoSort); }
+
+// نقرة: تصاعدي ← تنازلي ← بلا ترتيب
+function setSort(ci){
+  const idx = activeDetail, cur = detSort[idx];
+  const next = (!cur || cur.ci !== ci) ? {ci, dir: 1}
+             : cur.dir === 1           ? {ci, dir: -1}
+             : null;
+  if(next) detSnap(idx);          // اللقطة قبل تغيير الحالة، وإلا سجّلت الحالة الجديدة
+  detSort[idx] = next;
+  if(next){
+    applySort(idx);
+    saveDetSoon(idx);
+    showSyncStatus((next.dir === 1 ? '⬆️ الأقدم أولاً' : '⬇️ الأحدث أولاً')
+      + ' حسب «' + (detCols[idx][ci] || '') + '»');
+  }else showSyncStatus('↕️ أُلغي الترتيب — الصفوف بترتيبها الحالي');
+  renderDetTable();
+}
 
 // النقر على بطاقة حالة يفلتر عليها، وعلى «الإجمالي» يمسح كل الفلاتر
 function stFilter(val){
@@ -2717,6 +2823,8 @@ function addCol(){
 function delCol(ci){
   if(!confirm('حذف هذا العمود؟'))return;
   detSnap(activeDetail);
+  const st=detSort[activeDetail];
+  if(st){ if(st.ci===ci) detSort[activeDetail]=undefined; else if(st.ci>ci) st.ci--; }
   detCols[activeDetail].splice(ci,1);
   detRows[activeDetail].forEach(r=>r.splice(ci,1));
   renderDetTable();
@@ -2725,6 +2833,8 @@ function delCol(ci){
 function delLastCol(){
   if(detCols[activeDetail].length<=1)return;
   detSnap(activeDetail);
+  const st=detSort[activeDetail];
+  if(st && st.ci===detCols[activeDetail].length-1) detSort[activeDetail]=undefined;
   detCols[activeDetail].pop();
   detRows[activeDetail].forEach(r=>r.pop());
   renderDetTable();
@@ -2820,6 +2930,8 @@ async function impRun(){
     ensureTrackedCols(idx);
     migrateStatusLast(idx);
     normalizeDetDates(idx);
+    detSort[idx] = undefined;      // الملف الجديد يأخذ الترتيب الافتراضي
+    autoSort(idx);
     recalcTracked(idx);
     detColFilter[idx] = {}; detLateOnly[idx] = false;
     renderDetTable();
@@ -2881,6 +2993,7 @@ async function impRun(){
   });
 
   normalizeDetDates(idx);
+  autoSort(idx);                   // الصفوف الجديدة تأخذ مكانها الزمني الصحيح
   recalcTracked(idx);
   renderDetTable();
   const ignored = map.filter(m => m < 0).length;
@@ -3392,6 +3505,7 @@ ${pagesHTML}
 TRACKED.forEach(ensureTrackedCols);
 TRACKED.forEach(migrateStatusLast);
 normalizeAllDates();
+autoSortAll();
 recalcStrategies();
 renderDash();
 </script>
