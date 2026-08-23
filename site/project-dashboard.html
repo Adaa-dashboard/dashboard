@@ -18,7 +18,7 @@
   --r:12px;
 }
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
-html{font-size:14px;}
+html{font-size:15px;}   /* الأساس — يكبر تدريجياً في قواعد الاستجابة أدناه */
 body{font-family:'IBM Plex Sans Arabic',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;direction:rtl;}
 
 /* ── TOPBAR ── */
@@ -472,8 +472,9 @@ button.paid-badge{cursor:pointer;}
 /* ملخص حالات الاستراتيجيات */
 .st-summary{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
 .st-kpi{flex:1;min-width:110px;border-radius:9px;padding:8px 12px;border:1px solid;}
-.st-kpi .n{font-size:1.25rem;font-weight:800;line-height:1.1;}
-.st-kpi .t{font-size:.63rem;font-weight:700;opacity:.85;}
+.st-kpi .n{font-size:1.35rem;font-weight:800;line-height:1.1;}
+.st-kpi .n .of{font-size:.7rem;font-weight:700;opacity:.6;}
+.st-kpi .t{font-size:.66rem;font-weight:700;opacity:.85;}
 .st-done{background:#eaf6ee;border-color:#bfe0cc;color:#155c35;}
 .st-prog{background:#e9eefb;border-color:#c3d0f0;color:#1e40af;}
 .st-late{background:#fdeaea;border-color:#f2c2c2;color:#9b1c1c;}
@@ -504,12 +505,16 @@ button.paid-badge{cursor:pointer;}
 @media(max-width:760px){.st-boxes{grid-template-columns:1fr;}}
 
 /* ══════════ RESPONSIVE ══════════ */
+/* كل المقاسات بـ rem، فتكبير جذر الصفحة يكبّر كل شيء بالتناسب */
+@media(min-width:480px){  html{font-size:16px;} }
+@media(min-width:1024px){ html{font-size:17px;} }
+@media(min-width:1280px){ html{font-size:18px;} }
+@media(min-width:1600px){ html{font-size:19.5px;} }
+@media(min-width:1920px){ html{font-size:21px;} }
+@media(min-width:2400px){ html{font-size:22px;} }
+
 @media(min-width:1600px){
   .main{padding:22px 36px;}
-  .cmp-cv{font-size:1.35rem;}
-  .main-tbl td{font-size:.7rem;}
-  .main-tbl thead th{font-size:.66rem;}
-  .cell-input{font-size:.74rem;}
 }
 
 @media(max-width:1100px){
@@ -2246,11 +2251,13 @@ function renderStrategyExtras(){
   const bot = document.getElementById('strat-bottom');
   if(!isTracked(activeDetail)){ top.innerHTML = ''; bot.innerHTML = ''; return; }
 
-  const rows = detRows[activeDetail] || [];
+  const all  = detRows[activeDetail] || [];
+  const rows = detShown[activeDetail] || all;     // البطاقات تعكس المعروض بعد الفلترة
   const cS = dcol(activeDetail, 'stat');
   const cP = dcol(activeDetail, 'plan');
   const cR = dcol(activeDetail, 'recv');
   const f  = detColFilter[activeDetail];
+  const filtered = rows.length !== all.length;
   const DAY = 86400000;
 
   // مكتملة لكنها سُلِّمت بعد الموعد المخطط
@@ -2271,13 +2278,15 @@ function renderStrategyExtras(){
   };
   const sum = arr => arr.reduce((a, r)=> a + num(r), 0);
   const totalItems = sum(rows);
+  const grandTotal = sum(all);
 
   const on = v => f[cS] === v ? ' sel' : '';
   top.innerHTML = `<div class="st-summary">
     <div class="st-kpi st-total${Object.keys(f).length || detLateOnly[activeDetail] ? '' : ' sel'}"
          onclick="stFilter(null)" title="عرض الكل">
-      <div class="n">${totalItems}</div>
-      <div class="t">الإجمالي${totalItems !== rows.length ? ' · ' + rows.length + ' سطر' : ''}</div>
+      <div class="n">${totalItems}${filtered ? '<span class="of"> / ' + grandTotal + '</span>' : ''}</div>
+      <div class="t">${filtered ? 'الإجمالي المفلتر' : 'الإجمالي'}${
+        totalItems !== rows.length ? ' · ' + rows.length + ' سطر' : ''}</div>
     </div>
     ${ST_ORDER.map(([name, cls])=>{
       const n = sum(rows.filter(r => r[cS] === name));
@@ -2357,6 +2366,7 @@ function renderDetTable(){
   </tr>`;
   // Body
   const shown = detFilterRows(rows);
+  detShown[activeDetail] = shown.map(([r])=>r);
   document.getElementById('detail-tbody').innerHTML=shown.map(([row,ri])=>`
     <tr>${cols.map((_,ci)=>{
       if(activeDetail===1 && ci===cT){
@@ -2393,6 +2403,7 @@ function autoGrow(el){
 // ═══ فلترة بالعناوين: قائمة اختيار داخل رأس كل عمود ═══
 const detColFilter = [{}, {}, {}, {}];      // لكل مخرج: {رقم العمود: القيمة المختارة}
 const detLateOnly  = [false, false, false, false];   // اقتصار على ما سُلِّم بعد الموعد
+const detShown     = [null, null, null, null];       // الصفوف المعروضة بعد الفلترة
 
 // النقر على بطاقة حالة يفلتر عليها، وعلى «الإجمالي» يمسح كل الفلاتر
 function stFilter(val){
