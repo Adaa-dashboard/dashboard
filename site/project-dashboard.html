@@ -210,6 +210,12 @@ table.main-tbl{width:100%;border-collapse:collapse;}
   border-right:1px solid rgba(255,255,255,.1);}
 .th-sort:hover{background:rgba(255,255,255,.22);color:#fff;}
 .th-sort.on{background:var(--gold,#c9a020);color:#0d3d22;font-weight:700;}
+/* تبديل اليوم/الشهر — يظهر على أعمدة التاريخ فقط */
+.th-swap{background:rgba(255,255,255,.08);border:none;color:rgba(255,255,255,.5);
+  cursor:pointer;padding:6px 6px;font-size:.72rem;line-height:1;flex-shrink:0;transition:all .15s;
+  border-right:1px solid rgba(255,255,255,.1);}
+.th-swap:hover{background:rgba(201,160,32,.85);color:#0d3d22;}
+body.det-locked .th-swap{display:none;}
 body.det-locked .th-del{display:none;}
 .detail-tbl tbody tr{border-bottom:1px solid var(--border);transition:background .12s;}
 .detail-tbl tbody tr:hover{background:rgba(41,163,97,.04);}
@@ -2284,7 +2290,10 @@ const iso = (y, m, d) => {
 };
 
 // يُرجع YYYY-MM-DD، أو النص كما هو إن لم يكن تاريخاً (لا يوجد · لم يتم التحديد)
-function normDate(v){
+// dayFirst: هل يُقرأ 08/10/2026 كـ 8 أكتوبر (true) أم 10 أغسطس (false)؟
+// يُمرَّر من colDayFirst() التي تستنتجه من العمود كله لا من الخلية وحدها.
+function normDate(v, dayFirst){
+  if(dayFirst === undefined) dayFirst = true;
   if(v instanceof Date && !isNaN(v))
     return iso(v.getFullYear(), v.getMonth() + 1, v.getDate()) || '';
 
@@ -2299,13 +2308,13 @@ function normDate(v){
   if((m = t.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})(?:[T ].*)?$/)))
     return iso(+m[1], +m[2], +m[3]) || t;
 
-  // 13/04/2026 — اليوم أولاً (المتعارف عليه محلياً)، إلا إذا تجاوز الأول 12 فهو يوم قطعاً
+  // 08/10/2026 — أيّهما اليوم وأيّهما الشهر؟
   if((m = t.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2}|\d{4})$/))){
     let y = +m[3]; if(y < 100) y += 2000;
-    let a = +m[1], b = +m[2];
-    if(a > 12 && b <= 12) return iso(y, b, a) || t;   // يوم/شهر
-    if(b > 12 && a <= 12) return iso(y, a, b) || t;   // شهر/يوم
-    return iso(y, b, a) || t;                          // الافتراضي: يوم/شهر
+    const a = +m[1], b = +m[2];
+    if(a > 12 && b <= 12) return iso(y, b, a) || t;   // الأول يوم قطعاً
+    if(b > 12 && a <= 12) return iso(y, a, b) || t;   // الثاني يوم قطعاً
+    return (dayFirst ? iso(y, b, a) : iso(y, a, b)) || t;
   }
 
   // الرقم التسلسلي لإكسل (1900-03-01 فما بعد)
@@ -2319,20 +2328,78 @@ function normDate(v){
   return t;    // نص غير تاريخ — يبقى كما هو حتى لا تضيع المعلومة
 }
 
+const DMY_RE = /^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2}|\d{4})$/;
+
+// هل هذا العمود يوم/شهر أم شهر/يوم؟ يُستنتج من **العمود كله** لا من الخلية:
+// صفٌ واحد فيه جزء أول > 12 يحسم أنه يوم/شهر، والعكس بالعكس.
+// أدق بكثير من التخمين لكل خلية على حدة، وهو ما جعل 08/10 تُقرأ خطأ.
+function colDayFirst(idx, ci){
+  const rows = detRows[idx] || [];
+  let dayFirst = false, monthFirst = false;
+  rows.forEach(r=>{
+    const t = String(r[ci] == null ? '' : r[ci])
+      .replace(AR_DIGITS, c => String(c.charCodeAt(0) & 0xF)).trim();
+    const m = t.match(DMY_RE);
+    if(!m) return;
+    if(+m[1] > 12) dayFirst = true;
+    if(+m[2] > 12) monthFirst = true;
+  });
+  if(dayFirst && !monthFirst) return true;
+  if(monthFirst && !dayFirst) return false;
+  return true;      // بلا دليل: الافتراضي المحلي يوم/شهر
+}
+
 // توحيد كل خلايا أعمدة التاريخ في مخرج — تُرجع true إن تغيّر شيء
 function normalizeDetDates(idx){
   const cols = detCols[idx] || [], rows = detRows[idx] || [];
   const dc = cols.map((_, ci) => ci).filter(ci => isDateCol(idx, ci));
   if(!dc.length) return false;
   let changed = false;
-  rows.forEach(r=>{
-    dc.forEach(ci=>{
+  dc.forEach(ci=>{
+    const df = colDayFirst(idx, ci);
+    rows.forEach(r=>{
       const before = r[ci] == null ? '' : r[ci];
-      const after  = normDate(before);
+      const after  = normDate(before, df);
       if(after !== before){ r[ci] = after; changed = true; }
     });
   });
   return changed;
+}
+
+// ═══ إصلاح عمود انقلب فيه اليوم والشهر ═══
+// يبدّل الجزأين في كل خلايا العمود القابلة للتبديل (اليوم ≤ 12)،
+// ويترك ما لا يقبل التبديل (25 مثلاً ليس شهراً) كما هو.
+function swapDM(ci){
+  const idx = activeDetail;
+  const rows = detRows[idx] || [];
+  const plan = [];
+  rows.forEach((r, ri)=>{
+    const v = String(r[ci] == null ? '' : r[ci]).trim();
+    const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if(!m) return;
+    const sw = iso(+m[1], +m[3], +m[2]);     // الشهر ← اليوم
+    if(sw) plan.push([ri, v, sw]);
+  });
+  if(!plan.length){
+    alert('لا توجد في هذا العمود تواريخ يمكن تبديل يومها وشهرها.\n'
+        + '(اليوم أكبر من 12 لا يصلح شهراً)');
+    return;
+  }
+  const sample = plan.slice(0, 3).map(([, a, c]) => a + '  ←  ' + c).join('\n');
+  const stuck = rows.length - plan.length;
+  if(!confirm('تبديل اليوم والشهر في عمود «' + (detCols[idx][ci] || '') + '»\n\n'
+      + sample + (plan.length > 3 ? '\n…' : '') + '\n\n'
+      + plan.length + ' تاريخاً سيتغيّر'
+      + (stuck > 0 ? ' · ' + stuck + ' صفاً لن يتغيّر (يومه أكبر من 12 أو ليس تاريخاً)' : '')
+      + '\n\nيمكنك التراجع بزر ↩️ بعدها.')) return;
+
+  detSnap(idx);
+  plan.forEach(([ri, , sw]) => { rows[ri][ci] = sw; });
+  recalcTracked(idx);
+  applySort(idx);
+  renderDetTable();
+  saveDetailToCloud(idx);
+  showSyncStatus('🔁 بُدِّل اليوم والشهر في ' + plan.length + ' تاريخاً');
 }
 
 // تُرجع أرقام المخرجات التي تغيّرت فعلاً
@@ -2467,6 +2534,7 @@ function stLegend(){
       <br>عمودا «الحالة» و«الأيام» يُحسبان تلقائياً من التواريخ — يكفي تحديث تاريخَي التسليم المخطط والاستلام الفعلي.
       <br>صيغة التواريخ موحّدة <b dir="ltr">YYYY-MM-DD</b> — اكتبها بأي صيغة (13/04/2026 · 2026-4-13 · ١٣/٠٤/٢٠٢٦) وتُحوَّل تلقائياً، وكذلك ما يأتي من ملف Excel.
       <br>الجدول مرتَّب من <b>الأقدم إلى الأحدث</b> حسب أول عمود تاريخ. زر <b>⇅</b> في رأس أي عمود يرتّب عليه: تصاعدي ← تنازلي ← بلا ترتيب.
+      <br>لو ظهر عمود تاريخ مقلوباً (اليوم مكان الشهر) اضغط <b>⇄</b> في رأسه لتبديلهما في العمود كله — ويمكن التراجع بعدها.
       الأيام — للمستلَمة: موجب = تأخير عن المخطط، سالب = تسليم مبكر.
       وللتي لم تُستلم: موجب = أيام تأخير حتى اليوم، سالب = أيام متبقية للموعد.
     </div>`;
@@ -2492,8 +2560,11 @@ function renderDetTable(){
       const ico = !on ? '⇅' : st.dir === 1 ? '▲' : '▼';
       const tip = !on ? 'ترتيب حسب هذا العمود'
                 : st.dir === 1 ? 'مرتَّب تصاعدياً — اضغط للعكس' : 'مرتَّب تنازلياً — اضغط للإلغاء';
+      const swap = isDateCol(activeDetail, ci)
+        ? `<button class="th-swap" onclick="swapDM(${ci})"
+             title="تبديل اليوم والشهر في هذا العمود (لو انقلبا عند الاستيراد)">⇄</button>` : '';
       return `<th><div class="th-wrap">
-      <button class="th-sort${on ? ' on' : ''}" onclick="setSort(${ci})" title="${tip}">${ico}</button>
+      <button class="th-sort${on ? ' on' : ''}" onclick="setSort(${ci})" title="${tip}">${ico}</button>${swap}
       <textarea class="th-input" rows="1" placeholder="عنوان العمود" oninput="autoGrow(this)" onchange="headEdit(${ci}, this.value)">${esc(c)}</textarea>
       <button class="th-del" onclick="delCol(${ci})" title="حذف العمود">×</button>
     </div></th>`;}).join('')}
