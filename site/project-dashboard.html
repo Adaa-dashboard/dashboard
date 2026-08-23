@@ -591,6 +591,31 @@ body.view-only #view-only-bar{display:block;}
 
 <div id="view-only-bar">👁️ وضع العرض فقط — لا تملك صلاحية تعديل البيانات</div>
 
+<!-- IMPORT MODAL -->
+<div id="imp-modal" style="display:none" class="overlay" onclick="if(event.target===this)closeImp()">
+  <div class="modal-box" style="max-width:460px;text-align:right;">
+    <h2>📥 رفع ملف Excel</h2>
+    <div class="su-field">
+      <label>الورقة (Sheet)</label>
+      <select id="imp-sheet" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.72rem;"></select>
+    </div>
+    <div class="su-field">
+      <label>الطريقة</label>
+      <label style="display:flex;gap:7px;align-items:flex-start;font-size:.68rem;font-weight:600;margin-bottom:6px;cursor:pointer;">
+        <input type="radio" name="impmode" value="merge" checked style="margin-top:3px">
+        <span><b>دمج</b> — يحدّث الصفوف الموجودة ويضيف الجديدة، والعناوين لا تتغير</span>
+      </label>
+      <label style="display:flex;gap:7px;align-items:flex-start;font-size:.68rem;font-weight:600;cursor:pointer;">
+        <input type="radio" name="impmode" value="replace" style="margin-top:3px">
+        <span><b>استبدال كامل</b> — يمسح كل الصفوف والعناوين الحالية ويعتمد الملف</span>
+      </label>
+    </div>
+    <div id="imp-info" style="font-size:.66rem;color:var(--muted);line-height:1.8;margin-bottom:10px;"></div>
+    <button class="save-btn" style="width:100%;border-radius:7px;" onclick="impRun()">تنفيذ</button>
+    <button class="modal-close" onclick="closeImp()">إلغاء</button>
+  </div>
+</div>
+
 <!-- SETTINGS MODAL -->
 <div id="settings-modal" style="display:none" class="overlay" onclick="if(event.target===this)closeSettings()">
   <div class="modal-box" style="max-width:700px;width:95%;text-align:right;">
@@ -2117,7 +2142,8 @@ function dcol(idx, key){
     if(key === 'days' && c.includes('أيام'))  return i;
     if(key === 'plan' && c.includes('مخطط'))  return i;
     if(key === 'recv' && c.includes('استلام') && !c.includes('مخطط')) return i;
-    if(key === 'type' && c.trim() === 'النوع')   return i;
+    if(key === 'type'  && c.trim() === 'النوع') return i;
+    if(key === 'count' && c.includes('العدد'))  return i;
   }
   return -1;
 }
@@ -2236,21 +2262,32 @@ function renderStrategyExtras(){
     ? Math.round(lateDone.reduce((a,r)=>a + (pDate(r[cR]) - pDate(r[cP])) / DAY, 0) / lateDone.length)
     : 0;
 
+  // «العدد» يجعل الصف الواحد يمثّل عدة بنود (ملف واحد فيه 79 مؤشراً مثلاً)
+  const cN  = dcol(activeDetail, 'count');
+  const num = r => {
+    if(cN < 0) return 1;
+    const v = parseInt(String(r[cN] == null ? '' : r[cN]).replace(/[^0-9]/g, ''), 10);
+    return isNaN(v) || v < 1 ? 1 : v;
+  };
+  const sum = arr => arr.reduce((a, r)=> a + num(r), 0);
+  const totalItems = sum(rows);
+
   const on = v => f[cS] === v ? ' sel' : '';
   top.innerHTML = `<div class="st-summary">
     <div class="st-kpi st-total${Object.keys(f).length || detLateOnly[activeDetail] ? '' : ' sel'}"
          onclick="stFilter(null)" title="عرض الكل">
-      <div class="n">${rows.length}</div><div class="t">الإجمالي</div>
+      <div class="n">${totalItems}</div>
+      <div class="t">الإجمالي${totalItems !== rows.length ? ' · ' + rows.length + ' سطر' : ''}</div>
     </div>
     ${ST_ORDER.map(([name, cls])=>{
-      const n = rows.filter(r => r[cS] === name).length;
+      const n = sum(rows.filter(r => r[cS] === name));
       return `<div class="st-kpi ${cls}${on(name)}" onclick="stFilter('${name}')" title="فلترة على ${name}">
                 <div class="n">${n}</div><div class="t">${name}</div>
               </div>`;
     }).join('')}
     <div class="st-kpi st-lated${detLateOnly[activeDetail] ? ' sel' : ''}"
          onclick="stFilterLate()" title="مكتملة لكن سُلِّمت بعد الموعد المخطط">
-      <div class="n">${lateDone.length}</div>
+      <div class="n">${sum(lateDone)}</div>
       <div class="t">سُلِّم بعد الموعد${avgLate ? ' · بمتوسط ' + arDays(avgLate) : ''}</div>
     </div>
   </div>`;
@@ -2470,81 +2507,141 @@ function delLastCol(){
   renderDetTable();
 }
 
-// دمج لا استبدال: العناوين تبقى كما هي، والموجود يُحدَّث، والجديد يُضاف، بلا تكرار
+// الرفع: اختيار الورقة والطريقة (دمج أو استبدال كامل)
+let impState = null;
+
 function importXL(e){
   const file = e.target.files[0]; if(!file) return;
   const idx = activeDetail;
+  e.target.value = '';
   if(!can('edit:details:' + (idx + 1))){
-    showSyncStatus('🚫 صلاحيتك لا تسمح بتعديل هذا المخرج'); e.target.value=''; return;
+    showSyncStatus('🚫 صلاحيتك لا تسمح بتعديل هذا المخرج'); return;
   }
   const isCsv = file.name.toLowerCase().endsWith('.csv');
   const reader = new FileReader();
 
-  reader.onload = async ev => {
+  reader.onload = ev => {
     try{
-      let rows = [];
+      let sheets;
       if(isCsv){
-        rows = ev.target.result.split(/\r?\n/).map(r => r.split(',').map(c => c.trim().replace(/^"|"$/g, '')));
+        sheets = [{name: file.name, aoa: ev.target.result.split(/\r?\n/)
+          .map(r => r.split(',').map(c => c.trim().replace(/^"|"$/g, '')))}];
       }else{
         if(typeof XLSX === 'undefined'){ alert('مكتبة Excel لم تُحمَّل — تحقق من الاتصال'); return; }
         const wb = XLSX.read(ev.target.result, {type:'binary'});
-        rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:'', raw:false});
+        sheets = wb.SheetNames.map(n => ({
+          name: n,
+          aoa: XLSX.utils.sheet_to_json(wb.Sheets[n], {header:1, defval:'', raw:false})
+        }));
       }
-      rows = rows.filter(r => r && r.some(c => String(c).trim() !== ''));
-      if(rows.length < 2){ alert('الملف فارغ أو ليس فيه صفوف بيانات تحت العناوين'); return; }
+      sheets.forEach(sh => { sh.aoa = sh.aoa.filter(r => r && r.some(c => String(c).trim() !== '')); });
+      sheets = sheets.filter(sh => sh.aoa.length >= 2);
+      if(!sheets.length){ alert('لا توجد ورقة فيها عناوين وصفوف بيانات'); return; }
 
-      const norm = t => String(t == null ? '' : t).replace(/\s+/g, ' ').trim().toLowerCase();
-      const cols = detCols[idx];
-      const head = rows[0].map(norm);
-
-      // كل عمود في الملف ← رقم العمود المقابل في الجدول (بالاسم)، و-1 = يُتجاهَل
-      const map = head.map(h => cols.findIndex(c => norm(c) === h));
-      if(map.every(m => m < 0)){
-        alert('عناوين الملف لا تطابق أعمدة الجدول.\nنزّل القالب من زر «تصدير Excel» وعدّل عليه ثم ارفعه.');
-        return;
-      }
-
-      const keyCol = map.indexOf(0);   // أي عمود في الملف يقابل العمود الأول (المفتاح)
-      if(keyCol < 0){
-        alert('الملف لا يحتوي عمود «' + cols[0] + '» — وهو المفتاح الذي نطابق به الصفوف.');
-        return;
-      }
-
-      const seen = new Map();
-      detRows[idx].forEach((r, i)=>{ const k = norm(r[0]); if(k && !seen.has(k)) seen.set(k, i); });
-
-      let upd = 0, add = 0, skipped = 0;
-      rows.slice(1).forEach(fr => {
-        const key = norm(fr[keyCol]);
-        if(!key){ skipped++; return; }
-        let ri = seen.get(key);
-        if(ri === undefined){
-          ri = detRows[idx].length;
-          detRows[idx].push(cols.map(()=>''));
-          seen.set(key, ri);
-          add++;
-        }else upd++;
-        map.forEach((tc, fc)=>{
-          if(tc < 0) return;
-          const v = String(fr[fc] == null ? '' : fr[fc]).trim();
-          if(v !== '') detRows[idx][ri][tc] = v;    // الخلية الفارغة في الملف لا تمسح الموجود
-        });
-      });
-
-      recalcTracked(idx);
-      renderDetTable();
-      const ignored = map.filter(m => m < 0).length;
-      showSyncStatus('✅ حُدِّث ' + upd + ' · أُضيف ' + add +
-        (skipped ? ' · تُخطّي ' + skipped : '') +
-        (ignored ? ' · تُجوهل ' + ignored + ' عمود' : ''));
-      await saveDetailToCloud(idx);
-    }catch(err){
-      console.error(err);
-      alert('خطأ في قراءة الملف: ' + err.message);
-    }finally{ e.target.value = ''; }
+      impState = {idx, sheets};
+      const sel = document.getElementById('imp-sheet');
+      sel.innerHTML = sheets.map((sh, k)=>
+        `<option value="${k}">${esc(sh.name)} — ${sh.aoa.length - 1} صف</option>`).join('');
+      sel.value = String(sheets.length - 1);      // آخر ورقة غالباً الأحدث
+      document.querySelector('input[name=impmode][value=merge]').checked = true;
+      document.getElementById('imp-info').innerHTML =
+        'الجدول الحالي فيه <b>' + (detRows[idx] || []).length + '</b> صف.';
+      document.getElementById('imp-modal').style.display = 'flex';
+    }catch(err){ console.error(err); alert('خطأ في قراءة الملف: ' + err.message); }
   };
 
   isCsv ? reader.readAsText(file) : reader.readAsBinaryString(file);
+}
+
+function closeImp(){ document.getElementById('imp-modal').style.display = 'none'; impState = null; }
+
+async function impRun(){
+  if(!impState) return;
+  const {idx, sheets} = impState;
+  const aoa  = sheets[parseInt(document.getElementById('imp-sheet').value, 10)].aoa;
+  const mode = document.querySelector('input[name=impmode]:checked').value;
+
+  if(mode === 'replace' && !confirm(
+      'سيُمسح كل محتوى الجدول الحالي (' + (detRows[idx]||[]).length +
+      ' صف) ويُستبدل بمحتوى الملف (' + (aoa.length - 1) + ' صف).\nهل تريد المتابعة؟')) return;
+
+  closeImp();
+  const norm = t => String(t == null ? '' : t).replace(/\s+/g, ' ').trim().toLowerCase();
+  const head = aoa[0].map(norm);
+  const body = aoa.slice(1);
+
+  if(mode === 'replace'){
+    detCols[idx] = aoa[0].map(c => String(c).trim());
+    detRows[idx] = body.map(r => detCols[idx].map((_, ci) =>
+      String(r[ci] == null ? '' : r[ci]).trim()));
+    ensureTrackedCols(idx);
+    migrateStatusLast(idx);
+    recalcTracked(idx);
+    detColFilter[idx] = {}; detLateOnly[idx] = false;
+    renderDetTable();
+    showSyncStatus('✅ استُبدل الجدول بـ ' + detRows[idx].length + ' صف');
+    await saveDetailToCloud(idx);
+    return;
+  }
+
+  // ═══ دمج ═══
+  const cols = detCols[idx];
+  // المطابقة بالاسم، ثم بالمعنى للأعمدة المعروفة إن اختلفت التسمية
+  const KEYS = ['plan','recv','stat','days','count','type'];
+  const semantic = {};
+  KEYS.forEach(k => { const c = dcol(idx, k); if(c >= 0) semantic[k] = c; });
+  const keyOf = h => {
+    if(h.includes('مخطط')) return 'plan';
+    if(h.includes('استلام')) return 'recv';
+    if(h.includes('حالة')) return 'stat';
+    if(h.includes('أيام')) return 'days';
+    if(h.includes('العدد')) return 'count';
+    return null;
+  };
+  const map = head.map(h => {
+    const exact = cols.findIndex(c => norm(c) === h);
+    if(exact >= 0) return exact;
+    const k = keyOf(h);
+    return (k && semantic[k] !== undefined) ? semantic[k] : -1;
+  });
+  if(map.every(m => m < 0)){
+    alert('عناوين الملف لا تطابق أعمدة الجدول.\nنزّل القالب من «تصدير Excel» وعدّل عليه.');
+    return;
+  }
+  const keyCol = map.indexOf(0);
+  if(keyCol < 0){
+    alert('الملف لا يحتوي عمود «' + cols[0] + '» — وهو المفتاح الذي نطابق به الصفوف.');
+    return;
+  }
+
+  const seen = new Map();
+  detRows[idx].forEach((r, i)=>{ const k = norm(r[0]); if(k && !seen.has(k)) seen.set(k, i); });
+
+  let upd = 0, add = 0, skipped = 0;
+  body.forEach(fr => {
+    const key = norm(fr[keyCol]);
+    if(!key){ skipped++; return; }
+    let ri = seen.get(key);
+    if(ri === undefined){
+      ri = detRows[idx].length;
+      detRows[idx].push(cols.map(()=>''));
+      seen.set(key, ri);
+      add++;
+    }else upd++;
+    map.forEach((tc, fc)=>{
+      if(tc < 0) return;
+      const v = String(fr[fc] == null ? '' : fr[fc]).trim();
+      if(v !== '') detRows[idx][ri][tc] = v;
+    });
+  });
+
+  recalcTracked(idx);
+  renderDetTable();
+  const ignored = map.filter(m => m < 0).length;
+  showSyncStatus('✅ حُدِّث ' + upd + ' · أُضيف ' + add +
+    (skipped ? ' · تُخطّي ' + skipped : '') +
+    (ignored ? ' · تُجوهل ' + ignored + ' عمود' : ''));
+  await saveDetailToCloud(idx);
 }
 
 // ═══════════════════════════════════════════════════════════
