@@ -478,6 +478,12 @@ button.paid-badge{cursor:pointer;}
 .st-prog{background:#e9eefb;border-color:#c3d0f0;color:#1e40af;}
 .st-late{background:#fdeaea;border-color:#f2c2c2;color:#9b1c1c;}
 .st-hold{background:#f3f1ea;border-color:#ddd8c6;color:#7a6a2f;}
+.st-total{background:#0d3d22;border-color:#0d3d22;color:#fff;}
+.st-total .t{opacity:.75;}
+.st-lated{background:#fff3e0;border-color:#f0cf9a;color:#8a5200;}
+.st-kpi{cursor:pointer;transition:transform .12s, box-shadow .12s;}
+.st-kpi:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.10);}
+.st-kpi.sel{outline:2px solid var(--gold);outline-offset:1px;}
 /* خلية الحالة داخل الجدول */
 .st-chip{display:inline-block;border-radius:5px;padding:2px 8px;font-size:.62rem;font-weight:800;white-space:nowrap;}
 .st-days{font-size:.64rem;font-weight:700;}
@@ -1230,9 +1236,12 @@ async function loadFromCloud(){
       // للمخرجات التي لا صفوف فيها - ابق الافتراضي
       DEFAULT_ROWS.forEach((d,i)=>{ if(detRows[i].length===0) detRows[i]=d.map(r=>[...r]); });
     }
+    TRACKED.forEach(ensureTrackedCols);
     TRACKED.forEach(migrateStatusLast);
     recalcStrategies();
     renderDash();
+    // لو كان المستخدم في صفحة التفاصيل لحظة اكتمال التزامن، أعِد رسمها
+    if(document.getElementById('details-view').classList.contains('on')) renderDetails();
     showSyncStatus('✅ تم التزامن – '+new Date().toLocaleTimeString('ar'));
   } catch(e){
     console.error(e);
@@ -2103,10 +2112,11 @@ function dcol(idx, key){
   const cols = detCols[idx] || [];
   for(let i = 0; i < cols.length; i++){
     const c = String(cols[i] || '');
-    if(key === 'stat' && c.includes('الحالة'))   return i;
-    if(key === 'days' && c.includes('الأيام'))   return i;
-    if(key === 'plan' && c.includes('المخطط'))   return i;
-    if(key === 'recv' && c.includes('الاستلام')) return i;
+    // مطابقة بلا «ال» التعريف حتى تعمل مع «استلامها» و«مخطط» وغيرها
+    if(key === 'stat' && c.includes('حالة'))  return i;
+    if(key === 'days' && c.includes('أيام'))  return i;
+    if(key === 'plan' && c.includes('مخطط'))  return i;
+    if(key === 'recv' && c.includes('استلام') && !c.includes('مخطط')) return i;
     if(key === 'type' && c.trim() === 'النوع')   return i;
   }
   return -1;
@@ -2115,6 +2125,35 @@ function dcol(idx, key){
 const isTracked = i => TRACKED.includes(i)
   && dcol(i,'stat') >= 0 && dcol(i,'days') >= 0
   && dcol(i,'plan') >= 0 && dcol(i,'recv') >= 0;
+
+// م2 وغيره قد ينقصه عمود التسليم المخطط أو الأيام أو الحالة — نستكملها
+function ensureTrackedCols(idx){
+  if(!TRACKED.includes(idx)) return false;
+  const cols = detCols[idx];
+  if(!cols || !cols.length) return false;
+  let changed = false;
+
+  // «تاريخ التسليم المخطط» يُدرج قبل عمود الاستلام ليقرأ الجدول منطقياً
+  if(dcol(idx, 'plan') < 0){
+    const at  = dcol(idx, 'recv');
+    const pos = at >= 0 ? at : cols.length;
+    cols.splice(pos, 0, 'تاريخ التسليم المخطط');
+    (detRows[idx] || []).forEach(r=>{
+      while(r.length < cols.length - 1) r.push('');
+      r.splice(pos, 0, '');
+    });
+    changed = true;
+  }
+
+  [['days', 'الأيام (تأخير/متبقي)'], ['stat', 'الحالة']].forEach(([k, name])=>{
+    if(dcol(idx, k) < 0){
+      cols.push(name);
+      (detRows[idx] || []).forEach(r=>{ while(r.length < cols.length) r.push(''); });
+      changed = true;
+    }
+  });
+  return changed;
+}
 
 // «الحالة» تُعرض في آخر الجدول — تنقل العمود وقيمه لمن لديه بيانات بالترتيب القديم
 function migrateStatusLast(idx){
@@ -2183,10 +2222,38 @@ function renderStrategyExtras(){
 
   const rows = detRows[activeDetail] || [];
   const cS = dcol(activeDetail, 'stat');
-  top.innerHTML = '<div class="st-summary">' + ST_ORDER.map(([name, cls])=>{
-    const n = rows.filter(r => r[cS] === name).length;
-    return `<div class="st-kpi ${cls}"><div class="n">${n}</div><div class="t">${name}</div></div>`;
-  }).join('') + '</div>';
+  const cP = dcol(activeDetail, 'plan');
+  const cR = dcol(activeDetail, 'recv');
+  const f  = detColFilter[activeDetail];
+  const DAY = 86400000;
+
+  // مكتملة لكنها سُلِّمت بعد الموعد المخطط
+  const lateDone = rows.filter(r=>{
+    const p = pDate(r[cP]), rc = pDate(r[cR]);
+    return p && rc && rc > p;
+  });
+  const avgLate = lateDone.length
+    ? Math.round(lateDone.reduce((a,r)=>a + (pDate(r[cR]) - pDate(r[cP])) / DAY, 0) / lateDone.length)
+    : 0;
+
+  const on = v => f[cS] === v ? ' sel' : '';
+  top.innerHTML = `<div class="st-summary">
+    <div class="st-kpi st-total${Object.keys(f).length || detLateOnly[activeDetail] ? '' : ' sel'}"
+         onclick="stFilter(null)" title="عرض الكل">
+      <div class="n">${rows.length}</div><div class="t">الإجمالي</div>
+    </div>
+    ${ST_ORDER.map(([name, cls])=>{
+      const n = rows.filter(r => r[cS] === name).length;
+      return `<div class="st-kpi ${cls}${on(name)}" onclick="stFilter('${name}')" title="فلترة على ${name}">
+                <div class="n">${n}</div><div class="t">${name}</div>
+              </div>`;
+    }).join('')}
+    <div class="st-kpi st-lated${detLateOnly[activeDetail] ? ' sel' : ''}"
+         onclick="stFilterLate()" title="مكتملة لكن سُلِّمت بعد الموعد المخطط">
+      <div class="n">${lateDone.length}</div>
+      <div class="t">سُلِّم بعد الموعد${avgLate ? ' · بمتوسط ' + arDays(avgLate) : ''}</div>
+    </div>
+  </div>`;
 
   // القائمتان خاصتان بالاستراتيجيات (م1)
   if(activeDetail !== 0){
@@ -2288,6 +2355,24 @@ function autoGrow(el){
 
 // ═══ فلترة بالعناوين: قائمة اختيار داخل رأس كل عمود ═══
 const detColFilter = [{}, {}, {}, {}];      // لكل مخرج: {رقم العمود: القيمة المختارة}
+const detLateOnly  = [false, false, false, false];   // اقتصار على ما سُلِّم بعد الموعد
+
+// النقر على بطاقة حالة يفلتر عليها، وعلى «الإجمالي» يمسح كل الفلاتر
+function stFilter(val){
+  detLateOnly[activeDetail] = false;
+  const cS = dcol(activeDetail, 'stat');
+  if(val === null){ detColFilter[activeDetail] = {}; }
+  else if(cS >= 0){
+    const f = detColFilter[activeDetail];
+    if(f[cS] === val) delete f[cS]; else f[cS] = val;
+  }
+  renderDetTable();
+}
+
+function stFilterLate(){
+  detLateOnly[activeDetail] = !detLateOnly[activeDetail];
+  renderDetTable();
+}
 
 function setColFilter(ci, val){
   const f = detColFilter[activeDetail];
@@ -2297,6 +2382,7 @@ function setColFilter(ci, val){
 
 function clearColFilters(){
   detColFilter[activeDetail] = {};
+  detLateOnly[activeDetail] = false;
   renderDetTable();
 }
 
@@ -2320,15 +2406,21 @@ function thFilter(rows, ci){
 function detFilterRows(rows){
   const f = detColFilter[activeDetail];
   const keys = Object.keys(f);
+  const late = detLateOnly[activeDetail];
+  const cP = dcol(activeDetail, 'plan'), cR = dcol(activeDetail, 'recv');
   const out = [];
   rows.forEach((row, ri)=>{
+    if(late){
+      const p = pDate(row[cP]), rc = pDate(row[cR]);
+      if(!(p && rc && rc > p)) return;
+    }
     for(const k of keys){
       if(String(row[k] == null ? '' : row[k]).trim() !== f[k]) return;
     }
     out.push([row, ri]);
   });
   const bar = document.getElementById('det-filter-bar');
-  if(keys.length){
+  if(keys.length || late){
     bar.style.display = 'flex';
     document.getElementById('det-count').textContent =
       'عرض ' + out.length + ' من ' + rows.length + ' صف';
@@ -2954,6 +3046,7 @@ ${pagesHTML}
 // ═══════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════
+TRACKED.forEach(ensureTrackedCols);
 TRACKED.forEach(migrateStatusLast);
 recalcStrategies();
 renderDash();
