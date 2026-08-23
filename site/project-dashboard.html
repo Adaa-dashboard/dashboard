@@ -98,7 +98,7 @@ body{font-family:'IBM Plex Sans Arabic',sans-serif;background:var(--bg);color:va
 /* 4 output comparison cards */
 .cmp-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:0;align-items:stretch;}
 .cmp-card{border-radius:10px;border:1px solid var(--border);overflow:hidden;display:flex;flex-direction:column;}
-.cmp-card-hdr{padding:7px 12px;font-size:.68rem;font-weight:700;color:#fff;display:flex;align-items:center;gap:5px;}
+.cmp-card-hdr{padding:8px 12px;font-size:.68rem;font-weight:700;color:#fff;display:flex;align-items:flex-start;gap:5px;line-height:1.45;}
 .cmp-cols{display:grid;grid-template-columns:1fr 1fr;}
 .cmp-col{padding:10px 12px;text-align:center;}
 .cmp-col.pl{background:#eff6ff;border-left:1px solid var(--border);}
@@ -833,10 +833,10 @@ body.view-only #view-only-bar{display:block;}
         <thead>
           <tr>
             <th rowspan="2" style="vertical-align:middle;text-align:right">الشهر</th>
-            <th colspan="2" style="background:#0d3d22;border-left:2px solid rgba(255,255,255,.2)">المخرج الأول<br><small style="opacity:.65;font-weight:400">مراجعة الاستراتيجيات</small></th>
-            <th colspan="2" style="background:#155c35;border-left:2px solid rgba(255,255,255,.2)">المخرج الثاني<br><small style="opacity:.65;font-weight:400">قياس المؤشرات</small></th>
-            <th colspan="2" style="background:#1e7a48;border-left:2px solid rgba(255,255,255,.2)">المخرج الثالث<br><small style="opacity:.65;font-weight:400">التزام التوثيق</small></th>
-            <th colspan="2" style="background:#29a361;border-left:2px solid rgba(255,255,255,.2)">المخرج الرابع<br><small style="opacity:.65;font-weight:400">الطلبات الواردة</small></th>
+            <th colspan="2" style="background:#0d3d22;border-left:2px solid rgba(255,255,255,.2)">المخرج الأول<br><small style="opacity:.7;font-weight:400;line-height:1.5;display:block">مراجعة وتقييم الاستراتيجيات الواردة للمركز</small></th>
+            <th colspan="2" style="background:#155c35;border-left:2px solid rgba(255,255,255,.2)">المخرج الثاني<br><small style="opacity:.7;font-weight:400;line-height:1.5;display:block">تقييم قابلية قياس بطاقات المؤشرات والمبادرات</small></th>
+            <th colspan="2" style="background:#1e7a48;border-left:2px solid rgba(255,255,255,.2)">المخرج الثالث<br><small style="opacity:.7;font-weight:400;line-height:1.5;display:block">تقييم التزام الجهات بمعايير التوثيق</small></th>
+            <th colspan="2" style="background:#29a361;border-left:2px solid rgba(255,255,255,.2)">المخرج الرابع<br><small style="opacity:.7;font-weight:400;line-height:1.5;display:block">تنفيذ الطلبات الواردة على المركز</small></th>
             <th rowspan="2" style="vertical-align:middle">%مخطط</th>
             <th rowspan="2" style="vertical-align:middle">%فعلي</th>
             <th rowspan="2" style="vertical-align:middle">الفجوة</th>
@@ -1004,6 +1004,8 @@ const CLR=['#0d3d22','#155c35','#1e7a48','#29a361'];
 const MN=['أبريل 2026','مايو 2026','يونيو 2026','يوليو 2026','أغسطس 2026','سبتمبر 2026','أكتوبر 2026','نوفمبر 2026','ديسمبر 2026','يناير 2027','فبراير 2027','مارس 2027','أبريل 2027','مايو 2027','يونيو 2027','يوليو 2027','أغسطس 2027','سبتمبر 2027'];
 const ON=['المخرج الأول – مراجعة وتقييم الاستراتيجيات الواردة للمركز','المخرج الثاني – تقييم قابلية قياس بطاقات المؤشرات والمبادرات','المخرج الثالث – تقييم التزام الجهات بمعايير التوثيق','المخرج الرابع – تنفيذ الطلبات الواردة على المركز'];
 const ON_S=['مراجعة وتقييم الاستراتيجيات','تقييم قابلية قياس المؤشرات','تقييم التزام الجهات بالتوثيق','تنفيذ الطلبات الواردة'];
+// الوصف الكامل لكل مخرج — يُشتق من ON بحذف بادئة «المخرج الأول – »
+const ON_DESC = ON.map(n => (n.split('–')[1] || n).trim());
 const OI=['📋','📐','📂','📩'],OU=['تقريراً','خدمة','خدمة','تقريراً'];
 const OT=['مراجعة وتقييم الاستراتيجيات الواردة للمركز','تقييم قابلية قياس بطاقات المؤشرات والمبادرات','تقييم التزام الجهات بمعايير التوثيق','تنفيذ الطلبات الواردة على المركز'];
 const OS=[['مراجعة الوثائق الاستراتيجية الواردة','التحقق من التوافق مع منهجيات المركز','حصر المبادرات والمؤشرات المنبثقة','عكس النتائج على منصة أداء','إعداد 40 تقريراً متخصصاً'],['التحقق من قابلية قياس المؤشرات','استخدام معايير المركز لتحديد الجودة','تقديم توصيات لتحسين البطاقات','تنفيذ 850 خدمة'],['تقييم الوثائق الداعمة للمبادرات','التحقق من الالتزام بمعايير التوثيق','رفع تقارير دورية','تنفيذ 2500 خدمة'],['استقبال وتحليل الطلبات','دراسة الطلبات وتقديم تقارير','دعم اتخاذ القرارات','إعداد 18 تقريراً']];
@@ -1825,8 +1827,9 @@ function renderCmp(){
     const planPct=Math.min(100,cumP(i,curM)/TGT[i]*100).toFixed(1);
     el.innerHTML+=`<div class="cmp-card" style="display:flex;flex-direction:column;">
       <!-- Header: same height for all -->
-      <div style="background:${CLR[i]};color:#fff;padding:8px 12px;font-size:.7rem;font-weight:700;min-height:44px;display:flex;align-items:center;gap:6px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
-        ${OUT_LABELS[i]}<br><span style="font-size:.6rem;font-weight:500;opacity:.85">${ON_S[i]}</span>
+      <div style="background:${CLR[i]};color:#fff;padding:9px 12px;font-size:.72rem;font-weight:700;min-height:4.3rem;display:flex;flex-direction:column;justify-content:center;gap:3px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
+        <div>${OUT_LABELS[i]}</div>
+        <div style="font-size:.63rem;font-weight:500;opacity:.9;line-height:1.45;">${ON_DESC[i]}</div>
       </div>
       <!-- مخطط vs فعلي -->
       <div style="display:grid;grid-template-columns:1fr 1fr;">
