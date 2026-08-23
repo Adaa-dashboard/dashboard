@@ -187,6 +187,9 @@ table.main-tbl{width:100%;border-collapse:collapse;}
 .d-btn-del-col{background:#fff0ee;color:var(--red);border:1px dashed #f87171;}
 .d-btn-del-col:hover{background:var(--red);color:#fff;border-style:solid;}
 .d-btn-xl{background:#e8f5ee;color:var(--g3);border:1px solid var(--border);}
+.d-btn-undo{background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;}
+.d-btn-undo:hover:not(:disabled){background:#4338ca;color:#fff;}
+.d-btn:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.5);}
 .d-btn-xl:hover{background:var(--g3);color:#fff;}
 .detail-tbl-wrap{overflow-x:auto;overflow-y:hidden;border:1px solid var(--border);border-radius:10px;}
 .detail-tbl{width:100%;border-collapse:collapse;min-width:960px;}
@@ -892,6 +895,8 @@ body.view-only #view-only-bar{display:block;}
         <button class="d-btn d-btn-add-col" onclick="addCol()">+ عمود</button>
         <button class="d-btn d-btn-del-col" onclick="delLastCol()">− عمود</button>
         <button class="d-btn d-btn-add" onclick="addRow()">+ صف</button>
+        <button class="d-btn d-btn-undo" id="dt-undo" onclick="detUndoLast()" disabled
+                title="تراجع عن آخر تغيير (Ctrl+Z)">↩️ تراجع</button>
         <button class="d-btn" style="background:#f0e6ff;color:#7c3aed;border:1px solid #c4b5fd;" onclick="pasteTable()">📋 لصق جدول</button>
         <button class="d-btn d-btn-xl" onclick="exportDetXL()">⬇️ تصدير Excel</button>
         <label class="d-btn d-btn-xl" style="cursor:pointer">⬆️ رفع Excel (دمج)<input type="file" accept=".xlsx,.xls,.csv" onchange="importXL(event)"></label>
@@ -2089,6 +2094,7 @@ async function pasteTable(){
     if(!text){alert('انسخ الجدول من Excel أولاً');return;}
     const rows=text.trim().split('\n').map(r=>r.split('\t'));
     if(!rows.length)return;
+    detSnap(activeDetail);
     detCols[activeDetail]=rows[0].map(c=>c.trim());
     detRows[activeDetail]=rows.slice(1).filter(r=>r.some(c=>c.trim())).map(r=>rows[0].map((_,ci)=>(r[ci]||'').trim()));
     saveDetailToCloud(activeDetail);
@@ -2105,6 +2111,7 @@ async function pasteTable(){
         ev.preventDefault();
         const rows=ta.value.trim().split('\n').map(r=>r.split('\t'));
         if(rows.length>1){
+          detSnap(activeDetail);
           detCols[activeDetail]=rows[0].map(c=>c.trim());
           detRows[activeDetail]=rows.slice(1).filter(r=>r.some(c=>c.trim())).map(r=>rows[0].map((_,ci)=>(r[ci]||'').trim()));
           saveDetailToCloud(activeDetail);
@@ -2123,6 +2130,7 @@ function detDragStart(e,idx){detDragIdx=idx;e.dataTransfer.effectAllowed='move';
 function detDrop(e,idx){
   e.preventDefault();
   if(detDragIdx===null||detDragIdx===idx)return;
+  detSnap(activeDetail);
   const moved=detRows[activeDetail].splice(detDragIdx,1)[0];
   detRows[activeDetail].splice(idx,0,moved);
   detDragIdx=null;
@@ -2359,7 +2367,7 @@ function renderDetTable(){
   // Header
   document.getElementById('detail-thead').innerHTML=`<tr class="th-titles">
     ${cols.map((c,ci)=>`<th><div class="th-wrap">
-      <textarea class="th-input" rows="1" placeholder="عنوان العمود" oninput="autoGrow(this)" onchange="detCols[activeDetail][${ci}]=this.value;saveDetSoon(activeDetail)">${esc(c)}</textarea>
+      <textarea class="th-input" rows="1" placeholder="عنوان العمود" oninput="autoGrow(this)" onchange="headEdit(${ci}, this.value)">${esc(c)}</textarea>
       <button class="th-del" onclick="delCol(${ci})" title="حذف العمود">×</button>
     </div></th>`).join('')}
     <th rowspan="2" class="th-actions">حذف</th>
@@ -2376,7 +2384,7 @@ function renderDetTable(){
         const v=row[ci]||'';
         const opts=[...new Set([...M2_TYPES, v].filter(Boolean))]
           .map(o=>`<option ${o===v?'selected':''}>${esc(o)}</option>`).join('');
-        return `<td><select class="cell-input" onchange="detRows[activeDetail][${ri}][${ci}]=this.value;saveDetSoon(activeDetail)"><option value=""></option>${opts}</select></td>`;
+        return `<td><select class="cell-input" onchange="cellEdit(${ri}, ${ci}, this.value)"><option value=""></option>${opts}</select></td>`;
       }
       if(tracked && ci===cS){
         const v=row[ci]||'';
@@ -2387,7 +2395,7 @@ function renderDetTable(){
         const cls = isNaN(n) ? '' : n>0 ? 'st-d-late' : n<0 ? 'st-d-early' : 'st-d-zero';
         return `<td><span class="st-days ${cls}">${esc(v)||'—'}</span></td>`;
       }
-      return `<td><textarea class="cell-input" rows="1" placeholder="—" oninput="autoGrow(this)" onchange="detRows[activeDetail][${ri}][${ci}]=this.value;saveDetSoon(activeDetail)">${esc(row[ci]||'')}</textarea></td>`;
+      return `<td><textarea class="cell-input" rows="1" placeholder="—" oninput="autoGrow(this)" onchange="cellEdit(${ri}, ${ci}, this.value)">${esc(row[ci]||'')}</textarea></td>`;
     }).join('')}
     <td><button class="td-del" onclick="delRow(${ri})">🗑️</button></td>
     </tr>`).join('');
@@ -2395,6 +2403,7 @@ function renderDetTable(){
     .forEach(autoGrow);
   gateDet();
   renderStrategyExtras();
+  undoBtnSync();
 }
 
 // ارتفاع الخلية يتمدد مع النص (سطران أو أكثر)
@@ -2402,6 +2411,75 @@ function autoGrow(el){
   el.style.height = 'auto';
   el.style.height = el.scrollHeight + 'px';
 }
+
+// ═══════════════════════════════════════════════════════════
+// التراجع ↩️ — مكدّس لقطات مستقل لكل مخرج
+// ═══════════════════════════════════════════════════════════
+// كل عملية تُغيّر الجدول تلتقط صورة كاملة (الأعمدة + الصفوف + الفلاتر)
+// قبل التغيير. زر «تراجع» أو Ctrl+Z يعيد آخر صورة ويحفظها سحابياً.
+const UNDO_MAX = 30;
+const detUndo = [[], [], [], []];
+
+function detSnap(idx){
+  if(idx == null) idx = activeDetail;
+  detUndo[idx].push({
+    cols: detCols[idx].slice(),
+    rows: detRows[idx].map(r => r.slice()),
+    filt: Object.assign({}, detColFilter[idx]),
+    late: detLateOnly[idx]
+  });
+  if(detUndo[idx].length > UNDO_MAX) detUndo[idx].shift();
+  undoBtnSync();
+}
+
+function undoBtnSync(){
+  const b = document.getElementById('dt-undo');
+  if(!b) return;
+  const n = detUndo[activeDetail].length;
+  b.disabled = n === 0;
+  b.textContent = n ? '↩️ تراجع (' + n + ')' : '↩️ تراجع';
+}
+
+async function detUndoLast(){
+  const idx = activeDetail;
+  const snap = detUndo[idx].pop();
+  if(!snap){ undoBtnSync(); return; }
+  detCols[idx] = snap.cols;
+  detRows[idx] = snap.rows;
+  detColFilter[idx] = snap.filt;
+  detLateOnly[idx] = snap.late;
+  renderDetTable();
+  showSyncStatus('↩️ تم التراجع عن آخر تغيير');
+  await saveDetailToCloud(idx);
+}
+
+// تعديل خلية أو عنوان عمود — اللقطة تُؤخذ قبل الكتابة
+function cellEdit(ri, ci, val){
+  if(detRows[activeDetail][ri] === undefined) return;
+  if(detRows[activeDetail][ri][ci] === val) return;
+  detSnap(activeDetail);
+  detRows[activeDetail][ri][ci] = val;
+  saveDetSoon(activeDetail);
+}
+function headEdit(ci, val){
+  if(detCols[activeDetail][ci] === val) return;
+  detSnap(activeDetail);
+  detCols[activeDetail][ci] = val;
+  saveDetSoon(activeDetail);
+}
+
+// Ctrl+Z خارج حقول الإدخال (داخلها يبقى تراجع المتصفح النصي)
+document.addEventListener('keydown', e => {
+  if(!(e.ctrlKey || e.metaKey) || e.shiftKey) return;
+  if((e.key || '').toLowerCase() !== 'z') return;
+  const dv = document.getElementById('details-view');
+  if(!dv || !dv.classList.contains('on')) return;
+  const t = e.target, tag = t && t.tagName;
+  if(tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (t && t.isContentEditable)) return;
+  if(!detUndo[activeDetail].length) return;
+  e.preventDefault();
+  detUndoLast();
+});
 
 // ═══ فلترة بالعناوين: قائمة اختيار داخل رأس كل عمود ═══
 const detColFilter = [{}, {}, {}, {}];      // لكل مخرج: {رقم العمود: القيمة المختارة}
@@ -2493,32 +2571,40 @@ function exportDetXL(){
 }
 
 function addRow(){
+  detSnap(activeDetail);
   detRows[activeDetail].push(detCols[activeDetail].map(()=>''));
   renderDetTable();
   saveDetailToCloud(activeDetail);
 }
 function delRow(ri){
+  detSnap(activeDetail);
   detRows[activeDetail].splice(ri,1); renderDetTable();
   saveDetailToCloud(activeDetail);
 }
 function addCol(){
   const name=prompt('اسم العمود الجديد:','عمود جديد');
   if(!name)return;
+  detSnap(activeDetail);
   detCols[activeDetail].push(name);
   detRows[activeDetail].forEach(r=>r.push(''));
   renderDetTable();
+  saveDetSoon(activeDetail);
 }
 function delCol(ci){
   if(!confirm('حذف هذا العمود؟'))return;
+  detSnap(activeDetail);
   detCols[activeDetail].splice(ci,1);
   detRows[activeDetail].forEach(r=>r.splice(ci,1));
   renderDetTable();
+  saveDetSoon(activeDetail);
 }
 function delLastCol(){
   if(detCols[activeDetail].length<=1)return;
+  detSnap(activeDetail);
   detCols[activeDetail].pop();
   detRows[activeDetail].forEach(r=>r.pop());
   renderDetTable();
+  saveDetSoon(activeDetail);
 }
 
 // الرفع: اختيار الورقة والطريقة (دمج أو استبدال كامل)
@@ -2585,6 +2671,7 @@ async function impRun(){
   const body = aoa.slice(1);
 
   if(mode === 'replace'){
+    detSnap(idx);
     detCols[idx] = aoa[0].map(c => String(c).trim());
     detRows[idx] = body.map(r => detCols[idx].map((_, ci) =>
       String(r[ci] == null ? '' : r[ci]).trim()));
@@ -2628,6 +2715,7 @@ async function impRun(){
     return;
   }
 
+  detSnap(idx);
   const seen = new Map();
   detRows[idx].forEach((r, i)=>{ const k = norm(r[0]); if(k && !seen.has(k)) seen.set(k, i); });
 
