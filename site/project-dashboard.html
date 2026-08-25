@@ -228,6 +228,14 @@ body.is-admin .det-legend{display:block;}
   overflow-wrap:anywhere;}
 .th-input::placeholder{color:rgba(255,255,255,.4);}
 input.cell-date{padding-inline:2px;}
+/* صف مكرر: نفس قيمة العمود الأول موجودة في صف آخر */
+.detail-tbl tbody tr.dup-row{background:#fff5f5;}
+.detail-tbl tbody tr.dup-row:hover{background:#ffecec;}
+.detail-tbl tbody tr.dup-row td:first-child{box-shadow:inset 3px 0 0 var(--red,#dc2626);}
+.detail-tbl tbody tr.dup-row .cell-input{color:#9b1c1c;font-weight:700;}
+.dup-note{display:flex;align-items:center;gap:7px;background:#fff5f5;border:1px solid #f5b5b5;
+  color:#9b1c1c;border-radius:9px;padding:7px 12px;font-size:.66rem;font-weight:700;margin-bottom:10px;}
+
 /* أدوات الرأس: أيقونات مسطّحة في سطر هادئ تحت العنوان */
 .th-sort{border:none;background:none;cursor:pointer;line-height:1;flex-shrink:0;
   padding:1px 3px;font-size:.6rem;border-radius:4px;transition:all .15s;
@@ -660,6 +668,10 @@ body.view-only #view-only-bar{display:block;}
     <div class="su-field">
       <label>الطريقة</label>
       <label style="display:flex;gap:7px;align-items:flex-start;font-size:.68rem;font-weight:600;margin-bottom:6px;cursor:pointer;">
+        <input type="radio" name="impmode" value="append" style="margin-top:3px">
+        <span><b>إضافة صفوف جديدة</b> — لا يمسّ أي صف موجود إطلاقاً، والمكرر يظهر بالأحمر</span>
+      </label>
+      <label style="display:flex;gap:7px;align-items:flex-start;font-size:.68rem;font-weight:600;margin-bottom:6px;cursor:pointer;">
         <input type="radio" name="impmode" value="merge" checked style="margin-top:3px">
         <span><b>دمج</b> — يحدّث الصفوف الموجودة ويضيف الجديدة، والعناوين لا تتغير</span>
       </label>
@@ -668,6 +680,12 @@ body.view-only #view-only-bar{display:block;}
         <span><b>استبدال كامل</b> — يمسح كل الصفوف والعناوين الحالية ويعتمد الملف</span>
       </label>
     </div>
+    <label class="imp-today-field" style="display:flex;gap:7px;align-items:flex-start;font-size:.68rem;
+           font-weight:600;cursor:pointer;margin-bottom:10px;padding:8px 10px;background:#f7fbf9;
+           border:1px solid var(--border);border-radius:8px;">
+      <input type="checkbox" id="imp-today" checked style="margin-top:3px">
+      <span>سجّل <b id="imp-today-col">تاريخ الإرسال</b> = <b>تاريخ اليوم</b> للصفوف الجديدة الفارغة</span>
+    </label>
     <div id="imp-info" style="font-size:.66rem;color:var(--muted);line-height:1.8;margin-bottom:10px;"></div>
     <button class="save-btn" style="width:100%;border-radius:7px;" onclick="impRun()">تنفيذ</button>
     <button class="modal-close" onclick="closeImp()">إلغاء</button>
@@ -967,6 +985,7 @@ body.view-only #view-only-bar{display:block;}
       <button class="d-btn" onclick="clearColFilters()">✕ مسح الفلاتر</button>
     </div>
     <div id="det-lock"></div>
+    <div id="det-dup"></div>
     <div id="strat-top"></div>
     <div class="detail-tbl-wrap">
       <table class="detail-tbl" id="detail-tbl">
@@ -2194,7 +2213,7 @@ function pasteRun(text){
     alert('انسخ الجدول كاملاً مع سطر العناوين (صفّان على الأقل).');
     return;
   }
-  openImp(idx, [{name: 'المُلصَق', aoa}]);
+  openImp(idx, [{name: 'المُلصَق', aoa}], 'append');
 }
 
 let detDragIdx=null;
@@ -2376,6 +2395,12 @@ function colDayFirst(idx, ci){
 }
 
 // توحيد كل خلايا أعمدة التاريخ في مخرج — تُرجع true إن تغيّر شيء
+const todayISO = () => {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
+       + '-' + String(d.getDate()).padStart(2, '0');
+};
+
 function normalizeDetDates(idx){
   const cols = detCols[idx] || [], rows = detRows[idx] || [];
   const dc = cols.map((_, ci) => ci).filter(ci => isDateCol(idx, ci));
@@ -2566,8 +2591,11 @@ function renderDetTable(){
   // Body
   const shown = detFilterRows(rows);
   detShown[activeDetail] = shown.map(([r])=>r);
-  document.getElementById('detail-tbody').innerHTML=shown.map(([row,ri])=>`
-    <tr>${cols.map((_,ci)=>{
+  const dups = dupKeys(activeDetail);
+  document.getElementById('detail-tbody').innerHTML=shown.map(([row,ri])=>{
+    const isDup = dups.has(String(row[0] == null ? '' : row[0]).trim().toLowerCase());
+    return `
+    <tr class="${isDup ? 'dup-row' : ''}"${isDup ? ' title="مكرر — نفس قيمة العمود الأول موجودة في صف آخر"' : ''}>${cols.map((_,ci)=>{
       if(activeDetail===1 && ci===cT){
         const v=row[ci]||'';
         const opts=[...new Set([...M2_TYPES, v].filter(Boolean))]
@@ -2596,7 +2624,12 @@ function renderDetTable(){
       return `<td><textarea class="cell-input" rows="1" placeholder="—" oninput="autoGrow(this)" onchange="cellEdit(${ri}, ${ci}, this.value)">${esc(row[ci]||'')}</textarea></td>`;
     }).join('')}
     <td><button class="td-del" onclick="delRow(${ri})">🗑️</button></td>
-    </tr>`).join('');
+    </tr>`;}).join('');
+  // شريط تنبيه فوق الجدول إن وُجد تكرار
+  const dupBox = document.getElementById('det-dup');
+  if(dupBox) dupBox.innerHTML = dups.size
+    ? `<div class="dup-note">⚠️ ${dups.size} قيمة مكررة في «${esc(cols[0] || '')}»
+         — الصفوف المعنية بالأحمر</div>` : '';
   document.querySelectorAll('#detail-tbody textarea.cell-input, #detail-thead textarea.th-input')
     .forEach(autoGrow);
   gateDet();
@@ -2879,6 +2912,27 @@ function thFilter(rows, ci){
             <option value="">الكل</option>${opts}</select></span>`;
 }
 
+// عمود تاريخ الإرسال — هو أول عمود تاريخ عادةً («تاريخ ارسالها للشركة»)
+function sendDateCol(idx){
+  const cols = detCols[idx] || [];
+  for(let i = 0; i < cols.length; i++){
+    const c = String(cols[i] || '');
+    if(c.includes('تاريخ') && (c.includes('إرسال') || c.includes('ارسال'))) return i;
+  }
+  return firstDateCol(idx);
+}
+
+// مفاتيح العمود الأول التي تتكرر في أكثر من صف — تُلوَّن حمراء في الجدول
+function dupKeys(idx){
+  const seen = new Map(), dup = new Set();
+  (detRows[idx] || []).forEach(r=>{
+    const k = String(r[0] == null ? '' : r[0]).trim().toLowerCase();
+    if(!k) return;
+    if(seen.has(k)) dup.add(k); else seen.set(k, 1);
+  });
+  return dup;
+}
+
 // عرض العمود حسب ما يحمله — الأرقام والحالات لا تحتاج عرض عمود نصّي.
 // القيم نِسَب لا بكسلات: تُحوَّل إلى % في renderDetTable ليملأ الجدول الحاوية تماماً.
 const DEL_COL_W = 40;
@@ -3041,14 +3095,21 @@ function sheetAOA(ws){
 let impState = null;
 
 // يشترك فيها رفع الملف واللصق من الحافظة
-function openImp(idx, sheets){
+function openImp(idx, sheets, mode){
   impState = {idx, sheets};
   const sel = document.getElementById('imp-sheet');
   sel.innerHTML = sheets.map((sh, k)=>
     `<option value="${k}">${esc(sh.name)} — ${sh.aoa.length - 1} صف</option>`).join('');
   sel.value = String(sheets.length - 1);      // آخر ورقة غالباً الأحدث
   document.querySelector('.imp-sheet-field').style.display = sheets.length > 1 ? '' : 'none';
-  document.querySelector('input[name=impmode][value=merge]').checked = true;
+  document.querySelector('input[name=impmode][value=' + (mode || 'merge') + ']').checked = true;
+
+  // خيار ختم تاريخ اليوم — يُعرض فقط إن كان في الجدول عمود تاريخ إرسال
+  const sc  = sendDateCol(idx);
+  const fld = document.querySelector('.imp-today-field');
+  fld.style.display = sc >= 0 ? 'flex' : 'none';
+  if(sc >= 0) document.getElementById('imp-today-col').textContent = detCols[idx][sc];
+
   document.getElementById('imp-info').innerHTML =
     'الجدول الحالي فيه <b>' + (detRows[idx] || []).length + '</b> صف.';
   document.getElementById('imp-modal').style.display = 'flex';
@@ -3121,18 +3182,17 @@ async function impRun(){
     return;
   }
 
-  // ═══ دمج ═══
   const cols = detCols[idx];
   // المطابقة بالاسم، ثم بالمعنى للأعمدة المعروفة إن اختلفت التسمية
-  const KEYS = ['plan','recv','stat','days','count','type'];
+  const KEYS = ['plan','recv','count','type'];
   const semantic = {};
   KEYS.forEach(k => { const c = dcol(idx, k); if(c >= 0) semantic[k] = c; });
   const keyOf = h => {
     if(h.includes('مخطط')) return 'plan';
     if(h.includes('استلام')) return 'recv';
-    if(h.includes('حالة')) return 'stat';
-    if(h.includes('أيام')) return 'days';
     if(h.includes('العدد')) return 'count';
+    // «الحالة» و«الأيام» محسوبان — لا نطابقهما بالمعنى حتى لا يقع
+    // عمود مثل «أيام العمل» في عمود «الأيام (تأخير/متبقي)»
     return null;
   };
   const map = head.map(h => {
@@ -3146,41 +3206,67 @@ async function impRun(){
     return;
   }
   const keyCol = map.indexOf(0);
-  if(keyCol < 0){
-    alert('الملف لا يحتوي عمود «' + cols[0] + '» — وهو المفتاح الذي نطابق به الصفوف.');
+  if(mode === 'merge' && keyCol < 0){
+    alert('الملف لا يحتوي عمود «' + cols[0] + '» — وهو المفتاح الذي نطابق به الصفوف عند الدمج.\n'
+        + 'اختر «إضافة صفوف جديدة» إن أردت إضافتها كما هي.');
     return;
   }
 
   detSnap(idx);
-  const seen = new Map();
-  detRows[idx].forEach((r, i)=>{ const k = norm(r[0]); if(k && !seen.has(k)) seen.set(k, i); });
+  // ختم تاريخ اليوم على الصفوف الجديدة الفارغة إن طُلب
+  const sc  = sendDateCol(idx);
+  const box = document.getElementById('imp-today');
+  const stamp = (sc >= 0 && box && box.checked) ? todayISO() : '';
 
-  let upd = 0, add = 0, skipped = 0;
-  body.forEach(fr => {
-    const key = norm(fr[keyCol]);
-    if(!key){ skipped++; return; }
-    let ri = seen.get(key);
-    if(ri === undefined){
-      ri = detRows[idx].length;
-      detRows[idx].push(cols.map(()=>''));
-      seen.set(key, ri);
-      add++;
-    }else upd++;
-    map.forEach((tc, fc)=>{
-      if(tc < 0) return;
-      const v = String(fr[fc] == null ? '' : fr[fc]).trim();
-      if(v !== '') detRows[idx][ri][tc] = v;
-    });
+  const fill = (ri, fr) => map.forEach((tc, fc)=>{
+    if(tc < 0) return;
+    const v = String(fr[fc] == null ? '' : fr[fc]).trim();
+    if(v !== '') detRows[idx][ri][tc] = v;
   });
+
+  let upd = 0, add = 0, skipped = 0, dup = 0;
+
+  if(mode === 'append'){
+    // لا يُمسّ أي صف موجود — كل سطر يصير صفاً جديداً
+    const have = new Set(detRows[idx].map(r => norm(r[0])).filter(Boolean));
+    body.forEach(fr => {
+      if(!fr.some(c => String(c == null ? '' : c).trim() !== '')){ skipped++; return; }
+      const ri = detRows[idx].length;
+      detRows[idx].push(cols.map(()=>''));
+      fill(ri, fr);
+      if(stamp && !String(detRows[idx][ri][sc] || '').trim()) detRows[idx][ri][sc] = stamp;
+      const k = norm(detRows[idx][ri][0]);
+      if(k && have.has(k)) dup++; else if(k) have.add(k);
+      add++;
+    });
+  }else{
+    const seen = new Map();
+    detRows[idx].forEach((r, i)=>{ const k = norm(r[0]); if(k && !seen.has(k)) seen.set(k, i); });
+    body.forEach(fr => {
+      const key = norm(fr[keyCol]);
+      if(!key){ skipped++; return; }
+      let ri = seen.get(key), fresh = false;
+      if(ri === undefined){
+        ri = detRows[idx].length;
+        detRows[idx].push(cols.map(()=>''));
+        seen.set(key, ri);
+        add++; fresh = true;
+      }else upd++;
+      fill(ri, fr);
+      if(fresh && stamp && !String(detRows[idx][ri][sc] || '').trim()) detRows[idx][ri][sc] = stamp;
+    });
+  }
 
   normalizeDetDates(idx);
   autoSort(idx);                   // الصفوف الجديدة تأخذ مكانها الزمني الصحيح
   recalcTracked(idx);
   renderDetTable();
   const ignored = map.filter(m => m < 0).length;
-  showSyncStatus('✅ حُدِّث ' + upd + ' · أُضيف ' + add +
-    (skipped ? ' · تُخطّي ' + skipped : '') +
-    (ignored ? ' · تُجوهل ' + ignored + ' عمود' : ''));
+  showSyncStatus((mode === 'append' ? '✅ أُضيف ' + add + ' صف' : '✅ حُدِّث ' + upd + ' · أُضيف ' + add)
+    + (stamp ? ' · تاريخ الإرسال ' + stamp : '')
+    + (dup ? ' · ⚠️ ' + dup + ' مكرر بالأحمر' : '')
+    + (skipped ? ' · تُخطّي ' + skipped : '')
+    + (ignored ? ' · تُجوهل ' + ignored + ' عمود' : ''));
   await saveDetailToCloud(idx);
 }
 
