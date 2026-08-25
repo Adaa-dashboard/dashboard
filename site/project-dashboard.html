@@ -214,29 +214,29 @@ body.is-admin .det-legend{display:block;}
 .d-btn:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.5);}
 .d-btn-xl:hover{background:var(--g3);color:#fff;}
 .detail-tbl-wrap{overflow-x:auto;overflow-y:hidden;border:1px solid var(--border);border-radius:10px;}
-.detail-tbl{width:100%;border-collapse:collapse;}
+.detail-tbl{width:100%;border-collapse:collapse;table-layout:fixed;min-width:900px;}
 .detail-tbl thead th{background:var(--g2);color:#fff;padding:0;white-space:normal;
   vertical-align:middle;text-align:center;}
-.detail-tbl thead th.th-actions{min-width:40px;width:40px;}
-.detail-tbl thead tr.th-titles th{padding:4px 5px 7px;vertical-align:middle;}
+.detail-tbl thead th.th-actions{font-size:.6rem;}
+.detail-tbl thead tr.th-titles th{padding:7px 4px 5px;vertical-align:middle;}
 .detail-tbl thead th.th-actions{width:44px;font-size:.6rem;color:rgba(255,255,255,.6);padding:6px 8px;}
 .th-wrap{display:flex;flex-direction:column;align-items:stretch;gap:1px;}
-.th-tools{display:flex;justify-content:center;gap:3px;min-height:14px;}
-.th-line{display:flex;align-items:center;justify-content:center;gap:3px;}
-.th-input{background:transparent;border:none;color:#fff;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.68rem;font-weight:600;padding:2px 4px 5px;outline:none;width:100%;text-align:center;cursor:text;resize:none;overflow:hidden;line-height:1.5;}
+.th-tools{display:flex;justify-content:center;align-items:center;gap:2px;min-height:13px;}
+.th-input{background:transparent;border:none;color:#fff;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.68rem;font-weight:600;padding:2px 4px 5px;outline:none;width:100%;text-align:center;cursor:text;resize:none;overflow:hidden;line-height:1.5;
+  overflow-wrap:anywhere;}
 .th-input::placeholder{color:rgba(255,255,255,.4);}
-/* أزرار الرأس: شارات صغيرة في سطر مستقل فوق العنوان */
-.th-sort,.th-swap{border:none;cursor:pointer;line-height:1;flex-shrink:0;
-  border-radius:5px;padding:2px 6px;font-size:.62rem;transition:all .15s;
-  background:rgba(255,255,255,.12);color:rgba(255,255,255,.55);}
-.th-sort:hover,.th-swap:hover{background:rgba(255,255,255,.3);color:#fff;}
-.th-sort.on{background:var(--gold,#c9a020);color:#0d3d22;font-weight:700;}
-.th-swap:hover{background:rgba(201,160,32,.9);color:#0d3d22;}
+input.cell-date{padding-inline:2px;}
+/* أدوات الرأس: أيقونات مسطّحة في سطر هادئ تحت العنوان */
+.th-sort,.th-swap{border:none;background:none;cursor:pointer;line-height:1;flex-shrink:0;
+  padding:1px 3px;font-size:.6rem;border-radius:4px;transition:all .15s;
+  color:rgba(255,255,255,.4);}
+.th-sort:hover,.th-swap:hover{color:#fff;background:rgba(255,255,255,.14);}
+.th-sort.on{color:var(--gold,#c9a020);font-weight:800;}
 body.det-locked .th-swap{display:none;}
 .detail-tbl tbody tr{border-bottom:1px solid var(--border);transition:background .12s;}
 .detail-tbl tbody tr:hover{background:rgba(41,163,97,.04);}
 .detail-tbl td{padding:0;}
-.cell-input{width:100%;padding:6px 10px;border:none;background:transparent;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.7rem;outline:none;text-align:center;transition:background .12s;}
+.cell-input{width:100%;padding:6px 5px;border:none;background:transparent;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.7rem;outline:none;text-align:center;transition:background .12s;overflow-wrap:anywhere;}
 textarea.cell-input{display:block;resize:none;overflow:hidden;line-height:1.6;min-height:34px;
   white-space:pre-wrap;overflow-wrap:anywhere;text-align:center;padding:7px 8px;}
 .detail-tbl td{vertical-align:middle;max-width:240px;text-align:center;padding:2px 4px;}
@@ -256,16 +256,15 @@ textarea.th-input{display:block;resize:none;overflow:hidden;line-height:1.5;
   white-space:pre-wrap;overflow-wrap:anywhere;min-height:26px;}
 .det-filter{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
 #det-count{font-size:.68rem;color:var(--g1);font-weight:800;}
-/* أيقونة الفلتر — جنب اسم العمود، والـ select شفاف فوقها */
-.th-filt{position:relative;flex-shrink:0;width:17px;height:17px;border-radius:5px;
-  display:inline-flex;align-items:center;justify-content:center;cursor:pointer;
-  font-size:.5rem;line-height:1;background:rgba(255,255,255,.14);color:rgba(255,255,255,.6);
-  transition:all .15s;}
-.th-filt:hover{background:rgba(255,255,255,.3);color:#fff;}
-.th-filt.on{background:var(--gold);color:#20200a;font-weight:800;}
+/* أيقونة الفلتر — نفس شكل بقية الأدوات، والـ select شفاف فوقها */
+.th-filt{position:relative;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;
+  padding:1px 3px;border-radius:4px;cursor:pointer;font-size:.55rem;line-height:1;
+  color:rgba(255,255,255,.4);transition:all .15s;}
+.th-filt:hover{color:#fff;background:rgba(255,255,255,.14);}
+.th-filt.on{color:var(--gold);font-weight:800;background:rgba(201,160,32,.16);}
 .th-filt select{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:none;}
 .th-filt select option{color:#173d29;background:#fff;font-family:'IBM Plex Sans Arabic',sans-serif;}
-.th-filt-gap{flex-shrink:0;width:17px;}
+.th-filt-gap{display:none;}
 .detail-tbl thead th{vertical-align:middle;}
 .cell-input:focus{background:rgba(41,163,97,.07);}
 .td-del{background:none;border:none;color:var(--muted);cursor:pointer;padding:6px 8px;font-size:.78rem;transition:all .15s;white-space:nowrap;}
@@ -2578,6 +2577,9 @@ function renderDetTable(){
   const cS=dcol(activeDetail,'stat'), cD=dcol(activeDetail,'days'), cT=dcol(activeDetail,'type');
   // Header
   const st = detSort[activeDetail];
+  const ws = cols.map((_, ci) => colW(activeDetail, ci));
+  const wTot = ws.reduce((a, b) => a + b, 0) + DEL_COL_W;
+  const pct = w => (w / wTot * 100).toFixed(3) + '%';
   document.getElementById('detail-thead').innerHTML=`<tr class="th-titles">
     ${cols.map((c,ci)=>{
       const on = st && st.ci === ci;
@@ -2588,17 +2590,14 @@ function renderDetTable(){
         ? `<button class="th-swap" onclick="swapDM(${ci})"
              title="تبديل اليوم والشهر في هذا العمود (لو انقلبا عند الاستيراد)">⇄</button>` : '';
       // لا زر حذف هنا — كان يُضغط بالغلط. الحذف من ⚙️ أدوات الجدول
-      return `<th style="min-width:${colW(activeDetail, ci)}px">
+      return `<th style="width:${pct(ws[ci])}">
       <div class="th-wrap">
+        <textarea class="th-input" rows="1" placeholder="عنوان العمود" oninput="autoGrow(this)" onchange="headEdit(${ci}, this.value)">${esc(c)}</textarea>
         <div class="th-tools">
-          <button class="th-sort${on ? ' on' : ''}" onclick="setSort(${ci})" title="${tip}">${ico}</button>${swap}
-        </div>
-        <div class="th-line">
-          <textarea class="th-input" rows="1" placeholder="عنوان العمود" oninput="autoGrow(this)" onchange="headEdit(${ci}, this.value)">${esc(c)}</textarea>
-          ${thFilter(rows, ci)}
+          <button class="th-sort${on ? ' on' : ''}" onclick="setSort(${ci})" title="${tip}">${ico}</button>${thFilter(rows, ci)}${swap}
         </div>
       </div></th>`;}).join('')}
-    <th class="th-actions">حذف</th>
+    <th class="th-actions" style="width:${pct(DEL_COL_W)}">حذف</th>
   </tr>`;
   // Body
   const shown = detFilterRows(rows);
@@ -2916,14 +2915,16 @@ function thFilter(rows, ci){
             <option value="">الكل</option>${opts}</select></span>`;
 }
 
-// عرض العمود حسب ما يحمله — الأرقام والحالات لا تحتاج عرض عمود نصّي
+// عرض العمود حسب ما يحمله — الأرقام والحالات لا تحتاج عرض عمود نصّي.
+// القيم نِسَب لا بكسلات: تُحوَّل إلى % في renderDetTable ليملأ الجدول الحاوية تماماً.
+const DEL_COL_W = 40;
 function colW(idx, ci){
   const c = String((detCols[idx] || [])[ci] || '');
   if(c.includes('العدد'))                         return 62;
   if(c.includes('أيام'))                          return 86;   // العنوان أطول من محتواه
   if(c.includes('حالة') || c.trim() === 'النوع')  return 84;
   if(c.includes('تاريخ'))                         return 100;  // يكفي YYYY-MM-DD
-  return 118;
+  return 112;
 }
 
 function detFilterRows(rows){
