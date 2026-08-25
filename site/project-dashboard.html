@@ -201,6 +201,11 @@ table.main-tbl{width:100%;border-collapse:collapse;}
 .dt-menu button:hover{background:#eef4f0;}
 .dt-menu-sep{height:1px;background:var(--border);margin:4px 6px;}
 .dt-menu-hint{padding:6px 10px 4px;font-size:.6rem;color:#8aa696;line-height:1.7;border-top:1px solid var(--border);margin-top:4px;}
+.pick-col-list{display:flex;flex-direction:column;gap:4px;max-height:44vh;overflow:auto;}
+.pick-col-list button{text-align:start;background:#f7fbf9;border:1px solid var(--border);
+  border-radius:8px;cursor:pointer;padding:8px 11px;font-family:'IBM Plex Sans Arabic',sans-serif;
+  font-size:.72rem;font-weight:600;color:var(--g1);transition:all .15s;}
+.pick-col-list button:hover{background:#fff0ee;border-color:#f87171;color:var(--red);}
 /* شرح الحالات والصيغ — لصاحب الصلاحية الكاملة وحده */
 .det-legend{display:none;}
 body.is-admin .det-legend{display:block;}
@@ -209,32 +214,29 @@ body.is-admin .det-legend{display:block;}
 .d-btn:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.5);}
 .d-btn-xl:hover{background:var(--g3);color:#fff;}
 .detail-tbl-wrap{overflow-x:auto;overflow-y:hidden;border:1px solid var(--border);border-radius:10px;}
-.detail-tbl{width:100%;border-collapse:collapse;min-width:960px;}
+.detail-tbl{width:100%;border-collapse:collapse;}
 .detail-tbl thead th{background:var(--g2);color:#fff;padding:0;white-space:normal;
-  vertical-align:middle;text-align:center;min-width:122px;}
-.detail-tbl thead th.th-actions{min-width:44px;}
-.detail-tbl thead tr.th-titles th{padding:4px 6px 2px;vertical-align:bottom;}
-.detail-tbl thead tr.th-filters th{padding:0 6px 6px;vertical-align:top;}
+  vertical-align:middle;text-align:center;}
+.detail-tbl thead th.th-actions{min-width:40px;width:40px;}
+.detail-tbl thead tr.th-titles th{padding:4px 5px 7px;vertical-align:middle;}
 .detail-tbl thead th.th-actions{width:44px;font-size:.6rem;color:rgba(255,255,255,.6);padding:6px 8px;}
-.th-nofilter{display:block;font-size:.55rem;color:rgba(255,255,255,.25);}
-.th-wrap{display:flex;flex-direction:column;align-items:stretch;gap:2px;}
-.th-tools{display:flex;justify-content:center;gap:3px;}
+.th-wrap{display:flex;flex-direction:column;align-items:stretch;gap:1px;}
+.th-tools{display:flex;justify-content:center;gap:3px;min-height:14px;}
+.th-line{display:flex;align-items:center;justify-content:center;gap:3px;}
 .th-input{background:transparent;border:none;color:#fff;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.68rem;font-weight:600;padding:2px 4px 5px;outline:none;width:100%;text-align:center;cursor:text;resize:none;overflow:hidden;line-height:1.5;}
 .th-input::placeholder{color:rgba(255,255,255,.4);}
 /* أزرار الرأس: شارات صغيرة في سطر مستقل فوق العنوان */
-.th-sort,.th-swap,.th-del{border:none;cursor:pointer;line-height:1;flex-shrink:0;
+.th-sort,.th-swap{border:none;cursor:pointer;line-height:1;flex-shrink:0;
   border-radius:5px;padding:2px 6px;font-size:.62rem;transition:all .15s;
   background:rgba(255,255,255,.12);color:rgba(255,255,255,.55);}
 .th-sort:hover,.th-swap:hover{background:rgba(255,255,255,.3);color:#fff;}
-.th-del:hover{background:rgba(220,38,38,.75);color:#fff;}
 .th-sort.on{background:var(--gold,#c9a020);color:#0d3d22;font-weight:700;}
 .th-swap:hover{background:rgba(201,160,32,.9);color:#0d3d22;}
 body.det-locked .th-swap{display:none;}
-body.det-locked .th-del{display:none;}
 .detail-tbl tbody tr{border-bottom:1px solid var(--border);transition:background .12s;}
 .detail-tbl tbody tr:hover{background:rgba(41,163,97,.04);}
 .detail-tbl td{padding:0;}
-.cell-input{width:100%;padding:6px 10px;border:none;background:transparent;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.7rem;outline:none;text-align:center;transition:background .12s;min-width:80px;}
+.cell-input{width:100%;padding:6px 10px;border:none;background:transparent;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.7rem;outline:none;text-align:center;transition:background .12s;}
 textarea.cell-input{display:block;resize:none;overflow:hidden;line-height:1.6;min-height:34px;
   white-space:pre-wrap;overflow-wrap:anywhere;text-align:center;padding:7px 8px;}
 .detail-tbl td{vertical-align:middle;max-width:240px;text-align:center;padding:2px 4px;}
@@ -254,12 +256,16 @@ textarea.th-input{display:block;resize:none;overflow:hidden;line-height:1.5;
   white-space:pre-wrap;overflow-wrap:anywhere;min-height:26px;}
 .det-filter{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
 #det-count{font-size:.68rem;color:var(--g1);font-weight:800;}
-/* فلتر لكل عمود داخل رأس الجدول */
-.th-filter{width:100%;margin:0;padding:3px 5px;border-radius:5px;text-align:center;text-align-last:center;
-  border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.12);color:#fff;
-  font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.58rem;outline:none;cursor:pointer;}
-.th-filter option{color:#173d29;background:#fff;}
-.th-filter.on{background:var(--gold);color:#20200a;font-weight:800;border-color:var(--gold);}
+/* أيقونة الفلتر — جنب اسم العمود، والـ select شفاف فوقها */
+.th-filt{position:relative;flex-shrink:0;width:17px;height:17px;border-radius:5px;
+  display:inline-flex;align-items:center;justify-content:center;cursor:pointer;
+  font-size:.5rem;line-height:1;background:rgba(255,255,255,.14);color:rgba(255,255,255,.6);
+  transition:all .15s;}
+.th-filt:hover{background:rgba(255,255,255,.3);color:#fff;}
+.th-filt.on{background:var(--gold);color:#20200a;font-weight:800;}
+.th-filt select{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:none;}
+.th-filt select option{color:#173d29;background:#fff;font-family:'IBM Plex Sans Arabic',sans-serif;}
+.th-filt-gap{flex-shrink:0;width:17px;}
 .detail-tbl thead th{vertical-align:middle;}
 .cell-input:focus{background:rgba(41,163,97,.07);}
 .td-del{background:none;border:none;color:var(--muted);cursor:pointer;padding:6px 8px;font-size:.78rem;transition:all .15s;white-space:nowrap;}
@@ -942,10 +948,10 @@ body.view-only #view-only-bar{display:block;}
           <div class="dt-menu" id="dt-menu">
             <button onclick="dtMenu('addRow')">➕ <span>إضافة صف جديد</span></button>
             <button onclick="dtMenu('addCol')">➕ <span>إضافة عمود</span></button>
-            <button onclick="dtMenu('delLastCol')">➖ <span>حذف آخر عمود</span></button>
+            <button onclick="dtMenu('pickDelCol')">🗑️ <span>حذف عمود…</span></button>
             <div class="dt-menu-sep"></div>
             <button onclick="dtMenu('pasteTable')">📋 <span>لصق جدول من Excel</span></button>
-            <div class="dt-menu-hint">حذف عمود بعينه من زر <b>×</b> فوق عنوانه · حذف صف من 🗑️ في آخره</div>
+            <div class="dt-menu-hint">حذف صف من 🗑️ في آخره</div>
           </div>
         </div>
         <button class="d-btn d-btn-undo dt-edit" id="dt-undo" onclick="detUndoLast()" disabled
@@ -1497,7 +1503,7 @@ function gateDet(){
   document.querySelectorAll('#detail-thead textarea, #detail-tbody input,' +
                             '#detail-tbody textarea, #detail-tbody select')
     .forEach(el => el.disabled = !ok);
-  document.querySelectorAll('#detail-thead .th-del, #detail-tbody .td-del')
+  document.querySelectorAll('#detail-tbody .td-del')
     .forEach(el => el.style.display = ok ? '' : 'none');
   const l = document.getElementById('det-lock');
   if(l) l.textContent = 'صلاحيتك لا تشمل تعديل تفاصيل ' + ON_S[activeDetail] + ' — عرض فقط';
@@ -2581,17 +2587,18 @@ function renderDetTable(){
       const swap = isDateCol(activeDetail, ci)
         ? `<button class="th-swap" onclick="swapDM(${ci})"
              title="تبديل اليوم والشهر في هذا العمود (لو انقلبا عند الاستيراد)">⇄</button>` : '';
-      return `<th><div class="th-wrap">
-      <div class="th-tools">
-        <button class="th-sort${on ? ' on' : ''}" onclick="setSort(${ci})" title="${tip}">${ico}</button>${swap}
-        <button class="th-del" onclick="delCol(${ci})" title="حذف العمود">×</button>
-      </div>
-      <textarea class="th-input" rows="1" placeholder="عنوان العمود" oninput="autoGrow(this)" onchange="headEdit(${ci}, this.value)">${esc(c)}</textarea>
-    </div></th>`;}).join('')}
-    <th rowspan="2" class="th-actions">حذف</th>
-  </tr>
-  <tr class="th-filters">
-    ${cols.map((c,ci)=>`<th>${thFilter(rows, ci) || '<span class="th-nofilter">—</span>'}</th>`).join('')}
+      // لا زر حذف هنا — كان يُضغط بالغلط. الحذف من ⚙️ أدوات الجدول
+      return `<th style="min-width:${colW(activeDetail, ci)}px">
+      <div class="th-wrap">
+        <div class="th-tools">
+          <button class="th-sort${on ? ' on' : ''}" onclick="setSort(${ci})" title="${tip}">${ico}</button>${swap}
+        </div>
+        <div class="th-line">
+          <textarea class="th-input" rows="1" placeholder="عنوان العمود" oninput="autoGrow(this)" onchange="headEdit(${ci}, this.value)">${esc(c)}</textarea>
+          ${thFilter(rows, ci)}
+        </div>
+      </div></th>`;}).join('')}
+    <th class="th-actions">حذف</th>
   </tr>`;
   // Body
   const shown = detFilterRows(rows);
@@ -2650,7 +2657,33 @@ function closeDtMenu(){
 // تُغلق القائمة قبل التنفيذ، فلا تبقى مفتوحة فوق نافذة تأكيد
 function dtMenu(fn){
   closeDtMenu();
-  ({addRow, addCol, delLastCol, pasteTable})[fn]();
+  ({addRow, addCol, pickDelCol, pasteTable})[fn]();
+}
+
+// اختيار العمود المراد حذفه من قائمة — بدل زر × فوق كل عنوان
+// الذي كان يُضغط بالخطأ أثناء تعديل العناوين.
+function pickDelCol(){
+  const idx = activeDetail;
+  const cols = detCols[idx] || [];
+  if(cols.length <= 1){ alert('لا يمكن حذف آخر عمود في الجدول.'); return; }
+  const ov = document.createElement('div');
+  ov.className = 'overlay';
+  ov.style.display = 'flex';
+  ov.innerHTML = `<div class="modal-box" style="max-width:420px;text-align:right;">
+      <h2>🗑️ حذف عمود</h2>
+      <p style="font-size:.7rem;color:var(--muted);line-height:1.8;margin:0 0 10px;">
+        اختر العمود المراد حذفه. سيُحذف بكل قيمه في جميع الصفوف،
+        ويمكنك التراجع بزر ↩️ بعدها.</p>
+      <div class="pick-col-list">${cols.map((c, i)=>
+        `<button data-ci="${i}">${esc(c) || '(بلا عنوان)'}</button>`).join('')}</div>
+      <div style="margin-top:12px;"><button class="d-btn" id="pick-cancel">إلغاء</button></div>
+    </div>`;
+  document.body.appendChild(ov);
+  ov.onclick = e => { if(e.target === ov) ov.remove(); };
+  ov.querySelector('#pick-cancel').onclick = () => ov.remove();
+  ov.querySelectorAll('.pick-col-list button').forEach(b=>{
+    b.onclick = () => { ov.remove(); delCol(+b.dataset.ci); };
+  });
 }
 document.addEventListener('click', e => {
   if(!e.target.closest('.dt-gear-wrap')) closeDtMenu();
@@ -2871,14 +2904,26 @@ function colOptions(rows, ci){
   return [...seen].sort((a,b)=>a.localeCompare(b,'ar'));
 }
 
+// أيقونة فلتر صغيرة جنب اسم العمود — الـ select شفاف فوقها ليفتح قائمة المتصفح
 function thFilter(rows, ci){
   const cur = detColFilter[activeDetail][ci] || '';
   const opts = colOptions(rows, ci)
     .map(v=>`<option ${v===cur?'selected':''}>${esc(v)}</option>`).join('');
-  if(!opts) return '';
-  return `<select class="th-filter ${cur?'on':''}" title="فلترة حسب هذا العمود"
+  if(!opts) return '<span class="th-filt-gap"></span>';
+  return `<span class="th-filt${cur ? ' on' : ''}"
+            title="${cur ? 'مفلتر على: ' + esc(cur) : 'فلترة حسب هذا العمود'}">▼<select
             onchange="setColFilter(${ci}, this.value)">
-            <option value="">الكل</option>${opts}</select>`;
+            <option value="">الكل</option>${opts}</select></span>`;
+}
+
+// عرض العمود حسب ما يحمله — الأرقام والحالات لا تحتاج عرض عمود نصّي
+function colW(idx, ci){
+  const c = String((detCols[idx] || [])[ci] || '');
+  if(c.includes('العدد'))                         return 62;
+  if(c.includes('أيام'))                          return 86;   // العنوان أطول من محتواه
+  if(c.includes('حالة') || c.trim() === 'النوع')  return 84;
+  if(c.includes('تاريخ'))                         return 100;  // يكفي YYYY-MM-DD
+  return 118;
 }
 
 function detFilterRows(rows){
@@ -2958,16 +3003,6 @@ function delCol(ci){
   if(st){ if(st.ci===ci) detSort[activeDetail]=undefined; else if(st.ci>ci) st.ci--; }
   detCols[activeDetail].splice(ci,1);
   detRows[activeDetail].forEach(r=>r.splice(ci,1));
-  renderDetTable();
-  saveDetSoon(activeDetail);
-}
-function delLastCol(){
-  if(detCols[activeDetail].length<=1)return;
-  detSnap(activeDetail);
-  const st=detSort[activeDetail];
-  if(st && st.ci===detCols[activeDetail].length-1) detSort[activeDetail]=undefined;
-  detCols[activeDetail].pop();
-  detRows[activeDetail].forEach(r=>r.pop());
   renderDetTable();
   saveDetSoon(activeDetail);
 }
