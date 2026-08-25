@@ -194,27 +194,24 @@ table.main-tbl{width:100%;border-collapse:collapse;}
 .detail-tbl-wrap{overflow-x:auto;overflow-y:hidden;border:1px solid var(--border);border-radius:10px;}
 .detail-tbl{width:100%;border-collapse:collapse;min-width:960px;}
 .detail-tbl thead th{background:var(--g2);color:#fff;padding:0;white-space:normal;
-  vertical-align:middle;text-align:center;}
+  vertical-align:middle;text-align:center;min-width:122px;}
+.detail-tbl thead th.th-actions{min-width:44px;}
 .detail-tbl thead tr.th-titles th{padding:4px 6px 2px;vertical-align:bottom;}
 .detail-tbl thead tr.th-filters th{padding:0 6px 6px;vertical-align:top;}
 .detail-tbl thead th.th-actions{width:44px;font-size:.6rem;color:rgba(255,255,255,.6);padding:6px 8px;}
 .th-nofilter{display:block;font-size:.55rem;color:rgba(255,255,255,.25);}
-.th-wrap{display:flex;align-items:center;gap:0;}
-.th-input{background:transparent;border:none;color:#fff;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.68rem;font-weight:600;padding:6px 4px;outline:none;width:100%;text-align:center;cursor:text;}
+.th-wrap{display:flex;flex-direction:column;align-items:stretch;gap:2px;}
+.th-tools{display:flex;justify-content:center;gap:3px;}
+.th-input{background:transparent;border:none;color:#fff;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.68rem;font-weight:600;padding:2px 4px 5px;outline:none;width:100%;text-align:center;cursor:text;resize:none;overflow:hidden;line-height:1.5;}
 .th-input::placeholder{color:rgba(255,255,255,.4);}
-.th-del{background:rgba(255,255,255,.12);border:none;color:rgba(255,255,255,.6);cursor:pointer;padding:6px 7px;font-size:.75rem;border-right:1px solid rgba(255,255,255,.1);transition:all .15s;flex-shrink:0;}
-.th-del:hover{background:rgba(220,38,38,.6);color:#fff;}
-/* زر ترتيب الصفوف حسب هذا العمود */
-.th-sort{background:rgba(255,255,255,.08);border:none;color:rgba(255,255,255,.5);cursor:pointer;
-  padding:6px 6px;font-size:.7rem;line-height:1;transition:all .15s;flex-shrink:0;
-  border-right:1px solid rgba(255,255,255,.1);}
-.th-sort:hover{background:rgba(255,255,255,.22);color:#fff;}
+/* أزرار الرأس: شارات صغيرة في سطر مستقل فوق العنوان */
+.th-sort,.th-swap,.th-del{border:none;cursor:pointer;line-height:1;flex-shrink:0;
+  border-radius:5px;padding:2px 6px;font-size:.62rem;transition:all .15s;
+  background:rgba(255,255,255,.12);color:rgba(255,255,255,.55);}
+.th-sort:hover,.th-swap:hover{background:rgba(255,255,255,.3);color:#fff;}
+.th-del:hover{background:rgba(220,38,38,.75);color:#fff;}
 .th-sort.on{background:var(--gold,#c9a020);color:#0d3d22;font-weight:700;}
-/* تبديل اليوم/الشهر — يظهر على أعمدة التاريخ فقط */
-.th-swap{background:rgba(255,255,255,.08);border:none;color:rgba(255,255,255,.5);
-  cursor:pointer;padding:6px 6px;font-size:.72rem;line-height:1;flex-shrink:0;transition:all .15s;
-  border-right:1px solid rgba(255,255,255,.1);}
-.th-swap:hover{background:rgba(201,160,32,.85);color:#0d3d22;}
+.th-swap:hover{background:rgba(201,160,32,.9);color:#0d3d22;}
 body.det-locked .th-swap{display:none;}
 body.det-locked .th-del{display:none;}
 .detail-tbl tbody tr{border-bottom:1px solid var(--border);transition:background .12s;}
@@ -2533,7 +2530,7 @@ function stLegend(){
       <b style="color:#7a6a2f">معلق</b> بانتظار تحديد الموعد المخطط
       <br>عمودا «الحالة» و«الأيام» يُحسبان تلقائياً من التواريخ — يكفي تحديث تاريخَي التسليم المخطط والاستلام الفعلي.
       <br>صيغة التواريخ موحّدة <b dir="ltr">YYYY-MM-DD</b> — اكتبها بأي صيغة (13/04/2026 · 2026-4-13 · ١٣/٠٤/٢٠٢٦) وتُحوَّل تلقائياً، وكذلك ما يأتي من ملف Excel.
-      <br>الجدول مرتَّب من <b>الأقدم إلى الأحدث</b> حسب أول عمود تاريخ. زر <b>⇅</b> في رأس أي عمود يرتّب عليه: تصاعدي ← تنازلي ← بلا ترتيب.
+      <br>الجدول مرتَّب من <b>الأحدث إلى الأقدم</b> حسب أول عمود تاريخ — الجديد فوق. زر <b>⇅</b> في رأس أي عمود يرتّب عليه، والنقر يعكس الاتجاه ثم يلغيه.
       <br>لو ظهر عمود تاريخ مقلوباً (اليوم مكان الشهر) اضغط <b>⇄</b> في رأسه لتبديلهما في العمود كله — ويمكن التراجع بعدها.
       الأيام — للمستلَمة: موجب = تأخير عن المخطط، سالب = تسليم مبكر.
       وللتي لم تُستلم: موجب = أيام تأخير حتى اليوم، سالب = أيام متبقية للموعد.
@@ -2564,9 +2561,11 @@ function renderDetTable(){
         ? `<button class="th-swap" onclick="swapDM(${ci})"
              title="تبديل اليوم والشهر في هذا العمود (لو انقلبا عند الاستيراد)">⇄</button>` : '';
       return `<th><div class="th-wrap">
-      <button class="th-sort${on ? ' on' : ''}" onclick="setSort(${ci})" title="${tip}">${ico}</button>${swap}
+      <div class="th-tools">
+        <button class="th-sort${on ? ' on' : ''}" onclick="setSort(${ci})" title="${tip}">${ico}</button>${swap}
+        <button class="th-del" onclick="delCol(${ci})" title="حذف العمود">×</button>
+      </div>
       <textarea class="th-input" rows="1" placeholder="عنوان العمود" oninput="autoGrow(this)" onchange="headEdit(${ci}, this.value)">${esc(c)}</textarea>
-      <button class="th-del" onclick="delCol(${ci})" title="حذف العمود">×</button>
     </div></th>`;}).join('')}
     <th rowspan="2" class="th-actions">حذف</th>
   </tr>
@@ -2760,11 +2759,14 @@ function applySort(idx){
   return before.some((r, i) => r !== rows[i]);
 }
 
-// يطبّق الافتراضي (أقدم تاريخ أولاً) على من لم يُحدَّد له ترتيب بعد
+// أول اتجاه عند النقر: التاريخ يبدأ بالأحدث (الجديد فوق)، وغيره تصاعدياً
+const firstDir = (idx, ci) => isDateCol(idx, ci) ? -1 : 1;
+
+// يطبّق الافتراضي (أحدث تاريخ أولاً) على من لم يُحدَّد له ترتيب بعد
 function autoSort(idx){
   if(detSort[idx] === undefined){
     const ci = firstDateCol(idx);
-    detSort[idx] = ci >= 0 ? {ci, dir: 1} : null;
+    detSort[idx] = ci >= 0 ? {ci, dir: -1} : null;
   }
   return applySort(idx);
 }
@@ -2773,16 +2775,19 @@ function autoSortAll(){ return [0,1,2,3].filter(autoSort); }
 // نقرة: تصاعدي ← تنازلي ← بلا ترتيب
 function setSort(ci){
   const idx = activeDetail, cur = detSort[idx];
-  const next = (!cur || cur.ci !== ci) ? {ci, dir: 1}
-             : cur.dir === 1           ? {ci, dir: -1}
+  const fd = firstDir(idx, ci);
+  const next = (!cur || cur.ci !== ci) ? {ci, dir: fd}
+             : cur.dir === fd          ? {ci, dir: -fd}
              : null;
   if(next) detSnap(idx);          // اللقطة قبل تغيير الحالة، وإلا سجّلت الحالة الجديدة
   detSort[idx] = next;
   if(next){
     applySort(idx);
     saveDetSoon(idx);
-    showSyncStatus((next.dir === 1 ? '⬆️ الأقدم أولاً' : '⬇️ الأحدث أولاً')
-      + ' حسب «' + (detCols[idx][ci] || '') + '»');
+    const lbl = isDateCol(idx, ci)
+      ? (next.dir === -1 ? '⬇️ الأحدث أولاً' : '⬆️ الأقدم أولاً')
+      : (next.dir === 1  ? '⬆️ تصاعدي'      : '⬇️ تنازلي');
+    showSyncStatus(lbl + ' حسب «' + (detCols[idx][ci] || '') + '»');
   }else showSyncStatus('↕️ أُلغي الترتيب — الصفوف بترتيبها الحالي');
   renderDetTable();
 }
@@ -2861,13 +2866,25 @@ function detFilterRows(rows){
 // ═══ تصدير الجدول إلى Excel ═══
 function exportDetXL(){
   if(typeof XLSX === 'undefined'){ alert('مكتبة Excel لم تُحمَّل — تحقق من الاتصال'); return; }
-  const cols = detCols[activeDetail], rows = detRows[activeDetail];
-  const aoa = [cols.slice(), ...rows.map(r => cols.map((_, ci)=> r[ci] == null ? '' : String(r[ci])))];
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const idx = activeDetail;
+  const cols = detCols[idx], rows = detRows[idx];
+  // التواريخ تُكتب خلايا تاريخ حقيقية بصيغة yyyy-mm-dd — لا نصاً.
+  // النص كان يتركه إكسل نصاً، فإن عدّلت خلية حوّلها لصيغة الجهاز المحلية
+  // فيصير العمود مختلطاً وتنقلب التواريخ عند إعادة الرفع.
+  const aoa = [cols.slice(), ...rows.map(r => cols.map((_, ci)=>{
+    const v = r[ci] == null ? '' : String(r[ci]);
+    if(isDateCol(idx, ci) && ISO_DATE.test(v)){
+      const p = v.split('-');
+      return new Date(+p[0], +p[1] - 1, +p[2]);
+    }
+    return v;
+  }))];
+  const ws = XLSX.utils.aoa_to_sheet(aoa, {cellDates: true});
+  Object.keys(ws).forEach(k=>{ if(k[0] !== '!' && ws[k].t === 'd') ws[k].z = 'yyyy-mm-dd'; });
   ws['!cols'] = cols.map(c => ({wch: Math.min(40, Math.max(12, String(c).length + 8))}));
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'م' + (activeDetail + 1));
-  XLSX.writeFile(wb, 'تفاصيل-' + ON_S[activeDetail] + '.xlsx');
+  XLSX.utils.book_append_sheet(wb, ws, 'م' + (idx + 1));
+  XLSX.writeFile(wb, 'تفاصيل-' + ON_S[idx] + '.xlsx', {cellDates: true});
   showSyncStatus('⬇️ عدّل الملف ثم ارفعه من «رفع Excel (دمج)»');
 }
 
