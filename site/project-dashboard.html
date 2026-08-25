@@ -209,6 +209,8 @@ table.main-tbl{width:100%;border-collapse:collapse;}
 /* شرح الحالات والصيغ — لصاحب الصلاحية الكاملة وحده */
 .det-legend{display:none;}
 body.is-admin .det-legend{display:block;}
+.d-btn-copy{background:#f0e6ff;color:#7c3aed;border:1px solid #c4b5fd;}
+.d-btn-copy:hover{background:#7c3aed;color:#fff;}
 .d-btn-undo{background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;}
 .d-btn-undo:hover:not(:disabled){background:#4338ca;color:#fff;}
 .d-btn:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.5);}
@@ -227,12 +229,11 @@ body.is-admin .det-legend{display:block;}
 .th-input::placeholder{color:rgba(255,255,255,.4);}
 input.cell-date{padding-inline:2px;}
 /* أدوات الرأس: أيقونات مسطّحة في سطر هادئ تحت العنوان */
-.th-sort,.th-swap{border:none;background:none;cursor:pointer;line-height:1;flex-shrink:0;
+.th-sort{border:none;background:none;cursor:pointer;line-height:1;flex-shrink:0;
   padding:1px 3px;font-size:.6rem;border-radius:4px;transition:all .15s;
   color:rgba(255,255,255,.4);}
-.th-sort:hover,.th-swap:hover{color:#fff;background:rgba(255,255,255,.14);}
+.th-sort:hover{color:#fff;background:rgba(255,255,255,.14);}
 .th-sort.on{color:var(--gold,#c9a020);font-weight:800;}
-body.det-locked .th-swap{display:none;}
 .detail-tbl tbody tr{border-bottom:1px solid var(--border);transition:background .12s;}
 .detail-tbl tbody tr:hover{background:rgba(41,163,97,.04);}
 .detail-tbl td{padding:0;}
@@ -955,6 +956,8 @@ body.view-only #view-only-bar{display:block;}
         </div>
         <button class="d-btn d-btn-undo dt-edit" id="dt-undo" onclick="detUndoLast()" disabled
                 title="تراجع عن آخر تغيير (Ctrl+Z)">↩️ تراجع</button>
+        <button class="d-btn d-btn-copy" onclick="copyDetTable()"
+                title="نسخ الجدول كاملاً للحافظة — يُلصق في Excel أو Word كجدول">📄 نسخ الجدول</button>
         <button class="d-btn d-btn-xl" onclick="exportDetXL()">⬇️ تصدير Excel</button>
         <label class="d-btn d-btn-xl dt-edit" style="cursor:pointer">⬆️ رفع Excel<input type="file" accept=".xlsx,.xls,.csv" onchange="importXL(event)"></label>
       </div>
@@ -2389,41 +2392,6 @@ function normalizeDetDates(idx){
   return changed;
 }
 
-// ═══ إصلاح عمود انقلب فيه اليوم والشهر ═══
-// يبدّل الجزأين في كل خلايا العمود القابلة للتبديل (اليوم ≤ 12)،
-// ويترك ما لا يقبل التبديل (25 مثلاً ليس شهراً) كما هو.
-function swapDM(ci){
-  const idx = activeDetail;
-  const rows = detRows[idx] || [];
-  const plan = [];
-  rows.forEach((r, ri)=>{
-    const v = String(r[ci] == null ? '' : r[ci]).trim();
-    const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if(!m) return;
-    const sw = iso(+m[1], +m[3], +m[2]);     // الشهر ← اليوم
-    if(sw) plan.push([ri, v, sw]);
-  });
-  if(!plan.length){
-    alert('لا توجد في هذا العمود تواريخ يمكن تبديل يومها وشهرها.\n'
-        + '(اليوم أكبر من 12 لا يصلح شهراً)');
-    return;
-  }
-  const sample = plan.slice(0, 3).map(([, a, c]) => a + '  ←  ' + c).join('\n');
-  const stuck = rows.length - plan.length;
-  if(!confirm('تبديل اليوم والشهر في عمود «' + (detCols[idx][ci] || '') + '»\n\n'
-      + sample + (plan.length > 3 ? '\n…' : '') + '\n\n'
-      + plan.length + ' تاريخاً سيتغيّر'
-      + (stuck > 0 ? ' · ' + stuck + ' صفاً لن يتغيّر (يومه أكبر من 12 أو ليس تاريخاً)' : '')
-      + '\n\nيمكنك التراجع بزر ↩️ بعدها.')) return;
-
-  detSnap(idx);
-  plan.forEach(([ri, , sw]) => { rows[ri][ci] = sw; });
-  recalcTracked(idx);
-  applySort(idx);
-  renderDetTable();
-  saveDetailToCloud(idx);
-  showSyncStatus('🔁 بُدِّل اليوم والشهر في ' + plan.length + ' تاريخاً');
-}
 
 // تُرجع أرقام المخرجات التي تغيّرت فعلاً
 function normalizeAllDates(){
@@ -2557,7 +2525,6 @@ function stLegend(){
       <br>عمودا «الحالة» و«الأيام» يُحسبان تلقائياً من التواريخ — يكفي تحديث تاريخَي التسليم المخطط والاستلام الفعلي.
       <br>صيغة التواريخ موحّدة <b dir="ltr">YYYY-MM-DD</b> — اكتبها بأي صيغة (13/04/2026 · 2026-4-13 · ١٣/٠٤/٢٠٢٦) وتُحوَّل تلقائياً، وكذلك ما يأتي من ملف Excel.
       <br>الجدول مرتَّب من <b>الأحدث إلى الأقدم</b> حسب أول عمود تاريخ — الجديد فوق. زر <b>⇅</b> في رأس أي عمود يرتّب عليه، والنقر يعكس الاتجاه ثم يلغيه.
-      <br>لو ظهر عمود تاريخ مقلوباً (اليوم مكان الشهر) اضغط <b>⇄</b> في رأسه لتبديلهما في العمود كله — ويمكن التراجع بعدها.
       الأيام — للمستلَمة: موجب = تأخير عن المخطط، سالب = تسليم مبكر.
       وللتي لم تُستلم: موجب = أيام تأخير حتى اليوم، سالب = أيام متبقية للموعد.
     </div>`;
@@ -2586,15 +2553,12 @@ function renderDetTable(){
       const ico = !on ? '⇅' : st.dir === 1 ? '▲' : '▼';
       const tip = !on ? 'ترتيب حسب هذا العمود'
                 : st.dir === 1 ? 'مرتَّب تصاعدياً — اضغط للعكس' : 'مرتَّب تنازلياً — اضغط للإلغاء';
-      const swap = isDateCol(activeDetail, ci)
-        ? `<button class="th-swap" onclick="swapDM(${ci})"
-             title="تبديل اليوم والشهر في هذا العمود (لو انقلبا عند الاستيراد)">⇄</button>` : '';
       // لا زر حذف هنا — كان يُضغط بالغلط. الحذف من ⚙️ أدوات الجدول
       return `<th style="width:${pct(ws[ci])}">
       <div class="th-wrap">
         <textarea class="th-input" rows="1" placeholder="عنوان العمود" oninput="autoGrow(this)" onchange="headEdit(${ci}, this.value)">${esc(c)}</textarea>
         <div class="th-tools">
-          <button class="th-sort${on ? ' on' : ''}" onclick="setSort(${ci})" title="${tip}">${ico}</button>${thFilter(rows, ci)}${swap}
+          <button class="th-sort${on ? ' on' : ''}" onclick="setSort(${ci})" title="${tip}">${ico}</button>${thFilter(rows, ci)}
         </div>
       </div></th>`;}).join('')}
     <th class="th-actions" style="width:${pct(DEL_COL_W)}">حذف</th>
@@ -2950,6 +2914,50 @@ function detFilterRows(rows){
       'عرض ' + out.length + ' من ' + rows.length + ' صف';
   }else bar.style.display = 'none';
   return out;
+}
+
+// ═══ نسخ الجدول كاملاً للحافظة ═══
+// مفصول بـ Tab وسطر لكل صف، فيُلصق في Excel و Word كجدول حقيقي.
+// يُنسخ المعروض (بعد الفلترة) لأنه ما تراه على الشاشة.
+function copyDetTable(){
+  const idx  = activeDetail;
+  const cols = detCols[idx] || [];
+  const rows = detShown[idx] || detRows[idx] || [];
+  const cell = v => String(v == null ? '' : v).replace(/[\t\r\n]+/g, ' ').trim();
+  const tsv  = [cols.map(cell).join('\t')]
+    .concat(rows.map(r => cols.map((_, ci) => cell(r[ci])).join('\t')))
+    .join('\n');
+  const total = (detRows[idx] || []).length;
+  const done  = () => showSyncStatus('📄 نُسخ ' + rows.length + ' صف'
+    + (rows.length !== total ? ' (المعروض من ' + total + ')' : '')
+    + ' — الصقه في Excel أو Word');
+
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(tsv).then(done, () => copyFallback(tsv));
+  }else copyFallback(tsv);
+}
+
+// المتصفح منع الكتابة في الحافظة — نعرض النص جاهزاً للنسخ اليدوي
+function copyFallback(tsv){
+  const ov = document.createElement('div');
+  ov.className = 'overlay';
+  ov.style.display = 'flex';
+  ov.innerHTML = `<div class="modal-box" style="max-width:620px;text-align:right;">
+      <h2>📄 نسخ الجدول</h2>
+      <p style="font-size:.7rem;color:var(--muted);line-height:1.8;margin:0 0 8px;">
+        المتصفح لم يسمح بالنسخ التلقائي. النص محدَّد بالكامل — اضغط
+        <b>Ctrl</b>+<b>C</b> ثم الصقه في Excel أو Word.</p>
+      <textarea id="copy-box" rows="9" readonly style="width:100%;border:1px solid var(--border);
+        border-radius:9px;padding:10px;font-family:'IBM Plex Sans Arabic',sans-serif;
+        font-size:.68rem;resize:vertical;" dir="rtl"></textarea>
+      <div style="margin-top:12px;"><button class="d-btn" id="copy-close">إغلاق</button></div>
+    </div>`;
+  document.body.appendChild(ov);
+  const box = ov.querySelector('#copy-box');
+  box.value = tsv;
+  box.focus(); box.select();
+  ov.onclick = e => { if(e.target === ov) ov.remove(); };
+  ov.querySelector('#copy-close').onclick = () => ov.remove();
 }
 
 // ═══ تصدير الجدول إلى Excel ═══
