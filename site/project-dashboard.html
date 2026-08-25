@@ -228,6 +228,23 @@ body.is-admin .det-legend{display:block;}
   overflow-wrap:anywhere;}
 .th-input::placeholder{color:rgba(255,255,255,.4);}
 input.cell-date{padding-inline:2px;}
+/* ⚠️ اختلاف بين «الفعلي» المُدخَل والمحسوب من التفاصيل */
+.act-cell{position:relative;}
+.act-warn{position:absolute;top:1px;inset-inline-end:2px;font-size:.6rem;line-height:1;
+  cursor:pointer;opacity:.9;}
+.act-warn:hover{opacity:1;transform:scale(1.2);}
+.sync-warn{display:flex;align-items:center;gap:8px;background:#fff8e6;border:1px solid #e8d08a;
+  color:#7a5c00;border-radius:9px;padding:8px 13px;font-size:.68rem;font-weight:600;
+  line-height:1.8;margin-bottom:10px;}
+.sync-warn b{color:#9a5b00;font-size:.78rem;}
+
+/* فلتر «هذا الشهر» في التفاصيل */
+.det-month-bar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:10px;}
+.dm-btn{background:#eef4fb;color:#1e40af;border:1px solid #c3d9f5;}
+.dm-btn:hover{background:#1e40af;color:#fff;}
+.dm-btn.on{background:#1e40af;color:#fff;border-color:#1e40af;}
+.dm-hint{font-size:.62rem;color:var(--muted);}
+
 /* صف مكرر: نفس قيمة العمود الأول موجودة في صف آخر */
 .detail-tbl tbody tr.dup-row{background:#fff5f5;}
 .detail-tbl tbody tr.dup-row:hover{background:#ffecec;}
@@ -890,6 +907,7 @@ body.view-only #view-only-bar{display:block;}
 
   <!-- Main table -->
   <div class="tbl-sec">
+    <div id="sync-warn"></div>
     <div class="tbl-bar"><h3 id="main-tbl-title">📋 جدول المتابعة الشهري</h3><span>القيم بالريال السعودي</span>
   <div style="display:flex;gap:6px;align-items:center;">
     <span style="font-size:.58rem;color:rgba(255,255,255,.4)">شامل VAT 15%</span>
@@ -980,6 +998,7 @@ body.view-only #view-only-bar{display:block;}
         <label class="d-btn d-btn-xl dt-edit" style="cursor:pointer">⬆️ رفع Excel<input type="file" accept=".xlsx,.xls,.csv" onchange="importXL(event)"></label>
       </div>
     </div>
+    <div class="det-month-bar" id="det-month-bar"></div>
     <div class="det-filter" id="det-filter-bar" style="display:none">
       <span id="det-count"></span>
       <button class="d-btn" onclick="clearColFilters()">✕ مسح الفلاتر</button>
@@ -2089,12 +2108,21 @@ function renderTable(){
     const pp=mPlanPct(m), ap=mActPct(m), gap=ap-pp, ppay=mPay(m,true), apay=mPay(m,false);
     tPl+=pp; tAc+=ap; tPP+=ppay; tAP+=apay;
     const isPast=m<curM, isCur=m===curM;
+    // ⚠️ إن اختلف المُدخَل يدوياً عن المحسوب من جداول التفاصيل
+    const warn=i=>{
+      if(!inDoneRange(i,m)) return '';
+      const c=calcAct(i,m);
+      if(c===ac[i]) return '';
+      return `<span class="act-warn" title="التفاصيل تقول ${c} · المُدخَل ${ac[i]}
+اضغط لفتح تفاصيل ${ON_S[i]} مفلترة على ${MN[m-1]}"
+        onclick="openDetMonth(${i},${m})">⚠️</span>`;
+    };
     const chip=isPast&&ap>=pp?'<span class="chip chip-ok">✅ متقدم</span>':isPast&&ap<pp?'<span class="chip chip-bh">⚠️ متأخر</span>':isCur?'<span class="chip chip-cur">⏳ الحالي</span>':'<span class="chip chip-nd">🔜 قادم</span>';
     return`<tr class="${isCur?'cur-row':''}"><td>${MN[idx]}</td>
-      <td style="padding:0"><input class="edit-cell" style="color:#4aaed4;width:44px" value="${pl[0]}" onchange="MP[m][0]=parseInt(this.value)||0;savePlanSoon(m);renderTable();renderDash();" title="تعديل المخطط"></td><td style="padding:0"><input class="edit-cell" style="color:${CLR[0]};font-weight:700;width:44px" value="${ac[0]}" onchange="acts[idx][0]=parseInt(this.value)||0;saveMonthToCloud(m);renderTable();renderDash();" title="تعديل الفعلي"></td>
-      <td style="padding:0"><input class="edit-cell" style="color:#4aaed4;width:44px" value="${pl[1]}" onchange="MP[m][1]=parseInt(this.value)||0;savePlanSoon(m);renderTable();renderDash();" title="تعديل المخطط"></td><td style="padding:0"><input class="edit-cell" style="color:${CLR[1]};font-weight:700;width:44px" value="${ac[1]}" onchange="acts[idx][1]=parseInt(this.value)||0;saveMonthToCloud(m);renderTable();renderDash();" title="تعديل الفعلي"></td>
-      <td style="padding:0"><input class="edit-cell" style="color:#4aaed4;width:44px" value="${pl[2]}" onchange="MP[m][2]=parseInt(this.value)||0;savePlanSoon(m);renderTable();renderDash();" title="تعديل المخطط"></td><td style="padding:0"><input class="edit-cell" style="color:${CLR[2]};font-weight:700;width:44px" value="${ac[2]}" onchange="acts[idx][2]=parseInt(this.value)||0;saveMonthToCloud(m);renderTable();renderDash();" title="تعديل الفعلي"></td>
-      <td style="padding:0"><input class="edit-cell" style="color:#4aaed4;width:44px" value="${pl[3]}" onchange="MP[m][3]=parseInt(this.value)||0;savePlanSoon(m);renderTable();renderDash();" title="تعديل المخطط"></td><td style="padding:0"><input class="edit-cell" style="color:${CLR[3]};font-weight:700;width:44px" value="${ac[3]}" onchange="acts[idx][3]=parseInt(this.value)||0;saveMonthToCloud(m);renderTable();renderDash();" title="تعديل الفعلي"></td>
+      <td style="padding:0"><input class="edit-cell" style="color:#4aaed4;width:44px" value="${pl[0]}" onchange="MP[m][0]=parseInt(this.value)||0;savePlanSoon(m);renderTable();renderDash();" title="تعديل المخطط"></td><td style="padding:0" class="act-cell"><input class="edit-cell" style="color:${CLR[0]};font-weight:700;width:44px" value="${ac[0]}" onchange="acts[idx][0]=parseInt(this.value)||0;saveMonthToCloud(m);renderTable();renderDash();" title="تعديل الفعلي">${warn(0)}</td>
+      <td style="padding:0"><input class="edit-cell" style="color:#4aaed4;width:44px" value="${pl[1]}" onchange="MP[m][1]=parseInt(this.value)||0;savePlanSoon(m);renderTable();renderDash();" title="تعديل المخطط"></td><td style="padding:0" class="act-cell"><input class="edit-cell" style="color:${CLR[1]};font-weight:700;width:44px" value="${ac[1]}" onchange="acts[idx][1]=parseInt(this.value)||0;saveMonthToCloud(m);renderTable();renderDash();" title="تعديل الفعلي">${warn(1)}</td>
+      <td style="padding:0"><input class="edit-cell" style="color:#4aaed4;width:44px" value="${pl[2]}" onchange="MP[m][2]=parseInt(this.value)||0;savePlanSoon(m);renderTable();renderDash();" title="تعديل المخطط"></td><td style="padding:0" class="act-cell"><input class="edit-cell" style="color:${CLR[2]};font-weight:700;width:44px" value="${ac[2]}" onchange="acts[idx][2]=parseInt(this.value)||0;saveMonthToCloud(m);renderTable();renderDash();" title="تعديل الفعلي">${warn(2)}</td>
+      <td style="padding:0"><input class="edit-cell" style="color:#4aaed4;width:44px" value="${pl[3]}" onchange="MP[m][3]=parseInt(this.value)||0;savePlanSoon(m);renderTable();renderDash();" title="تعديل المخطط"></td><td style="padding:0" class="act-cell"><input class="edit-cell" style="color:${CLR[3]};font-weight:700;width:44px" value="${ac[3]}" onchange="acts[idx][3]=parseInt(this.value)||0;saveMonthToCloud(m);renderTable();renderDash();" title="تعديل الفعلي">${warn(3)}</td>
       <td style="color:var(--blue)">${fp(pp)}</td>
       <td style="color:var(--g4);font-weight:700">${fp(ap)}</td>
       <td style="color:${gap>=0?'var(--g5)':'var(--red)'};font-weight:700">${gap>=0?'+':''}${fp(gap)}</td>
@@ -2103,6 +2131,13 @@ function renderTable(){
       <td style="color:var(--g2);font-weight:700">${f(apay*1.15,0)}</td>
       <td>${chip}</td></tr>`;
   }).join('');
+  const diffs = actDiffs();
+  const sb = document.getElementById('sync-warn');
+  if(sb) sb.innerHTML = diffs.length
+    ? `<div class="sync-warn">⚠️ <b>${diffs.length}</b> خانة يختلف فيها «الفعلي» المُدخَل عن المحسوب من جداول التفاصيل
+         — علّمناها بـ ⚠️ داخل الجدول، واضغط العلامة لترى بنود ذلك الشهر.
+         <span style="opacity:.75">تُقارَن الأشهر من أول شهر فيه تاريخ إنجاز في التفاصيل حتى الشهر الحالي فقط.</span></div>`
+    : '';
   document.getElementById('main-tfoot').innerHTML=`<tr><td>الإجمالي</td><td colspan="8">—</td><td>${fp(tPl)}</td><td>${fp(tAc)}</td><td style="color:${tAc>=tPl?'#42c97c':'#fca5a5'}">${fp(tAc-tPl)}</td><td>${f(tPP,0)}</td><td>${f(tAP,0)}</td><td>${f(tAP*1.15,0)}</td><td>18 شهر</td></tr>`;
 }
 
@@ -2633,6 +2668,7 @@ function renderDetTable(){
   document.querySelectorAll('#detail-tbody textarea.cell-input, #detail-thead textarea.th-input')
     .forEach(autoGrow);
   gateDet();
+  renderDetMonthBar();
   renderStrategyExtras();
   undoBtnSync();
 }
@@ -2775,6 +2811,39 @@ document.addEventListener('keydown', e => {
 const detColFilter = [{}, {}, {}, {}];      // لكل مخرج: {رقم العمود: القيمة المختارة}
 const detLateOnly  = [false, false, false, false];   // اقتصار على ما سُلِّم بعد الموعد
 const detShown     = [null, null, null, null];       // الصفوف المعروضة بعد الفلترة
+// اقتصار على بنود شهر معيّن من المشروع (0 = كل الأشهر) — حسب تاريخ الإنجاز
+const detMonth     = [0, 0, 0, 0];
+
+function toggleDetMonth(){
+  const idx = activeDetail;
+  detMonth[idx] = detMonth[idx] ? 0 : curM;
+  renderDetTable();
+}
+// من علامة التنبيه في جدول المتابعة: افتح تفاصيل المخرج مفلترة على ذلك الشهر
+function openDetMonth(idx, m){
+  activeDetail = idx;
+  detMonth[idx] = m;
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
+  document.getElementById('details-view').classList.add('on');
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('on'));
+  const nb = [...document.querySelectorAll('.nav-btn')].find(b=>/التفاصيل/.test(b.textContent));
+  if(nb) nb.classList.add('on');
+  renderDetails();
+}
+
+// شريط زر «هذا الشهر» فوق الجدول
+function renderDetMonthBar(){
+  const el = document.getElementById('det-month-bar');
+  if(!el) return;
+  const idx = activeDetail;
+  if(doneDateCol(idx) < 0){ el.innerHTML = ''; return; }
+  const on = detMonth[idx] > 0;
+  const lbl = MN[(on ? detMonth[idx] : curM) - 1];
+  el.innerHTML = `<button class="d-btn dm-btn ${on ? 'on' : ''}" onclick="toggleDetMonth()"
+      title="اقتصار الجدول على البنود المنجزة في هذا الشهر (حسب ${esc(detCols[idx][doneDateCol(idx)] || '')})">
+      📅 ${on ? 'بنود ' + esc(lbl) + ' فقط' : 'هذا الشهر فقط (' + esc(lbl) + ')'}</button>`
+    + (on ? `<span class="dm-hint">حسب «${esc(detCols[idx][doneDateCol(idx)] || '')}»</span>` : '');
+}
 
 // ═══════════════════════════════════════════════════════════
 // ترتيب الصفوف — الافتراضي: أقدم تاريخ أولاً في كل المخرجات
@@ -2888,6 +2957,7 @@ function setColFilter(ci, val){
 }
 
 function clearColFilters(){
+  detMonth[activeDetail] = 0;
   detColFilter[activeDetail] = {};
   detLateOnly[activeDetail] = false;
   renderDetTable();
@@ -2910,6 +2980,79 @@ function thFilter(rows, ci){
             title="${cur ? 'مفلتر على: ' + esc(cur) : 'فلترة حسب هذا العمود'}">▼<select
             onchange="setColFilter(${ci}, this.value)">
             <option value="">الكل</option>${opts}</select></span>`;
+}
+
+// ═══════════════════════════════════════════════════════════
+// مقارنة التقرير الشهري بجداول التفاصيل
+// ═══════════════════════════════════════════════════════════
+// عمود «تاريخ الإنجاز» في كل مخرج — هو ما يحدّد الشهر الذي يُحتسب فيه البند
+// م1/م2: تاريخ الاستلام من الشركة · م3: تاريخ التقييم · م4: تاريخ الإنجاز
+function doneDateCol(idx){
+  const cols = detCols[idx] || [];
+  const find = t => cols.findIndex(c => String(c || '').includes('تاريخ') && String(c || '').includes(t));
+  let i = find('إنجاز'); if(i >= 0) return i;
+  i = find('انجاز');     if(i >= 0) return i;
+  i = find('تقييم');     if(i >= 0) return i;
+  return dcol(idx, 'recv');
+}
+
+// عدد البنود في الصف — عمود «العدد» إن وُجد، وإلا 1
+function itemCount(idx, r){
+  const cN = dcol(idx, 'count');
+  if(cN < 0) return 1;
+  const v = parseInt(String(r[cN] == null ? '' : r[cN]).replace(/[^0-9]/g, ''), 10);
+  return isNaN(v) || v < 1 ? 1 : v;
+}
+
+// رقم شهر المشروع لتاريخ ما (الشهر 1 = أبريل 2026)، أو 0 خارج المدى
+function projMonthOf(v){
+  const d = pDate(v);
+  if(!d) return 0;
+  const m = (d.getFullYear() - 2026) * 12 + (d.getMonth() + 1) - 3;
+  return (m >= 1 && m <= projectMonths) ? m : 0;
+}
+
+// المنجز المحسوب من التفاصيل لمخرج في شهر
+function calcAct(idx, m){
+  const cD = doneDateCol(idx);
+  if(cD < 0) return 0;
+  let t = 0;
+  (detRows[idx] || []).forEach(r=>{ if(projMonthOf(r[cD]) === m) t += itemCount(idx, r); });
+  return t;
+}
+
+// المدى الذي تغطّيه تفاصيل المخرج فعلاً: [أول شهر فيه تاريخ إنجاز .. الشهر الحالي].
+// المقارنة خارجه بلا معنى — قبل أن تبدأ تعبئة التفاصيل كل شهر سيبدو «مختلفاً».
+function doneRange(idx){
+  const cD = doneDateCol(idx);
+  if(cD < 0) return null;
+  let first = 0;
+  (detRows[idx] || []).forEach(r=>{
+    const m = projMonthOf(r[cD]);
+    if(m > 0 && (!first || m < first)) first = m;
+  });
+  return first ? {from: first, to: curM} : null;
+}
+const tracksDone = idx => !!doneRange(idx);
+
+// كل خانة يختلف فيها المُدخَل يدوياً عن المحسوب من التفاصيل
+function actDiffs(){
+  const out = [];
+  [0,1,2,3].forEach(i=>{
+    const rg = doneRange(i);
+    if(!rg) return;
+    for(let m = rg.from; m <= rg.to; m++){
+      const manual = (acts[m-1] || [])[i] || 0;
+      const calc = calcAct(i, m);
+      if(manual !== calc) out.push({i, m, manual, calc});
+    }
+  });
+  return out;
+}
+// هل تُقارَن هذه الخانة أصلاً؟
+function inDoneRange(idx, m){
+  const rg = doneRange(idx);
+  return !!rg && m >= rg.from && m <= rg.to;
 }
 
 // عمود تاريخ الإرسال — هو أول عمود تاريخ عادةً («تاريخ ارسالها للشركة»)
@@ -2949,9 +3092,12 @@ function detFilterRows(rows){
   const f = detColFilter[activeDetail];
   const keys = Object.keys(f);
   const late = detLateOnly[activeDetail];
+  const mOnly = detMonth[activeDetail];
+  const cD = mOnly ? doneDateCol(activeDetail) : -1;
   const cP = dcol(activeDetail, 'plan'), cR = dcol(activeDetail, 'recv');
   const out = [];
   rows.forEach((row, ri)=>{
+    if(mOnly && (cD < 0 || projMonthOf(row[cD]) !== mOnly)) return;
     if(late){
       const p = pDate(row[cP]), rc = pDate(row[cR]);
       if(!(p && rc && rc > p)) return;
@@ -2962,7 +3108,7 @@ function detFilterRows(rows){
     out.push([row, ri]);
   });
   const bar = document.getElementById('det-filter-bar');
-  if(keys.length || late){
+  if(keys.length || late || mOnly){
     bar.style.display = 'flex';
     document.getElementById('det-count').textContent =
       'عرض ' + out.length + ' من ' + rows.length + ' صف';
