@@ -187,6 +187,23 @@ table.main-tbl{width:100%;border-collapse:collapse;}
 .d-btn-del-col{background:#fff0ee;color:var(--red);border:1px dashed #f87171;}
 .d-btn-del-col:hover{background:var(--red);color:#fff;border-style:solid;}
 .d-btn-xl{background:#e8f5ee;color:var(--g3);border:1px solid var(--border);}
+/* ⚙️ أدوات الجدول — قائمة منسدلة تجمع إنشاء الصفوف والأعمدة واللصق */
+.dt-gear-wrap{position:relative;}
+.d-btn-gear{background:#eef4f0;color:var(--g2);border:1px solid var(--border);}
+.d-btn-gear:hover,.d-btn-gear.on{background:var(--g2);color:#fff;}
+.dt-menu{display:none;position:absolute;top:calc(100% + 6px);inset-inline-start:0;z-index:60;
+  min-width:15rem;background:#fff;border:1px solid var(--border);border-radius:10px;
+  box-shadow:0 12px 30px rgba(13,61,34,.18);padding:5px;}
+.dt-menu.on{display:block;}
+.dt-menu button{display:flex;align-items:center;gap:8px;width:100%;text-align:start;
+  background:none;border:none;border-radius:7px;cursor:pointer;padding:8px 10px;
+  font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.72rem;font-weight:600;color:var(--g1);}
+.dt-menu button:hover{background:#eef4f0;}
+.dt-menu-sep{height:1px;background:var(--border);margin:4px 6px;}
+.dt-menu-hint{padding:6px 10px 4px;font-size:.6rem;color:#8aa696;line-height:1.7;border-top:1px solid var(--border);margin-top:4px;}
+/* شرح الحالات والصيغ — لصاحب الصلاحية الكاملة وحده */
+.det-legend{display:none;}
+body.is-admin .det-legend{display:block;}
 .d-btn-undo{background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;}
 .d-btn-undo:hover:not(:disabled){background:#4338ca;color:#fff;}
 .d-btn:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.5);}
@@ -247,9 +264,6 @@ textarea.th-input{display:block;resize:none;overflow:hidden;line-height:1.5;
 .cell-input:focus{background:rgba(41,163,97,.07);}
 .td-del{background:none;border:none;color:var(--muted);cursor:pointer;padding:6px 8px;font-size:.78rem;transition:all .15s;white-space:nowrap;}
 .td-del:hover{color:var(--red);}
-.xl-drop{border:2px dashed var(--border);border-radius:10px;padding:24px;text-align:center;cursor:pointer;transition:all .18s;margin-top:10px;}
-.xl-drop:hover,.xl-drop.drag{border-color:var(--g5);background:rgba(41,163,97,.05);}
-.xl-drop p{font-size:.78rem;color:var(--muted);margin-top:6px;}
 
 /* ── PAYMENT VIEW ── */
 .pay-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
@@ -446,7 +460,7 @@ body.view-only .edit-cell{pointer-events:none;color:#5c7a68!important;}
 body.no-monthly .mi-input{pointer-events:none;opacity:.55;}
 body.no-monthly #monthly-view .save-btn{display:none!important;}
 body.no-monthly .edit-cell{pointer-events:none;color:#5c7a68!important;}
-body.det-locked .dt-btns{display:none!important;}
+body.det-locked .dt-edit{display:none!important;}
 #det-lock{display:none;background:#fff6e0;border:1px solid #e8d08a;color:#7a5c00;
   padding:7px 10px;border-radius:8px;font-size:.68rem;font-weight:700;margin-bottom:10px;}
 body.det-locked #det-lock{display:block;}
@@ -633,7 +647,7 @@ body.view-only #view-only-bar{display:block;}
 <div id="imp-modal" style="display:none" class="overlay" onclick="if(event.target===this)closeImp()">
   <div class="modal-box" style="max-width:460px;text-align:right;">
     <h2>📥 رفع ملف Excel</h2>
-    <div class="su-field">
+    <div class="su-field imp-sheet-field">
       <label>الورقة (Sheet)</label>
       <select id="imp-sheet" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:.72rem;"></select>
     </div>
@@ -922,14 +936,22 @@ body.view-only #view-only-bar{display:block;}
     <div class="detail-toolbar">
       <div class="dt-title" id="dt-title"></div>
       <div class="dt-btns">
-        <button class="d-btn d-btn-add-col" onclick="addCol()">+ عمود</button>
-        <button class="d-btn d-btn-del-col" onclick="delLastCol()">− عمود</button>
-        <button class="d-btn d-btn-add" onclick="addRow()">+ صف</button>
-        <button class="d-btn d-btn-undo" id="dt-undo" onclick="detUndoLast()" disabled
+        <div class="dt-gear-wrap dt-edit">
+          <button class="d-btn d-btn-gear" id="dt-gear" onclick="toggleDtMenu(event)"
+                  title="أدوات الجدول: صفوف وأعمدة ولصق">⚙️ أدوات الجدول</button>
+          <div class="dt-menu" id="dt-menu">
+            <button onclick="dtMenu('addRow')">➕ <span>إضافة صف جديد</span></button>
+            <button onclick="dtMenu('addCol')">➕ <span>إضافة عمود</span></button>
+            <button onclick="dtMenu('delLastCol')">➖ <span>حذف آخر عمود</span></button>
+            <div class="dt-menu-sep"></div>
+            <button onclick="dtMenu('pasteTable')">📋 <span>لصق جدول من Excel</span></button>
+            <div class="dt-menu-hint">حذف عمود بعينه من زر <b>×</b> فوق عنوانه · حذف صف من 🗑️ في آخره</div>
+          </div>
+        </div>
+        <button class="d-btn d-btn-undo dt-edit" id="dt-undo" onclick="detUndoLast()" disabled
                 title="تراجع عن آخر تغيير (Ctrl+Z)">↩️ تراجع</button>
-        <button class="d-btn" style="background:#f0e6ff;color:#7c3aed;border:1px solid #c4b5fd;" onclick="pasteTable()">📋 لصق جدول</button>
         <button class="d-btn d-btn-xl" onclick="exportDetXL()">⬇️ تصدير Excel</button>
-        <label class="d-btn d-btn-xl" style="cursor:pointer">⬆️ رفع Excel (دمج)<input type="file" accept=".xlsx,.xls,.csv" onchange="importXL(event)"></label>
+        <label class="d-btn d-btn-xl dt-edit" style="cursor:pointer">⬆️ رفع Excel<input type="file" accept=".xlsx,.xls,.csv" onchange="importXL(event)"></label>
       </div>
     </div>
     <div class="det-filter" id="det-filter-bar" style="display:none">
@@ -945,13 +967,6 @@ body.view-only #view-only-bar{display:block;}
       </table>
     </div>
     <div id="strat-bottom"></div>
-    <div class="xl-drop" id="xl-drop" onclick="document.querySelector('#details-view input[type=file]').click()"
-      ondragover="event.preventDefault();this.classList.add('drag')"
-      ondragleave="this.classList.remove('drag')"
-      ondrop="this.classList.remove('drag');importXL({target:{files:event.dataTransfer.files}})">
-      <div style="font-size:1.6rem;">📋</div>
-      <p>اسحب وأفلت ملف Excel هنا أو انقر لرفعه – سيُستورد مباشرة في الجدول</p>
-    </div>
   </div>
 </div>
 
@@ -2123,49 +2138,55 @@ function renderDetails(){
   document.getElementById('dt-title').textContent=ON[activeDetail];
   renderDetTable();
 }
+// اللصق يمرّ من نفس مسار رفع Excel: مطابقة الأعمدة بالاسم ثم بالمعنى،
+// ودمج افتراضي بدل استبدال الجدول كله كما كان.
 async function pasteTable(){
-  try{
-    const text=await navigator.clipboard.readText();
-    if(!text){alert('انسخ الجدول من Excel أولاً');return;}
-    const rows=text.trim().split('\n').map(r=>r.split('\t'));
-    if(!rows.length)return;
-    detSnap(activeDetail);
-    detCols[activeDetail]=rows[0].map(c=>c.trim());
-    detRows[activeDetail]=rows.slice(1).filter(r=>r.some(c=>c.trim())).map(r=>rows[0].map((_,ci)=>(r[ci]||'').trim()));
-    normalizeDetDates(activeDetail);
-    detSort[activeDetail] = undefined;
-    autoSort(activeDetail);
-    recalcTracked(activeDetail);
-    saveDetailToCloud(activeDetail);
-    renderDetTable();
-    showSyncStatus('✅ تم لصق '+detRows[activeDetail].length+' صف');
-  }catch(err){
-    const ta=document.createElement('textarea');
-    ta.style.cssText='position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:80%;height:200px;z-index:9999;border:2px solid #0d3d22;border-radius:8px;padding:10px;font-size:.8rem;';
-    ta.placeholder='الصق الجدول من Excel هنا ثم اضغط Enter...';
-    document.body.appendChild(ta);
-    ta.focus();
-    ta.onkeydown=ev=>{
-      if(ev.key==='Enter'&&!ev.shiftKey){
-        ev.preventDefault();
-        const rows=ta.value.trim().split('\n').map(r=>r.split('\t'));
-        if(rows.length>1){
-          detSnap(activeDetail);
-          detCols[activeDetail]=rows[0].map(c=>c.trim());
-          detRows[activeDetail]=rows.slice(1).filter(r=>r.some(c=>c.trim())).map(r=>rows[0].map((_,ci)=>(r[ci]||'').trim()));
-          normalizeDetDates(activeDetail);
-          detSort[activeDetail] = undefined;
-          autoSort(activeDetail);
-          recalcTracked(activeDetail);
-          saveDetailToCloud(activeDetail);
-          renderDetTable();
-          showSyncStatus('✅ تم لصق '+detRows[activeDetail].length+' صف');
-        }
-        ta.remove();
-      }
-      if(ev.key==='Escape')ta.remove();
-    };
+  let text = '';
+  try{ text = await navigator.clipboard.readText(); }catch(err){ text = ''; }
+  if(text && text.trim()) return pasteRun(text);
+
+  // المتصفح منع قراءة الحافظة — نفتح حقلاً تلصق فيه يدوياً
+  const ov = document.createElement('div');
+  ov.className = 'overlay';
+  ov.style.display = 'flex';
+  ov.innerHTML = `<div class="modal-box" style="max-width:560px;text-align:right;">
+      <h2>📋 لصق جدول</h2>
+      <p style="font-size:.7rem;color:var(--muted);line-height:1.8;margin:0 0 8px;">
+        انسخ الجدول من Excel <b>مع سطر العناوين</b> والصقه هنا، ثم اضغط «متابعة».
+        ستظهر بعدها نافذة الدمج كما في رفع الملف.</p>
+      <textarea id="paste-box" rows="8" style="width:100%;border:1px solid var(--border);
+        border-radius:9px;padding:10px;font-family:'IBM Plex Sans Arabic',sans-serif;
+        font-size:.72rem;resize:vertical;" placeholder="الصق هنا…"></textarea>
+      <div style="display:flex;gap:8px;justify-content:flex-start;margin-top:12px;">
+        <button class="d-btn d-btn-xl" id="paste-go">متابعة</button>
+        <button class="d-btn" id="paste-cancel">إلغاء</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  const box = ov.querySelector('#paste-box');
+  box.focus();
+  ov.querySelector('#paste-cancel').onclick = () => ov.remove();
+  ov.onclick = e => { if(e.target === ov) ov.remove(); };
+  ov.querySelector('#paste-go').onclick = () => {
+    const v = box.value;
+    ov.remove();
+    if(v.trim()) pasteRun(v);
+  };
+}
+
+function pasteRun(text){
+  const idx = activeDetail;
+  if(!can('edit:details:' + (idx + 1))){
+    showSyncStatus('🚫 صلاحيتك لا تسمح بتعديل هذا المخرج'); return;
   }
+  const aoa = text.replace(/\r/g, '').split('\n')
+    .map(r => r.split('\t').map(c => c.trim()))
+    .filter(r => r.some(c => c !== ''));
+  if(aoa.length < 2){
+    alert('انسخ الجدول كاملاً مع سطر العناوين (صفّان على الأقل).');
+    return;
+  }
+  openImp(idx, [{name: 'المُلصَق', aoa}]);
 }
 
 let detDragIdx=null;
@@ -2522,7 +2543,7 @@ function renderStrategyExtras(){
 
 function stLegend(){
   return `
-    <div class="st-legend">
+    <div class="st-legend det-legend">
       <b>دليل الحالات:</b>
       <b style="color:#155c35">مكتمل</b> تم الاستلام من الشركة ·
       <b style="color:#1e40af">قيد التنفيذ</b> لم يحن موعد التسليم المخطط بعد ·
@@ -2612,6 +2633,28 @@ function renderDetTable(){
   renderStrategyExtras();
   undoBtnSync();
 }
+
+// ═══ قائمة ⚙️ أدوات الجدول ═══
+function toggleDtMenu(e){
+  e.stopPropagation();
+  const m = document.getElementById('dt-menu'), g = document.getElementById('dt-gear');
+  const on = !m.classList.contains('on');
+  m.classList.toggle('on', on);
+  g.classList.toggle('on', on);
+}
+function closeDtMenu(){
+  const m = document.getElementById('dt-menu'), g = document.getElementById('dt-gear');
+  if(m) m.classList.remove('on');
+  if(g) g.classList.remove('on');
+}
+// تُغلق القائمة قبل التنفيذ، فلا تبقى مفتوحة فوق نافذة تأكيد
+function dtMenu(fn){
+  closeDtMenu();
+  ({addRow, addCol, delLastCol, pasteTable})[fn]();
+}
+document.addEventListener('click', e => {
+  if(!e.target.closest('.dt-gear-wrap')) closeDtMenu();
+});
 
 // ارتفاع الخلية يتمدد مع النص (سطران أو أكثر)
 function autoGrow(el){
@@ -2953,6 +2996,20 @@ function sheetAOA(ws){
 // الرفع: اختيار الورقة والطريقة (دمج أو استبدال كامل)
 let impState = null;
 
+// يشترك فيها رفع الملف واللصق من الحافظة
+function openImp(idx, sheets){
+  impState = {idx, sheets};
+  const sel = document.getElementById('imp-sheet');
+  sel.innerHTML = sheets.map((sh, k)=>
+    `<option value="${k}">${esc(sh.name)} — ${sh.aoa.length - 1} صف</option>`).join('');
+  sel.value = String(sheets.length - 1);      // آخر ورقة غالباً الأحدث
+  document.querySelector('.imp-sheet-field').style.display = sheets.length > 1 ? '' : 'none';
+  document.querySelector('input[name=impmode][value=merge]').checked = true;
+  document.getElementById('imp-info').innerHTML =
+    'الجدول الحالي فيه <b>' + (detRows[idx] || []).length + '</b> صف.';
+  document.getElementById('imp-modal').style.display = 'flex';
+}
+
 function importXL(e){
   const file = e.target.files[0]; if(!file) return;
   const idx = activeDetail;
@@ -2978,15 +3035,7 @@ function importXL(e){
       sheets = sheets.filter(sh => sh.aoa.length >= 2);
       if(!sheets.length){ alert('لا توجد ورقة فيها عناوين وصفوف بيانات'); return; }
 
-      impState = {idx, sheets};
-      const sel = document.getElementById('imp-sheet');
-      sel.innerHTML = sheets.map((sh, k)=>
-        `<option value="${k}">${esc(sh.name)} — ${sh.aoa.length - 1} صف</option>`).join('');
-      sel.value = String(sheets.length - 1);      // آخر ورقة غالباً الأحدث
-      document.querySelector('input[name=impmode][value=merge]').checked = true;
-      document.getElementById('imp-info').innerHTML =
-        'الجدول الحالي فيه <b>' + (detRows[idx] || []).length + '</b> صف.';
-      document.getElementById('imp-modal').style.display = 'flex';
+      openImp(idx, sheets);
     }catch(err){ console.error(err); alert('خطأ في قراءة الملف: ' + err.message); }
   };
 
