@@ -228,6 +228,36 @@ body.is-admin .det-legend{display:block;}
   overflow-wrap:anywhere;}
 .th-input::placeholder{color:rgba(255,255,255,.4);}
 input.cell-date{padding-inline:2px;}
+/* ═══ نظرة عامة: آخر تحديث لكل مخرج ═══ */
+.ov-box{background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  box-shadow:var(--shadow);margin-bottom:14px;overflow:hidden;}
+.ov-head{display:flex;align-items:center;gap:10px;padding:11px 16px;cursor:pointer;
+  background:linear-gradient(90deg,#0d3d22,#1e7a48);color:#fff;user-select:none;}
+.ov-head h3{margin:0;font-size:.82rem;font-weight:800;}
+.ov-head .ov-sub{font-size:.64rem;color:rgba(255,255,255,.7);font-weight:600;}
+.ov-head .ov-arrow{margin-inline-start:auto;font-size:.7rem;transition:transform .2s;}
+.ov-box.closed .ov-arrow{transform:rotate(-90deg);}
+.ov-box.closed .ov-grid{display:none;}
+.ov-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:14px 16px;}
+.ov-card{border:1px solid var(--border);border-radius:11px;overflow:hidden;background:#fff;
+  display:flex;flex-direction:column;}
+.ov-card .ov-t{padding:7px 11px;color:#fff;font-size:.66rem;font-weight:800;line-height:1.5;}
+.ov-card .ov-body{padding:10px 12px 12px;display:flex;flex-direction:column;gap:7px;flex:1;}
+.ov-date{font-size:1.02rem;font-weight:800;color:var(--g1);direction:ltr;text-align:center;
+  font-variant-numeric:tabular-nums;letter-spacing:.02em;}
+.ov-ago{font-size:.6rem;font-weight:700;text-align:center;color:var(--muted);margin-top:-4px;}
+.ov-ago.fresh{color:var(--g3);}
+.ov-ago.stale{color:var(--amber,#9a5b00);}
+.ov-what{font-size:.63rem;color:#5f7a6b;line-height:1.75;border-top:1px dashed var(--border);
+  padding-top:7px;overflow-wrap:anywhere;}
+.ov-what b{color:var(--g1);font-weight:700;}
+.ov-none{font-size:.68rem;color:var(--muted);text-align:center;padding:6px 0;font-weight:600;}
+.ov-foot{margin-top:auto;padding-top:7px;border-top:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:baseline;font-size:.6rem;color:var(--muted);}
+.ov-foot b{font-size:.8rem;color:var(--g2);font-weight:800;direction:ltr;}
+@media(max-width:1100px){.ov-grid{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:620px){.ov-grid{grid-template-columns:1fr;}}
+
 /* أدوات الرأس: أيقونات مسطّحة في سطر هادئ تحت العنوان */
 .th-sort{border:none;background:none;cursor:pointer;line-height:1;flex-shrink:0;
   padding:1px 3px;font-size:.6rem;border-radius:4px;transition:all .15s;
@@ -842,6 +872,8 @@ body.view-only #view-only-bar{display:block;}
 
 <div class="main">
 <div id="dashboard-view" class="view on">
+
+  <div id="overview-box"></div>
 
   <div class="month-bar">
     <label>الشهر الحالي للمشروع:</label>
@@ -1756,6 +1788,81 @@ function renderProgress(){
   `;
 }
 
+// ═══════════════════════════════════════════════════════════
+// نظرة عامة — آخر تحديث لكل مخرج، أعلى الصفحة الرئيسية
+// ═══════════════════════════════════════════════════════════
+// «آخر تحديث» = أحدث تاريخ **لم يتجاوز اليوم** في أي عمود تاريخ بالمخرج،
+// فالموعد المخطط في المستقبل ليس حدثاً وقع بعد.
+function lastUpdate(idx){
+  const cols = detCols[idx] || [], rows = detRows[idx] || [];
+  const dcs = cols.map((_, ci) => ci).filter(ci => isDateCol(idx, ci));
+  if(!dcs.length) return null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  let best = null;
+  rows.forEach(r=>{
+    dcs.forEach(ci=>{
+      const d = pDate(r[ci]);
+      if(!d || d > today) return;
+      if(!best || d > best.d) best = {d, ci, name: String(r[0] || '').trim()};
+    });
+  });
+  return best;
+}
+
+let ovOpen = true;
+try{ ovOpen = localStorage.getItem('adaa_overview_open') !== '0'; }catch(e){}
+function toggleOverview(){
+  ovOpen = !ovOpen;
+  try{ localStorage.setItem('adaa_overview_open', ovOpen ? '1' : '0'); }catch(e){}
+  renderOverview();
+}
+
+function renderOverview(){
+  const el = document.getElementById('overview-box');
+  if(!el) return;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const DAY = 86400000;
+  const ups = [0,1,2,3].map(lastUpdate);
+  const newest = ups.filter(Boolean).sort((a,b)=>b.d - a.d)[0];
+  const sub = newest
+    ? 'آخر نشاط في المشروع: ' + newest.d.toISOString().slice(0,10)
+    : 'لا توجد تواريخ مسجّلة بعد';
+
+  const cards = [0,1,2,3].map(i=>{
+    const u = ups[i];
+    const cum = cumA(i, curM);
+    let body;
+    if(!u){
+      body = '<div class="ov-none">لا يوجد تحديث مسجّل</div>';
+    }else{
+      const days = Math.round((today - u.d) / DAY);
+      const ago  = days === 0 ? 'اليوم' : 'قبل ' + arDays(days);
+      const cls  = days <= 14 ? 'fresh' : days > 45 ? 'stale' : '';
+      const col  = (detCols[i] || [])[u.ci] || '';
+      body = `<div class="ov-date">${esc(u.d.toISOString().slice(0,10))}</div>
+        <div class="ov-ago ${cls}">${ago}</div>
+        <div class="ov-what">${u.name ? '<b>' + esc(u.name) + '</b><br>' : ''}${esc(col)}</div>`;
+    }
+    return `<div class="ov-card">
+      <div class="ov-t" style="background:${CLR[i]}">${OI[i]} ${esc(ON_S[i])}</div>
+      <div class="ov-body">
+        ${body}
+        <div class="ov-foot"><span>المحقق حتى الآن</span>
+          <span><b>${f(cum)}</b> / ${f(TGT[i])} ${OU[i]}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `<div class="ov-box ${ovOpen ? '' : 'closed'}">
+    <div class="ov-head" onclick="toggleOverview()">
+      <h3>👁️ نظرة عامة — آخر تحديث للمخرجات</h3>
+      <span class="ov-sub">${esc(sub)}</span>
+      <span class="ov-arrow">▼</span>
+    </div>
+    <div class="ov-grid">${cards}</div>
+  </div>`;
+}
+
 // حالة طي صندوق التنبيهات — محفوظة لكل متصفح
 let alertsOpen = true;
 try{ alertsOpen = localStorage.getItem('adaa_alerts_open') !== '0'; }catch(e){}
@@ -2092,6 +2199,7 @@ function renderTable(){
 // ═══════════════════════════════════════════════════════════
 function renderDash(){
   buildTabs();
+  renderOverview();
   renderProgress();
   recalcStrategies();
   renderAlerts();
