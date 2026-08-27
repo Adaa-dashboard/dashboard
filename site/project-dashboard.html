@@ -987,6 +987,7 @@ body.view-only #view-only-bar{display:block;}
             <button onclick="dtMenu('pickDelCol')">🗑️ <span>حذف عمود…</span></button>
             <div class="dt-menu-sep"></div>
             <button onclick="dtMenu('pasteTable')">📋 <span>لصق جدول من Excel</span></button>
+            <button onclick="dtMenu('dedupeRows')" id="dt-dedupe">🧹 <span>حذف الصفوف المكررة…</span></button>
             <div class="dt-menu-hint">حذف صف من 🗑️ في آخره</div>
           </div>
         </div>
@@ -1383,7 +1384,20 @@ async function loadFromCloud(){
 // حفظ تفاصيل مخرج
 // الترتيب هنا مقصود: نُدرج الجديد أولاً ثم نحذف القديم بمعرّفاته.
 // الطريقة السابقة (حذف ثم إدراج) كانت تفقد كل الصفوف إن فشل الإدراج.
-async function saveDetailToCloud(idx){
+// طابور حفظ مستقل لكل مخرج — **لا تُزله**.
+// الحفظ عمليتان لا واحدة: إدراج الجديد ثم حذف القديم بمعرّفاته. فإن تداخل
+// حفظان على نفس المخرج، قرأ الثاني معرّفات ما قبل إدراج الأول، فبقي
+// الإدراجان معاً وحُذف القديم مرة واحدة ⇒ **الجدول كله يتضاعف**.
+// والتداخل واقعٌ فعلاً: saveDetSoon تؤجّل 1.2 ث بينما addRow/delRow/impRun
+// و dedupeRows و loadFromCloud تحفظ فوراً.
+const detSaveQ = [null, null, null, null];
+function saveDetailToCloud(idx){
+  const next = () => saveDetailNow(idx);
+  detSaveQ[idx] = (detSaveQ[idx] || Promise.resolve()).then(next, next);
+  return detSaveQ[idx];
+}
+
+async function saveDetailNow(idx){
   const sb = getSB();
   if(!sb){ showSyncStatus('⚠️ تعذّر الاتصال — لم يُحفظ'); return; }
   if(!can('edit:details:' + (idx + 1))){
@@ -1407,10 +1421,18 @@ async function saveDetailToCloud(idx){
       if(iErr) throw iErr;                    // فشل الإدراج ⇒ لم يُحذف شيء
     }
 
+    // الحذف يأتي بعد الإدراج، فلو فشل بقي القديم والجديد معاً ⇒ تكرار.
+    // نعيد المحاولة مرة، ثم نُبلّغ برسالة تقول ما العمل بدل خطأ غامض —
+    // فالبيانات الجديدة محفوظة فعلاً والناقص حذف القديم وحده.
     if(oldRows && oldRows.length){
-      const {error: dErr} = await sb.from('detail_rows')
-        .delete().in('id', oldRows.map(r=>r.id));
-      if(dErr) throw dErr;
+      const ids = oldRows.map(r=>r.id);
+      let dErr = (await sb.from('detail_rows').delete().in('id', ids)).error;
+      if(dErr) dErr = (await sb.from('detail_rows').delete().in('id', ids)).error;
+      if(dErr){
+        console.error(dErr);
+        showSyncStatus('⚠️ حُفظ الجديد ولم يُحذف القديم — أعِد التحميل ثم ⚙️ «حذف الصفوف المكررة»');
+        return;
+      }
     }
     showSyncStatus('✅ تم حفظ تفاصيل ' + ON_S[idx]);
   }catch(e){ sbErr(e); }
@@ -2248,7 +2270,10 @@ function pasteRun(text){
     alert('انسخ الجدول كاملاً مع سطر العناوين (صفّان على الأقل).');
     return;
   }
-  openImp(idx, [{name: 'المُلصَق', aoa}], 'append');
+  // الافتراضي «دمج»: الصف الموجود يُحدَّث ولا يُكرَّر. كان 'append' فكان لصق
+  // جدول فيه صفوف موجودة يضيفها نسخةً ثانية — وهو سبب تكرار البيانات.
+  // وضع «إضافة صفوف جديدة» ما زال متاحاً باختياره يدوياً من النافذة.
+  openImp(idx, [{name: 'المُلصَق', aoa}]);
 }
 
 let detDragIdx=null;
@@ -2664,7 +2689,11 @@ function renderDetTable(){
   const dupBox = document.getElementById('det-dup');
   if(dupBox) dupBox.innerHTML = dups.size
     ? `<div class="dup-note">⚠️ ${dups.size} قيمة مكررة في «${esc(cols[0] || '')}»
-         — الصفوف المعنية بالأحمر</div>` : '';
+         — الصفوف المعنية بالأحمر، وتُنظَّف من ⚙️ → «🧹 حذف الصفوف المكررة»</div>` : '';
+  // العدد على بند القائمة نفسه، فيُعرف وجود المكرر قبل فتحها
+  const ddBtn = document.getElementById('dt-dedupe');
+  if(ddBtn) ddBtn.querySelector('span').textContent =
+    dups.size ? 'حذف الصفوف المكررة (' + dups.size + ')…' : 'حذف الصفوف المكررة…';
   document.querySelectorAll('#detail-tbody textarea.cell-input, #detail-thead textarea.th-input')
     .forEach(autoGrow);
   gateDet();
@@ -2689,7 +2718,7 @@ function closeDtMenu(){
 // تُغلق القائمة قبل التنفيذ، فلا تبقى مفتوحة فوق نافذة تأكيد
 function dtMenu(fn){
   closeDtMenu();
-  ({addRow, addCol, pickDelCol, pasteTable})[fn]();
+  ({addRow, addCol, pickDelCol, pasteTable, dedupeRows})[fn]();
 }
 
 // اختيار العمود المراد حذفه من قائمة — بدل زر × فوق كل عنوان
@@ -2717,6 +2746,63 @@ function pickDelCol(){
     b.onclick = () => { ov.remove(); delCol(+b.dataset.ci); };
   });
 }
+// ═══ حذف الصفوف المكررة ═══
+// المكرر = نفس قيمة العمود الأول — نفس تعريف dupKeys تماماً، فما يُحذف هو
+// المُلوَّن بالأحمر لا غير. الصف بلا مفتاح لا يُمسّ إطلاقاً.
+// **لا نحذف حذفاً أعمى**: يبقى أول ظهور بترتيب الجدول، وتُملأ خلاياه الفارغة
+// من نسخه قبل إزالتها — فلا تضيع معلومة موجودة في نسخة دون أخرى. والخلية
+// المتعارضة (قيمتان مختلفتان) تبقى على قيمة الصف الباقي ويُبلَّغ بعددها.
+// «الحالة» و«الأيام» محسوبان من التواريخ فيُستثنيان من الدمج وعدّ التعارض.
+function dedupeRows(){
+  const idx = activeDetail;
+  if(!can('edit:details:' + (idx + 1))){
+    showSyncStatus('🚫 صلاحيتك لا تسمح بتعديل هذا المخرج'); return;
+  }
+  const rows = detRows[idx] || [], cols = detCols[idx] || [];
+  const keyOfRow = r => String(r[0] == null ? '' : r[0]).trim().toLowerCase();
+  const skip = new Set([dcol(idx, 'stat'), dcol(idx, 'days')].filter(c => c >= 0));
+
+  // نبني الناتج على نسخ، فلا يتغيّر الجدول قبل التأكيد
+  const out = [], at = new Map(), groups = new Set();
+  let dropped = 0, filled = 0, clash = 0;
+
+  rows.forEach(r=>{
+    const k = keyOfRow(r);
+    if(!k || !at.has(k)){ if(k) at.set(k, out.length); out.push(r.slice()); return; }
+    const keep = out[at.get(k)];
+    groups.add(k); dropped++;
+    r.forEach((v, ci)=>{
+      if(skip.has(ci)) return;
+      const a = String(keep[ci] == null ? '' : keep[ci]).trim();
+      const b = String(v == null ? '' : v).trim();
+      if(!b) return;
+      if(!a){ keep[ci] = v; filled++; }
+      else if(a !== b) clash++;
+    });
+  });
+
+  if(!dropped){ alert('لا توجد صفوف مكررة في هذا الجدول.'); return; }
+
+  if(!confirm(
+      'قيم مكررة في «' + (cols[0] || 'العمود الأول') + '»: ' + groups.size + '\n\n'
+      + 'الصفوف المعنية: ' + (groups.size + dropped)
+      + ' — يبقى منها ' + groups.size + ' ويُحذف ' + dropped + '.\n'
+      + (filled ? 'قبل الحذف تُملأ الخلايا الفارغة في الصف الباقي من نسخه: '
+                  + filled + '.\n' : '')
+      + (clash ? '\n⚠️ خلايا فيها قيمتان مختلفتان: ' + clash
+                 + ' — تبقى قيمة الصف الباقي.\n' : '')
+      + '\nيمكنك التراجع بزر ↩️ بعدها.')) return;
+
+  detSnap(idx);
+  detRows[idx] = out;
+  if(isTracked(idx)) recalcTracked(idx);
+  renderDetTable();
+  showSyncStatus('🧹 حُذف من النسخ المكررة: ' + dropped
+    + (filled ? ' · مُلئت خلايا فارغة: ' + filled : '')
+    + (clash ? ' · ⚠️ تعارض بقي كما هو: ' + clash : ''));
+  saveDetailToCloud(idx);
+}
+
 document.addEventListener('click', e => {
   if(!e.target.closest('.dt-gear-wrap')) closeDtMenu();
 });
