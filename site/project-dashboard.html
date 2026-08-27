@@ -1384,7 +1384,20 @@ async function loadFromCloud(){
 // حفظ تفاصيل مخرج
 // الترتيب هنا مقصود: نُدرج الجديد أولاً ثم نحذف القديم بمعرّفاته.
 // الطريقة السابقة (حذف ثم إدراج) كانت تفقد كل الصفوف إن فشل الإدراج.
-async function saveDetailToCloud(idx){
+// طابور حفظ مستقل لكل مخرج — **لا تُزله**.
+// الحفظ عمليتان لا واحدة: إدراج الجديد ثم حذف القديم بمعرّفاته. فإن تداخل
+// حفظان على نفس المخرج، قرأ الثاني معرّفات ما قبل إدراج الأول، فبقي
+// الإدراجان معاً وحُذف القديم مرة واحدة ⇒ **الجدول كله يتضاعف**.
+// والتداخل واقعٌ فعلاً: saveDetSoon تؤجّل 1.2 ث بينما addRow/delRow/impRun
+// و dedupeRows و loadFromCloud تحفظ فوراً.
+const detSaveQ = [null, null, null, null];
+function saveDetailToCloud(idx){
+  const next = () => saveDetailNow(idx);
+  detSaveQ[idx] = (detSaveQ[idx] || Promise.resolve()).then(next, next);
+  return detSaveQ[idx];
+}
+
+async function saveDetailNow(idx){
   const sb = getSB();
   if(!sb){ showSyncStatus('⚠️ تعذّر الاتصال — لم يُحفظ'); return; }
   if(!can('edit:details:' + (idx + 1))){
@@ -1408,10 +1421,18 @@ async function saveDetailToCloud(idx){
       if(iErr) throw iErr;                    // فشل الإدراج ⇒ لم يُحذف شيء
     }
 
+    // الحذف يأتي بعد الإدراج، فلو فشل بقي القديم والجديد معاً ⇒ تكرار.
+    // نعيد المحاولة مرة، ثم نُبلّغ برسالة تقول ما العمل بدل خطأ غامض —
+    // فالبيانات الجديدة محفوظة فعلاً والناقص حذف القديم وحده.
     if(oldRows && oldRows.length){
-      const {error: dErr} = await sb.from('detail_rows')
-        .delete().in('id', oldRows.map(r=>r.id));
-      if(dErr) throw dErr;
+      const ids = oldRows.map(r=>r.id);
+      let dErr = (await sb.from('detail_rows').delete().in('id', ids)).error;
+      if(dErr) dErr = (await sb.from('detail_rows').delete().in('id', ids)).error;
+      if(dErr){
+        console.error(dErr);
+        showSyncStatus('⚠️ حُفظ الجديد ولم يُحذف القديم — أعِد التحميل ثم ⚙️ «حذف الصفوف المكررة»');
+        return;
+      }
     }
     showSyncStatus('✅ تم حفظ تفاصيل ' + ON_S[idx]);
   }catch(e){ sbErr(e); }
