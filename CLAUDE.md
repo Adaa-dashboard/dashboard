@@ -35,16 +35,22 @@
   - `app_users` بلا أي سياسة ⇒ لا يُقرأ من الواجهة؛ كل وصول عبر دوال `security definer`
   - **مهم:** REST API المباشر يرجع 403 "Host not in allowlist" — يجب استخدام supabase-js client فقط (دالة `sbFetch` تترجم مسارات REST لاستدعاءات client)
 - **النشر:**
+  - **المستودع:** `Adaa-dashboard/dashboard` — نُقل من حساب شخصي إلى منظمة
+    `Adaa-dashboard` حتى يخلو رابط المشاركة من اسم المستخدم.
+    تطبيق Claude مثبَّت على المنظمة بصلاحية قراءة وكتابة
   - **الرابط المعتمد:** `https://adaa-project.netlify.app` — Netlify مربوط بالمستودع،
-    ينشر تلقائياً مع كل دمج في `main`. اختير لأنه لا يتضمن اسم المستخدم في الرابط
-    (GitHub Pages يفرض `<username>.github.io` للمستودعات الشخصية)
+    ينشر تلقائياً مع كل دمج في `main`. **بقي يعمل بعد نقل المستودع ولم يحتج
+    إعادة ربط** — لا تُعِد إنشاء الموقع على Netlify
   - ملفات اللوحة في مجلد **`site/`** وحده — **لا تضع فيه `package.json` أبداً**:
     المستودع يحتوي مشروع Next.js لا علاقة له باللوحة، وكان Netlify يكتشفه ويحاول
     بناءه فيفشل النشر بـ "Failed Due To Plugin Error". جعل `site/` قاعدة البناء
     (`base` في `netlify.toml`) يمنع اكتشاف أي إطار عمل من الأساس — وهو الحل الذي
     نجح؛ `NETLIFY_NEXT_PLUGIN_SKIP` لم يكفِ
   - `index.html` في الجذر تحويل إلى `./site/` · و`site/index.html` تحويل إلى اللوحة
-  - **GitHub Pages** نسخة احتياطية على `https://sultanaalarjani.github.io/<repo>/`
+  - **GitHub Pages** نسخة احتياطية على `https://adaa-dashboard.github.io/dashboard`
+    — رابط المنظمة خالٍ من اسم المستخدم، فسببُ تفضيل Netlify الأصلي
+    (أن Pages يفرض `<username>.github.io` للمستودعات الشخصية) لم يعد قائماً.
+    ومع ذلك يبقى رابط Netlify هو المعتمد للمشاركة
   - لوحة استقطاب المواهب تبقى على `/hr-dashboard/`
 - XLSX.js من CDN لاستيراد Excel
 
@@ -390,4 +396,5 @@
 ## سير العمل
 1. عدّل `site/project-dashboard.html`
 2. تحقق: `./check.sh` من جذر المستودع (يقرأ `site/project-dashboard.html`)
-3. `git commit` ثم `git push` — الدمج في `main` ينشر تلقائياً على GitHub Pages
+3. `git commit` ثم `git push` — الدمج في `main` ينشر تلقائياً على
+   Netlify (الرابط المعتمد) و GitHub Pages (الاحتياطي)
