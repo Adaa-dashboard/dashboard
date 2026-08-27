@@ -2651,11 +2651,12 @@ function renderDetTable(){
   // Body
   const shown = detFilterRows(rows);
   detShown[activeDetail] = shown.map(([r])=>r);
-  const dups = dupKeys(activeDetail);
+  const dupG = dupGroups(activeDetail);
+  const dupIdx = new Set(dupG.flat());
   document.getElementById('detail-tbody').innerHTML=shown.map(([row,ri])=>{
-    const isDup = dups.has(String(row[0] == null ? '' : row[0]).trim().toLowerCase());
+    const isDup = dupIdx.has(ri);
     return `
-    <tr class="${isDup ? 'dup-row' : ''}"${isDup ? ' title="مكرر — نفس قيمة العمود الأول موجودة في صف آخر"' : ''}>${cols.map((_,ci)=>{
+    <tr class="${isDup ? 'dup-row' : ''}"${isDup ? ` title="مكرر — تطابق مع صف آخر في: ${esc(dupWhy(activeDetail, ri))}"` : ''}>${cols.map((_,ci)=>{
       if(activeDetail===1 && ci===cT){
         const v=row[ci]||'';
         const opts=[...new Set([...M2_TYPES, v].filter(Boolean))]
@@ -2687,13 +2688,14 @@ function renderDetTable(){
     </tr>`;}).join('');
   // شريط تنبيه فوق الجدول إن وُجد تكرار
   const dupBox = document.getElementById('det-dup');
-  if(dupBox) dupBox.innerHTML = dups.size
-    ? `<div class="dup-note">⚠️ ${dups.size} قيمة مكررة في «${esc(cols[0] || '')}»
-         — الصفوف المعنية بالأحمر، وتُنظَّف من ⚙️ → «🧹 حذف الصفوف المكررة»</div>` : '';
+  if(dupBox) dupBox.innerHTML = dupG.length
+    ? `<div class="dup-note">⚠️ ${dupG.length} مجموعة مكررة
+         — المطابقة في «${esc(idCols(activeDetail).map(ci => cols[ci] || '').filter(Boolean).join('» أو «'))}»،
+         الصفوف المعنية بالأحمر وتُنظَّف من ⚙️ → «🧹 حذف الصفوف المكررة»</div>` : '';
   // العدد على بند القائمة نفسه، فيُعرف وجود المكرر قبل فتحها
   const ddBtn = document.getElementById('dt-dedupe');
   if(ddBtn) ddBtn.querySelector('span').textContent =
-    dups.size ? 'حذف الصفوف المكررة (' + dups.size + ')…' : 'حذف الصفوف المكررة…';
+    dupG.length ? 'حذف الصفوف المكررة (' + dupG.length + ')…' : 'حذف الصفوف المكررة…';
   document.querySelectorAll('#detail-tbody textarea.cell-input, #detail-thead textarea.th-input')
     .forEach(autoGrow);
   gateDet();
@@ -2747,8 +2749,8 @@ function pickDelCol(){
   });
 }
 // ═══ حذف الصفوف المكررة ═══
-// المكرر = نفس قيمة العمود الأول — نفس تعريف dupKeys تماماً، فما يُحذف هو
-// المُلوَّن بالأحمر لا غير. الصف بلا مفتاح لا يُمسّ إطلاقاً.
+// يعمل على **نفس مجموعات `dupGroups`** التي تُلوَّن بالأحمر، فما يُحذف هو
+// ما تراه محدَّداً لا غير — الرمز والاسم معاً، لا العمود الأول وحده.
 // **لا نحذف حذفاً أعمى**: يبقى أول ظهور بترتيب الجدول، وتُملأ خلاياه الفارغة
 // من نسخه قبل إزالتها — فلا تضيع معلومة موجودة في نسخة دون أخرى. والخلية
 // المتعارضة (قيمتان مختلفتان) تبقى على قيمة الصف الباقي ويُبلَّغ بعددها.
@@ -2759,34 +2761,37 @@ function dedupeRows(){
     showSyncStatus('🚫 صلاحيتك لا تسمح بتعديل هذا المخرج'); return;
   }
   const rows = detRows[idx] || [], cols = detCols[idx] || [];
-  const keyOfRow = r => String(r[0] == null ? '' : r[0]).trim().toLowerCase();
+  const groups = dupGroups(idx);
+  if(!groups.length){ alert('لا توجد صفوف مكررة في هذا الجدول.'); return; }
   const skip = new Set([dcol(idx, 'stat'), dcol(idx, 'days')].filter(c => c >= 0));
 
-  // نبني الناتج على نسخ، فلا يتغيّر الجدول قبل التأكيد
-  const out = [], at = new Map(), groups = new Set();
-  let dropped = 0, filled = 0, clash = 0;
+  // نعمل على نسخ، فلا يتغيّر الجدول قبل التأكيد
+  const merged = rows.map(r => r.slice());
+  const drop = new Set();
+  let filled = 0, clash = 0;
 
-  rows.forEach(r=>{
-    const k = keyOfRow(r);
-    if(!k || !at.has(k)){ if(k) at.set(k, out.length); out.push(r.slice()); return; }
-    const keep = out[at.get(k)];
-    groups.add(k); dropped++;
-    r.forEach((v, ci)=>{
-      if(skip.has(ci)) return;
-      const a = String(keep[ci] == null ? '' : keep[ci]).trim();
-      const b = String(v == null ? '' : v).trim();
-      if(!b) return;
-      if(!a){ keep[ci] = v; filled++; }
-      else if(a !== b) clash++;
+  groups.forEach(g=>{
+    const keep = merged[g[0]];
+    g.slice(1).forEach(i=>{
+      drop.add(i);
+      merged[i].forEach((v, ci)=>{
+        if(skip.has(ci)) return;
+        const a = String(keep[ci] == null ? '' : keep[ci]).trim();
+        const b = String(v == null ? '' : v).trim();
+        if(!b) return;
+        if(!a){ keep[ci] = v; filled++; }
+        else if(a !== b) clash++;
+      });
     });
   });
 
-  if(!dropped){ alert('لا توجد صفوف مكررة في هذا الجدول.'); return; }
+  const out = merged.filter((_, i) => !drop.has(i));
+  const idNames = idCols(idx).map(ci => cols[ci] || '').filter(Boolean).join('» أو «');
 
   if(!confirm(
-      'قيم مكررة في «' + (cols[0] || 'العمود الأول') + '»: ' + groups.size + '\n\n'
-      + 'الصفوف المعنية: ' + (groups.size + dropped)
-      + ' — يبقى منها ' + groups.size + ' ويُحذف ' + dropped + '.\n'
+      'مجموعات مكررة (المطابقة في «' + idNames + '»): ' + groups.length + '\n\n'
+      + 'الصفوف المعنية: ' + (groups.length + drop.size)
+      + ' — يبقى منها ' + groups.length + ' ويُحذف ' + drop.size + '.\n'
       + (filled ? 'قبل الحذف تُملأ الخلايا الفارغة في الصف الباقي من نسخه: '
                   + filled + '.\n' : '')
       + (clash ? '\n⚠️ خلايا فيها قيمتان مختلفتان: ' + clash
@@ -2797,7 +2802,7 @@ function dedupeRows(){
   detRows[idx] = out;
   if(isTracked(idx)) recalcTracked(idx);
   renderDetTable();
-  showSyncStatus('🧹 حُذف من النسخ المكررة: ' + dropped
+  showSyncStatus('🧹 حُذف من النسخ المكررة: ' + drop.size
     + (filled ? ' · مُلئت خلايا فارغة: ' + filled : '')
     + (clash ? ' · ⚠️ تعارض بقي كما هو: ' + clash : ''));
   saveDetailToCloud(idx);
@@ -3152,14 +3157,60 @@ function sendDateCol(idx){
 }
 
 // مفاتيح العمود الأول التي تتكرر في أكثر من صف — تُلوَّن حمراء في الجدول
-function dupKeys(idx){
-  const seen = new Map(), dup = new Set();
-  (detRows[idx] || []).forEach(r=>{
-    const k = String(r[0] == null ? '' : r[0]).trim().toLowerCase();
-    if(!k) return;
-    if(seen.has(k)) dup.add(k); else seen.set(k, 1);
+// ═══ كشف التكرار ═══
+// **أعمدة الهوية**: العمود الأول، **و**عمود «الاسم» إن كان عموداً آخر.
+// السبب: م2 أوله «الرمز»، وبعض المؤشرات بلا رمز — اسمها وحده هويتها.
+// الاكتفاء بالعمود الأول كان يتخطّى تلك الصفوف تماماً (شرط `if(!k) return`)
+// فيمرّ المكرر دون أن يُكتشف.
+// وإن كان العمود الأول هو «الاسم» أصلاً (م1 و م3 الافتراضيان) فلا عمود ثانٍ
+// يُضاف، ويبقى السلوك كما كان بلا أي ضجيج جديد.
+function idCols(idx){
+  const cols = detCols[idx] || [];
+  if(!cols.length) return [];
+  const n = cols.findIndex(c => String(c || '').includes('اسم'));
+  return n > 0 ? [0, n] : [0];
+}
+
+const cellKey = v => String(v == null ? '' : v).trim().toLowerCase();
+
+// مجموعات الصفوف المتطابقة. صفّان في مجموعة واحدة إن تشاركا قيمة غير فارغة
+// في **أي** عمود هوية، والتطابق ينتقل: أ=ب بالرمز و ب=ج بالاسم ⇒ الثلاثة مجموعة.
+// الصف الخالي من كل قيم الهوية لا يُمسّ إطلاقاً.
+// تُرجع مصفوفة مجموعات، كل مجموعة فهارس صفوف مرتّبة تصاعدياً (طولها ≥ 2).
+function dupGroups(idx){
+  const rows = detRows[idx] || [], ids = idCols(idx);
+  if(!ids.length || !rows.length) return [];
+  const parent = rows.map((_, i) => i);
+  const find = a => { while(parent[a] !== a){ parent[a] = parent[parent[a]]; a = parent[a]; } return a; };
+  const join = (a, b) => { a = find(a); b = find(b); if(a !== b) parent[b] = a; };
+
+  ids.forEach(ci=>{
+    const seen = new Map();
+    rows.forEach((r, i)=>{
+      const k = cellKey(r[ci]);
+      if(!k) return;
+      if(seen.has(k)) join(seen.get(k), i); else seen.set(k, i);
+    });
   });
-  return dup;
+
+  const g = new Map();
+  rows.forEach((r, i)=>{
+    if(!ids.some(ci => cellKey(r[ci]))) return;   // بلا هوية ⇒ خارج الحساب
+    const root = find(i);
+    if(!g.has(root)) g.set(root, []);
+    g.get(root).push(i);
+  });
+  return [...g.values()].filter(a => a.length > 1);
+}
+
+// أي عمود هوية سبّب التطابق — يظهر في تلميح الصف الأحمر ليُتحقَّق منه بلمحة
+function dupWhy(idx, ri){
+  const rows = detRows[idx] || [], r = rows[ri];
+  if(!r) return '';
+  return idCols(idx).filter(ci=>{
+    const k = cellKey(r[ci]);
+    return k && rows.some((o, j) => j !== ri && cellKey(o[ci]) === k);
+  }).map(ci => (detCols[idx] || [])[ci] || '').filter(Boolean).join(' · ');
 }
 
 // عرض العمود حسب ما يحمله — الأرقام والحالات لا تحتاج عرض عمود نصّي.
