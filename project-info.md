@@ -60,7 +60,9 @@
 - **الإعداد:** شغّل `supabase/setup.sql` مرة واحدة، وفعّل Anonymous Sign-Ins
 
 ## الاستضافة
+- **المستودع:** `Adaa-dashboard/dashboard`
 - **الرابط المعتمد:** https://adaa-project.netlify.app
+- **الاحتياطي:** https://adaa-dashboard.github.io/dashboard
 - Netlify مربوط بمستودع GitHub — ينشر تلقائياً مع كل دمج في `main`
 - ملفات اللوحة في مجلد `site/` (قاعدة البناء في `netlify.toml`)
 
