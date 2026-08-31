@@ -93,7 +93,7 @@ function tgtQuarter(refData: RefData, key: string, q: number): number | null {
 function tgtEff(refData: RefData, key: string, q: number): number | null {
   return refData.targetMode === "quarterly" ? tgtQuarter(refData, key, q) : tgtAnnual(refData, key);
 }
-const GAUGE_TRACK = "rgba(255,255,255,0.08)";
+const GAUGE_TRACK = "#e9f1ef";
 
 export default function Dashboard({ me }: { me: Me }) {
   const router = useRouter();
@@ -101,24 +101,22 @@ export default function Dashboard({ me }: { me: Me }) {
   const [tab, setTab] = useState<string>("overview");
   const [refData, setRefData] = useState<RefData>(EMPTY_REF);
   const [loaded, setLoaded] = useState(false);
-  const [theme, setTheme] = useState("dark");
   const [lang, setLang] = useState<Lang>("ar");
+  const [setOpen, setSetOpen] = useState(false);
   const t = useCallback((ar: string, en: string) => (lang === "en" ? en : ar), [lang]);
 
   useEffect(() => {
-    const saved = typeof window !== "undefined" ? localStorage.getItem("theme") : null;
-    if (saved) setTheme(saved);
     const savedLang = typeof window !== "undefined" ? localStorage.getItem("lang") : null;
     if (savedLang === "en" || savedLang === "ar") setLang(savedLang);
-  }, []);
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
+    // الثيمات الداكنة القديمة أُزيلت لصالح هوية أداء — نظّف أي بقية محفوظة
     try {
-      localStorage.setItem("theme", theme);
+      localStorage.removeItem("theme");
     } catch {
       /* ignore */
     }
-  }, [theme]);
+    document.documentElement.removeAttribute("data-theme");
+  }, []);
+
   useEffect(() => {
     document.documentElement.setAttribute("lang", lang);
     document.documentElement.setAttribute("dir", lang === "en" ? "ltr" : "rtl");
@@ -158,77 +156,106 @@ export default function Dashboard({ me }: { me: Me }) {
     router.refresh();
   }
 
+  const TITLES: Record<string, [string, string]> = {
+    overview: ["نظرة عامة", "Overview"],
+    details: ["المؤشرات التفصيلية", "KPI Details"],
+    entry: ["إدخال الفعلي", "Data Entry"],
+    tasks: ["المهام والتكليفات", "Tasks"],
+    report: ["الإنجاز الأسبوعي", "Weekly Achievement"],
+    structure: ["القطاعات والإدارات", "Sectors"],
+    users: ["المستخدمون والصلاحيات", "Users & Roles"],
+  };
+  const title = TITLES[tab] ?? TITLES.overview;
+
+  function NavItem({ id, icon, label }: { id: string; icon: string; label: [string, string] }) {
+    return (
+      <button className={`nav-item ${tab === id ? "active" : ""}`} onClick={() => setTab(id)}>
+        <span className="ic">{icon}</span> {t(label[0], label[1])}
+      </button>
+    );
+  }
+  function SubItem({ id, label }: { id: string; label: [string, string] }) {
+    return (
+      <button className={`sub-item ${tab === id ? "active" : ""}`} onClick={() => setTab(id)}>
+        {t(label[0], label[1])}
+      </button>
+    );
+  }
+
   return (
     <LangCtx.Provider value={{ lang, t }}>
-      <div className="topbar">
-        <div className="brand">{t("إدارة عمليات الأداء", "Performance Operations")}</div>
-        <div className="user">
-          <span>
-            {me.name}{" "}
-            <span className={`badge ${isAdmin ? "badge-admin" : "badge-manager"}`}>
-              {isAdmin ? t("مدير الإدارة", "Admin") : t("مدير قطاع", "Sector Manager")}
-            </span>
-          </span>
-          <button
-            className="theme-select"
-            onClick={() => setLang(lang === "ar" ? "en" : "ar")}
-            title="Language / اللغة"
-          >
-            {lang === "ar" ? "EN" : "ع"}
-          </button>
-          <select
-            className="theme-select"
-            value={theme}
-            onChange={(e) => setTheme(e.target.value)}
-            title={t("الثيم / لون الخلفية", "Theme")}
-            aria-label="theme"
-          >
-            <option value="dark">🌙 {t("داكن", "Dark")}</option>
-            <option value="light">☀️ {t("فاتح", "Light")}</option>
-            <option value="black">⚫ {t("أسود", "Black")}</option>
-            <option value="slate">🌫️ {t("رمادي", "Slate")}</option>
-            <option value="royal">🔵 {t("أزرق", "Royal")}</option>
-          </select>
-          <button className="btn btn-ghost btn-sm" onClick={logout}>
-            {t("خروج", "Logout")}
-          </button>
-        </div>
-      </div>
+      <div className="shell">
+        <aside className="rail">
+          <div className="rail-brand">
+            <div className="nm">{t("إدارة عمليات الأداء", "Performance Operations")}</div>
+            <div className="sb">{t("مركز أداء", "Adaa")}</div>
+          </div>
 
-      <div className="container">
-        <div className="tabs">
-          <button className={`tab ${tab === "overview" ? "active" : ""}`} onClick={() => setTab("overview")}>
-            {t("النظرة العامة", "Overview")}
+          <NavItem id="overview" icon="◱" label={["نظرة عامة", "Overview"]} />
+          <NavItem id="details" icon="◎" label={["المؤشرات التفصيلية", "KPI Details"]} />
+          <NavItem id="entry" icon="✎" label={["إدخال الفعلي", "Data Entry"]} />
+          <NavItem id="tasks" icon="✓" label={["المهام والتكليفات", "Tasks"]} />
+          <NavItem id="report" icon="▤" label={["الإنجاز الأسبوعي", "Weekly Achievement"]} />
+
+          <div className="rail-gap" />
+
+          <button className={`nav-item ${setOpen ? "open" : ""}`} onClick={() => setSetOpen(!setOpen)}>
+            <span className="ic">⚙</span> {t("الإعدادات", "Settings")} <span className="cv">▾</span>
           </button>
-          <button className={`tab ${tab === "weekly" ? "active" : ""}`} onClick={() => setTab("weekly")}>
-            {t("تحديث المؤشرات", "KPI Update")}
-          </button>
-          <button className={`tab ${tab === "entry" ? "active" : ""}`} onClick={() => setTab("entry")}>
-            {t("إدخال البيانات", "Data Entry")}
-          </button>
-          {isAdmin && (
+          <div className={`subnav ${setOpen ? "show" : ""}`}>
+            {isAdmin && <SubItem id="users" label={["المستخدمون والصلاحيات", "Users & Roles"]} />}
+            {isAdmin && <SubItem id="structure" label={["القطاعات والإدارات", "Sectors"]} />}
+            <button className="sub-item" onClick={() => setLang(lang === "ar" ? "en" : "ar")}>
+              {t("اللغة", "Language")}
+              <span className="lang-chip">{lang === "ar" ? "EN" : "AR"}</span>
+            </button>
+          </div>
+
+          <div className="whoami">
+            <div className="av">{(me.name || "?").trim().charAt(0)}</div>
+            <div>
+              <div className="nm">{me.name}</div>
+              <div className="rl">{isAdmin ? t("مدير الإدارة", "Admin") : t("مدير قطاع", "Sector Manager")}</div>
+            </div>
+            <button className="out" onClick={logout} title={t("خروج", "Logout")} aria-label="logout">
+              ⏻
+            </button>
+          </div>
+        </aside>
+
+        <main className="main-area">
+          <div className="page-head">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="hlogo" src="/adaa-logo.png" alt="أداء — المركز الوطني لقياس أداء الأجهزة العامة" />
+            <div className="hsep" />
+            <h1>{t(title[0], title[1])}</h1>
+            <div className="grow" />
+          </div>
+
+          {!loaded ? (
+            <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>
+          ) : (
             <>
-              <button className={`tab ${tab === "structure" ? "active" : ""}`} onClick={() => setTab("structure")}>
-                {t("الهيكل التنظيمي", "Structure")}
-              </button>
-              <button className={`tab ${tab === "users" ? "active" : ""}`} onClick={() => setTab("users")}>
-                {t("المدراء والصلاحيات", "Users & Roles")}
-              </button>
+              {tab === "overview" && <Overview me={me} refData={refData} />}
+              {tab === "details" && <WeeklyReview me={me} refData={refData} />}
+              {tab === "entry" && <EntrySection me={me} refData={refData} reload={loadRef} />}
+              {tab === "tasks" && (
+                <div className="soon">
+                  <b>{t("المهام والتكليفات", "Tasks")}</b>
+                  {t("قيد التنفيذ — تصل في التحديث القادم.", "Under construction — coming in the next update.")}
+                </div>
+              )}
+              {tab === "report" && (
+                <div className="soon">
+                  <b>{t("الإنجاز الأسبوعي", "Weekly Achievement")}</b>
+                  {t("قيد التنفيذ — تصل في التحديث القادم.", "Under construction — coming in the next update.")}
+                </div>
+              )}
+              {tab === "structure" && isAdmin && <SectorsManager refData={refData} reload={loadRef} />}
+              {tab === "users" && isAdmin && <UsersManager refData={refData} />}
             </>
           )}
-        </div>
-
-        {!loaded ? (
-          <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>
-        ) : (
-          <>
-            {tab === "overview" && <Overview me={me} refData={refData} />}
-            {tab === "weekly" && <WeeklyReview me={me} refData={refData} />}
-            {tab === "entry" && <EntrySection me={me} refData={refData} reload={loadRef} />}
-            {tab === "structure" && isAdmin && <SectorsManager refData={refData} reload={loadRef} />}
-            {tab === "users" && isAdmin && <UsersManager refData={refData} />}
-          </>
-        )}
+        </main>
       </div>
     </LangCtx.Provider>
   );
@@ -301,7 +328,7 @@ function Gauge({
   const r = 72;
   const sw = 16;
   const v = value == null ? 0 : Math.max(0, Math.min(value, max));
-  const color = bandOf(value, bands)?.color ?? "#64748b";
+  const color = bandOf(value, bands)?.color ?? "#8a9a95";
   const needleAngle = 180 - (v / max) * 180;
   const [nx, ny] = polar(cx, cy, r - 6, needleAngle);
   // رسم أقواس ملوّنة من الحالات (كل حالة من نسبتها إلى بداية التالية)
@@ -478,7 +505,7 @@ function Overview({ me, refData }: { me: Me; refData: RefData }) {
 
       <div className="kpis">
         <div className="kpi">
-          <div className="v" style={{ color: "#22d3ee" }}>{overall != null ? `${overall}%` : "—"}</div>
+          <div className="v" style={{ color: "var(--g-800)" }}>{overall != null ? `${overall}%` : "—"}</div>
           <div className="l">{t("الإنجاز العام للمؤشرات", "Overall Achievement")}</div>
         </div>
         <div className="kpi">
@@ -516,7 +543,7 @@ function Overview({ me, refData }: { me: Me; refData: RefData }) {
             <div
               key={ind.id}
               className="gauge-box clickable"
-              style={{ borderTopColor: ind.band?.color ?? "#475569" }}
+              style={{ borderTopColor: ind.band?.color ?? "var(--border)" }}
               onClick={() => setOpenIndicator(ind)}
             >
               <div className="gauge-head">
@@ -526,7 +553,7 @@ function Overview({ me, refData }: { me: Me; refData: RefData }) {
                 {ind.name}
               </div>
               <Gauge value={ind.value} bands={bands} />
-              <div className="gauge-status" style={{ color: ind.band?.color ?? "#64748b" }}>
+              <div className="gauge-status" style={{ color: ind.band?.color ?? "#8a9a95" }}>
                 {ind.bandLabel ?? "—"}
               </div>
             </div>
@@ -561,7 +588,7 @@ function Overview({ me, refData }: { me: Me; refData: RefData }) {
                 <span className="sector-name">{s.name}</span>
                 <span
                   className="sector-pct"
-                  style={{ background: band ? tint(band.color) : "rgba(255,255,255,0.05)", color: band?.color ?? "#64748b" }}
+                  style={{ background: band ? tint(band.color) : "var(--bg2)", color: band?.color ?? "#8a9a95" }}
                 >
                   {ach != null ? `${ach}%` : "—"}
                 </span>
@@ -930,7 +957,7 @@ function WeeklyReview({ me, refData }: { me: Me; refData: RefData }) {
   }
 
   const cellOf = (band: Band | null) =>
-    band ? { bg: tint(band.color), fg: band.color } : { bg: "rgba(255,255,255,0.04)", fg: "#64748b" };
+    band ? { bg: tint(band.color), fg: band.color } : { bg: "var(--bg2)", fg: "#8a9a95" };
 
   return (
     <div>
