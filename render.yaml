@@ -1,20 +1,28 @@
 # إعداد نشر تلقائي على Render — https://render.com
-# الخطوات: New + → Blueprint → اختر هذا المستودع والفرع → Apply
+# الخطوات: New + → Blueprint → اختر مستودع Adaa-dashboard/dashboard وفرع main → Apply
+#
+# مهم: كل المتغيّرات هنا بـ sync:false — أي أن Render لا يكتب قيمها من هذا الملف،
+# بل يبقيها كما هي في لوحة الخدمة (أو يسألك عنها مرة واحدة عند الإنشاء).
+# هذا يحمي DATABASE_URL ورقم جوال المدير من أن يُدهسا بقيم افتراضية عند أي مزامنة.
 services:
   - type: web
     name: perf-dashboard
     runtime: docker
     plan: free
+    branch: main
     autoDeploy: true
     envVars:
-      # رقم جوال مدير الإدارة (سجّلي الدخول به — الرمز يظهر على الشاشة في وضع العرض)
+      # رابط قاعدة Neon — يُدخَل في لوحة Render فقط، ولا يُكتب في المستودع أبداً
+      - key: DATABASE_URL
+        sync: false
+      # رقم جوال مدير الإدارة (سجّلي الدخول به — الرمز يظهر على الشاشة بلا مزوّد SMS)
       - key: ADMIN_PHONE
-        value: "0500000000"
+        sync: false
       - key: ADMIN_NAME
-        value: عبدالله الحزامي
+        sync: false
       # الموقع يعمل عبر HTTPS على Render
       - key: COOKIE_SECURE
-        value: "true"
-      # النسخة النهائية: بدون بيانات تجريبية (تبدأ نظيفة وجاهزة للتعديل)
+        sync: false
+      # النسخة النهائية: بدون بيانات تجريبية
       - key: SEED_DEMO
-        value: "false"
+        sync: false

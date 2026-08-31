@@ -10,3 +10,7 @@ DEPLOY.md
 .env.local
 Dockerfile
 .dockerignore
+site
+hr-dashboard
+supabase
+*.md
