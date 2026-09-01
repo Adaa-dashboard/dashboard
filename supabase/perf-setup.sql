@@ -489,6 +489,32 @@ $$;
 grant execute on function public.perf_shared_report(text) to anon, authenticated;
 
 -- ------------------------------------------------------------
+-- 8.5) منح الصلاحيات صراحةً
+--   لا نعتمد على خيار «Automatically expose new tables» في لوحة Supabase:
+--   الملف يمنح ما يلزم بنفسه، ويسحب ما لا يجوز كشفه مهما كان ذلك الخيار.
+-- ------------------------------------------------------------
+grant usage on schema public to anon, authenticated;
+
+do $$
+declare t text;
+begin
+  foreach t in array array['perf_sectors','perf_indicators','perf_periods',
+                           'perf_targets','perf_measurements','perf_tasks',
+                           'perf_notes','perf_settings','perf_last_seen','perf_shares']
+  loop
+    -- الحارس الفعلي سياسات RLS أعلاه؛ هذه الطبقة الخشنة تحتها
+    execute format('grant select, insert, update, delete on public.%I to authenticated', t);
+    execute format('revoke all on public.%I from anon', t);
+  end loop;
+end $$;
+
+-- جدول المستخدمين لا يُكشف لأي دور: كل وصول عبر دوال security definer.
+-- الجلسات تُقرأ فقط، وسياستها تحصر كل شخص في صفّه.
+revoke all on public.perf_users    from anon, authenticated;
+revoke all on public.perf_sessions from anon, authenticated;
+grant select on public.perf_sessions to authenticated;
+
+-- ------------------------------------------------------------
 -- 9) البذرة: القطاعات والمؤشرات وعتبات الحالة
 --     insert ... on conflict do nothing ⇒ لا تُدهس أي قيمة عدّلتِها
 -- ------------------------------------------------------------
