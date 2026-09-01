@@ -221,6 +221,13 @@ function getPool(): Pool {
   if (!pool) {
     const url = process.env.DATABASE_URL || "";
     const isLocal = /localhost|127\.0\.0\.1/.test(url);
+    // كل نسخة من الدالة على استضافة بلا خادم تفتح تجمّع اتصالات خاصاً بها،
+    // فرابط Neon المجمّع (‎-pooler‎) ضروري وإلا نفدت اتصالات القاعدة.
+    if (process.env.VERCEL && url && !url.includes("-pooler")) {
+      console.warn(
+        "[db] DATABASE_URL لا يشير إلى Neon pooler — استخدم الرابط المجمّع (‎-pooler‎) لتفادي نفاد الاتصالات."
+      );
+    }
     pool = new Pool({
       connectionString: url,
       ssl: isLocal ? false : { rejectUnauthorized: false },
@@ -240,6 +247,13 @@ async function ensurePg() {
 }
 
 function ensureDir() {
+  // الاستضافة بلا خادم (Vercel) نظام ملفاتها للقراءة فقط، والملف البديل
+  // يضيع مع كل طلب. الفشل هنا برسالة واضحة خير من بيانات تختفي بصمت.
+  if (process.env.VERCEL) {
+    throw new Error(
+      "DATABASE_URL غير مضبوط — لا يمكن الحفظ في ملف على استضافة بلا خادم. اضبط متغيّر DATABASE_URL في إعدادات المشروع."
+    );
+  }
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
