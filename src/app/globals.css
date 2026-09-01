@@ -1792,3 +1792,489 @@ table.matrix thead th {
     grid-template-columns: 1fr;
   }
 }
+
+/* ===================== الإنجاز الأسبوعي ===================== */
+.wk-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.wk-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.wk-nav,
+.wk-acts {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.wk-nav b {
+  font-family: "Noto Kufi Arabic", sans-serif;
+  font-size: 13.5px;
+  color: var(--g-900);
+  min-width: 140px;
+  text-align: center;
+}
+
+.wk {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+/* الترويسة */
+.wk-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  background: linear-gradient(135deg, var(--g-900), var(--g-700));
+  color: #fff;
+}
+.wk-logo {
+  height: 42px;
+  width: auto;
+  filter: brightness(0) invert(1);
+}
+.wk-ht {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.wk-ht h2 {
+  margin: 0;
+  font-size: 18px;
+  font-family: "Noto Kufi Arabic", sans-serif;
+  color: #fff;
+}
+.wk-ht span {
+  font-size: 12.5px;
+  opacity: 0.82;
+}
+.wk-hr {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+}
+.wk-hr b {
+  font-size: 14px;
+  font-family: "Noto Kufi Arabic", sans-serif;
+}
+.wk-hr span {
+  font-size: 11.5px;
+  opacity: 0.75;
+}
+
+/* البطاقة العلوية */
+.wk-hero {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  padding: 22px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--g-50);
+  flex-wrap: wrap;
+}
+.wk-heroT {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 200px;
+}
+.wk-lbl {
+  font-size: 11.5px;
+  color: var(--muted);
+  font-weight: 700;
+}
+.wk-hd {
+  font-family: "Noto Kufi Arabic", sans-serif;
+  font-size: 15px;
+}
+.wk-hd.up,
+.wk-delta.up {
+  color: #1a9d5c;
+}
+.wk-hd.down,
+.wk-delta.down {
+  color: #d34a4a;
+}
+.wk-hd.flat,
+.wk-delta.flat {
+  color: var(--muted);
+}
+.wk-sub2 {
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.wk-heroS {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+.wk-spark {
+  display: block;
+}
+
+/* الأقسام */
+.wk-sect {
+  border-bottom: 1px solid var(--border);
+}
+.wk-sect:last-of-type {
+  border-bottom: none;
+}
+.wk-sh {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px 24px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: start;
+}
+.wk-sh h3 {
+  margin: 0;
+  flex: 1;
+  font-size: 14px;
+  color: var(--g-900);
+  font-family: "Noto Kufi Arabic", sans-serif;
+}
+.wk-count {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 11px;
+  background: var(--g-100);
+  color: var(--g-800);
+  font-size: 11.5px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  direction: ltr;
+}
+.wk-caret {
+  color: var(--muted);
+  font-size: 12px;
+  transition: transform 0.15s;
+}
+.wk-sect.open > .wk-sh .wk-caret,
+.wk-krow.open .wk-caret {
+  transform: rotate(180deg);
+}
+.wk-sb {
+  padding: 0 24px 20px;
+}
+
+/* الجداول */
+.wk-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.wk-tbl th {
+  text-align: start;
+  padding: 9px 10px;
+  font-size: 11.5px;
+  color: var(--muted);
+  font-weight: 700;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.wk-tbl td {
+  padding: 11px 10px;
+  border-bottom: 1px solid var(--g-50);
+  vertical-align: middle;
+  color: var(--ink);
+}
+.wk-tbl tbody tr:last-child td {
+  border-bottom: none;
+}
+.wk-krow {
+  cursor: pointer;
+}
+.wk-krow:hover {
+  background: var(--g-50);
+}
+.wk-kname {
+  font-weight: 700;
+  color: var(--g-900);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.wk-badge {
+  display: inline-block;
+  min-width: 52px;
+  text-align: center;
+  padding: 4px 9px;
+  border-radius: 999px;
+  color: #fff;
+  font-weight: 800;
+  font-size: 11.5px;
+  direction: ltr;
+}
+.wk-delta {
+  font-weight: 700;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.wk-sparkcell {
+  width: 96px;
+}
+.wk-sub td {
+  background: var(--g-50);
+  padding: 14px 16px;
+}
+.wk-secgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+.wk-sec {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.wk-sec b {
+  font-size: 12px;
+  color: var(--g-900);
+}
+.wk-secv {
+  font-family: "Noto Kufi Arabic", sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  direction: ltr;
+}
+.wk-secd {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.wk-upd {
+  color: var(--ink-2);
+  font-size: 12px;
+}
+.wk-st {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.wk-st.ok {
+  background: #e6f5ee;
+  color: #14804a;
+}
+.wk-st.risk {
+  background: #fdf1de;
+  color: #a86c07;
+}
+.wk-st.late {
+  background: #fbe9e9;
+  color: #b53434;
+}
+.wk-st.done {
+  background: var(--g-100);
+  color: var(--g-800);
+}
+
+/* القوائم والتحديات */
+.wk-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.wk-list li {
+  position: relative;
+  padding-inline-start: 20px;
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.7;
+}
+.wk-list li::before {
+  content: "•";
+  position: absolute;
+  inset-inline-start: 4px;
+  color: var(--g-600);
+  font-weight: 800;
+}
+.wk-list.good li::before {
+  content: "✓";
+  color: #1a9d5c;
+  font-size: 11px;
+}
+.wk-chal {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.wk-ch {
+  border: 1px solid var(--border);
+  border-inline-start: 3px solid #e0971a;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.wk-ch b {
+  font-size: 13px;
+  color: var(--g-900);
+}
+.wk-chw {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.wk-ch p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  line-height: 1.7;
+}
+.wk-foot {
+  padding: 14px 24px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* نافذة المشاركة */
+.wk-note {
+  margin: 0 0 14px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  line-height: 1.8;
+}
+.wk-mk {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.wk-mk label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-2);
+  margin: 0;
+}
+.wk-sact {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.wk-danger {
+  color: #b53434;
+}
+
+/* الصفحة العامة (رابط المشاركة) */
+.wk-public {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 28px 18px 40px;
+}
+.wk-ro {
+  margin: 14px 0 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+.wk-gone {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 48px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.wk-gone .wk-logo {
+  filter: none;
+  height: 48px;
+}
+.wk-gone b {
+  font-family: "Noto Kufi Arabic", sans-serif;
+  font-size: 16px;
+  color: var(--g-900);
+}
+.wk-gone span {
+  font-size: 13px;
+  color: var(--ink-2);
+  max-width: 380px;
+  line-height: 1.9;
+}
+
+/* الطباعة / تصدير PDF — تُطبع بطاقة التقرير وحدها */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+  body {
+    background: #fff;
+  }
+  .no-print,
+  .rail,
+  .page-head,
+  .modal-overlay {
+    display: none !important;
+  }
+  .shell,
+  .main-area,
+  .wk-public {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+  }
+  .wk {
+    border: none;
+    border-radius: 0;
+  }
+  .wk-head {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .wk-hero,
+  .wk-badge,
+  .wk-st,
+  .wk-count {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .wk-caret {
+    display: none;
+  }
+  .wk-sect {
+    break-inside: avoid;
+  }
+  .wk-tbl tr {
+    break-inside: avoid;
+  }
+}
+.wk-nospark {
+  font-size: 11.5px;
+  color: var(--muted);
+}

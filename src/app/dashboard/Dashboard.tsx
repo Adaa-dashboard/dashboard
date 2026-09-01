@@ -3,6 +3,7 @@
 import { createContext, useContext, useCallback, useEffect, useMemo, useState } from "react";
 import Activity from "./Activity";
 import Tasks from "./Tasks";
+import WeeklyPanel from "./WeeklyPanel";
 import { LineChart, Line as ChartLine, SECTOR_STYLES } from "./Charts";
 import { latestYear, quarterlySeries, sectorSeries, yearlySeries } from "@/lib/analytics";
 import { useRouter } from "next/navigation";
@@ -251,12 +252,7 @@ export default function Dashboard({ me }: { me: Me }) {
                   t={t}
                 />
               )}
-              {tab === "report" && (
-                <div className="soon">
-                  <b>{t("الإنجاز الأسبوعي", "Weekly Achievement")}</b>
-                  {t("قيد التنفيذ — تصل في التحديث القادم.", "Under construction — coming in the next update.")}
-                </div>
-              )}
+              {tab === "report" && <WeeklyPanel t={t} />}
               {tab === "structure" && isAdmin && <SectorsManager refData={refData} reload={loadRef} />}
               {tab === "users" && isAdmin && <UsersManager refData={refData} />}
             </>
