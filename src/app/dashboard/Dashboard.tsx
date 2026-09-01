@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useCallback, useEffect, useMemo, useState } from "react";
 import Activity from "./Activity";
+import Tasks from "./Tasks";
 import { LineChart, Line as ChartLine, SECTOR_STYLES } from "./Charts";
 import { latestYear, quarterlySeries, sectorSeries, yearlySeries } from "@/lib/analytics";
 import { useRouter } from "next/navigation";
@@ -243,10 +244,12 @@ export default function Dashboard({ me }: { me: Me }) {
               {tab === "details" && <WeeklyReview me={me} refData={refData} />}
               {tab === "entry" && <EntrySection me={me} refData={refData} reload={loadRef} />}
               {tab === "tasks" && (
-                <div className="soon">
-                  <b>{t("المهام والتكليفات", "Tasks")}</b>
-                  {t("قيد التنفيذ — تصل في التحديث القادم.", "Under construction — coming in the next update.")}
-                </div>
+                <Tasks
+                  meId={me.id}
+                  isAdmin={isAdmin}
+                  indicators={refData.indicators.map((i) => ({ id: i.id, name: i.name }))}
+                  t={t}
+                />
               )}
               {tab === "report" && (
                 <div className="soon">
