@@ -1,10 +1,18 @@
+import {
+  createSession,
+  getUserByUsername,
+  pwBlockedFor,
+  pwClearFailures,
+  pwNoteFailure,
+  updateUser,
+} from "@/lib/db";
 import { NextResponse } from "next/server";
-import { createSession, getUserByUsername, updateUser } from "@/lib/db";
-import { SESSION_COOKIE, SESSION_TTL_MS } from "@/lib/session";
+import { SESSION_COOKIE, sessionTtl } from "@/lib/session";
 
-/* تفعيل الحساب: يختار صاحبه كلمة مروره بنفسه أول مرة.
-   المفتاح اسم المستخدم + آخر أربعة أرقام من جواله المسجَّل — فلا يستطيع
-   زميل يعرف اسم المستخدم وحده أن يستولي على حساب لم يُفعَّل بعد. */
+/* ضبط كلمة المرور بلا وسيط: يخدم حالتين بنفس المنطق —
+   «مستخدم جديد» (حساب بلا كلمة مرور) و«نسيت كلمة المرور» (له كلمة ويريد غيرها).
+   في الحالتين المفتاح: اسم المستخدم + آخر أربعة أرقام من جواله المسجَّل.
+   الجوال لا يُطلب في الدخول العادي إطلاقاً — هنا فقط. */
 export async function POST(req: Request) {
   const b = await req.json().catch(() => ({}));
   const username = String(b.username || "").trim();
@@ -16,29 +24,36 @@ export async function POST(req: Request) {
     { status: 401 }
   );
 
-  const user = await getUserByUsername(username);
-  if (!user || !user.active) return bad;
-  if (user.passwordHash) {
+  // أربعة أرقام تُخمَّن بعشرة آلاف محاولة — التقييد هو ما يجعلها كافية
+  const blocked = await pwBlockedFor(username);
+  if (blocked > 0) {
     return NextResponse.json(
-      { error: "هذا الحساب مفعّل بالفعل — سجّل الدخول بكلمة مرورك، أو راجع مدير الإدارة لإعادة تعيينها" },
-      { status: 409 }
+      { error: `محاولات كثيرة خاطئة — انتظر ${Math.ceil(blocked / 60)} دقيقة ثم أعد المحاولة` },
+      { status: 429 }
     );
   }
-  if (last4.length !== 4 || !user.phone.endsWith(last4)) return bad;
+
+  const user = await getUserByUsername(username);
+  if (!user || !user.active || last4.length !== 4 || !user.phone.endsWith(last4)) {
+    await pwNoteFailure(username);
+    return bad;
+  }
   if (password.length < 6) {
     return NextResponse.json({ error: "كلمة المرور لا تقل عن ٦ أحرف" }, { status: 400 });
   }
 
   await updateUser(user.id, { password });
+  await pwClearFailures(username);
 
-  const token = await createSession(user.id, SESSION_TTL_MS);
+  const ttl = sessionTtl(b.remember);
+  const token = await createSession(user.id, ttl);
   const res = NextResponse.json({ ok: true, role: user.role });
   res.cookies.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.COOKIE_SECURE === "true",
     path: "/",
-    maxAge: SESSION_TTL_MS / 1000,
+    maxAge: ttl / 1000,
   });
   return res;
 }

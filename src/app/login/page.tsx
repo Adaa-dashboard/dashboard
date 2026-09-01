@@ -24,7 +24,11 @@ export default function LoginPage() {
   }, [lang]);
   // الطريقة المعتمدة: اسم المستخدم وكلمة المرور. الدخول بالجوال يبقى متاحاً
   // للحسابات التي لم تُضبط لها كلمة مرور بعد، فلا يُقفَل أحد خارج اللوحة.
-  const [mode, setMode] = useState<"password" | "otp" | "activate">("password");
+  // choose = شاشة الاختيار · password = تسجيل دخول · activate = مستخدم جديد
+  // أو نسيت كلمة المرور (نفس النموذج) · otp = الدخول بالجوال (مسار احتياطي)
+  const [mode, setMode] = useState<"choose" | "password" | "otp" | "activate">("choose");
+  const [isReset, setIsReset] = useState(false); // نسيت كلمة المرور، لا مستخدم جديد
+  const [remember, setRemember] = useState(true);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [last4, setLast4] = useState("");
@@ -45,11 +49,12 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password, remember }),
       });
       const data = await res.json();
       if (data.needsActivation) {
         setMode("activate");
+        setIsReset(false);
         setPassword("");
         setInfo(
           t(
@@ -81,7 +86,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/activate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, last4, password }),
+        body: JSON.stringify({ username, last4, password, remember }),
       });
       const data = await res.json();
       if (!res.ok) setError(data.error || "تعذّر التفعيل");
@@ -169,11 +174,21 @@ export default function LoginPage() {
         />
         <h1>{t("لوحة إدارة عمليات الأداء", "Performance Operations Dashboard")}</h1>
         <p className="sub">
-          {mode === "activate"
+          {mode === "choose"
             ? t(
-                "أول دخول: اكتب اسم المستخدم وآخر أربعة أرقام من جوالك، ثم اختر كلمة مرورك.",
-                "First sign-in: enter your username and the last four digits of your phone, then choose a password."
+                "لوحة متابعة أداء الإدارة — اختر كيف تريد الدخول.",
+                "Performance dashboard — choose how to sign in."
               )
+            : mode === "activate"
+            ? isReset
+              ? t(
+                  "لاستعادة الدخول: اكتب اسم المستخدم وآخر أربعة أرقام من جوالك، ثم اختر كلمة مرور جديدة.",
+                  "To recover access: enter your username and the last four digits of your phone, then choose a new password."
+                )
+              : t(
+                  "أول دخول: اكتب اسم المستخدم وآخر أربعة أرقام من جوالك، ثم اختر كلمة مرورك.",
+                  "First sign-in: enter your username and the last four digits of your phone, then choose a password."
+                )
             : mode === "password"
             ? t(
                 "سجّل الدخول باسم المستخدم وكلمة المرور المسنَدَين إليك.",
@@ -188,7 +203,39 @@ export default function LoginPage() {
         {error && <div className="alert alert-error">{error}</div>}
         {info && <div className="alert alert-info">{info}</div>}
 
-        {mode === "activate" ? (
+        {mode === "choose" ? (
+          <div className="auth-choose">
+            <button
+              className="btn"
+              onClick={() => {
+                setMode("password");
+                setError("");
+                setInfo("");
+              }}
+            >
+              {t("تسجيل الدخول", "Sign in")}
+            </button>
+            <button
+              className="btn btn-ghost"
+              onClick={() => {
+                setMode("activate");
+                setIsReset(false);
+                setError("");
+                setInfo("");
+                setPassword("");
+                setPw2("");
+              }}
+            >
+              {t("مستخدم جديد", "New user")}
+            </button>
+            <p className="auth-hint">
+              {t(
+                "«مستخدم جديد» لمن أُنشئ له حساب ولم يختر كلمة مروره بعد.",
+                "“New user” is for an account that has been created but has no password yet."
+              )}
+            </p>
+          </div>
+        ) : mode === "activate" ? (
           <form onSubmit={activate}>
             <div className="field">
               <label>{t("اسم المستخدم", "Username")}</label>
@@ -239,19 +286,28 @@ export default function LoginPage() {
                 style={{ textAlign: "left" }}
               />
             </div>
+            <label className="auth-remember">
+              <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+              {t("تذكّر هذا الجهاز", "Remember this device")}
+            </label>
             <button className="btn" style={{ width: "100%" }} disabled={loading}>
-              {loading ? t("جارٍ التفعيل...", "Activating...") : t("تفعيل الحساب والدخول", "Activate & sign in")}
+              {loading
+                ? t("جارٍ الحفظ...", "Saving...")
+                : isReset
+                ? t("حفظ كلمة المرور والدخول", "Save password & sign in")
+                : t("تفعيل الحساب والدخول", "Activate & sign in")}
             </button>
             <button
               type="button"
               className="btn btn-ghost"
               style={{ width: "100%", marginTop: "10px" }}
               onClick={() => {
-                setMode("password");
+                setMode("choose");
                 setError("");
                 setInfo("");
                 setPassword("");
                 setPw2("");
+                setLast4("");
               }}
             >
               {t("رجوع", "Back")}
@@ -282,33 +338,38 @@ export default function LoginPage() {
                 style={{ textAlign: "left" }}
               />
             </div>
+            <label className="auth-remember">
+              <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+              {t("تذكّر هذا الجهاز", "Remember this device")}
+            </label>
             <button className="btn" style={{ width: "100%" }} disabled={loading}>
               {loading ? t("جارٍ الدخول...", "Signing in...") : t("دخول", "Sign in")}
             </button>
             <button
               type="button"
-              className="btn btn-ghost"
-              style={{ width: "100%", marginTop: "10px" }}
+              className="auth-link"
               onClick={() => {
-                setMode("otp");
+                setMode("activate");
+                setIsReset(true);
                 setError("");
                 setInfo("");
+                setPassword("");
+                setPw2("");
               }}
             >
-              {t("الدخول برقم الجوال بدلاً من ذلك", "Sign in with phone instead")}
+              {t("نسيت كلمة المرور؟", "Forgot your password?")}
             </button>
             <button
               type="button"
               className="btn btn-ghost"
-              style={{ width: "100%", marginTop: "8px" }}
+              style={{ width: "100%", marginTop: "6px" }}
               onClick={() => {
-                setMode("activate");
+                setMode("choose");
                 setError("");
                 setInfo("");
-                setPassword("");
               }}
             >
-              {t("أول دخول؟ فعّل حسابك", "First time? Activate your account")}
+              {t("رجوع", "Back")}
             </button>
           </form>
         ) : step === "phone" ? (
@@ -334,12 +395,12 @@ export default function LoginPage() {
               className="btn btn-ghost"
               style={{ width: "100%", marginTop: "10px" }}
               onClick={() => {
-                setMode("password");
+                setMode("choose");
                 setError("");
                 setInfo("");
               }}
             >
-              {t("الدخول باسم المستخدم", "Sign in with username")}
+              {t("رجوع", "Back")}
             </button>
           </form>
         ) : (

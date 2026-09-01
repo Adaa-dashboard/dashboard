@@ -178,6 +178,8 @@ interface DBShape {
   notes: Note[];
   shares: ReportShare[];
   lastSeen: Record<string, string>; // معرّف المستخدم → آخر وقت اطّلع فيه على التحديثات
+  // اسم المستخدم → محاولات التحقّق الفاشلة ووقت انتهاء الحظر
+  pwTries: Record<string, { n: number; until: number }>;
   settings: Settings;
   // المستهدفات لكل (قطاع|مؤشر): رقم واحد (سنوي) أو مصفوفة [ربع1..ربع4]
   targets: Record<string, number | number[]>;
@@ -199,6 +201,7 @@ function defaultDB(): DBShape {
     notes: [],
     shares: [],
     lastSeen: {},
+    pwTries: {},
     settings: { statuses: DEFAULT_STATUS_BANDS, targetMode: "annual" },
     targets: {},
   };
@@ -264,6 +267,7 @@ function normalize(db: DBShape): DBShape {
   if (!Array.isArray(db.notes)) db.notes = [];
   if (!Array.isArray(db.shares)) db.shares = [];
   if (!db.lastSeen || typeof db.lastSeen !== "object") db.lastSeen = {};
+  if (!db.pwTries || typeof db.pwTries !== "object") db.pwTries = {};
   db.tasks.forEach((t) => {
     if (!Array.isArray(t.updates)) t.updates = [];
   });
@@ -905,6 +909,38 @@ export async function getLastSeen(userId: string): Promise<string> {
 export async function markSeen(userId: string): Promise<void> {
   const db = await getDB();
   db.lastSeen[userId] = new Date().toISOString();
+  await save(db);
+}
+
+/* ============ تقييد محاولات التحقّق ============ */
+const PW_MAX_TRIES = 5;
+const PW_BLOCK_MS = 15 * 60 * 1000;
+
+/** الثواني المتبقية للحظر، أو 0 إن كان مسموحاً.
+    الحظر يبدأ بعد PW_MAX_TRIES محاولة فاشلة داخل النافذة نفسها. */
+export async function pwBlockedFor(username: string): Promise<number> {
+  const db = await getDB();
+  const rec = db.pwTries[normUsername(username)];
+  if (!rec || rec.until < Date.now() || rec.n < PW_MAX_TRIES) return 0;
+  return Math.ceil((rec.until - Date.now()) / 1000);
+}
+
+export async function pwNoteFailure(username: string): Promise<void> {
+  const db = await getDB();
+  const k = normUsername(username);
+  const rec = db.pwTries[k];
+  const open = rec && rec.until > Date.now();
+  db.pwTries[k] = {
+    n: open ? rec.n + 1 : 1,
+    // النافذة تُفتح مع أول فشل وتبقى ثابتة، فالمحاولات المتتابعة لا تمدّها بلا نهاية
+    until: open ? rec.until : Date.now() + PW_BLOCK_MS,
+  };
+  await save(db);
+}
+
+export async function pwClearFailures(username: string): Promise<void> {
+  const db = await getDB();
+  delete db.pwTries[normUsername(username)];
   await save(db);
 }
 

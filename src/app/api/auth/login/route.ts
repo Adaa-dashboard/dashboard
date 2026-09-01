@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { createSession, getUserByUsername, verifyPassword } from "@/lib/db";
-import { SESSION_COOKIE, SESSION_TTL_MS } from "@/lib/session";
+import { SESSION_COOKIE, sessionTtl } from "@/lib/session";
 
 export async function POST(req: Request) {
-  const { username, password } = await req.json().catch(() => ({}));
+  const b = await req.json().catch(() => ({}));
+  const { username, password } = b;
   const u = String(username || "").trim();
   const p = String(password || "");
 
@@ -23,14 +24,15 @@ export async function POST(req: Request) {
   }
   if (!verifyPassword(p, user.passwordHash)) return bad;
 
-  const token = await createSession(user.id, SESSION_TTL_MS);
+  const ttl = sessionTtl(b.remember);
+  const token = await createSession(user.id, ttl);
   const res = NextResponse.json({ ok: true, role: user.role });
   res.cookies.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.COOKIE_SECURE === "true",
     path: "/",
-    maxAge: SESSION_TTL_MS / 1000,
+    maxAge: ttl / 1000,
   });
   return res;
 }
