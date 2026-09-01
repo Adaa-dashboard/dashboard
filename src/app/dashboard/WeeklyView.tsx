@@ -101,15 +101,21 @@ function KpiRow({ k }: { k: WeeklyKpi }) {
           <span className="wk-caret">▾</span>
           {k.name}
         </td>
-        <td className="ltr">{k.target == null ? "—" : k.target}</td>
-        <td className="ltr">{k.actual == null ? "—" : k.actual}</td>
-        <td>
+        <td className="ltr" data-l="المستهدف">
+          {k.target == null ? "—" : k.target}
+        </td>
+        <td className="ltr" data-l="الفعلي">
+          {k.actual == null ? "—" : k.actual}
+        </td>
+        <td data-l="الإنجاز">
           <span className="wk-badge" style={{ background: k.color }}>
             {pct(k.achievement)}
           </span>
         </td>
-        <td className={`wk-delta ${d.cls}`}>{d.txt}</td>
-        <td className="wk-sparkcell">
+        <td className={`wk-delta ${d.cls}`} data-l="عن الأسبوع الماضي">
+          {d.txt}
+        </td>
+        <td className="wk-sparkcell" data-l="المسار">
           <Spark points={k.history} color={k.color} />
         </td>
       </tr>
@@ -241,13 +247,17 @@ export default function WeeklyView({
             <tbody>
               {report.tasks.map((tk) => (
                 <tr key={tk.id}>
-                  <td>{tk.title}</td>
-                  <td>{tk.who}</td>
-                  <td className="ltr">{tk.due}</td>
-                  <td>
+                  <td className="wk-tname">{tk.title}</td>
+                  <td data-l="المسؤول">{tk.who}</td>
+                  <td className="ltr" data-l="الموعد">
+                    {tk.due}
+                  </td>
+                  <td data-l="الحالة">
                     <span className={`wk-st ${tk.state}`}>{STATE_AR[tk.state]}</span>
                   </td>
-                  <td className="wk-upd">{tk.lastUpdate}</td>
+                  <td className="wk-upd" data-l="آخر تحديث">
+                    {tk.lastUpdate}
+                  </td>
                 </tr>
               ))}
             </tbody>

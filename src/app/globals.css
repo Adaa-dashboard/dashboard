@@ -2513,3 +2513,376 @@ table.matrix thead th {
   width: auto;
   margin: 2px auto 14px;
 }
+
+/* ===================== الجوال: شريط سفلي بدل القائمة الجانبية ===================== */
+.tabbar {
+  display: none;
+}
+.sheet-wrap {
+  display: none;
+}
+
+@media (max-width: 860px) {
+  /* القائمة الجانبية تختفي تماماً — لا تُطوى فوق المحتوى */
+  .rail {
+    display: none;
+  }
+  .shell {
+    display: block;
+  }
+  .main-area {
+    /* مساحة أسفل الصفحة للشريط السفلي + منطقة الإيماء في آيفون */
+    padding: 14px 14px calc(86px + env(safe-area-inset-bottom));
+  }
+
+  .page-head {
+    gap: 10px;
+    padding-bottom: 12px;
+  }
+  .page-head h1 {
+    font-size: 17px;
+  }
+  .page-head .hlogo {
+    height: 30px;
+  }
+
+  .tabbar {
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    gap: 4px;
+    padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, var(--g-700), var(--g-800));
+    border-start-start-radius: 20px;
+    border-start-end-radius: 20px;
+    box-shadow: 0 -6px 24px rgba(0, 59, 51, 0.22);
+  }
+  .tab-btn {
+    flex: 1 1 0;
+    min-width: 0;
+    letter-spacing: -0.01em;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    background: transparent;
+    border: none;
+    border-radius: 16px;
+    padding: 9px 1px;
+    color: rgba(255, 255, 255, 0.82);
+    font: inherit;
+    font-size: 9px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .tab-btn .ic {
+    font-size: 17px;
+    line-height: 1;
+  }
+  .tab-btn .lb {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .tab-btn.active {
+    background: #fff;
+    color: var(--g-800);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.18);
+  }
+  .tab-btn.active .lb {
+    font-weight: 700;
+  }
+
+  /* ورقة الإعدادات تنزلق من الأسفل */
+  .sheet-wrap {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    display: flex;
+    align-items: flex-end;
+    background: rgba(4, 32, 28, 0.45);
+  }
+  .sheet {
+    width: 100%;
+    background: #fff;
+    border-start-start-radius: 22px;
+    border-start-end-radius: 22px;
+    padding: 10px 16px calc(20px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 82vh;
+    overflow: auto;
+  }
+  .sheet-grip {
+    width: 42px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    margin: 4px auto 12px;
+  }
+  .sheet-me {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 0 4px 14px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 8px;
+  }
+  .sheet-me .av {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    flex: none;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, var(--g-700), #00b288);
+    color: #fff;
+    font-weight: 800;
+    font-family: "Noto Kufi Arabic", sans-serif;
+  }
+  .sheet-me .nm {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: var(--g-900);
+  }
+  .sheet-me .rl {
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .sheet-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    text-align: start;
+    background: transparent;
+    border: none;
+    border-radius: 12px;
+    padding: 14px 12px;
+    font: inherit;
+    font-size: 13.5px;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .sheet-item.active {
+    background: var(--g-50);
+    color: var(--g-800);
+    font-weight: 700;
+  }
+  .sheet-item.danger {
+    color: #d34a4a;
+  }
+  .sheet-item .lang-chip {
+    margin-inline-start: auto;
+    background: var(--g-100);
+    color: var(--g-800);
+    border-radius: 7px;
+    padding: 2px 9px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  /* النوافذ تفتح فوق الشريط السفلي لا تحته */
+  .modal-overlay {
+    z-index: 80;
+  }
+}
+
+/* الهاتف: صف واحد لكل بطاقة مؤشر، وأزرار وحقول بعرض كامل */
+@media (max-width: 620px) {
+  .gauge-grid,
+  .kpis {
+    grid-template-columns: 1fr !important;
+  }
+  .pills {
+    flex-wrap: wrap;
+  }
+  .section-title.with-chips {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .ov-top {
+    grid-template-columns: 1fr !important;
+  }
+  .dt-bar,
+  .wk-bar {
+    gap: 8px;
+  }
+  .dt-q {
+    max-width: none;
+    width: 100%;
+    margin-inline-start: 0;
+  }
+  .segs {
+    width: 100%;
+    overflow-x: auto;
+  }
+  .wk-nav,
+  .wk-acts {
+    width: 100%;
+  }
+  .wk-nav b {
+    flex: 1;
+  }
+  .wk-acts .btn {
+    flex: 1;
+  }
+  .wk-head {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .wk-hr {
+    text-align: start;
+  }
+  .wk-hero {
+    gap: 16px;
+  }
+  .row {
+    flex-direction: column;
+  }
+  .row > div {
+    width: 100%;
+  }
+}
+
+/* الهاتف: جدول التفاصيل يصير بطاقات — عمود واحد بدل تمرير أفقي بثمانية أعمدة */
+@media (max-width: 620px) {
+  .dt-tw {
+    overflow-x: visible;
+  }
+  .dt-tbl {
+    min-width: 0;
+    display: block;
+  }
+  .dt-tbl thead {
+    display: none;
+  }
+  .dt-tbl tbody,
+  .dt-tbl tr {
+    display: block;
+  }
+  .dt-tbl tr {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    margin: 10px 12px;
+    background: #fff;
+  }
+  .dt-tbl td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    border-bottom: 1px dashed var(--g-50);
+  }
+  .dt-tbl td:last-child {
+    border-bottom: none;
+  }
+  /* اسم الصف عنوان البطاقة */
+  .dt-tbl td.dt-name {
+    justify-content: flex-start;
+    font-size: 13.5px;
+    padding-top: 0;
+    padding-bottom: 9px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 3px;
+  }
+  .dt-tbl td[data-l]::before {
+    content: attr(data-l);
+    font-size: 11.5px;
+    color: var(--muted);
+    font-weight: 600;
+    flex: none;
+  }
+  .dt-act input {
+    width: 110px;
+  }
+  .dt-tbl td.dt-delta,
+  .dt-tbl td.dt-diff,
+  .dt-tbl td.dt-ach {
+    text-align: end;
+  }
+
+  /* نفس المعالجة لجداول تقرير الإنجاز الأسبوعي */
+  .wk-tbl {
+    display: block;
+  }
+  .wk-tbl thead {
+    display: none;
+  }
+  .wk-tbl tbody,
+  .wk-tbl tr {
+    display: block;
+  }
+  .wk-tbl tbody tr {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+  }
+  .wk-tbl td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    border-bottom: 1px dashed var(--g-50);
+  }
+  .wk-tbl td:last-child {
+    border-bottom: none;
+  }
+  .wk-tbl td[data-l]::before {
+    content: attr(data-l);
+    font-size: 11.5px;
+    color: var(--muted);
+    font-weight: 600;
+    flex: none;
+  }
+  .wk-tbl td.wk-kname,
+  .wk-tbl td.wk-tname {
+    justify-content: flex-start;
+    font-weight: 700;
+    color: var(--g-900);
+    padding-top: 0;
+    padding-bottom: 9px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 3px;
+  }
+  .wk-sub td {
+    display: block;
+    background: transparent;
+    padding: 8px 0 0;
+  }
+  .wk-sparkcell {
+    width: auto;
+  }
+  .wk-hero {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+  .wk-hero .wk-ring {
+    margin: 0 auto;
+  }
+  .wk-heroS {
+    align-items: center;
+  }
+  .wk-secgrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* الشريط السفلي لا يُطبع */
+@media print {
+  .tabbar,
+  .sheet-wrap {
+    display: none !important;
+  }
+}

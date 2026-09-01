@@ -348,8 +348,10 @@ export default function Details({
                       return (
                         <tr key={it.id}>
                           <td className="dt-name">{it.name}</td>
-                          <td className="ltr">{num(c.target)}</td>
-                          <td className={`dt-act ${st ? st : ""}`}>
+                          <td className="ltr" data-l={t("المستهدف", "Target")}>
+                            {num(c.target)}
+                          </td>
+                          <td className={`dt-act ${st ? st : ""}`} data-l={t("الفعلي", "Actual")}>
                             {editable ? (
                               <input
                                 type="number"
@@ -368,11 +370,19 @@ export default function Details({
                             {st === "ok" && <span className="dt-tick">✓</span>}
                             {st === "err" && <span className="dt-x">!</span>}
                           </td>
-                          <td className={`ltr dt-diff ${c.diff == null ? "" : c.diff < 0 ? "neg" : "pos"}`}>
+                          <td
+                            className={`ltr dt-diff ${c.diff == null ? "" : c.diff < 0 ? "neg" : "pos"}`}
+                            data-l={t("الفرق", "Gap")}
+                          >
                             {c.diff == null ? "—" : c.diff > 0 ? `+${c.diff}` : String(c.diff)}
                           </td>
-                          <td className="ltr dt-ach">{pct(c.ach)}</td>
-                          <td className={`dt-delta ${c.delta == null || Math.round(c.delta) === 0 ? "flat" : c.delta > 0 ? "up" : "down"}`}>
+                          <td className="ltr dt-ach" data-l={t("الإنجاز", "Achievement")}>
+                            {pct(c.ach)}
+                          </td>
+                          <td
+                            className={`dt-delta ${c.delta == null || Math.round(c.delta) === 0 ? "flat" : c.delta > 0 ? "up" : "down"}`}
+                            data-l={t("عن الربع السابق", "vs. prev. quarter")}
+                          >
                             {c.delta == null ? (
                               "—"
                             ) : Math.round(c.delta) === 0 ? (
@@ -383,7 +393,7 @@ export default function Details({
                               </bdi>
                             )}
                           </td>
-                          <td>
+                          <td data-l={t("الحالة", "Status")}>
                             {c.band ? (
                               <span
                                 className="dt-badge"
@@ -395,7 +405,7 @@ export default function Details({
                               <span className="muted">—</span>
                             )}
                           </td>
-                          <td>
+                          <td data-l={t("ملاحظات", "Notes")}>
                             <button
                               className={`dt-note ${notes ? "has" : ""}`}
                               onClick={() => setNotesFor({ sectorId, indicatorId })}

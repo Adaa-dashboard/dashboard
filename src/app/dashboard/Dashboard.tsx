@@ -113,6 +113,7 @@ export default function Dashboard({ me }: { me: Me }) {
   const [setOpen, setSetOpen] = useState(false);
   const t = useCallback((ar: string, en: string) => (lang === "en" ? en : ar), [lang]);
   const [pwOpen, setPwOpen] = useState(false);
+  const [sheet, setSheet] = useState(false); // ورقة الإعدادات على الجوال
 
   useEffect(() => {
     const savedLang = typeof window !== "undefined" ? localStorage.getItem("lang") : null;
@@ -180,6 +181,27 @@ export default function Dashboard({ me }: { me: Me }) {
     return (
       <button className={`nav-item ${tab === id ? "active" : ""}`} onClick={() => setTab(id)}>
         <span className="ic">{icon}</span> {t(label[0], label[1])}
+      </button>
+    );
+  }
+  function TabBtn({ id, icon, label }: { id: string; icon: string; label: [string, string] }) {
+    return (
+      <button className={`tab-btn ${tab === id ? "active" : ""}`} onClick={() => setTab(id)}>
+        <span className="ic">{icon}</span>
+        <span className="lb">{t(label[0], label[1])}</span>
+      </button>
+    );
+  }
+  function SheetItem({ id, label }: { id: string; label: [string, string] }) {
+    return (
+      <button
+        className={`sheet-item ${tab === id ? "active" : ""}`}
+        onClick={() => {
+          setTab(id);
+          setSheet(false);
+        }}
+      >
+        {t(label[0], label[1])}
       </button>
     );
   }
@@ -277,7 +299,58 @@ export default function Dashboard({ me }: { me: Me }) {
             </>
           )}
         </main>
+
+        {/* شريط التنقّل السفلي — يظهر على الجوال وحده بدل القائمة الجانبية */}
+        <nav className="tabbar" aria-label={t("التنقل", "Navigation")}>
+          <TabBtn id="overview" icon="◱" label={["الرئيسية", "Home"]} />
+          <TabBtn id="details" icon="◎" label={["مؤشرات", "KPIs"]} />
+          <TabBtn id="tasks" icon="✓" label={["المهام", "Tasks"]} />
+          <TabBtn id="report" icon="▤" label={["الأسبوعي", "Weekly"]} />
+          <button
+            className={`tab-btn ${sheet ? "active" : ""}`}
+            onClick={() => setSheet(true)}
+            aria-label={t("الإعدادات", "Settings")}
+          >
+            <span className="ic">⚙</span>
+            <span className="lb">{t("الإعدادات", "Settings")}</span>
+          </button>
+        </nav>
       </div>
+
+      {sheet && (
+        <div className="sheet-wrap" onClick={() => setSheet(false)}>
+          <div className="sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="sheet-grip" />
+            <div className="sheet-me">
+              <div className="av">{(me.name || "?").trim().charAt(0)}</div>
+              <div>
+                <div className="nm">{me.name}</div>
+                <div className="rl">{isAdmin ? t("مدير الإدارة", "Admin") : t("مدير قطاع", "Sector Manager")}</div>
+              </div>
+            </div>
+            {isAdmin && <SheetItem id="entry" label={["المؤشرات والمستهدفات", "KPIs & Targets"]} />}
+            {isAdmin && <SheetItem id="users" label={["المستخدمون والصلاحيات", "Users & Roles"]} />}
+            {isAdmin && <SheetItem id="structure" label={["القطاعات والإدارات", "Sectors"]} />}
+            <button
+              className="sheet-item"
+              onClick={() => {
+                setSheet(false);
+                setPwOpen(true);
+              }}
+            >
+              {t("تغيير كلمة المرور", "Change password")}
+            </button>
+            <button className="sheet-item" onClick={() => setLang(lang === "ar" ? "en" : "ar")}>
+              {t("اللغة", "Language")}
+              <span className="lang-chip">{lang === "ar" ? "EN" : "AR"}</span>
+            </button>
+            <button className="sheet-item danger" onClick={logout}>
+              {t("تسجيل الخروج", "Sign out")}
+            </button>
+          </div>
+        </div>
+      )}
+
       {pwOpen && <PasswordModal onClose={() => setPwOpen(false)} t={t} />}
     </LangCtx.Provider>
   );
