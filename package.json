@@ -10,7 +10,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "next": "15.1.6",
+    "next": "^15.5.25",
     "nodemailer": "^6.10.0",
     "pg": "^8.22.0",
     "react": "19.0.0",
