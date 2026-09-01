@@ -34,6 +34,7 @@ export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [last4, setLast4] = useState("");
+  const [regPhone, setRegPhone] = useState("");
   const [pw2, setPw2] = useState("");
   const [step, setStep] = useState<"phone" | "code">("phone");
   const [phone, setPhone] = useState("");
@@ -99,7 +100,9 @@ export default function LoginPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           username,
-          last4,
+          // التسجيل الأول: الجوال كاملاً · الاستعادة: آخر أربعة أرقام
+          phone: isReset ? undefined : regPhone,
+          last4: isReset ? last4 : undefined,
           password,
           remember,
           sectorIds: !isReset && sectorId ? [sectorId] : undefined,
@@ -203,8 +206,8 @@ export default function LoginPage() {
                   "To recover access: enter your username and the last four digits of your phone, then choose a new password."
                 )
               : t(
-                  "أول دخول: اكتب اسم المستخدم وآخر أربعة أرقام من جوالك، ثم اختر كلمة مرورك.",
-                  "First sign-in: enter your username and the last four digits of your phone, then choose a password."
+                  "أول دخول: اكتب اسم المستخدم ورقم جوالك، ثم اختر كلمة مرورك.",
+                  "First sign-in: enter your username and phone number, then choose a password."
                 )
             : mode === "password"
             ? t(
@@ -265,18 +268,34 @@ export default function LoginPage() {
                 style={{ textAlign: "left" }}
               />
             </div>
-            <div className="field">
-              <label>{t("آخر ٤ أرقام من جوالك", "Last 4 digits of your phone")}</label>
-              <input
-                inputMode="numeric"
-                maxLength={4}
-                value={last4}
-                onChange={(e) => setLast4(e.target.value.replace(/\D/g, ""))}
-                required
-                dir="ltr"
-                style={{ textAlign: "center", letterSpacing: "6px" }}
-              />
-            </div>
+            {isReset ? (
+              <div className="field">
+                <label>{t("آخر ٤ أرقام من جوالك", "Last 4 digits of your phone")}</label>
+                <input
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={last4}
+                  onChange={(e) => setLast4(e.target.value.replace(/\D/g, ""))}
+                  required
+                  dir="ltr"
+                  style={{ textAlign: "center", letterSpacing: "6px" }}
+                />
+              </div>
+            ) : (
+              <div className="field">
+                <label>{t("رقم الجوال", "Phone number")}</label>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  placeholder="05XXXXXXXX"
+                  value={regPhone}
+                  onChange={(e) => setRegPhone(e.target.value)}
+                  required
+                  dir="ltr"
+                  style={{ textAlign: "left" }}
+                />
+              </div>
+            )}
             {!isReset && sectors.length > 0 && (
               <div className="field">
                 <label>
@@ -341,6 +360,7 @@ export default function LoginPage() {
                 setPassword("");
                 setPw2("");
                 setLast4("");
+                setRegPhone("");
               }}
             >
               {t("رجوع", "Back")}

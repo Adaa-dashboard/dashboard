@@ -2,6 +2,7 @@ import {
   createSession,
   getUserByUsername,
   listSectors,
+  normalizePhone,
   pwBlockedFor,
   pwClearFailures,
   pwNoteFailure,
@@ -17,11 +18,12 @@ import { SESSION_COOKIE, sessionTtl } from "@/lib/session";
 export async function POST(req: Request) {
   const b = await req.json().catch(() => ({}));
   const username = String(b.username || "").trim();
+  const phone = String(b.phone || "").trim();
   const last4 = String(b.last4 || "").replace(/\D/g, "");
   const password = String(b.password || "");
 
   const bad = NextResponse.json(
-    { error: "اسم المستخدم أو أرقام الجوال غير صحيحة" },
+    { error: "اسم المستخدم أو رقم الجوال غير صحيح" },
     { status: 401 }
   );
 
@@ -35,7 +37,16 @@ export async function POST(req: Request) {
   }
 
   const user = await getUserByUsername(username);
-  if (!user || !user.active || last4.length !== 4 || !user.phone.endsWith(last4)) {
+  // التسجيل الأول يطابق رقم الجوال كاملاً · والاستعادة تكتفي بآخر أربعة
+  // أرقام، فالجوال الكامل لا يُطلب إلا مرة واحدة.
+  const first = !!user && !user.passwordHash;
+  const matches = user
+    ? first
+      ? !!phone && normalizePhone(phone) === user.phone
+      : last4.length === 4 && user.phone.endsWith(last4)
+    : false;
+
+  if (!user || !user.active || !matches) {
     await pwNoteFailure(username);
     return bad;
   }
@@ -46,9 +57,8 @@ export async function POST(req: Request) {
   // القطاع يُقبل في التسجيل الأول وحده ولمدير القطاع وحده:
   // فلا يغيّر أحدٌ قطاعه لاحقاً عبر «نسيت كلمة المرور» ليرى بيانات ليست له،
   // ومدير الإدارة يرى الكل أصلاً فلا معنى لقطاعٍ عنده.
-  const firstTime = !user.passwordHash;
   let sectorIds: string[] | undefined;
-  if (firstTime && user.role === "manager" && Array.isArray(b.sectorIds) && b.sectorIds.length) {
+  if (first && user.role === "manager" && Array.isArray(b.sectorIds) && b.sectorIds.length) {
     const known = new Set((await listSectors()).map((s) => s.id));
     const picked = b.sectorIds.map(String).filter((id: string) => known.has(id));
     if (picked.length) sectorIds = picked;
