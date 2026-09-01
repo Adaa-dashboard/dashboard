@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   if (!user || !user.active) return bad;
   if (!user.passwordHash) {
     return NextResponse.json(
-      { error: "لم تُضبط كلمة مرور لهذا الحساب بعد — ادخل برقم الجوال أو راجع مدير الإدارة" },
+      { error: "لم تُفعَّل كلمة مرور هذا الحساب بعد", needsActivation: true },
       { status: 409 }
     );
   }

@@ -484,6 +484,7 @@ export async function updateUser(
     role?: Role;
     username?: string;
     password?: string;
+    clearPassword?: boolean;
   }
 ): Promise<void> {
   const db = await getDB();
@@ -503,8 +504,10 @@ export async function updateUser(
     }
     u.username = un || undefined;
   }
-  // كلمة مرور فارغة = أبقِ الحالية كما هي (لا تُمسح بالخطأ)
-  if (patch.password) u.passwordHash = hashPassword(patch.password);
+  // كلمة مرور فارغة = أبقِ الحالية كما هي (لا تُمسح بالخطأ).
+  // المسح المتعمّد وحده يُرجع الحساب إلى «بانتظار التفعيل».
+  if (patch.clearPassword) u.passwordHash = undefined;
+  else if (patch.password) u.passwordHash = hashPassword(patch.password);
   await save(db);
 }
 

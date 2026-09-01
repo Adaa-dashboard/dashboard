@@ -8,7 +8,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ error: "غير مصرّح" }, { status: 403 });
   }
   const { id } = await ctx.params;
-  const { active, sectorIds, name, role, username, password } = await req
+  const { active, sectorIds, name, role, username, password, clearPassword } = await req
     .json()
     .catch(() => ({}));
 
@@ -37,6 +37,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       role: role === "admin" || role === "manager" ? role : undefined,
       username: typeof username === "string" ? username : undefined,
       password: typeof password === "string" && password ? password : undefined,
+      clearPassword: clearPassword === true,
     });
   } catch (e) {
     return NextResponse.json(

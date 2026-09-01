@@ -1685,6 +1685,7 @@ function UsersManager({ refData }: { refData: RefData }) {
   const [sectorIds, setSectorIds] = useState<string[]>([]);
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
+  const [editing, setEditing] = useState<UserRow | null>(null);
 
   const load = useCallback(async () => {
     const d = await fetch("/api/users").then((r) => r.json());
@@ -1741,51 +1742,12 @@ function UsersManager({ refData }: { refData: RefData }) {
     load();
   }
 
-  // اسم المستخدم وكلمة المرور: يُضبطان لكل حساب على حدة —
-  // كلمة المرور تُرسَل مرة واحدة وتُخزَّن مُجزّأة، ولا تعود من الخادم أبداً
-  function editUsername(u: UserRow) {
-    const v = prompt(`اسم المستخدم لـ ${u.name}:`, u.username || "");
-    if (v == null) return;
-    patch(u.id, { username: v.trim() });
-  }
-  function setPasswordFor(u: UserRow) {
-    if (!u.username) {
-      setErr("اضبط اسم المستخدم أولاً قبل كلمة المرور");
-      return;
-    }
-    const v = prompt(`كلمة مرور جديدة لـ ${u.name} (٦ أحرف فأكثر):`, "");
-    if (v == null) return;
-    if (v.trim().length < 6) {
-      setErr("كلمة المرور لا تقل عن ٦ أحرف");
-      return;
-    }
-    patch(u.id, { password: v.trim() });
-    setMsg(`ضُبطت كلمة مرور ${u.name} ✓ — سلّميها له ليغيّرها لاحقاً`);
-  }
   async function remove(u: UserRow) {
     if (!confirm(`حذف ${u.name}؟`)) return;
     const res = await fetch(`/api/users/${u.id}`, { method: "DELETE" });
     const d = await res.json();
     if (!res.ok) alert(d.error || "تعذّر الحذف");
     else load();
-  }
-
-  async function editSectors(u: UserRow) {
-    const names = refData.sectors.map((s, i) => `${i + 1}) ${s.name}`).join("\n");
-    const input = prompt(
-      `أرقام القطاعات لـ ${u.name} (مفصولة بفاصلة):\n${names}`,
-      u.sectorIds
-        .map((id) => refData.sectors.findIndex((s) => s.id === id) + 1)
-        .filter((n) => n > 0)
-        .join(",")
-    );
-    if (input == null) return;
-    const idxs = input
-      .split(/[،,]/)
-      .map((x) => parseInt(x.trim(), 10) - 1)
-      .filter((n) => n >= 0 && n < refData.sectors.length);
-    const ids = idxs.map((n) => refData.sectors[n].id);
-    patch(u.id, { sectorIds: ids });
   }
 
   const sectorNames = (ids: string[]) =>
@@ -1797,8 +1759,8 @@ function UsersManager({ refData }: { refData: RefData }) {
         <h2 className="section-title">{t("إضافة مستخدم", "Add User")}</h2>
         <p className="muted" style={{ marginTop: -8, marginBottom: 16 }}>
           {t(
-            "مدير القطاع = يدخل بيانات قطاعاته فقط. مدير الإدارة = صلاحيات كاملة على كل القطاعات.",
-            "Sector Manager = enters data for assigned sectors only. Admin = full access to all sectors."
+            "مدير القطاع = يدخل بيانات قطاعاته فقط. مدير الإدارة = صلاحيات كاملة على كل القطاعات. اترك كلمة المرور فارغة وأعطِه اسم المستخدم فقط — يختار كلمته بنفسه عند أول دخول.",
+            "Sector Manager = assigned sectors only. Admin = full access. Leave the password blank and hand over the username only — the owner picks their password at first sign-in."
           )}
         </p>
         {err && <div className="alert alert-error">{err}</div>}
@@ -1833,7 +1795,10 @@ function UsersManager({ refData }: { refData: RefData }) {
               />
             </div>
             <div>
-              <label>{t("كلمة المرور", "Password")}</label>
+              <label>
+                {t("كلمة المرور", "Password")}{" "}
+                <span className="opt">{t("(اختيارية)", "(optional)")}</span>
+              </label>
               <input
                 type="password"
                 value={password}
@@ -1842,6 +1807,7 @@ function UsersManager({ refData }: { refData: RefData }) {
                 style={{ textAlign: "left" }}
                 autoComplete="new-password"
                 minLength={6}
+                placeholder={t("اتركها فارغة ليختارها هو", "Leave blank — the owner sets it")}
               />
             </div>
             <div style={{ flex: "0 0 170px" }}>
@@ -1877,7 +1843,7 @@ function UsersManager({ refData }: { refData: RefData }) {
           <tr>
             <th>{t("الاسم", "Name")}</th>
             <th>{t("اسم المستخدم", "Username")}</th>
-            <th>{t("كلمة المرور", "Password")}</th>
+            <th>{t("الحساب", "Account")}</th>
             <th>{t("رقم الجوال", "Phone")}</th>
             <th>{t("الصلاحية", "Role")}</th>
             <th>{t("القطاعات", "Sectors")}</th>
@@ -1894,9 +1860,9 @@ function UsersManager({ refData }: { refData: RefData }) {
               </td>
               <td>
                 {u.hasPassword ? (
-                  <span className="badge badge-manager">{t("مضبوطة", "Set")}</span>
+                  <span className="badge badge-manager">{t("مفعّل", "Active")}</span>
                 ) : (
-                  <span className="badge badge-off">{t("غير مضبوطة", "Not set")}</span>
+                  <span className="badge badge-off">{t("بانتظار التفعيل", "Awaiting setup")}</span>
                 )}
               </td>
               <td dir="ltr" style={{ textAlign: "right" }}>
@@ -1917,27 +1883,8 @@ function UsersManager({ refData }: { refData: RefData }) {
               </td>
               <td>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  <button className="btn btn-ghost btn-sm" onClick={() => editUsername(u)}>
-                    {t("اسم المستخدم", "Username")}
-                  </button>
-                  <button className="btn btn-ghost btn-sm" onClick={() => setPasswordFor(u)}>
-                    {u.hasPassword ? t("تغيير كلمة المرور", "Change password") : t("ضبط كلمة المرور", "Set password")}
-                  </button>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() =>
-                      patch(u.id, { role: u.role === "admin" ? "manager" : "admin" })
-                    }
-                  >
-                    {u.role === "admin" ? t("اجعله مدير قطاع", "Make manager") : t("اجعله مدير إدارة", "Make admin")}
-                  </button>
-                  {u.role === "manager" && (
-                    <button className="btn btn-ghost btn-sm" onClick={() => editSectors(u)}>
-                      {t("القطاعات", "Sectors")}
-                    </button>
-                  )}
-                  <button className="btn btn-ghost btn-sm" onClick={() => patch(u.id, { active: !u.active })}>
-                    {u.active ? t("إيقاف", "Disable") : t("تفعيل", "Enable")}
+                  <button className="btn btn-sm" onClick={() => setEditing(u)}>
+                    {t("تعديل الصلاحيات", "Edit access")}
                   </button>
                   <button className="btn btn-danger btn-sm" onClick={() => remove(u)}>
                     {t("حذف", "Delete")}
@@ -1948,6 +1895,188 @@ function UsersManager({ refData }: { refData: RefData }) {
           ))}
         </tbody>
       </table>
+
+      {editing && (
+        <EditUserModal
+          user={editing}
+          sectors={refData.sectors}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            load();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ============ تعديل صلاحيات مستخدم ============ */
+function EditUserModal({
+  user,
+  sectors,
+  onClose,
+  onSaved,
+}: {
+  user: UserRow;
+  sectors: Sector[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const { t } = useT();
+  const [name, setName] = useState(user.name);
+  const [username, setUsername] = useState(user.username || "");
+  const [role, setRole] = useState<Role>(user.role);
+  const [ids, setIds] = useState<string[]>(user.sectorIds || []);
+  const [active, setActive] = useState(user.active);
+  const [pw, setPw] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [msg, setMsg] = useState("");
+
+  function toggle(id: string) {
+    setIds((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  }
+
+  async function send(body: object, okMsg: string): Promise<boolean> {
+    setBusy(true);
+    setErr("");
+    setMsg("");
+    const res = await fetch(`/api/users/${user.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const d = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) {
+      setErr(d.error || t("تعذّر الحفظ", "Could not save"));
+      return false;
+    }
+    setMsg(okMsg);
+    return true;
+  }
+
+  async function save() {
+    const ok = await send(
+      {
+        name,
+        username,
+        role,
+        sectorIds: role === "manager" ? ids : [],
+        active,
+        password: pw || undefined,
+      },
+      t("حُفظ ✓", "Saved ✓")
+    );
+    if (ok) onSaved();
+  }
+
+  // إعادة التعيين تمسح كلمة المرور فيعود الحساب «بانتظار التفعيل»،
+  // ويختار صاحبه كلمة جديدة بنفسه من شاشة الدخول — فلا تمرّ كلمة مرور بأحد غيره.
+  async function resetPassword() {
+    if (
+      !window.confirm(
+        t(
+          "إعادة تعيين كلمة المرور؟ سيختار صاحب الحساب كلمة جديدة بنفسه عند أول دخول.",
+          "Reset the password? The account owner will choose a new one at next sign-in."
+        )
+      )
+    )
+      return;
+    if (await send({ clearPassword: true }, t("أُعيد التعيين ✓", "Reset ✓"))) onSaved();
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal task-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="m-h">
+          <h3>
+            {t("تعديل الصلاحيات", "Edit access")} — {user.name}
+          </h3>
+          <button className="mx" onClick={onClose} aria-label="close">
+            ✕
+          </button>
+        </div>
+        <div className="m-b">
+          {err && <div className="alert alert-error">{err}</div>}
+          {msg && <div className="alert alert-success">{msg}</div>}
+
+          <label>{t("الاسم الظاهر في الحساب", "Display name")}</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} />
+
+          <label>{t("اسم المستخدم", "Username")}</label>
+          <input
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            dir="ltr"
+            style={{ textAlign: "left" }}
+            autoComplete="off"
+          />
+
+          <label>{t("الصلاحية", "Role")}</label>
+          <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
+            <option value="manager">{t("مدير قطاع", "Sector Manager")}</option>
+            <option value="admin">{t("مدير الإدارة — صلاحية كاملة", "Admin — full access")}</option>
+          </select>
+
+          {role === "manager" && (
+            <>
+              <label>{t("القطاعات المسؤول عنها", "Assigned sectors")}</label>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 4 }}>
+                {sectors.map((sc) => (
+                  <label key={sc.id} className="checkbox-inline">
+                    <input type="checkbox" checked={ids.includes(sc.id)} onChange={() => toggle(sc.id)} />
+                    {sc.name}
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
+
+          <label style={{ marginTop: 14 }}>{t("حالة الحساب", "Account status")}</label>
+          <label className="checkbox-inline">
+            <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
+            {t("نشط (يستطيع الدخول)", "Active (can sign in)")}
+          </label>
+
+          <label style={{ marginTop: 14 }}>
+            {t("كلمة المرور", "Password")}{" "}
+            <span className="opt">
+              {user.hasPassword
+                ? t("(مفعّلة — اتركها فارغة لتبقى كما هي)", "(set — leave blank to keep)")
+                : t("(بانتظار التفعيل — يختارها صاحب الحساب)", "(awaiting setup — the owner chooses it)")}
+            </span>
+          </label>
+          <input
+            type="password"
+            value={pw}
+            onChange={(e) => setPw(e.target.value)}
+            placeholder={t("اتركها فارغة إن لم ترد تغييرها", "Leave blank to keep")}
+            dir="ltr"
+            style={{ textAlign: "left" }}
+            autoComplete="new-password"
+          />
+          {user.hasPassword && (
+            <button
+              className="btn btn-ghost btn-sm"
+              style={{ marginTop: 10, alignSelf: "flex-start" }}
+              onClick={resetPassword}
+              disabled={busy}
+            >
+              {t("إعادة تعيين كلمة المرور", "Reset password")}
+            </button>
+          )}
+        </div>
+        <div className="m-f">
+          <button className="btn" onClick={save} disabled={busy}>
+            {busy ? t("جارٍ الحفظ...", "Saving...") : t("حفظ", "Save")}
+          </button>
+          <button className="btn btn-ghost" onClick={onClose}>
+            {t("إغلاق", "Close")}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

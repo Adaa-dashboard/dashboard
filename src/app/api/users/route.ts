@@ -24,6 +24,8 @@ export async function POST(req: Request) {
   if (!phone || String(phone).replace(/\D/g, "").length < 9) {
     return NextResponse.json({ error: "أدخل رقم جوال صحيح" }, { status: 400 });
   }
+  // كلمة المرور اختيارية: الحساب بلا كلمة مرور يبقى «بانتظار التفعيل»
+  // ويختار صاحبه كلمته بنفسه من شاشة الدخول.
   if (typeof password === "string" && password && password.length < 6) {
     return NextResponse.json({ error: "كلمة المرور لا تقل عن ٦ أحرف" }, { status: 400 });
   }

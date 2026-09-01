@@ -24,9 +24,11 @@ export default function LoginPage() {
   }, [lang]);
   // الطريقة المعتمدة: اسم المستخدم وكلمة المرور. الدخول بالجوال يبقى متاحاً
   // للحسابات التي لم تُضبط لها كلمة مرور بعد، فلا يُقفَل أحد خارج اللوحة.
-  const [mode, setMode] = useState<"password" | "otp">("password");
+  const [mode, setMode] = useState<"password" | "otp" | "activate">("password");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [last4, setLast4] = useState("");
+  const [pw2, setPw2] = useState("");
   const [step, setStep] = useState<"phone" | "code">("phone");
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
@@ -46,7 +48,43 @@ export default function LoginPage() {
         body: JSON.stringify({ username, password }),
       });
       const data = await res.json();
-      if (!res.ok) setError(data.error || "تعذّر الدخول");
+      if (data.needsActivation) {
+        setMode("activate");
+        setPassword("");
+        setInfo(
+          t(
+            "أول دخول لك — اختر كلمة مرورك الآن.",
+            "First sign-in — choose your password now."
+          )
+        );
+      } else if (!res.ok) setError(data.error || "تعذّر الدخول");
+      else {
+        router.push("/dashboard");
+        router.refresh();
+      }
+    } catch {
+      setError("تعذّر الاتصال بالخادم");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function activate(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    if (password !== pw2) {
+      setError(t("الكلمتان غير متطابقتين", "Passwords do not match"));
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/activate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, last4, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) setError(data.error || "تعذّر التفعيل");
       else {
         router.push("/dashboard");
         router.refresh();
@@ -131,7 +169,12 @@ export default function LoginPage() {
         />
         <h1>{t("لوحة إدارة عمليات الأداء", "Performance Operations Dashboard")}</h1>
         <p className="sub">
-          {mode === "password"
+          {mode === "activate"
+            ? t(
+                "أول دخول: اكتب اسم المستخدم وآخر أربعة أرقام من جوالك، ثم اختر كلمة مرورك.",
+                "First sign-in: enter your username and the last four digits of your phone, then choose a password."
+              )
+            : mode === "password"
             ? t(
                 "سجّل الدخول باسم المستخدم وكلمة المرور المسنَدَين إليك.",
                 "Sign in with the username and password assigned to you."
@@ -145,7 +188,76 @@ export default function LoginPage() {
         {error && <div className="alert alert-error">{error}</div>}
         {info && <div className="alert alert-info">{info}</div>}
 
-        {mode === "password" ? (
+        {mode === "activate" ? (
+          <form onSubmit={activate}>
+            <div className="field">
+              <label>{t("اسم المستخدم", "Username")}</label>
+              <input
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                autoComplete="username"
+                required
+                dir="ltr"
+                style={{ textAlign: "left" }}
+              />
+            </div>
+            <div className="field">
+              <label>{t("آخر ٤ أرقام من جوالك", "Last 4 digits of your phone")}</label>
+              <input
+                inputMode="numeric"
+                maxLength={4}
+                value={last4}
+                onChange={(e) => setLast4(e.target.value.replace(/\D/g, ""))}
+                required
+                dir="ltr"
+                style={{ textAlign: "center", letterSpacing: "6px" }}
+              />
+            </div>
+            <div className="field">
+              <label>{t("كلمة المرور الجديدة", "New password")}</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="new-password"
+                minLength={6}
+                required
+                dir="ltr"
+                style={{ textAlign: "left" }}
+              />
+            </div>
+            <div className="field">
+              <label>{t("تأكيد كلمة المرور", "Confirm password")}</label>
+              <input
+                type="password"
+                value={pw2}
+                onChange={(e) => setPw2(e.target.value)}
+                autoComplete="new-password"
+                minLength={6}
+                required
+                dir="ltr"
+                style={{ textAlign: "left" }}
+              />
+            </div>
+            <button className="btn" style={{ width: "100%" }} disabled={loading}>
+              {loading ? t("جارٍ التفعيل...", "Activating...") : t("تفعيل الحساب والدخول", "Activate & sign in")}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{ width: "100%", marginTop: "10px" }}
+              onClick={() => {
+                setMode("password");
+                setError("");
+                setInfo("");
+                setPassword("");
+                setPw2("");
+              }}
+            >
+              {t("رجوع", "Back")}
+            </button>
+          </form>
+        ) : mode === "password" ? (
           <form onSubmit={signIn}>
             <div className="field">
               <label>{t("اسم المستخدم", "Username")}</label>
@@ -184,6 +296,19 @@ export default function LoginPage() {
               }}
             >
               {t("الدخول برقم الجوال بدلاً من ذلك", "Sign in with phone instead")}
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{ width: "100%", marginTop: "8px" }}
+              onClick={() => {
+                setMode("activate");
+                setError("");
+                setInfo("");
+                setPassword("");
+              }}
+            >
+              {t("أول دخول؟ فعّل حسابك", "First time? Activate your account")}
             </button>
           </form>
         ) : step === "phone" ? (
