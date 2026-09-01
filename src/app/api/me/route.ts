@@ -9,6 +9,8 @@ export async function GET() {
       id: user.id,
       name: user.name,
       phone: user.phone,
+      username: user.username || "",
+      hasPassword: !!user.passwordHash,
       role: user.role,
       sectorIds: user.sectorIds || [],
     },

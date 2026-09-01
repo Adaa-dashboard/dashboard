@@ -2505,3 +2505,11 @@ table.matrix thead th {
   color: var(--g-800);
   font-weight: 700;
 }
+
+/* شعار أداء أعلى بطاقة الدخول */
+.auth-card .auth-logo {
+  display: block;
+  height: 46px;
+  width: auto;
+  margin: 2px auto 14px;
+}

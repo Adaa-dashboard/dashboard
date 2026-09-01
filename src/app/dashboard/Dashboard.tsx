@@ -27,6 +27,8 @@ interface Me {
   id: string;
   name: string;
   phone: string;
+  username?: string;
+  hasPassword?: boolean;
   role: Role;
   sectorIds: string[];
 }
@@ -110,6 +112,7 @@ export default function Dashboard({ me }: { me: Me }) {
   const [lang, setLang] = useState<Lang>("ar");
   const [setOpen, setSetOpen] = useState(false);
   const t = useCallback((ar: string, en: string) => (lang === "en" ? en : ar), [lang]);
+  const [pwOpen, setPwOpen] = useState(false);
 
   useEffect(() => {
     const savedLang = typeof window !== "undefined" ? localStorage.getItem("lang") : null;
@@ -211,6 +214,9 @@ export default function Dashboard({ me }: { me: Me }) {
             {isAdmin && <SubItem id="entry" label={["المؤشرات والمستهدفات", "KPIs & Targets"]} />}
             {isAdmin && <SubItem id="users" label={["المستخدمون والصلاحيات", "Users & Roles"]} />}
             {isAdmin && <SubItem id="structure" label={["القطاعات والإدارات", "Sectors"]} />}
+            <button className="sub-item" onClick={() => setPwOpen(true)}>
+              {t("تغيير كلمة المرور", "Change password")}
+            </button>
             <button className="sub-item" onClick={() => setLang(lang === "ar" ? "en" : "ar")}>
               {t("اللغة", "Language")}
               <span className="lang-chip">{lang === "ar" ? "EN" : "AR"}</span>
@@ -272,7 +278,74 @@ export default function Dashboard({ me }: { me: Me }) {
           )}
         </main>
       </div>
+      {pwOpen && <PasswordModal onClose={() => setPwOpen(false)} t={t} />}
     </LangCtx.Provider>
+  );
+}
+
+/* ============ تغيير كلمة المرور ============ */
+function PasswordModal({
+  onClose,
+  t,
+}: {
+  onClose: () => void;
+  t: (ar: string, en: string) => string;
+}) {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [again, setAgain] = useState("");
+  const [err, setErr] = useState("");
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    setErr("");
+    setMsg("");
+    if (next !== again) return setErr(t("الكلمتان غير متطابقتين", "Passwords do not match"));
+    setBusy(true);
+    const res = await fetch("/api/me/password", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ current, next }),
+    });
+    const d = await res.json().catch(() => ({}));
+    setBusy(false);
+    if (!res.ok) return setErr(d.error || t("تعذّر التغيير", "Could not change"));
+    setMsg(t("تم تغيير كلمة المرور ✓", "Password changed ✓"));
+    setCurrent("");
+    setNext("");
+    setAgain("");
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal task-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="m-h">
+          <h3>{t("تغيير كلمة المرور", "Change password")}</h3>
+          <button className="mx" onClick={onClose} aria-label="close">
+            ✕
+          </button>
+        </div>
+        <div className="m-b">
+          {err && <div className="alert alert-error">{err}</div>}
+          {msg && <div className="alert alert-success">{msg}</div>}
+          <label>{t("كلمة المرور الحالية", "Current password")}</label>
+          <input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} dir="ltr" />
+          <label>{t("كلمة المرور الجديدة", "New password")}</label>
+          <input type="password" value={next} onChange={(e) => setNext(e.target.value)} dir="ltr" minLength={6} />
+          <label>{t("تأكيد الجديدة", "Confirm new password")}</label>
+          <input type="password" value={again} onChange={(e) => setAgain(e.target.value)} dir="ltr" minLength={6} />
+        </div>
+        <div className="m-f">
+          <button className="btn" onClick={save} disabled={busy || !current || !next}>
+            {busy ? t("جارٍ...", "Saving...") : t("حفظ", "Save")}
+          </button>
+          <button className="btn btn-ghost" onClick={onClose}>
+            {t("إغلاق", "Close")}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1521,6 +1594,8 @@ function IndicatorsManager({ refData, reload }: { refData: RefData; reload: () =
 interface UserRow {
   id: string;
   phone: string;
+  username?: string;
+  hasPassword?: boolean;
   name: string;
   role: Role;
   active: boolean;
@@ -1531,6 +1606,8 @@ function UsersManager({ refData }: { refData: RefData }) {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [role, setRole] = useState<Role>("manager");
   const [sectorIds, setSectorIds] = useState<string[]>([]);
   const [err, setErr] = useState("");
@@ -1555,7 +1632,14 @@ function UsersManager({ refData }: { refData: RefData }) {
     const res = await fetch("/api/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone, name, role, sectorIds: role === "manager" ? sectorIds : [] }),
+      body: JSON.stringify({
+        phone,
+        name,
+        username,
+        password,
+        role,
+        sectorIds: role === "manager" ? sectorIds : [],
+      }),
     });
     const d = await res.json();
     if (!res.ok) setErr(d.error || "خطأ");
@@ -1563,6 +1647,8 @@ function UsersManager({ refData }: { refData: RefData }) {
       setMsg(`تمت إضافة ${d.user.name} ✓`);
       setPhone("");
       setName("");
+      setUsername("");
+      setPassword("");
       setRole("manager");
       setSectorIds([]);
       load();
@@ -1570,12 +1656,38 @@ function UsersManager({ refData }: { refData: RefData }) {
   }
 
   async function patch(id: string, body: object) {
-    await fetch(`/api/users/${id}`, {
+    setErr("");
+    setMsg("");
+    const res = await fetch(`/api/users/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) setErr(d.error || "تعذّر الحفظ");
     load();
+  }
+
+  // اسم المستخدم وكلمة المرور: يُضبطان لكل حساب على حدة —
+  // كلمة المرور تُرسَل مرة واحدة وتُخزَّن مُجزّأة، ولا تعود من الخادم أبداً
+  function editUsername(u: UserRow) {
+    const v = prompt(`اسم المستخدم لـ ${u.name}:`, u.username || "");
+    if (v == null) return;
+    patch(u.id, { username: v.trim() });
+  }
+  function setPasswordFor(u: UserRow) {
+    if (!u.username) {
+      setErr("اضبط اسم المستخدم أولاً قبل كلمة المرور");
+      return;
+    }
+    const v = prompt(`كلمة مرور جديدة لـ ${u.name} (٦ أحرف فأكثر):`, "");
+    if (v == null) return;
+    if (v.trim().length < 6) {
+      setErr("كلمة المرور لا تقل عن ٦ أحرف");
+      return;
+    }
+    patch(u.id, { password: v.trim() });
+    setMsg(`ضُبطت كلمة مرور ${u.name} ✓ — سلّميها له ليغيّرها لاحقاً`);
   }
   async function remove(u: UserRow) {
     if (!confirm(`حذف ${u.name}؟`)) return;
@@ -1637,6 +1749,28 @@ function UsersManager({ refData }: { refData: RefData }) {
               <label>{t("الاسم", "Name")}</label>
               <input value={name} onChange={(e) => setName(e.target.value)} />
             </div>
+            <div>
+              <label>{t("اسم المستخدم", "Username")}</label>
+              <input
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                dir="ltr"
+                style={{ textAlign: "left" }}
+                autoComplete="off"
+              />
+            </div>
+            <div>
+              <label>{t("كلمة المرور", "Password")}</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                dir="ltr"
+                style={{ textAlign: "left" }}
+                autoComplete="new-password"
+                minLength={6}
+              />
+            </div>
             <div style={{ flex: "0 0 170px" }}>
               <label>{t("الصلاحية", "Role")}</label>
               <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
@@ -1669,6 +1803,8 @@ function UsersManager({ refData }: { refData: RefData }) {
         <thead>
           <tr>
             <th>{t("الاسم", "Name")}</th>
+            <th>{t("اسم المستخدم", "Username")}</th>
+            <th>{t("كلمة المرور", "Password")}</th>
             <th>{t("رقم الجوال", "Phone")}</th>
             <th>{t("الصلاحية", "Role")}</th>
             <th>{t("القطاعات", "Sectors")}</th>
@@ -1680,6 +1816,16 @@ function UsersManager({ refData }: { refData: RefData }) {
           {users.map((u) => (
             <tr key={u.id}>
               <td>{u.name}</td>
+              <td dir="ltr" style={{ textAlign: "right" }}>
+                {u.username || <span className="muted">—</span>}
+              </td>
+              <td>
+                {u.hasPassword ? (
+                  <span className="badge badge-manager">{t("مضبوطة", "Set")}</span>
+                ) : (
+                  <span className="badge badge-off">{t("غير مضبوطة", "Not set")}</span>
+                )}
+              </td>
               <td dir="ltr" style={{ textAlign: "right" }}>
                 {u.phone}
               </td>
@@ -1698,6 +1844,20 @@ function UsersManager({ refData }: { refData: RefData }) {
               </td>
               <td>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <button className="btn btn-ghost btn-sm" onClick={() => editUsername(u)}>
+                    {t("اسم المستخدم", "Username")}
+                  </button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => setPasswordFor(u)}>
+                    {u.hasPassword ? t("تغيير كلمة المرور", "Change password") : t("ضبط كلمة المرور", "Set password")}
+                  </button>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() =>
+                      patch(u.id, { role: u.role === "admin" ? "manager" : "admin" })
+                    }
+                  >
+                    {u.role === "admin" ? t("اجعله مدير قطاع", "Make manager") : t("اجعله مدير إدارة", "Make admin")}
+                  </button>
                   {u.role === "manager" && (
                     <button className="btn btn-ghost btn-sm" onClick={() => editSectors(u)}>
                       {t("القطاعات", "Sectors")}

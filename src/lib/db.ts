@@ -8,7 +8,9 @@ export type Role = "admin" | "manager";
 
 export interface User {
   id: string;
-  phone: string; // رقم الجوال (معرّف الدخول)
+  phone: string; // رقم الجوال (يبقى مخزّناً — كان معرّف الدخول قبل كلمات المرور)
+  username?: string; // اسم المستخدم في العمل — معرّف الدخول الجديد
+  passwordHash?: string; // scrypt$<salt>$<hash> — لا تُخزَّن كلمة المرور نفسها أبداً
   email?: string; // اختياري
   name: string;
   role: Role;
@@ -31,6 +33,29 @@ export function normalizePhone(input: string): string {
   else if (p.startsWith("5") && p.length === 9) p = "966" + p;
   else if (!p.startsWith("966") && p.length === 9) p = "966" + p;
   return p;
+}
+
+/** توحيد اسم المستخدم: حروف صغيرة بلا مسافات طرفية — المطابقة تتم عليه. */
+export function normUsername(input: string): string {
+  return (input || "").trim().toLowerCase();
+}
+
+/* كلمات المرور تُخزَّن مُجزّأة بـ scrypt (من مكتبة node نفسها — بلا اعتماد جديد
+   يحتاج بناءً أصلياً داخل Docker). الصيغة: scrypt$<salt>$<hash> */
+const SCRYPT_KEYLEN = 64;
+export function hashPassword(plain: string): string {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(plain, salt, SCRYPT_KEYLEN).toString("hex");
+  return `scrypt$${salt}$${hash}`;
+}
+export function verifyPassword(plain: string, stored: string | undefined): boolean {
+  if (!stored) return false;
+  const [scheme, salt, hash] = stored.split("$");
+  if (scheme !== "scrypt" || !salt || !hash) return false;
+  const got = crypto.scryptSync(plain, salt, SCRYPT_KEYLEN);
+  const want = Buffer.from(hash, "hex");
+  // مقارنة بزمن ثابت حتى لا يتسرّب طول التطابق
+  return got.length === want.length && crypto.timingSafeEqual(got, want);
 }
 
 export interface Session {
@@ -398,19 +423,33 @@ export async function getUserByPhone(phone: string): Promise<User | undefined> {
   return (await getDB()).users.find((u) => u.phone === p);
 }
 
+export async function getUserByUsername(username: string): Promise<User | undefined> {
+  const u = normUsername(username);
+  if (!u) return undefined;
+  return (await getDB()).users.find((x) => normUsername(x.username || "") === u);
+}
+
 export async function createUser(input: {
   phone: string;
   name: string;
   role: Role;
   sectorIds?: string[];
+  username?: string;
+  password?: string;
 }): Promise<User> {
   const db = await getDB();
   const phone = normalizePhone(input.phone);
   if (!phone || phone.length < 10) throw new Error("رقم جوال غير صحيح");
   if (db.users.some((u) => u.phone === phone)) throw new Error("هذا الرقم مضاف مسبقًا");
+  const username = normUsername(input.username || "");
+  if (username && db.users.some((u) => normUsername(u.username || "") === username)) {
+    throw new Error("اسم المستخدم مستخدَم مسبقًا");
+  }
   const user: User = {
     id: newId(),
     phone,
+    username: username || undefined,
+    passwordHash: input.password ? hashPassword(input.password) : undefined,
     name: input.name.trim() || phone,
     role: input.role,
     active: true,
@@ -424,7 +463,14 @@ export async function createUser(input: {
 
 export async function updateUser(
   id: string,
-  patch: { active?: boolean; sectorIds?: string[]; name?: string }
+  patch: {
+    active?: boolean;
+    sectorIds?: string[];
+    name?: string;
+    role?: Role;
+    username?: string;
+    password?: string;
+  }
 ): Promise<void> {
   const db = await getDB();
   const u = db.users.find((x) => x.id === id);
@@ -432,6 +478,19 @@ export async function updateUser(
   if (typeof patch.active === "boolean") u.active = patch.active;
   if (Array.isArray(patch.sectorIds)) u.sectorIds = patch.sectorIds;
   if (typeof patch.name === "string" && patch.name.trim()) u.name = patch.name.trim();
+  if (patch.role === "admin" || patch.role === "manager") {
+    u.role = patch.role;
+    if (patch.role === "admin") u.sectorIds = [];
+  }
+  if (typeof patch.username === "string") {
+    const un = normUsername(patch.username);
+    if (un && db.users.some((x) => x.id !== id && normUsername(x.username || "") === un)) {
+      throw new Error("اسم المستخدم مستخدَم مسبقًا");
+    }
+    u.username = un || undefined;
+  }
+  // كلمة مرور فارغة = أبقِ الحالية كما هي (لا تُمسح بالخطأ)
+  if (patch.password) u.passwordHash = hashPassword(patch.password);
   await save(db);
 }
 

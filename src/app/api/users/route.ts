@@ -7,7 +7,12 @@ export async function GET() {
   if (!user || user.role !== "admin") {
     return NextResponse.json({ error: "غير مصرّح" }, { status: 403 });
   }
-  return NextResponse.json({ users: await listUsers() });
+  // كلمة المرور المُجزّأة لا تخرج من الخادم أبداً — يخرج فقط هل ضُبطت أم لا
+  const users = (await listUsers()).map(({ passwordHash, ...u }) => ({
+    ...u,
+    hasPassword: !!passwordHash,
+  }));
+  return NextResponse.json({ users });
 }
 
 export async function POST(req: Request) {
@@ -15,9 +20,12 @@ export async function POST(req: Request) {
   if (!user || user.role !== "admin") {
     return NextResponse.json({ error: "غير مصرّح" }, { status: 403 });
   }
-  const { phone, name, role, sectorIds } = await req.json().catch(() => ({}));
+  const { phone, name, role, sectorIds, username, password } = await req.json().catch(() => ({}));
   if (!phone || String(phone).replace(/\D/g, "").length < 9) {
     return NextResponse.json({ error: "أدخل رقم جوال صحيح" }, { status: 400 });
+  }
+  if (typeof password === "string" && password && password.length < 6) {
+    return NextResponse.json({ error: "كلمة المرور لا تقل عن ٦ أحرف" }, { status: 400 });
   }
   try {
     const created = await createUser({
@@ -25,8 +33,13 @@ export async function POST(req: Request) {
       name: name || "",
       role: role === "admin" ? "admin" : "manager",
       sectorIds: Array.isArray(sectorIds) ? sectorIds : [],
+      username: typeof username === "string" ? username : undefined,
+      password: typeof password === "string" && password ? password : undefined,
     });
-    return NextResponse.json({ ok: true, user: created });
+    // لا تُعِد كلمة المرور المُجزّأة في رد الإنشاء
+    const { passwordHash, ...safe } = created;
+    void passwordHash;
+    return NextResponse.json({ ok: true, user: { ...safe, hasPassword: !!passwordHash } });
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "خطأ" },
