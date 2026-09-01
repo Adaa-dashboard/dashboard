@@ -4,6 +4,7 @@ import { createContext, useContext, useCallback, useEffect, useMemo, useState } 
 import Activity from "./Activity";
 import Tasks from "./Tasks";
 import WeeklyPanel from "./WeeklyPanel";
+import Details from "./Details";
 import { LineChart, Line as ChartLine, SECTOR_STYLES } from "./Charts";
 import { latestYear, quarterlySeries, sectorSeries, yearlySeries } from "@/lib/analytics";
 import { useRouter } from "next/navigation";
@@ -164,7 +165,7 @@ export default function Dashboard({ me }: { me: Me }) {
   const TITLES: Record<string, [string, string]> = {
     overview: ["نظرة عامة", "Overview"],
     details: ["المؤشرات التفصيلية", "KPI Details"],
-    entry: ["إدخال الفعلي", "Data Entry"],
+    entry: ["المؤشرات والمستهدفات", "KPIs & Targets"],
     tasks: ["المهام والتكليفات", "Tasks"],
     report: ["الإنجاز الأسبوعي", "Weekly Achievement"],
     structure: ["القطاعات والإدارات", "Sectors"],
@@ -198,7 +199,6 @@ export default function Dashboard({ me }: { me: Me }) {
 
           <NavItem id="overview" icon="◱" label={["نظرة عامة", "Overview"]} />
           <NavItem id="details" icon="◎" label={["المؤشرات التفصيلية", "KPI Details"]} />
-          <NavItem id="entry" icon="✎" label={["إدخال الفعلي", "Data Entry"]} />
           <NavItem id="tasks" icon="✓" label={["المهام والتكليفات", "Tasks"]} />
           <NavItem id="report" icon="▤" label={["الإنجاز الأسبوعي", "Weekly Achievement"]} />
 
@@ -208,6 +208,7 @@ export default function Dashboard({ me }: { me: Me }) {
             <span className="ic">⚙</span> {t("الإعدادات", "Settings")} <span className="cv">▾</span>
           </button>
           <div className={`subnav ${setOpen ? "show" : ""}`}>
+            {isAdmin && <SubItem id="entry" label={["المؤشرات والمستهدفات", "KPIs & Targets"]} />}
             {isAdmin && <SubItem id="users" label={["المستخدمون والصلاحيات", "Users & Roles"]} />}
             {isAdmin && <SubItem id="structure" label={["القطاعات والإدارات", "Sectors"]} />}
             <button className="sub-item" onClick={() => setLang(lang === "ar" ? "en" : "ar")}>
@@ -242,8 +243,20 @@ export default function Dashboard({ me }: { me: Me }) {
           ) : (
             <>
               {tab === "overview" && <Overview me={me} refData={refData} />}
-              {tab === "details" && <WeeklyReview me={me} refData={refData} />}
-              {tab === "entry" && <EntrySection me={me} refData={refData} reload={loadRef} />}
+              {tab === "details" && (
+                <Details
+                  isAdmin={isAdmin}
+                  mySectorIds={me.sectorIds}
+                  sectors={visibleSectors(me, refData)}
+                  indicators={activeIndicators(refData)}
+                  periods={refData.periods}
+                  statuses={refData.statuses}
+                  targetOf={(sid, iid, q) => tgtForScope(refData, tkey(sid, iid), q)}
+                  t={t}
+                  reload={loadRef}
+                />
+              )}
+              {tab === "entry" && isAdmin && <EntrySection me={me} refData={refData} reload={loadRef} />}
               {tab === "tasks" && (
                 <Tasks
                   meId={me.id}
@@ -826,306 +839,6 @@ function IndicatorModal({
             </tbody>
           </table>
         </div>
-      </div>
-    </div>
-  );
-}
-
-/* ============ تحديث حالة المؤشرات ============ */
-function TargetActualCell({
-  target,
-  actual,
-  bg,
-  fg,
-  strong,
-}: {
-  target: number | null;
-  actual: number;
-  bg: string;
-  fg: string;
-  strong?: boolean;
-}) {
-  const { t } = useT();
-  return (
-    <div className="ta-cell" style={{ background: bg, color: fg }}>
-      <div className="ta-box">
-        <span className="ta-lbl">{t("مستهدف", "Target")}</span>
-        <span className="ta-val">{target != null ? fmtNum(target) : "—"}</span>
-      </div>
-      <div className="ta-sep" />
-      <div className="ta-box">
-        <span className="ta-lbl">{t("منجز", "Done")}</span>
-        <span className={"ta-val" + (strong ? " strong" : "")}>{fmtNum(actual)}</span>
-      </div>
-    </div>
-  );
-}
-
-function WeeklyReview({ me, refData }: { me: Me; refData: RefData }) {
-  const { t, lang } = useT();
-  const sectors = visibleSectors(me, refData);
-  const indicators = activeIndicators(refData);
-  const bands = refData.statuses;
-  const [measurements, setMeasurements] = useState<Measurement[]>([]);
-
-  const load = useCallback(async () => {
-    const d = await fetch("/api/measurements").then((r) => r.json());
-    setMeasurements(d.measurements || []);
-  }, []);
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  // أحدث قيمة لكل (قطاع×مؤشر) — المنجز كما أدخله المستخدم مباشرةً (بدون تراكم)
-  const latest = useMemo(() => latestByCell(measurements), [measurements]);
-  const lastUpdated = useMemo(() => lastUpdatedOf(measurements), [measurements]);
-
-  // صفوف المصفوفة: المستهدف السنوي · المنجز = آخر قيمة · الحالة حسب المنجز÷المستهدف
-  const indRows = useMemo(() => {
-    return indicators.map((ind, i) => {
-      const perSector = sectors.map((s) => {
-        const key = tkey(s.id, ind.id);
-        const target = tgtAnnual(refData, key);
-        const m = latest.get(key);
-        const done = m?.actual ?? null;
-        const band = target && target > 0 && done != null ? bandOf((done / target) * 100, bands) : null;
-        return { sector: s, done, target, band, updatedAt: m?.updatedAt };
-      });
-      const doneSum = perSector.reduce((t, ps) => (ps.done != null ? t + ps.done : t), 0);
-      const tgtSum = perSector.reduce((t, ps) => (ps.target != null ? t + ps.target : t), 0);
-      const rowBand = tgtSum > 0 ? bandOf((doneSum / tgtSum) * 100, bands) : null;
-      return { ind, num: i + 1, perSector, doneSum, tgtSum, rowBand };
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [indicators, sectors, latest, bands, refData.targets, refData.targetMode]);
-
-  // عدّ الخلايا حسب الحالة
-  const bandCounts: Record<string, number> = {};
-  for (const b of bands) bandCounts[b.label] = 0;
-  for (const r of indRows)
-    for (const ps of r.perSector) if (ps.band) bandCounts[ps.band.label] = (bandCounts[ps.band.label] || 0) + 1;
-
-  // إجماليات
-  let doneTotal = 0;
-  let tgtTotal = 0;
-  for (const r of indRows) {
-    doneTotal += r.doneSum;
-    tgtTotal += r.tgtSum;
-  }
-
-  // آخر التحديثات (الأحدث أولًا)
-  const sVisible = new Set(sectors.map((s) => s.id));
-  const iActive = new Set(indicators.map((i) => i.id));
-  const numOf = new Map(indicators.map((ind, i) => [ind.id, i + 1]));
-  const nameOf = (id: string, arr: { id: string; name: string }[]) => arr.find((x) => x.id === id)?.name || "";
-  const recent = [...latest.values()]
-    .filter((m) => m.actual != null && sVisible.has(m.sectorId) && iActive.has(m.indicatorId))
-    .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""))
-    .slice(0, 12);
-
-  const today = new Date().toLocaleDateString(lang === "en" ? "en-US" : "ar-SA-u-nu-latn", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-
-  const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
-
-  // تقرير PDF (المنجز مقابل المستهدف لكل قطاع×مؤشر) عبر نافذة طباعة
-  function printPDF() {
-    const rows = sectors
-      .map((s) =>
-        indicators
-          .map((ind) => {
-            const key = tkey(s.id, ind.id);
-            const m = latest.get(key);
-            const tgt = tgtAnnual(refData, key);
-            const r = evaluate(m?.actual, tgt, bands);
-            return `<tr>
-              <td>${esc(s.name)}</td>
-              <td>${esc(ind.name)}</td>
-              <td class="c">${ind.unit === "percent" ? "نسبة" : "عدد"}</td>
-              <td class="c">${tgt != null ? tgt : "—"}</td>
-              <td class="c">${m?.actual != null ? m.actual : "—"}</td>
-              <td class="c">${r.achievement != null ? Math.round(r.achievement) + "%" : "—"}</td>
-              <td class="c" style="background:${r.bg};color:${r.color}">${r.label}</td>
-              <td class="c">${esc(fmtDate(m?.updatedAt, lang) || "—")}</td>
-            </tr>`;
-          })
-          .join("")
-      )
-      .join("");
-    const html = `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>تقرير الأداء</title>
-      <style>
-        *{font-family:"Segoe UI",Tahoma,Arial,sans-serif}
-        body{padding:20px;color:#1a2233}
-        h1{color:#0e3a5f;margin:0 0 2px;font-size:22px}
-        .sub{color:#5b6b82;margin:0 0 14px;font-size:12px}
-        table{width:100%;border-collapse:collapse;margin-bottom:10px;font-size:11.5px}
-        th,td{border:1px solid #d4dbe6;padding:5px 7px;text-align:right}
-        th{background:#eef4f8}
-        td.c{text-align:center}
-        @media print{tr{page-break-inside:avoid}}
-      </style></head><body>
-      <h1>تقرير حالة المؤشرات — إدارة عمليات الأداء</h1>
-      <p class="sub">${esc(today)} · المنجز/المستهدف: ${fmtNum(doneTotal)} / ${fmtNum(tgtTotal)}</p>
-      <table><thead><tr><th>القطاع</th><th>المؤشر</th><th>الوحدة</th><th>المستهدف</th><th>المنجز</th><th>الإنجاز</th><th>الحالة</th><th>آخر تحديث</th></tr></thead><tbody>${rows}</tbody></table>
-      <script>window.onload=function(){window.print()}</script>
-      </body></html>`;
-    const w = window.open("", "_blank");
-    if (w) {
-      w.document.write(html);
-      w.document.close();
-    }
-  }
-
-  function exportExcel() {
-    const header = ["القطاع", "المؤشر", "الوحدة", "المستهدف", "المنجز", "نسبة الإنجاز %", "الحالة", "آخر تحديث"];
-    const rows: string[][] = [];
-    for (const s of sectors)
-      for (const ind of indicators) {
-        const key = tkey(s.id, ind.id);
-        const m = latest.get(key);
-        const tgt = tgtAnnual(refData, key);
-        const r = evaluate(m?.actual, tgt, bands);
-        rows.push([
-          s.name,
-          ind.name,
-          ind.unit === "percent" ? "نسبة" : "عدد",
-          tgt != null ? String(tgt) : "",
-          m?.actual != null ? String(m.actual) : "",
-          r.achievement != null ? String(Math.round(r.achievement)) : "",
-          r.label,
-          fmtDate(m?.updatedAt, lang),
-        ]);
-      }
-    const csv = [header, ...rows]
-      .map((r) => r.map((c) => (/[",\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c)).join(","))
-      .join("\r\n");
-    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "تقرير-الأداء-الكامل.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  const cellOf = (band: Band | null) =>
-    band ? { bg: tint(band.color), fg: band.color } : { bg: "var(--bg2)", fg: "#8a9a95" };
-
-  return (
-    <div>
-      {/* شريط العنوان */}
-      <div className="weekly-banner">
-        <div>
-          <div className="weekly-title">{t("تحديث حالة المؤشرات", "KPI Status Update")}</div>
-          <div className="weekly-date">
-            {lastUpdated
-              ? `${t("آخر تحديث:", "Last update:")} ${fmtDate(lastUpdated, lang)}`
-              : t("لا توجد تحديثات بعد", "No updates yet")}
-          </div>
-        </div>
-        <div className="weekly-actions">
-          <button className="btn btn-sm btn-ghost" onClick={load}>{t("تحديث", "Refresh")}</button>
-          <button className="btn btn-sm" onClick={printPDF}>🖨 {t("حفظ PDF", "Save PDF")}</button>
-          <button className="btn btn-sm" onClick={exportExcel}>⬇ Excel</button>
-        </div>
-      </div>
-
-      {/* ملخص سريع */}
-      <div className="kpis" style={{ marginTop: 14 }}>
-        <div className="kpi">
-          <div className="v" style={{ color: "#a78bfa" }} dir="ltr">
-            {fmtNum(doneTotal)} / {fmtNum(tgtTotal)}
-          </div>
-          <div className="l">{t("المنجز / المستهدف السنوي", "Done / Annual target")}</div>
-        </div>
-        {bands.map((b) => (
-          <div className="kpi" key={b.label}>
-            <div className="v" style={{ color: b.color }}>{bandCounts[b.label] || 0}</div>
-            <div className="l">{b.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* مصفوفة المؤشرات × القطاعات */}
-      <div className="card" style={{ marginTop: 16, overflowX: "auto" }}>
-        <h2 className="section-title">
-          {t("المستهدف والمنجز لكل قطاع", "Target & Done per Sector")}
-          <span className="muted" style={{ fontSize: 12, fontWeight: 400, marginRight: 8 }}>
-            {t(
-              "(المنجَز: الإجمالي المُدخَل مباشرةً · المستهدف: سنوي)",
-              "(Done: the value entered directly · Target: annual)"
-            )}
-          </span>
-        </h2>
-        <table className="matrix">
-          <thead>
-            <tr>
-              <th style={{ textAlign: "right", minWidth: 220 }}>{t("المؤشر", "KPI")}</th>
-              {sectors.map((s) => (
-                <th key={s.id}>{s.name}</th>
-              ))}
-              <th>{t("الإجمالي", "Total")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {indRows.map((r) => (
-              <tr key={r.ind.id}>
-                <td style={{ textAlign: "right" }}>
-                  <span className="muted">KPI {r.num}</span> · {r.ind.name}
-                </td>
-                {r.perSector.map((ps) => {
-                  const c = cellOf(ps.band);
-                  return (
-                    <td key={ps.sector.id}>
-                      <TargetActualCell target={ps.target} actual={ps.done ?? 0} bg={c.bg} fg={c.fg} />
-                    </td>
-                  );
-                })}
-                <td>
-                  <TargetActualCell
-                    target={r.tgtSum > 0 ? r.tgtSum : null}
-                    actual={r.doneSum}
-                    bg={cellOf(r.rowBand).bg}
-                    fg={cellOf(r.rowBand).fg}
-                    strong
-                  />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* آخر التحديثات */}
-      <div className="card" style={{ marginTop: 16 }}>
-        <h2 className="section-title">
-          {t("آخر التحديثات", "Latest updates")} ({recent.length})
-        </h2>
-        {recent.length === 0 ? (
-          <div className="muted">{t("لم تُسجّل أي بيانات بعد.", "No data recorded yet.")}</div>
-        ) : (
-          <div className="weak-grid">
-            {recent.map((m, i) => (
-              <div key={i} className="weak-item" style={{ borderRightColor: "#22c55e" }}>
-                <span className="weak-pct" style={{ color: "#22c55e" }} dir="ltr">
-                  {fmtNum(m.actual ?? 0)}
-                </span>
-                <div>
-                  <div className="weak-ind">{nameOf(m.sectorId, sectors)}</div>
-                  <div className="muted" style={{ fontSize: 12 }}>
-                    <span>KPI {numOf.get(m.indicatorId)}</span> · {nameOf(m.indicatorId, indicators)}
-                    {" · "}
-                    <span>{fmtDate(m.updatedAt, lang)}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
