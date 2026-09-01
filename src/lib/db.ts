@@ -73,6 +73,55 @@ export interface Measurement {
   updatedAt: string;
 }
 
+/* ===== المهام والتكليفات ===== */
+export type TaskPriority = "high" | "mid";
+export type TaskState = "ok" | "risk" | "done";
+
+export interface TaskUpdate {
+  id: string;
+  text: string;
+  byId: string;
+  byName: string;
+  at: string;
+}
+
+export interface Task {
+  id: string;
+  title: string;
+  description?: string;
+  assigneeId: string;
+  priority: TaskPriority;
+  dueDate: string; // YYYY-MM-DD
+  indicatorId?: string;
+  state: TaskState;
+  updates: TaskUpdate[];
+  createdById: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
+/* ===== ملاحظات المؤشرات (مع منشن) ===== */
+export interface Note {
+  id: string;
+  sectorId: string;
+  indicatorId: string;
+  text: string;
+  mentions: string[]; // معرّفات المستخدمين المذكورين
+  byId: string;
+  byName: string;
+  at: string;
+}
+
+/* ===== روابط مشاركة الإنجاز الأسبوعي ===== */
+export interface ReportShare {
+  token: string;
+  weekStart: string; // YYYY-MM-DD — الأحد
+  createdById: string;
+  createdAt: string;
+  expiresAt?: string;
+  views: { at: string; ua?: string }[];
+}
+
 export interface StatusBand {
   label: string;
   color: string;
@@ -100,6 +149,10 @@ interface DBShape {
   indicators: Indicator[];
   periods: Period[];
   measurements: Measurement[];
+  tasks: Task[];
+  notes: Note[];
+  shares: ReportShare[];
+  lastSeen: Record<string, string>; // معرّف المستخدم → آخر وقت اطّلع فيه على التحديثات
   settings: Settings;
   // المستهدفات لكل (قطاع|مؤشر): رقم واحد (سنوي) أو مصفوفة [ربع1..ربع4]
   targets: Record<string, number | number[]>;
@@ -117,6 +170,10 @@ function defaultDB(): DBShape {
     indicators: [],
     periods: [],
     measurements: [],
+    tasks: [],
+    notes: [],
+    shares: [],
+    lastSeen: {},
     settings: { statuses: DEFAULT_STATUS_BANDS, targetMode: "annual" },
     targets: {},
   };
@@ -161,18 +218,31 @@ function ensureDir() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
+// السجلات المحفوظة قبل إضافة المهام والملاحظات لا تحتوي هذه المفاتيح —
+// نكمّلها بقيم فارغة بدل أن ينهار القارئ عليها. لا يُمسّ أي مفتاح موجود.
+function normalize(db: DBShape): DBShape {
+  if (!Array.isArray(db.tasks)) db.tasks = [];
+  if (!Array.isArray(db.notes)) db.notes = [];
+  if (!Array.isArray(db.shares)) db.shares = [];
+  if (!db.lastSeen || typeof db.lastSeen !== "object") db.lastSeen = {};
+  db.tasks.forEach((t) => {
+    if (!Array.isArray(t.updates)) t.updates = [];
+  });
+  return db;
+}
+
 async function loadRaw(): Promise<DBShape | null> {
   if (USE_PG) {
     await ensurePg();
     const res = await getPool().query("SELECT data FROM app_state WHERE id = 1");
     if (res.rows.length === 0) return null;
-    return { ...defaultDB(), ...(res.rows[0].data as Partial<DBShape>) };
+    return normalize({ ...defaultDB(), ...(res.rows[0].data as Partial<DBShape>) });
   }
   ensureDir();
   if (!fs.existsSync(DB_FILE)) return null;
   try {
     const parsed = JSON.parse(fs.readFileSync(DB_FILE, "utf-8")) as Partial<DBShape>;
-    return { ...defaultDB(), ...parsed };
+    return normalize({ ...defaultDB(), ...parsed });
   } catch {
     return defaultDB();
   }
@@ -650,4 +720,165 @@ export async function updateSettings(patch: Partial<Settings>): Promise<Settings
   db.settings = cur;
   await save(db);
   return db.settings;
+}
+
+/* ============ المهام والتكليفات ============ */
+export async function listTasks(): Promise<Task[]> {
+  const db = await getDB();
+  return [...db.tasks].sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+}
+
+export async function createTask(input: {
+  title: string;
+  description?: string;
+  assigneeId: string;
+  priority: TaskPriority;
+  dueDate: string;
+  indicatorId?: string;
+  createdById: string;
+}): Promise<Task> {
+  const db = await getDB();
+  const task: Task = {
+    id: newId(),
+    title: input.title.trim(),
+    description: (input.description || "").trim() || undefined,
+    assigneeId: input.assigneeId,
+    priority: input.priority === "high" ? "high" : "mid",
+    dueDate: input.dueDate,
+    indicatorId: input.indicatorId || undefined,
+    state: "ok",
+    updates: [],
+    createdById: input.createdById,
+    createdAt: new Date().toISOString(),
+  };
+  db.tasks.push(task);
+  await save(db);
+  return task;
+}
+
+export async function updateTask(
+  id: string,
+  patch: { state?: TaskState; update?: { text: string; byId: string; byName: string } }
+): Promise<Task | undefined> {
+  const db = await getDB();
+  const task = db.tasks.find((t) => t.id === id);
+  if (!task) return undefined;
+  if (patch.state === "ok" || patch.state === "risk" || patch.state === "done") {
+    task.state = patch.state;
+    task.completedAt = patch.state === "done" ? new Date().toISOString() : undefined;
+  }
+  const text = patch.update?.text?.trim();
+  if (text) {
+    task.updates.push({
+      id: newId(),
+      text,
+      byId: patch.update!.byId,
+      byName: patch.update!.byName,
+      at: new Date().toISOString(),
+    });
+  }
+  await save(db);
+  return task;
+}
+
+export async function deleteTask(id: string): Promise<void> {
+  const db = await getDB();
+  db.tasks = db.tasks.filter((t) => t.id !== id);
+  await save(db);
+}
+
+/* ============ ملاحظات المؤشرات ============ */
+export async function listNotes(filter?: { sectorId?: string; indicatorId?: string }): Promise<Note[]> {
+  const db = await getDB();
+  return db.notes
+    .filter((n) => (!filter?.sectorId || n.sectorId === filter.sectorId))
+    .filter((n) => (!filter?.indicatorId || n.indicatorId === filter.indicatorId))
+    .sort((a, b) => (a.at || "").localeCompare(b.at || ""));
+}
+
+export async function createNote(input: {
+  sectorId: string;
+  indicatorId: string;
+  text: string;
+  mentions: string[];
+  byId: string;
+  byName: string;
+}): Promise<Note> {
+  const db = await getDB();
+  const note: Note = {
+    id: newId(),
+    sectorId: input.sectorId,
+    indicatorId: input.indicatorId,
+    text: input.text.trim(),
+    mentions: input.mentions.filter(Boolean),
+    byId: input.byId,
+    byName: input.byName,
+    at: new Date().toISOString(),
+  };
+  db.notes.push(note);
+  await save(db);
+  return note;
+}
+
+/* ============ آخر اطّلاع على التحديثات ============ */
+export async function getLastSeen(userId: string): Promise<string> {
+  const db = await getDB();
+  return db.lastSeen[userId] || "";
+}
+
+export async function markSeen(userId: string): Promise<void> {
+  const db = await getDB();
+  db.lastSeen[userId] = new Date().toISOString();
+  await save(db);
+}
+
+/* ============ روابط مشاركة التقرير ============ */
+export async function listShares(): Promise<ReportShare[]> {
+  const db = await getDB();
+  return db.shares;
+}
+
+export async function createShare(input: {
+  weekStart: string;
+  createdById: string;
+  days: number | null;
+}): Promise<ReportShare> {
+  const db = await getDB();
+  const share: ReportShare = {
+    token: crypto.randomBytes(12).toString("hex"),
+    weekStart: input.weekStart,
+    createdById: input.createdById,
+    createdAt: new Date().toISOString(),
+    expiresAt:
+      input.days && input.days > 0
+        ? new Date(Date.now() + input.days * 86400000).toISOString()
+        : undefined,
+    views: [],
+  };
+  db.shares.push(share);
+  await save(db);
+  return share;
+}
+
+export async function getShare(token: string): Promise<ReportShare | undefined> {
+  const db = await getDB();
+  const s = db.shares.find((x) => x.token === token);
+  if (!s) return undefined;
+  if (s.expiresAt && s.expiresAt < new Date().toISOString()) return undefined;
+  return s;
+}
+
+export async function recordShareView(token: string, ua?: string): Promise<void> {
+  const db = await getDB();
+  const s = db.shares.find((x) => x.token === token);
+  if (!s) return;
+  s.views.push({ at: new Date().toISOString(), ua });
+  if (s.views.length > 200) s.views = s.views.slice(-200);
+  await save(db);
+}
+
+export async function revokeShare(token: string): Promise<void> {
+  const db = await getDB();
+  db.shares = db.shares.filter((x) => x.token !== token);
+  await save(db);
 }

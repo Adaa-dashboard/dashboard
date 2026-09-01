@@ -1,6 +1,9 @@
 "use client";
 
 import { createContext, useContext, useCallback, useEffect, useMemo, useState } from "react";
+import Activity from "./Activity";
+import { LineChart, Line as ChartLine, SECTOR_STYLES } from "./Charts";
+import { latestYear, quarterlySeries, sectorSeries, yearlySeries } from "@/lib/analytics";
 import { useRouter } from "next/navigation";
 import { evaluate, fmtValue, fmtNum, bandOf, tint, Band, DEFAULT_BANDS } from "@/lib/calc";
 
@@ -317,53 +320,37 @@ function arc(cx: number, cy: number, r: number, v0: number, v1: number, max: num
 function Gauge({
   value,
   bands,
-  max = 120,
+  max = 100,
 }: {
   value: number | null;
   bands: Band[];
   max?: number;
 }) {
+  // قوس نصف دائري: مسار رمادي، وفوقه قوس بلون الحالة بمقدار الإنجاز
   const cx = 100;
   const cy = 95;
   const r = 72;
-  const sw = 16;
+  const sw = 15;
   const v = value == null ? 0 : Math.max(0, Math.min(value, max));
   const color = bandOf(value, bands)?.color ?? "#8a9a95";
-  const needleAngle = 180 - (v / max) * 180;
-  const [nx, ny] = polar(cx, cy, r - 6, needleAngle);
-  // رسم أقواس ملوّنة من الحالات (كل حالة من نسبتها إلى بداية التالية)
-  const sorted = [...bands].sort((a, b) => a.from - b.from);
 
   return (
     <div style={{ position: "relative" }}>
       <svg viewBox="0 0 200 118" width="100%" style={{ display: "block" }}>
         <path d={arc(cx, cy, r, 0, max, max)} stroke={GAUGE_TRACK} strokeWidth={sw} fill="none" strokeLinecap="round" />
-        {sorted.map((b, i) => {
-          const to = i < sorted.length - 1 ? sorted[i + 1].from : max;
-          if (to <= b.from) return null;
-          return (
-            <path
-              key={i}
-              d={arc(cx, cy, r, b.from, to, max)}
-              stroke={b.color}
-              strokeWidth={sw}
-              fill="none"
-              strokeLinecap={i === 0 || i === sorted.length - 1 ? "round" : "butt"}
-            />
-          );
-        })}
-        {value != null && (
-          <>
-            <line x1={cx} y1={cy} x2={nx} y2={ny} stroke="#e8eefc" strokeWidth={3} strokeLinecap="round" />
-            <circle cx={cx} cy={cy} r={6} fill="#e8eefc" />
-          </>
+        {value != null && v > 0 && (
+          <path d={arc(cx, cy, r, 0, v, max)} stroke={color} strokeWidth={sw} fill="none" strokeLinecap="round" />
         )}
-      </svg>
-      <div style={{ textAlign: "center", marginTop: -10 }}>
-        <span style={{ fontSize: 26, fontWeight: 800, color }}>
+        <text
+          x={cx}
+          y={cy - 4}
+          textAnchor="middle"
+          fill="var(--g-900)"
+          style={{ font: "800 30px 'Noto Kufi Arabic', sans-serif", direction: "ltr" }}
+        >
           {value == null ? "—" : `${Math.round(value)}%`}
-        </span>
-      </div>
+        </text>
+      </svg>
     </div>
   );
 }
@@ -481,6 +468,44 @@ function Overview({ me, refData }: { me: Me; refData: RefData }) {
     URL.revokeObjectURL(url);
   }
 
+  // ===== السلاسل الزمنية للأداء العام وللقطاعات =====
+  const year = useMemo(() => latestYear(measurements, refData.periods), [measurements, refData.periods]);
+  const [range, setRange] = useState<"quarter" | "year">("quarter");
+  const targetOf = useCallback(
+    (sectorId: string, indicatorId: string) => tgtAnnual(refData, tkey(sectorId, indicatorId)),
+    [refData]
+  );
+
+  const overallSeries = useMemo(
+    () =>
+      range === "quarter"
+        ? quarterlySeries(measurements, refData.periods, year, targetOf)
+        : yearlySeries(measurements, refData.periods, targetOf),
+    [measurements, refData.periods, year, targetOf, range]
+  );
+
+  const sectorLines: ChartLine[] = useMemo(
+    () =>
+      sectors.map((s, i) => ({
+        name: s.name,
+        color: SECTOR_STYLES[i % SECTOR_STYLES.length].color,
+        dash: SECTOR_STYLES[i % SECTOR_STYLES.length].dash,
+        points: sectorSeries(measurements, refData.periods, s.id, range, year, targetOf),
+      })),
+    [sectors, measurements, refData.periods, range, year, targetOf]
+  );
+
+  const rangeTabs = (
+    <span className="vtabs">
+      <button className={`vtab ${range === "quarter" ? "on" : ""}`} onClick={() => setRange("quarter")}>
+        {year}
+      </button>
+      <button className={`vtab ${range === "year" ? "on" : ""}`} onClick={() => setRange("year")}>
+        {t("كل السنوات", "All years")}
+      </button>
+    </span>
+  );
+
   return (
     <div>
       <div className="toolbar">
@@ -503,27 +528,47 @@ function Overview({ me, refData }: { me: Me; refData: RefData }) {
         </button>
       </div>
 
-      <div className="kpis">
-        <div className="kpi">
-          <div className="v" style={{ color: "var(--g-800)" }}>{overall != null ? `${overall}%` : "—"}</div>
-          <div className="l">{t("الإنجاز العام للمؤشرات", "Overall Achievement")}</div>
-        </div>
-        <div className="kpi">
-          <div className="v">{indicators.length}</div>
-          <div className="l">{t("عدد المؤشرات", "KPIs")}</div>
-        </div>
-        {bands.map((b) => (
-          <div
-            key={b.label}
-            className={`kpi clickable${statusFilter === b.label ? " active" : ""}`}
-            style={statusFilter === b.label ? { borderColor: b.color } : undefined}
-            onClick={() => setStatusFilter(statusFilter === b.label ? null : b.label)}
-          >
-            <div className="v" style={{ color: b.color }}>{bandCounts[b.label] || 0}</div>
-            <div className="l">{b.label}</div>
+      <div className="ov-top">
+        <div className="card">
+          <div className="card-top">
+            <h3>{t("الأداء العام", "Overall performance")}</h3>
+            {rangeTabs}
           </div>
-        ))}
+          <LineChart
+            lines={[
+              {
+                name: t("الأداء العام", "Overall"),
+                color: "#00584c",
+                dash: "",
+                points: overallSeries,
+              },
+            ]}
+            labels={overallSeries.map((p) => p.label)}
+            emptyText={t("لا توجد قياسات كافية لرسم المسار بعد.", "Not enough measurements yet.")}
+          />
+        </div>
+
+        <Activity t={t} />
       </div>
+
+      <h2 className="section-title with-chips">
+        {t("حالة المؤشرات", "KPI status")}
+        <span className="pills">
+          {bands.map((b) => (
+            <button
+              key={b.label}
+              className={`pill ${statusFilter === b.label ? "on" : ""}`}
+              style={{ ["--c" as string]: b.color }}
+              onClick={() => setStatusFilter(statusFilter === b.label ? null : b.label)}
+            >
+              <i />
+              {b.label}
+              <b>{bandCounts[b.label] || 0}</b>
+            </button>
+          ))}
+        </span>
+      </h2>
+
       {statusFilter && (
         <div className="filter-note">
           {t("عرض حالة:", "Showing status:")} <strong>{statusFilter}</strong> {t("فقط", "only")}
@@ -547,7 +592,7 @@ function Overview({ me, refData }: { me: Me; refData: RefData }) {
               onClick={() => setOpenIndicator(ind)}
             >
               <div className="gauge-head">
-                <span className="gauge-num">KPI {ind.num}</span>
+                
               </div>
               <div className="gauge-name" title={ind.name}>
                 {ind.name}
@@ -572,6 +617,18 @@ function Overview({ me, refData }: { me: Me; refData: RefData }) {
           onClose={() => setOpenIndicator(null)}
         />
       )}
+
+      <h2 className="section-title with-chips" style={{ marginTop: 28 }}>
+        {t("الأداء العام للقطاعات", "Sector performance")}
+        {rangeTabs}
+      </h2>
+      <div className="card" style={{ marginBottom: 22 }}>
+        <LineChart
+          lines={sectorLines}
+          labels={(sectorLines[0]?.points || []).map((p) => p.label)}
+          emptyText={t("لا توجد قياسات كافية لرسم مسارات القطاعات بعد.", "Not enough measurements yet.")}
+        />
+      </div>
 
       <h2 className="section-title" style={{ marginTop: 28 }}>
         {t("تفاصيل القطاعات", "Sector Details")}

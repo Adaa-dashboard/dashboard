@@ -1194,3 +1194,293 @@ table.matrix thead th {
     height: 40px;
   }
 }
+
+/* ============================================================
+   نظرة عامة — الرسوم وشرائح الحالة وآخر التحديثات
+   ============================================================ */
+.ov-top {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 22px;
+  align-items: start;
+}
+.card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.card-top h3 {
+  font-size: 15px;
+  color: var(--g-900);
+  margin: 0;
+  white-space: nowrap;
+}
+
+.vtabs {
+  display: inline-flex;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  padding: 3px;
+  gap: 3px;
+}
+.vtab {
+  background: transparent;
+  border: none;
+  color: var(--ink-2);
+  border-radius: 8px;
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.vtab.on {
+  background: #fff;
+  color: var(--g-800);
+  box-shadow: 0 2px 6px rgba(0, 50, 42, 0.12);
+}
+
+/* الرسم الخطي */
+.chart-wrap {
+  position: relative;
+}
+.chart-tip {
+  position: absolute;
+  top: 24px;
+  transform: translateX(50%);
+  pointer-events: none;
+  z-index: 5;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 13px;
+  white-space: nowrap;
+  box-shadow: 0 14px 34px rgba(0, 40, 34, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.chart-tip .h {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--g-700);
+  direction: ltr;
+  text-align: start;
+}
+.chart-tip .r {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+.chart-tip .r i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
+}
+.chart-tip .r b {
+  margin-inline-start: auto;
+  padding-inline-start: 16px;
+  font-weight: 800;
+  direction: ltr;
+  font-variant-numeric: tabular-nums;
+  font-family: "Noto Kufi Arabic", sans-serif;
+}
+.chart-legend {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+  padding: 12px 8px 2px;
+  padding-inline-start: 38px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+.chart-legend .hi {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.chart-legend .hi svg {
+  display: block;
+  flex: none;
+}
+
+/* شرائح حالة المؤشرات */
+.section-title.with-chips {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.pills {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1.5px solid var(--c);
+  background: #fff;
+  border-radius: 99px;
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.pill i {
+  width: 9px;
+  height: 9px;
+  border-radius: 99px;
+  background: var(--c);
+  display: block;
+}
+.pill b {
+  font-family: "Noto Kufi Arabic", sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--c);
+  font-variant-numeric: tabular-nums;
+  direction: ltr;
+}
+.pill:hover {
+  background: var(--bg2);
+}
+.pill.on {
+  background: var(--c);
+  border-color: var(--c);
+  color: #fff;
+}
+.pill.on i {
+  background: #fff;
+}
+.pill.on b {
+  color: #fff;
+}
+
+/* آخر التحديثات */
+.upcard {
+  display: flex;
+  flex-direction: column;
+}
+.up-h {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0 0 4px;
+  text-align: start;
+  cursor: pointer;
+  font: inherit;
+}
+.up-h h3 {
+  font-size: 15px;
+  color: var(--g-900);
+  margin: 0;
+  white-space: nowrap;
+}
+.up-h .unread {
+  background: #fbeaea;
+  border: 1px solid #eec4c4;
+  color: #a83232;
+  border-radius: 99px;
+  padding: 2px 11px;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.up-h .cv {
+  margin-inline-start: auto;
+  font-size: 11px;
+  color: var(--muted);
+  transition: transform 0.2s;
+}
+.upcard.open .up-h .cv {
+  transform: rotate(180deg);
+}
+.feed {
+  display: flex;
+  flex-direction: column;
+  margin-top: 6px;
+  flex: 1;
+}
+.up {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 11px 2px;
+  min-width: 0;
+  border-bottom: 1px solid var(--border);
+}
+.up:last-child {
+  border-bottom: none;
+}
+.up.new {
+  background: var(--g-50);
+  border-radius: 10px;
+  padding-inline: 10px;
+}
+.up .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 99px;
+  background: var(--c);
+  flex: none;
+  margin-top: 7px;
+}
+.up .txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.up .t {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.5;
+}
+.up .t.bad {
+  color: #b13636;
+}
+.up .s {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.up .tg {
+  background: var(--g-700);
+  color: #fff;
+  border-radius: 5px;
+  padding: 1px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  margin-inline-start: 8px;
+  vertical-align: 2px;
+}
+.up-more {
+  padding-top: 10px;
+  margin-top: 2px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--g-700);
+  cursor: pointer;
+}
+
+@media (max-width: 1100px) {
+  .ov-top {
+    grid-template-columns: 1fr;
+  }
+}
