@@ -236,6 +236,11 @@ export default function Dashboard({ me }: { me: Me }) {
             {isAdmin && <SubItem id="entry" label={["المؤشرات والمستهدفات", "KPIs & Targets"]} />}
             {isAdmin && <SubItem id="users" label={["المستخدمون والصلاحيات", "Users & Roles"]} />}
             {isAdmin && <SubItem id="structure" label={["القطاعات والإدارات", "Sectors"]} />}
+            {isAdmin && (
+              <a className="sub-item" href="/api/export" download>
+                {t("نسخة احتياطية من البيانات", "Download backup")}
+              </a>
+            )}
             <button className="sub-item" onClick={() => setPwOpen(true)}>
               {t("تغيير كلمة المرور", "Change password")}
             </button>
@@ -331,6 +336,11 @@ export default function Dashboard({ me }: { me: Me }) {
             {isAdmin && <SheetItem id="entry" label={["المؤشرات والمستهدفات", "KPIs & Targets"]} />}
             {isAdmin && <SheetItem id="users" label={["المستخدمون والصلاحيات", "Users & Roles"]} />}
             {isAdmin && <SheetItem id="structure" label={["القطاعات والإدارات", "Sectors"]} />}
+            {isAdmin && (
+              <a className="sheet-item" href="/api/export" download onClick={() => setSheet(false)}>
+                {t("نسخة احتياطية من البيانات", "Download backup")}
+              </a>
+            )}
             <button
               className="sheet-item"
               onClick={() => {

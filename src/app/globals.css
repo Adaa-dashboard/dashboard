@@ -3005,3 +3005,9 @@ table.matrix thead th {
     margin-bottom: 3px;
   }
 }
+
+/* بند الإعدادات حين يكون رابط تنزيل لا زراً */
+.subnav a.sub-item,
+.sheet a.sheet-item {
+  text-decoration: none;
+}
