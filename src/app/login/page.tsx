@@ -29,6 +29,8 @@ export default function LoginPage() {
   const [mode, setMode] = useState<"choose" | "password" | "otp" | "activate">("choose");
   const [isReset, setIsReset] = useState(false); // نسيت كلمة المرور، لا مستخدم جديد
   const [remember, setRemember] = useState(true);
+  const [sectors, setSectors] = useState<{ id: string; name: string }[]>([]);
+  const [sectorId, setSectorId] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [last4, setLast4] = useState("");
@@ -74,6 +76,15 @@ export default function LoginPage() {
     }
   }
 
+  // قائمة القطاعات تُجلب عند فتح نموذج التسجيل فقط
+  useEffect(() => {
+    if (mode !== "activate" || isReset || sectors.length) return;
+    fetch("/api/sectors/public")
+      .then((r) => r.json())
+      .then((d) => setSectors(d.sectors || []))
+      .catch(() => setSectors([]));
+  }, [mode, isReset, sectors.length]);
+
   async function activate(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -86,7 +97,13 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/activate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, last4, password, remember }),
+        body: JSON.stringify({
+          username,
+          last4,
+          password,
+          remember,
+          sectorIds: !isReset && sectorId ? [sectorId] : undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) setError(data.error || "تعذّر التفعيل");
@@ -260,6 +277,22 @@ export default function LoginPage() {
                 style={{ textAlign: "center", letterSpacing: "6px" }}
               />
             </div>
+            {!isReset && sectors.length > 0 && (
+              <div className="field">
+                <label>
+                  {t("القطاع الذي تتبع له", "Your sector")}{" "}
+                  <span className="opt">{t("(يحدّده مدير الإدارة لاحقاً إن لم تكن متأكداً)", "(the admin can set it later)")}</span>
+                </label>
+                <select value={sectorId} onChange={(e) => setSectorId(e.target.value)}>
+                  <option value="">{t("— اختر القطاع —", "— Choose a sector —")}</option>
+                  {sectors.map((sc) => (
+                    <option key={sc.id} value={sc.id}>
+                      {sc.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="field">
               <label>{t("كلمة المرور الجديدة", "New password")}</label>
               <input

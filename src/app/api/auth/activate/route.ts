@@ -1,6 +1,7 @@
 import {
   createSession,
   getUserByUsername,
+  listSectors,
   pwBlockedFor,
   pwClearFailures,
   pwNoteFailure,
@@ -42,7 +43,18 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "كلمة المرور لا تقل عن ٦ أحرف" }, { status: 400 });
   }
 
-  await updateUser(user.id, { password });
+  // القطاع يُقبل في التسجيل الأول وحده ولمدير القطاع وحده:
+  // فلا يغيّر أحدٌ قطاعه لاحقاً عبر «نسيت كلمة المرور» ليرى بيانات ليست له،
+  // ومدير الإدارة يرى الكل أصلاً فلا معنى لقطاعٍ عنده.
+  const firstTime = !user.passwordHash;
+  let sectorIds: string[] | undefined;
+  if (firstTime && user.role === "manager" && Array.isArray(b.sectorIds) && b.sectorIds.length) {
+    const known = new Set((await listSectors()).map((s) => s.id));
+    const picked = b.sectorIds.map(String).filter((id: string) => known.has(id));
+    if (picked.length) sectorIds = picked;
+  }
+
+  await updateUser(user.id, { password, sectorIds });
   await pwClearFailures(username);
 
   const ttl = sessionTtl(b.remember);
