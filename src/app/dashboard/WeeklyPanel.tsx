@@ -1,5 +1,8 @@
 "use client";
 
+import { apiFetch } from "@/lib/api";
+import { BASE } from "@/lib/base";
+
 import { useCallback, useEffect, useState } from "react";
 import WeeklyView, { arDate } from "./WeeklyView";
 import type { WeeklyReport } from "@/lib/weekly";
@@ -35,7 +38,7 @@ export default function WeeklyPanel({ t }: { t: (ar: string, en: string) => stri
 
   const load = useCallback(async () => {
     setLoading(true);
-    const r = await fetch(`/api/report?week=${week}`).then((x) => x.json());
+    const r = await apiFetch(`/api/report?week=${week}`).then((x) => x.json());
     setReport(r.report || null);
     setCanShare(!!r.canShare);
     setLoading(false);
@@ -107,7 +110,7 @@ function ShareModal({
   const [err, setErr] = useState("");
 
   const load = useCallback(async () => {
-    const r = await fetch("/api/report/share").then((x) => x.json());
+    const r = await apiFetch("/api/report/share").then((x) => x.json());
     setRows(r.shares || []);
   }, []);
 
@@ -118,7 +121,7 @@ function ShareModal({
   async function create() {
     setBusy(true);
     setErr("");
-    const r = await fetch("/api/report/share", {
+    const r = await apiFetch("/api/report/share", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ weekStart: week, days: days === "0" ? null : Number(days) }),
@@ -130,7 +133,7 @@ function ShareModal({
   }
 
   async function copy(token: string) {
-    const url = `${window.location.origin}/w/${token}`;
+    const url = `${window.location.origin}${BASE}/w/?t=${token}`;
     try {
       await navigator.clipboard.writeText(url);
       setCopied(token);
@@ -142,7 +145,7 @@ function ShareModal({
 
   async function revoke(token: string) {
     if (!window.confirm(t("إلغاء هذا الرابط نهائيًا؟", "Revoke this link permanently?"))) return;
-    await fetch(`/api/report/share?token=${token}`, { method: "DELETE" });
+    await apiFetch(`/api/report/share?token=${token}`, { method: "DELETE" });
     await load();
   }
 

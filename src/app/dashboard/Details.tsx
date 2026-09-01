@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/api";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Band, bandOf, tint } from "@/lib/calc";
 
@@ -96,8 +98,8 @@ export default function Details({
   const load = useCallback(async () => {
     setLoading(true);
     const [m, n] = await Promise.all([
-      fetch("/api/measurements").then((r) => r.json()),
-      fetch("/api/notes").then((r) => r.json()),
+      apiFetch("/api/measurements").then((r) => r.json()),
+      apiFetch("/api/notes").then((r) => r.json()),
     ]);
     setRows(m.measurements || []);
     const counts: Record<string, number> = {};
@@ -171,7 +173,7 @@ export default function Details({
   /** الفعلي يُحفظ في الفترة الجارية نفسها التي تكتب فيها شاشة الإدخال — بلا مساس بالتاريخ. */
   async function currentPeriodId(): Promise<string> {
     if (periods.length > 0) return periods[0].id;
-    const res = await fetch("/api/periods", {
+    const res = await apiFetch("/api/periods", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ label: "التحديث" }),
@@ -191,7 +193,7 @@ export default function Details({
     setSaving((s) => ({ ...s, [k]: "busy" }));
     try {
       const pid = await currentPeriodId();
-      const res = await fetch("/api/measurements", {
+      const res = await apiFetch("/api/measurements", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -489,7 +491,7 @@ function NotesPanel({
   const [err, setErr] = useState("");
 
   const load = useCallback(async () => {
-    const r = await fetch(`/api/notes?sectorId=${sectorId}&indicatorId=${indicatorId}`).then((x) =>
+    const r = await apiFetch(`/api/notes?sectorId=${sectorId}&indicatorId=${indicatorId}`).then((x) =>
       x.json()
     );
     setNotes((r.notes || []).slice().reverse());
@@ -507,7 +509,7 @@ function NotesPanel({
     if (!text.trim()) return;
     setBusy(true);
     setErr("");
-    const r = await fetch("/api/notes", {
+    const r = await apiFetch("/api/notes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

@@ -1,8 +1,13 @@
-import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/session";
+"use client";
 
-export default async function Home() {
-  const user = await getCurrentUser();
-  if (user) redirect("/dashboard");
-  redirect("/login");
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { whoAmI } from "@/lib/supa";
+
+export default function Home() {
+  const router = useRouter();
+  useEffect(() => {
+    whoAmI().then((me) => router.replace(me ? "/dashboard" : "/login"));
+  }, [router]);
+  return <div className="empty">جارٍ التحميل...</div>;
 }

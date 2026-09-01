@@ -1,9 +1,17 @@
 /** @type {import('next').NextConfig} */
+
+// اللوحة تُنشر ملفات ثابتة على GitHub Pages تحت مسار فرعي،
+// لأن نطاقات الاستضافة التي تشغّل خواديم محجوبة في شبكة العمل.
+// BASE_PATH يُمرَّر وقت البناء فيتغيّر المسار بلا تعديل الكود.
+const basePath = process.env.BASE_PATH || "";
+
 const nextConfig = {
   reactStrictMode: true,
-  // إخراج مستقل لتشغيل أخف داخل Docker (Render).
-  // على Vercel لا يُستخدم — المنصّة تبني دوالّها بنفسها، وتركه يطبع تحذيراً.
-  output: process.env.VERCEL ? undefined : "standalone",
+  output: "export",
+  basePath,
+  assetPrefix: basePath || undefined,
+  images: { unoptimized: true },
+  trailingSlash: true,
 };
 
 export default nextConfig;

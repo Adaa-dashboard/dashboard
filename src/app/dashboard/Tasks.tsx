@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/api";
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 type State = "ok" | "risk" | "done";
@@ -80,7 +82,7 @@ export default function Tasks({
   const [err, setErr] = useState("");
 
   const load = useCallback(async () => {
-    const r = await fetch("/api/tasks").then((x) => x.json());
+    const r = await apiFetch("/api/tasks").then((x) => x.json());
     setTasks(r.tasks || []);
     setPeople(r.people || []);
     setLoaded(true);
@@ -107,7 +109,7 @@ export default function Tasks({
   }, [tasks, onlyDone]);
 
   async function saveState(task: Task, state: State, text: string) {
-    const r = await fetch(`/api/tasks/${task.id}`, {
+    const r = await apiFetch(`/api/tasks/${task.id}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ state, text }),
@@ -366,7 +368,7 @@ function NewTask({
   async function submit() {
     setBusy(true);
     setErr("");
-    const r = await fetch("/api/tasks", {
+    const r = await apiFetch("/api/tasks", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ title, description, assigneeId, dueDate, priority, indicatorId }),

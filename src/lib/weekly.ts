@@ -3,21 +3,33 @@
 // المكتملة هذا الأسبوع، والتحديات من المتعثرة، والخطة من المستحقة القادمة.
 
 import { computeAchievement } from "@/lib/calc";
-import {
-  Indicator,
-  Measurement,
-  Sector,
-  Task,
-  User,
-  getSettings,
-  listIndicators,
-  listMeasurements,
-  listSectors,
-  listTasks,
-  listUsers,
-  getTargets,
-  targetKey,
-} from "@/lib/db";
+
+/* البيانات تُمرَّر إلى الدالة بدل أن تجلبها بنفسها — فتعمل في المتصفح
+   (Supabase) وفي الخادم على السواء، ولا تعتمد على قاعدة بعينها. */
+export interface WeeklyInput {
+  measurements: Measurement[];
+  sectors: Sector[];
+  indicators: Indicator[];
+  tasks: Task[];
+  users: { id: string; name: string }[];
+  targets: Record<string, number | number[]>;
+  statuses: { label: string; color: string; from: number }[];
+}
+export interface Sector { id: string; name: string }
+export interface Indicator { id: string; name: string; unit: "percent" | "number" }
+export interface Measurement {
+  sectorId: string; indicatorId: string; actual: number | null; updatedAt: string;
+}
+export interface TaskUpdate { text: string }
+export interface Task {
+  id: string; title: string; assigneeId: string; createdById: string;
+  dueDate: string; state: "ok" | "risk" | "done";
+  updates: TaskUpdate[]; completedAt?: string;
+}
+export interface User { id: string; role: "admin" | "manager"; sectorIds: string[] }
+export function targetKey(sectorId: string, indicatorId: string): string {
+  return `${sectorId}|${indicatorId}`;
+}
 
 export interface WeeklySector {
   id: string;
@@ -104,18 +116,16 @@ function colorFor(achievement: number | null, bands: { from: number; color: stri
   return match?.color || "#8a9a95";
 }
 
-export async function buildWeekly(weekStart: string, forUser?: User): Promise<WeeklyReport> {
+export function buildWeekly(
+  weekStart: string,
+  input: WeeklyInput,
+  forUser?: User
+): WeeklyReport {
   const weekEnd = addDays(weekStart, 6);
   const prevEnd = addDays(weekStart, -1);
 
-  const [measurements, sectors, indicators, tasks, users, settings] = await Promise.all([
-    listMeasurements(),
-    listSectors(),
-    listIndicators(),
-    listTasks(),
-    listUsers(),
-    getSettings(),
-  ]);
+  const { measurements, sectors, indicators, tasks, users, targets: tg } = input;
+  const settings = { statuses: input.statuses };
 
   const scoped: Measurement[] =
     forUser && forUser.role !== "admin"
@@ -126,8 +136,6 @@ export async function buildWeekly(weekStart: string, forUser?: User): Promise<We
       ? sectors.filter((s) => forUser.sectorIds.includes(s.id))
       : sectors;
 
-  // المستهدفات من قاعدة البيانات مباشرة عبر مفتاح (قطاع|مؤشر)
-  const tg = await getTargets();
   const targetOf = (sectorId: string, indicatorId: string): number | null => {
     const raw = tg[targetKey(sectorId, indicatorId)];
     if (raw == null) return null;
@@ -154,7 +162,7 @@ export async function buildWeekly(weekStart: string, forUser?: User): Promise<We
     return avg(vals);
   };
 
-  const kpis: WeeklyKpi[] = (indicators as Indicator[]).map((ind) => {
+  const kpis: WeeklyKpi[] = indicators.map((ind) => {
     let sumTarget = 0;
     let sumActual = 0;
     let anyTarget = false;
@@ -197,7 +205,7 @@ export async function buildWeekly(weekStart: string, forUser?: User): Promise<We
 
   const overallOf = (snap: Map<string, Measurement>): number | null =>
     avg(
-      (indicators as Indicator[])
+      indicators
         .map((ind) => indAchievement(snap, ind.id))
         .filter((v): v is number => v != null)
     );
@@ -206,10 +214,10 @@ export async function buildWeekly(weekStart: string, forUser?: User): Promise<We
   const prevOverall = overallOf(before);
   const overallHistory = snapshots.map(overallOf);
 
-  const nameOf = (id: string) => (users as User[]).find((u) => u.id === id)?.name || "—";
+  const nameOf = (id: string) => users.find((u) => u.id === id)?.name || "—";
   const mine = (tk: Task) =>
     !forUser || forUser.role === "admin" || tk.assigneeId === forUser.id || tk.createdById === forUser.id;
-  const visibleTasks = (tasks as Task[]).filter(mine);
+  const visibleTasks = tasks.filter(mine);
 
   const taskRows: WeeklyTaskRow[] = visibleTasks
     .filter((tk) => tk.state !== "done")

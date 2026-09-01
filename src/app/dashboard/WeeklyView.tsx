@@ -1,5 +1,7 @@
 "use client";
 
+import { asset } from "@/lib/base";
+
 import { useState } from "react";
 import type { WeeklyKpi, WeeklyReport } from "@/lib/weekly";
 
@@ -176,7 +178,7 @@ export default function WeeklyView({
   return (
     <div className="wk">
       <header className="wk-head">
-        <img src="/adaa-logo.png" alt="أداء" className="wk-logo" />
+        <img src={asset("/adaa-logo.png")} alt="أداء" className="wk-logo" />
         <div className="wk-ht">
           <h2>الإنجاز الأسبوعي</h2>
           <span>{dept}</span>

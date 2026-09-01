@@ -1,5 +1,9 @@
 "use client";
 
+import { asset } from "@/lib/base";
+
+import { apiFetch } from "@/lib/api";
+
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
@@ -25,8 +29,8 @@ export default function LoginPage() {
   // الطريقة المعتمدة: اسم المستخدم وكلمة المرور. الدخول بالجوال يبقى متاحاً
   // للحسابات التي لم تُضبط لها كلمة مرور بعد، فلا يُقفَل أحد خارج اللوحة.
   // choose = شاشة الاختيار · password = تسجيل دخول · activate = مستخدم جديد
-  // أو نسيت كلمة المرور (نفس النموذج) · otp = الدخول بالجوال (مسار احتياطي)
-  const [mode, setMode] = useState<"choose" | "password" | "otp" | "activate">("choose");
+  // أو نسيت كلمة المرور — النموذج نفسه
+  const [mode, setMode] = useState<"choose" | "password" | "activate">("choose");
   const [isReset, setIsReset] = useState(false); // نسيت كلمة المرور، لا مستخدم جديد
   const [remember, setRemember] = useState(true);
   const [sectors, setSectors] = useState<{ id: string; name: string }[]>([]);
@@ -36,9 +40,6 @@ export default function LoginPage() {
   const [last4, setLast4] = useState("");
   const [regPhone, setRegPhone] = useState("");
   const [pw2, setPw2] = useState("");
-  const [step, setStep] = useState<"phone" | "code">("phone");
-  const [phone, setPhone] = useState("");
-  const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [loading, setLoading] = useState(false);
@@ -49,7 +50,7 @@ export default function LoginPage() {
     setInfo("");
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/login", {
+      const res = await apiFetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password, remember }),
@@ -80,7 +81,7 @@ export default function LoginPage() {
   // قائمة القطاعات تُجلب عند فتح نموذج التسجيل فقط
   useEffect(() => {
     if (mode !== "activate" || isReset || sectors.length) return;
-    fetch("/api/sectors/public")
+    apiFetch("/api/sectors/public")
       .then((r) => r.json())
       .then((d) => setSectors(d.sectors || []))
       .catch(() => setSectors([]));
@@ -95,7 +96,7 @@ export default function LoginPage() {
     }
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/activate", {
+      const res = await apiFetch("/api/auth/activate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -121,59 +122,6 @@ export default function LoginPage() {
     }
   }
 
-  async function requestCode(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    setInfo("");
-    setLoading(true);
-    try {
-      const res = await fetch("/api/auth/request-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "حدث خطأ");
-      } else {
-        setStep("code");
-        if (data.devCode) {
-          setInfo(t(`وضع التجربة: رمزك هو ${data.devCode}`, `Demo mode: your code is ${data.devCode}`));
-        } else {
-          setInfo(t("تم إرسال رمز الدخول برسالة إلى جوالك.", "A login code has been sent to your phone."));
-        }
-      }
-    } catch {
-      setError("تعذّر الاتصال بالخادم");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function verifyCode(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-    try {
-      const res = await fetch("/api/auth/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, code }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "الرمز غير صحيح");
-      } else {
-        router.push("/dashboard");
-        router.refresh();
-      }
-    } catch {
-      setError("تعذّر الاتصال بالخادم");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   return (
     <div className="auth-wrap">
       <div className="card auth-card">
@@ -189,7 +137,7 @@ export default function LoginPage() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           className="auth-logo"
-          src="/adaa-logo.png"
+          src={asset("/adaa-logo.png")}
           alt="أداء — المركز الوطني لقياس أداء الأجهزة العامة"
         />
         <h1>{t("لوحة إدارة عمليات الأداء", "Performance Operations Dashboard")}</h1>
@@ -214,10 +162,7 @@ export default function LoginPage() {
                 "سجّل الدخول باسم المستخدم وكلمة المرور المسنَدَين إليك.",
                 "Sign in with the username and password assigned to you."
               )
-            : t(
-                "سجّل الدخول برقم جوالك المصرّح به. سيصلك رمز مكوّن من 6 أرقام برسالة نصية.",
-                "Sign in with your authorized phone number. A 6-digit code will be sent to you by SMS."
-              )}
+            : ""}
         </p>
 
         {error && <div className="alert alert-error">{error}</div>}
@@ -425,70 +370,7 @@ export default function LoginPage() {
               {t("رجوع", "Back")}
             </button>
           </form>
-        ) : step === "phone" ? (
-          <form onSubmit={requestCode}>
-            <div className="field">
-              <label>{t("رقم الجوال", "Phone number")}</label>
-              <input
-                type="tel"
-                inputMode="tel"
-                placeholder="05XXXXXXXX"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                required
-                dir="ltr"
-                style={{ textAlign: "left" }}
-              />
-            </div>
-            <button className="btn" style={{ width: "100%" }} disabled={loading}>
-              {loading ? t("جارٍ الإرسال...", "Sending...") : t("إرسال رمز الدخول", "Send login code")}
-            </button>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              style={{ width: "100%", marginTop: "10px" }}
-              onClick={() => {
-                setMode("choose");
-                setError("");
-                setInfo("");
-              }}
-            >
-              {t("رجوع", "Back")}
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={verifyCode}>
-            <div className="field">
-              <label>{t("رمز الدخول", "Login code")}</label>
-              <input
-                inputMode="numeric"
-                maxLength={6}
-                placeholder="------"
-                value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                required
-                dir="ltr"
-                style={{ textAlign: "center", letterSpacing: "8px", fontSize: "22px" }}
-              />
-            </div>
-            <button className="btn" style={{ width: "100%" }} disabled={loading}>
-              {loading ? t("جارٍ التحقق...", "Verifying...") : t("دخول", "Sign in")}
-            </button>
-            <button
-              type="button"
-              className="btn btn-ghost"
-              style={{ width: "100%", marginTop: "10px" }}
-              onClick={() => {
-                setStep("phone");
-                setCode("");
-                setError("");
-                setInfo("");
-              }}
-            >
-              {t("تغيير الرقم", "Change number")}
-            </button>
-          </form>
-        )}
+        ) : null}
       </div>
     </div>
   );

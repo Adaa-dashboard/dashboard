@@ -1,5 +1,9 @@
 "use client";
 
+import { asset } from "@/lib/base";
+
+import { apiFetch } from "@/lib/api";
+
 import { createContext, useContext, useCallback, useEffect, useMemo, useState } from "react";
 import Activity from "./Activity";
 import Tasks from "./Tasks";
@@ -139,11 +143,11 @@ export default function Dashboard({ me }: { me: Me }) {
 
   const loadRef = useCallback(async () => {
     const [s, i, p, st, tg] = await Promise.all([
-      fetch("/api/sectors").then((r) => r.json()),
-      fetch(`/api/indicators${isAdmin ? "?all=1" : ""}`).then((r) => r.json()),
-      fetch("/api/periods").then((r) => r.json()),
-      fetch("/api/settings").then((r) => r.json()),
-      fetch("/api/targets").then((r) => r.json()),
+      apiFetch("/api/sectors").then((r) => r.json()),
+      apiFetch(`/api/indicators${isAdmin ? "?all=1" : ""}`).then((r) => r.json()),
+      apiFetch("/api/periods").then((r) => r.json()),
+      apiFetch("/api/settings").then((r) => r.json()),
+      apiFetch("/api/targets").then((r) => r.json()),
     ]);
     setRefData({
       sectors: s.sectors || [],
@@ -161,7 +165,7 @@ export default function Dashboard({ me }: { me: Me }) {
   }, [loadRef]);
 
   async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await apiFetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
     router.refresh();
   }
@@ -265,7 +269,7 @@ export default function Dashboard({ me }: { me: Me }) {
         <main className="main-area">
           <div className="page-head">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="hlogo" src="/adaa-logo.png" alt="أداء — المركز الوطني لقياس أداء الأجهزة العامة" />
+            <img className="hlogo" src={asset("/adaa-logo.png")} alt="أداء — المركز الوطني لقياس أداء الأجهزة العامة" />
             <div className="hsep" />
             <h1>{t(title[0], title[1])}</h1>
             <div className="grow" />
@@ -386,7 +390,7 @@ function PasswordModal({
     setMsg("");
     if (next !== again) return setErr(t("الكلمتان غير متطابقتين", "Passwords do not match"));
     setBusy(true);
-    const res = await fetch("/api/me/password", {
+    const res = await apiFetch("/api/me/password", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ current, next }),
@@ -545,7 +549,7 @@ function Overview({ me, refData }: { me: Me; refData: RefData }) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const d = await fetch("/api/measurements").then((r) => r.json());
+    const d = await apiFetch("/api/measurements").then((r) => r.json());
     setMeasurements(d.measurements || []);
     setLoading(false);
   }, []);
@@ -1021,7 +1025,7 @@ function DataEntry({ me, refData, reload }: { me: Me; refData: RefData; reload: 
       setUpdated({});
       return;
     }
-    const d = await fetch(`/api/measurements?sectorId=${sectorId}`).then((r) => r.json());
+    const d = await apiFetch(`/api/measurements?sectorId=${sectorId}`).then((r) => r.json());
     // أحدث قيمة لكل مؤشر (بغضّ النظر عن الفترة)
     const byInd = new Map<string, Measurement>();
     for (const m of (d.measurements || []) as Measurement[]) {
@@ -1049,7 +1053,7 @@ function DataEntry({ me, refData, reload }: { me: Me; refData: RefData; reload: 
   // فترة واحدة ثابتة تُخزَّن فيها القيم الحالية (تُنشأ مرة واحدة إن لم توجد)
   async function ensureCurrentPeriodId(): Promise<string> {
     if (refData.periods.length > 0) return refData.periods[0].id;
-    const res = await fetch("/api/periods", {
+    const res = await apiFetch("/api/periods", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ label: "التحديث" }),
@@ -1073,7 +1077,7 @@ function DataEntry({ me, refData, reload }: { me: Me; refData: RefData; reload: 
         target: targetOf(ind.id) ?? "",
         actual: vals[ind.id] ?? "",
       }));
-      const res = await fetch("/api/measurements", {
+      const res = await apiFetch("/api/measurements", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items }),
@@ -1269,12 +1273,12 @@ function TargetsManager({ refData, reload }: { refData: RefData; reload: () => v
             if (arr.some((x) => x > 0)) targets[key] = arr;
           }
         }
-      await fetch("/api/settings", {
+      await apiFetch("/api/settings", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ targetMode: mode }),
       });
-      const res = await fetch("/api/targets", {
+      const res = await apiFetch("/api/targets", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ targets }),
@@ -1430,7 +1434,7 @@ function StatusBandsManager({ refData, reload }: { refData: RefData; reload: () 
       setErr("أضف حالة واحدة على الأقل");
       return;
     }
-    const res = await fetch("/api/settings", {
+    const res = await apiFetch("/api/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ statuses }),
@@ -1525,7 +1529,7 @@ function SectorsManager({ refData, reload }: { refData: RefData; reload: () => v
   const [err, setErr] = useState("");
   async function add() {
     setErr("");
-    const res = await fetch("/api/sectors", {
+    const res = await apiFetch("/api/sectors", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
@@ -1540,7 +1544,7 @@ function SectorsManager({ refData, reload }: { refData: RefData; reload: () => v
   async function rename(id: string, current: string) {
     const v = prompt("اسم القطاع الجديد:", current);
     if (v && v.trim()) {
-      await fetch(`/api/sectors/${id}`, {
+      await apiFetch(`/api/sectors/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: v }),
@@ -1550,7 +1554,7 @@ function SectorsManager({ refData, reload }: { refData: RefData; reload: () => v
   }
   async function remove(id: string) {
     if (!confirm("حذف القطاع سيحذف قياساته. متابعة؟")) return;
-    await fetch(`/api/sectors/${id}`, { method: "DELETE" });
+    await apiFetch(`/api/sectors/${id}`, { method: "DELETE" });
     reload();
   }
   return (
@@ -1618,7 +1622,7 @@ function IndicatorsManager({ refData, reload }: { refData: RefData; reload: () =
   }
   async function save() {
     setMsg("");
-    const res = await fetch("/api/indicators", {
+    const res = await apiFetch("/api/indicators", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ indicators: list.filter((x) => x.name.trim()) }),
@@ -1699,7 +1703,7 @@ function UsersManager({ refData }: { refData: RefData }) {
   const [q, setQ] = useState("");
 
   const load = useCallback(async () => {
-    const d = await fetch("/api/users").then((r) => r.json());
+    const d = await apiFetch("/api/users").then((r) => r.json());
     setUsers(d.users || []);
   }, []);
   useEffect(() => {
@@ -1714,7 +1718,7 @@ function UsersManager({ refData }: { refData: RefData }) {
     e.preventDefault();
     setErr("");
     setMsg("");
-    const res = await fetch("/api/users", {
+    const res = await apiFetch("/api/users", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -1743,7 +1747,7 @@ function UsersManager({ refData }: { refData: RefData }) {
   async function patch(id: string, body: object) {
     setErr("");
     setMsg("");
-    const res = await fetch(`/api/users/${id}`, {
+    const res = await apiFetch(`/api/users/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -1755,7 +1759,7 @@ function UsersManager({ refData }: { refData: RefData }) {
 
   async function remove(u: UserRow) {
     if (!confirm(`حذف ${u.name}؟`)) return;
-    const res = await fetch(`/api/users/${u.id}`, { method: "DELETE" });
+    const res = await apiFetch(`/api/users/${u.id}`, { method: "DELETE" });
     const d = await res.json();
     if (!res.ok) alert(d.error || "تعذّر الحذف");
     else load();
@@ -1976,7 +1980,7 @@ function EditUserModal({
     setBusy(true);
     setErr("");
     setMsg("");
-    const res = await fetch(`/api/users/${user.id}`, {
+    const res = await apiFetch(`/api/users/${user.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

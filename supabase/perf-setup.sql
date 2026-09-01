@@ -489,6 +489,18 @@ $$;
 grant execute on function public.perf_shared_report(text) to anon, authenticated;
 
 -- ------------------------------------------------------------
+-- 8.4) أسماء القطاعات للزائر قبل الدخول
+--   شاشة «مستخدم جديد» تحتاج القائمة ليختار قطاعه، وهو لم يسجّل بعد.
+--   دالة تُرجع الأسماء وحدها — لا أرقام ولا أداء.
+-- ------------------------------------------------------------
+create or replace function public.perf_public_sectors()
+returns table (id text, name text, ord int)
+language sql stable security definer set search_path = public as $$
+  select s.id, s.name, s.ord from public.perf_sectors s order by s.ord;
+$$;
+grant execute on function public.perf_public_sectors() to anon, authenticated;
+
+-- ------------------------------------------------------------
 -- 8.5) منح الصلاحيات صراحةً
 --   لا نعتمد على خيار «Automatically expose new tables» في لوحة Supabase:
 --   الملف يمنح ما يلزم بنفسه، ويسحب ما لا يجوز كشفه مهما كان ذلك الخيار.

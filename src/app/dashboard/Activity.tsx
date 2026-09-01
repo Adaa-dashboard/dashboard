@@ -1,5 +1,7 @@
 "use client";
 
+import { apiFetch } from "@/lib/api";
+
 import { useCallback, useEffect, useState } from "react";
 
 type Item = {
@@ -42,7 +44,7 @@ export default function Activity({ t }: { t: (ar: string, en: string) => string 
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
-    const r = await fetch("/api/activity").then((x) => x.json());
+    const r = await apiFetch("/api/activity").then((x) => x.json());
     setItems(r.activity || []);
     setUnread(r.unread || 0);
     setLoaded(true);
@@ -56,7 +58,7 @@ export default function Activity({ t }: { t: (ar: string, en: string) => string 
     const next = !open;
     setOpen(next);
     if (next && unread > 0) {
-      await fetch("/api/activity", { method: "POST" });
+      await apiFetch("/api/activity", { method: "POST" });
       setUnread(0);
     }
   }
