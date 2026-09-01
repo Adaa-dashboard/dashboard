@@ -1686,6 +1686,7 @@ function UsersManager({ refData }: { refData: RefData }) {
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
   const [editing, setEditing] = useState<UserRow | null>(null);
+  const [q, setQ] = useState("");
 
   const load = useCallback(async () => {
     const d = await fetch("/api/users").then((r) => r.json());
@@ -1749,6 +1750,16 @@ function UsersManager({ refData }: { refData: RefData }) {
     if (!res.ok) alert(d.error || "تعذّر الحذف");
     else load();
   }
+
+  const term = q.trim().toLowerCase();
+  const shown = term
+    ? users.filter(
+        (u) =>
+          u.name.toLowerCase().includes(term) ||
+          (u.username || "").toLowerCase().includes(term) ||
+          u.phone.includes(term)
+      )
+    : users;
 
   const sectorNames = (ids: string[]) =>
     ids.map((id) => refData.sectors.find((s) => s.id === id)?.name).filter(Boolean).join("، ") || "—";
@@ -1837,8 +1848,19 @@ function UsersManager({ refData }: { refData: RefData }) {
         </form>
       </div>
 
-      <h2 className="section-title">{t("المستخدمون", "Users")} ({users.length})</h2>
-      <table>
+      <div className="users-bar">
+        <h2 className="section-title" style={{ margin: 0 }}>
+          {t("المستخدمون", "Users")} ({shown.length}
+          {shown.length !== users.length ? ` / ${users.length}` : ""})
+        </h2>
+        <input
+          className="users-q"
+          placeholder={t("بحث بالاسم أو اسم المستخدم…", "Search by name or username…")}
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+      </div>
+      <table className="users-tbl">
         <thead>
           <tr>
             <th>{t("الاسم", "Name")}</th>
@@ -1852,29 +1874,31 @@ function UsersManager({ refData }: { refData: RefData }) {
           </tr>
         </thead>
         <tbody>
-          {users.map((u) => (
+          {shown.map((u) => (
             <tr key={u.id}>
-              <td>{u.name}</td>
-              <td dir="ltr" style={{ textAlign: "right" }}>
+              <td className="u-name">{u.name}</td>
+              <td dir="ltr" style={{ textAlign: "right" }} data-l={t("اسم المستخدم", "Username")}>
                 {u.username || <span className="muted">—</span>}
               </td>
-              <td>
+              <td data-l={t("الحساب", "Account")}>
                 {u.hasPassword ? (
                   <span className="badge badge-manager">{t("مفعّل", "Active")}</span>
                 ) : (
                   <span className="badge badge-off">{t("بانتظار التفعيل", "Awaiting setup")}</span>
                 )}
               </td>
-              <td dir="ltr" style={{ textAlign: "right" }}>
+              <td dir="ltr" style={{ textAlign: "right" }} data-l={t("رقم الجوال", "Phone")}>
                 {u.phone}
               </td>
-              <td>
+              <td data-l={t("الصلاحية", "Role")}>
                 <span className={`badge ${u.role === "admin" ? "badge-admin" : "badge-manager"}`}>
                   {u.role === "admin" ? t("مدير الإدارة", "Admin") : t("مدير قطاع", "Sector Manager")}
                 </span>
               </td>
-              <td>{u.role === "manager" ? sectorNames(u.sectorIds) : t("الكل", "All")}</td>
-              <td>
+              <td data-l={t("القطاعات", "Sectors")}>
+                {u.role === "manager" ? sectorNames(u.sectorIds) : t("الكل", "All")}
+              </td>
+              <td data-l={t("الحالة", "Status")}>
                 {u.active ? (
                   <span className="badge badge-manager">{t("نشط", "Active")}</span>
                 ) : (

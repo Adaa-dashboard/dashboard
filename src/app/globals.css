@@ -2934,3 +2934,74 @@ table.matrix thead th {
 .auth-link:hover {
   color: var(--g-900);
 }
+
+/* شاشة المستخدمين: بحث فوق الجدول */
+.users-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 24px 0 12px;
+}
+.users-q {
+  margin-inline-start: auto;
+  max-width: 260px;
+  min-height: 36px;
+}
+
+/* الهاتف: صفوف المستخدمين بطاقات — ثمانية أعمدة لا تسع الشاشة */
+@media (max-width: 620px) {
+  .users-q {
+    max-width: none;
+    width: 100%;
+    margin-inline-start: 0;
+  }
+  .users-tbl {
+    display: block;
+    min-width: 0;
+  }
+  .users-tbl thead {
+    display: none;
+  }
+  .users-tbl tbody,
+  .users-tbl tr {
+    display: block;
+  }
+  .users-tbl tbody tr {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    background: #fff;
+  }
+  .users-tbl td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    border-bottom: 1px dashed var(--g-50);
+    text-align: start;
+  }
+  .users-tbl td:last-child {
+    border-bottom: none;
+    padding-top: 10px;
+  }
+  .users-tbl td[data-l]::before {
+    content: attr(data-l);
+    font-size: 11.5px;
+    color: var(--muted);
+    font-weight: 600;
+    flex: none;
+  }
+  .users-tbl td.u-name {
+    justify-content: flex-start;
+    font-weight: 700;
+    color: var(--g-900);
+    font-size: 13.5px;
+    padding-top: 0;
+    padding-bottom: 9px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 3px;
+  }
+}
