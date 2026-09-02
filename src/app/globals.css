@@ -975,6 +975,16 @@ table.matrix thead th {
   flex-direction: column;
   gap: 6px;
   color: #fff;
+  /* الشريط يثبت مع تمرير الصفحة — والبطاقات البيضاء وحدها هي التي تتحرك.
+     يحتاج align-self وإلا امتدّ ارتفاع الشريط لطول الصفحة فلم يعد له
+     ما «يلتصق» داخله. */
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .rail .rail-brand {
   padding: 0 9px 20px;
@@ -1189,6 +1199,11 @@ table.matrix thead th {
     flex-wrap: wrap;
     align-items: center;
     padding: 14px;
+    /* بالعرض الضيق يصير الشريط صفّاً أعلى الصفحة، فلا معنى لتثبيته */
+    position: static;
+    align-self: auto;
+    height: auto;
+    overflow: visible;
   }
   .rail .rail-brand {
     padding: 0 8px 0 0;
