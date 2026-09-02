@@ -72,6 +72,7 @@ export default function Tasks({
   indicators,
   t,
   kind = "task",
+  onlyMine = false,
   focusId,
   onFocusDone,
 }: {
@@ -80,6 +81,8 @@ export default function Tasks({
   indicators: Indicator[];
   t: (ar: string, en: string) => string;
   kind?: Kind;
+  /** يرى ما أُسند إليه أو ما أنشأه وحده — ما لم يُمنح «كل المهام» */
+  onlyMine?: boolean;
   /** فتح بند بعينه مباشرة (قادم من زر «عرض» في آخر التحديثات) */
   focusId?: string | null;
   onFocusDone?: () => void;
@@ -105,10 +108,14 @@ export default function Tasks({
   const load = useCallback(async () => {
     const r = await apiFetch("/api/tasks").then((x) => x.json());
     const all: Task[] = r.tasks || [];
-    setTasks(all.filter((x) => (x.kind === "assignment" ? "assignment" : "task") === kind));
+    setTasks(
+      all
+        .filter((x) => (x.kind === "assignment" ? "assignment" : "task") === kind)
+        .filter((x) => !onlyMine || x.assigneeId === meId || x.createdById === meId)
+    );
     setPeople(r.people || []);
     setLoaded(true);
-  }, [kind]);
+  }, [kind, onlyMine, meId]);
 
   useEffect(() => {
     load();

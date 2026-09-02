@@ -103,23 +103,122 @@ grant select, insert, update, delete on public.perf_change_requests to authentic
 revoke all on public.perf_change_requests from anon;
 
 
+-- ============================================================
+--  ٥) نظام الصلاحيات التفصيلي
+--     كان عندنا دوران فقط: مدير إدارة / مدير قطاع. صار لكل حساب
+--     قائمة صلاحيات صريحة، فيمكن إعطاء موظف «نظرة عامة» بلا
+--     «التكليفات» مثلاً، أو «مهامه» دون بقية المهام.
+--     لا يوجد تجاوز ضمني للدور: ما لم يُمنح لا يظهر.
+-- ============================================================
+alter table public.perf_users
+  add column if not exists scopes text[] not null default '{}';
+
 -- ------------------------------------------------------------
---  ٤) إظهار الراية في شاشة المستخدمين وحفظها
+--  الصلاحيات المعرَّفة (نفس القائمة في الكود):
+--    overview        نظرة عامة
+--    assignments     التكليفات
+--    changes         طلبات التغيير — عرض ونسخ وتصدير
+--    changes:upload  رفع ملف طلبات التغيير
+--    details         المؤشرات التفصيلية
+--    details:all     كل القطاعات لا قطاعه فقط
+--    entry           المؤشرات والمستهدفات
+--    structure       القطاعات والإدارات
+--    tasks           المهام
+--    tasks:all       كل المهام لا مهامه فقط
+--    weekly          الإنجاز الأسبوعي
+--    users           المستخدمون والصلاحيات
+-- ------------------------------------------------------------
+
+-- تعبئة أولية للحسابات القائمة حتى لا تفقد ما كانت تصل إليه.
+-- «users» لا تُمنح هنا لأحد — تُمنح صراحةً بعد قليل.
+update public.perf_users
+   set scopes = array['overview','assignments','changes','details','details:all',
+                      'entry','structure','tasks','tasks:all','weekly']
+ where role = 'admin' and coalesce(array_length(scopes,1),0) = 0;
+
+update public.perf_users
+   set scopes = array['overview','details','tasks']
+ where role <> 'admin' and coalesce(array_length(scopes,1),0) = 0;
+
+-- من كانت له راية رفع طلبات التغيير تُنقل صلاحيةً
+update public.perf_users
+   set scopes = scopes || array['changes','changes:upload']
+ where can_changes and not (scopes @> array['changes:upload']);
+
+-- ------------------------------------------------------------
+--  «المستخدمون والصلاحيات» لحساب واحد بعينه
+--  غيّري اسم المستخدم في السطر التالي إن اختلف.
+-- ------------------------------------------------------------
+update public.perf_users
+   set scopes = array['overview','assignments','changes','changes:upload','details',
+                      'details:all','entry','structure','tasks','tasks:all','weekly','users']
+ where username = public.perf_norm_user('salarjani');
+
+-- شبكة أمان: لو لم يحصل أحد على «users» لأي سبب، تُمنح لأقدم مدير إدارة
+-- نشط — وإلا أُقفلت إدارة المستخدمين على الجميع بلا رجعة.
+do $$
+declare v_id bigint;
+begin
+  if not exists (select 1 from public.perf_users where active and scopes @> array['users']) then
+    select id into v_id from public.perf_users
+      where active and role = 'admin' order by created_at limit 1;
+    if v_id is not null then
+      update public.perf_users set scopes = scopes || array['users'] where id = v_id;
+    end if;
+  end if;
+end $$;
+
+-- ------------------------------------------------------------
+--  دوال القراءة — تقرأ من جدول المستخدمين مباشرة عبر الجلسة،
+--  فتغيير الصلاحية يسري فوراً بلا خروج وعودة.
+-- ------------------------------------------------------------
+create or replace function public.perf_has_scope(p_scope text)
+returns boolean language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1
+      from public.perf_sessions s
+      join public.perf_users u on u.id = s.app_user_id
+     where s.user_id = auth.uid() and u.active and u.scopes @> array[p_scope]
+  );
+$$;
+revoke all on function public.perf_has_scope(text) from public, anon;
+grant execute on function public.perf_has_scope(text) to authenticated;
+
+create or replace function public.perf_my_scopes()
+returns text[] language sql stable security definer set search_path = public as $$
+  select coalesce(
+    (select u.scopes
+       from public.perf_sessions s
+       join public.perf_users u on u.id = s.app_user_id
+      where s.user_id = auth.uid() and u.active),
+    '{}'::text[]);
+$$;
+revoke all on function public.perf_my_scopes() from public, anon;
+grant execute on function public.perf_my_scopes() to authenticated;
+
+-- رفع ملف طلبات التغيير صار صلاحيةً لا راية
+create or replace function public.perf_can_changes()
+returns boolean language sql stable security definer set search_path = public as $$
+  select public.perf_has_scope('changes:upload');
+$$;
+
+-- ============================================================
+--  ٦) إدارة المستخدمين — بصلاحية «users» لا بالدور
 --     الدالتان تُحذفان أولاً لأن تغيير التوقيع أو نوع الإرجاع
 --     لا يقبله create or replace، ولو تُركت القديمة صار تعارضاً.
--- ------------------------------------------------------------
+-- ============================================================
 drop function if exists public.perf_list_users();
 create or replace function public.perf_list_users()
 returns table (id text, username text, name text, phone text, role text,
                sector_ids text[], active boolean, has_password boolean,
-               can_changes boolean)
+               scopes text[])
 language plpgsql security definer set search_path = public as $$
 begin
-  if not public.perf_is_admin() then raise exception 'forbidden'; end if;
+  if not public.perf_has_scope('users') then raise exception 'forbidden'; end if;
   return query select u.id::text, u.username, u.display_name, u.phone, u.role,
                       u.sector_ids, u.active,
                       (u.pass_hash is not null and u.pass_hash <> ''),
-                      u.can_changes
+                      u.scopes
                  from public.perf_users u order by u.created_at;
 end;
 $$;
@@ -128,14 +227,16 @@ grant execute on function public.perf_list_users() to authenticated;
 
 drop function if exists public.perf_save_user(
   text, text, text, text, text, text[], boolean, text, boolean);
+drop function if exists public.perf_save_user(
+  text, text, text, text, text, text[], boolean, text, boolean, boolean);
 create or replace function public.perf_save_user(
   p_id text, p_username text, p_name text, p_phone text, p_role text,
   p_sectors text[], p_active boolean, p_password text, p_clear_password boolean,
-  p_can_changes boolean default null
+  p_scopes text[] default null
 ) returns jsonb language plpgsql security definer set search_path = public, extensions as $$
 declare v_id bigint; v_me bigint; v_hash text;
 begin
-  if not public.perf_is_admin() then raise exception 'forbidden'; end if;
+  if not public.perf_has_scope('users') then raise exception 'forbidden'; end if;
   if coalesce(p_username,'') = '' then return jsonb_build_object('error','no_username'); end if;
   if p_password is not null and p_password <> '' and length(p_password) < 6 then
     return jsonb_build_object('error','short'); end if;
@@ -143,10 +244,13 @@ begin
   select app_user_id into v_me from public.perf_sessions where user_id = auth.uid();
   v_id := nullif(p_id,'')::bigint;
 
-  -- لا يسحب مدير الإدارة صلاحيته من نفسه ولا يوقف حسابه، وإلا أُقفلت اللوحة
+  -- لا يسحب أحد صلاحية إدارة المستخدمين من نفسه ولا يوقف حسابه،
+  -- وإلا أُقفلت الشاشة على الجميع بلا رجعة
   if v_id is not null and v_id = v_me then
-    if p_role = 'manager' then return jsonb_build_object('error','self_demote'); end if;
     if p_active is false then return jsonb_build_object('error','self_disable'); end if;
+    if p_scopes is not null and not (p_scopes @> array['users']) then
+      return jsonb_build_object('error','self_scope');
+    end if;
   end if;
 
   if exists (select 1 from public.perf_users
@@ -160,12 +264,12 @@ begin
 
   if v_id is null then
     insert into public.perf_users (username, display_name, phone, pass_hash, role,
-                                   sector_ids, active, can_changes)
+                                   sector_ids, active, scopes)
     values (public.perf_norm_user(p_username), coalesce(nullif(p_name,''), p_username),
             public.perf_norm_phone(p_phone), v_hash,
             case when p_role = 'admin' then 'admin' else 'manager' end,
-            case when p_role = 'admin' then '{}'::text[] else coalesce(p_sectors,'{}') end,
-            coalesce(p_active, true), coalesce(p_can_changes, false))
+            coalesce(p_sectors,'{}'), coalesce(p_active, true),
+            coalesce(p_scopes, array['overview','details','tasks']))
     returning id into v_id;
   else
     update public.perf_users set
@@ -173,17 +277,16 @@ begin
       display_name = coalesce(nullif(p_name,''), display_name),
       phone        = case when coalesce(p_phone,'') = '' then phone else public.perf_norm_phone(p_phone) end,
       role         = case when p_role in ('admin','manager') then p_role else role end,
-      sector_ids   = case when p_role = 'admin' then '{}'::text[]
-                          when p_sectors is null then sector_ids else p_sectors end,
+      sector_ids   = case when p_sectors is null then sector_ids else p_sectors end,
       active       = coalesce(p_active, active),
-      can_changes  = coalesce(p_can_changes, can_changes),
+      scopes       = coalesce(p_scopes, scopes),
       -- كلمة مرور فارغة تُبقي الحالية · والمسح المتعمّد يُرجع الحساب لبانتظار التفعيل
       pass_hash    = case when p_clear_password then null
                           when v_hash is not null then v_hash else pass_hash end
     where id = v_id;
   end if;
 
-  -- تغيير الصلاحيات يسري فوراً على الجلسات المفتوحة، وإيقاف الحساب يُنهيها
+  -- تغيير الدور أو القطاعات يسري فوراً على الجلسات المفتوحة، وإيقاف الحساب يُنهيها
   update public.perf_sessions s
      set role = u.role, sector_ids = u.sector_ids, display_name = u.display_name, username = u.username
     from public.perf_users u where u.id = s.app_user_id and u.id = v_id;
@@ -194,6 +297,18 @@ begin
 end;
 $$;
 revoke all on function public.perf_save_user(
-  text, text, text, text, text, text[], boolean, text, boolean, boolean) from public, anon;
+  text, text, text, text, text, text[], boolean, text, boolean, text[]) from public, anon;
 grant execute on function public.perf_save_user(
-  text, text, text, text, text, text[], boolean, text, boolean, boolean) to authenticated;
+  text, text, text, text, text, text[], boolean, text, boolean, text[]) to authenticated;
+
+create or replace function public.perf_delete_user(p_id text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_me bigint;
+begin
+  if not public.perf_has_scope('users') then raise exception 'forbidden'; end if;
+  select app_user_id into v_me from public.perf_sessions where user_id = auth.uid();
+  if nullif(p_id,'')::bigint = v_me then return jsonb_build_object('error','self_delete'); end if;
+  delete from public.perf_users where id = nullif(p_id,'')::bigint;
+  return jsonb_build_object('ok', true);
+end;
+$$;

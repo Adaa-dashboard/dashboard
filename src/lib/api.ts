@@ -138,8 +138,8 @@ export async function apiFetch(path: string, init: Init = {}) {
     if (p === "/api/me") {
       const me = await whoAmI();
       if (!me) return ok({ user: null });
-      const { data: canCh } = await s.rpc("perf_can_changes");
-      return ok({ user: { ...me, canChanges: canCh === true } });
+      const { data: sc } = await s.rpc("perf_my_scopes");
+      return ok({ user: { ...me, scopes: Array.isArray(sc) ? sc : [] } });
     }
 
     /* ---------------- المرجعيات ---------------- */
@@ -261,7 +261,7 @@ export async function apiFetch(path: string, init: Init = {}) {
         users: (data || []).map((u: Record<string, unknown>) => ({
           id: String(u.id), username: u.username, name: u.name, phone: u.phone,
           role: u.role, sectorIds: u.sector_ids || [], active: u.active,
-          hasPassword: u.has_password, canChanges: u.can_changes === true,
+          hasPassword: u.has_password, scopes: u.scopes || [],
         })),
       });
     }
@@ -270,7 +270,7 @@ export async function apiFetch(path: string, init: Init = {}) {
         p_id: null, p_username: body.username, p_name: body.name, p_phone: body.phone,
         p_role: body.role, p_sectors: body.sectorIds || [], p_active: true,
         p_password: body.password || null, p_clear_password: false,
-        p_can_changes: body.canChanges === true,
+        p_scopes: Array.isArray(body.scopes) ? body.scopes : null,
       });
       if (error) return err("غير مصرّح", 403);
       if (data?.error === "dup_username") return err("اسم المستخدم مستخدَم مسبقًا", 400);
@@ -301,13 +301,14 @@ export async function apiFetch(path: string, init: Init = {}) {
           p_active: typeof body.active === "boolean" ? body.active : cur.active,
           p_password: body.password || null,
           p_clear_password: body.clearPassword === true,
-          p_can_changes:
-            typeof body.canChanges === "boolean" ? body.canChanges : cur.can_changes === true,
+          p_scopes: Array.isArray(body.scopes) ? body.scopes : null,
         });
         if (error) return err("غير مصرّح", 403);
         if (data?.error === "dup_username") return err("اسم المستخدم مستخدَم مسبقًا", 400);
         if (data?.error === "short") return err("كلمة المرور لا تقل عن ٦ أحرف", 400);
         if (data?.error === "self_demote") return err("لا يمكنك سحب صلاحيتك من نفسك", 400);
+        if (data?.error === "self_scope")
+          return err("لا يمكنك سحب صلاحية «المستخدمون والصلاحيات» من نفسك", 400);
         if (data?.error === "self_disable") return err("لا يمكنك إيقاف حسابك الخاص", 400);
         return ok({ ok: true });
       }

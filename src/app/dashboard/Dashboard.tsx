@@ -7,6 +7,15 @@ import { apiFetch } from "@/lib/api";
 import { createContext, useContext, useCallback, useEffect, useMemo, useState } from "react";
 import Activity, { type Item as ActivityItem } from "./Activity";
 import Changes from "./Changes";
+import Backup from "./Backup";
+import {
+  ALL_SCOPES,
+  DEFAULT_SCOPES,
+  SCOPE_GROUPS,
+  can as hasScope,
+  scopeLabel,
+  type Scope,
+} from "@/lib/scopes";
 import Tasks from "./Tasks";
 import WeeklyPanel from "./WeeklyPanel";
 import Details from "./Details";
@@ -36,8 +45,8 @@ interface Me {
   hasPassword?: boolean;
   role: Role;
   sectorIds: string[];
-  /** يرفع ملف طلبات التغيير (مدير الإدارة يملكها دائماً) */
-  canChanges?: boolean;
+  /** الصلاحيات الممنوحة لهذا الحساب */
+  scopes: string[];
 }
 interface Sector {
   id: string;
@@ -113,7 +122,14 @@ const GAUGE_TRACK = "#e9f1ef";
 export default function Dashboard({ me }: { me: Me }) {
   const router = useRouter();
   const isAdmin = me.role === "admin";
-  const [tab, setTab] = useState<string>("overview");
+  const can = useCallback((s: Scope) => hasScope(me.scopes, s), [me.scopes]);
+  // أول صفحة يملكها — فلا يفتح الحساب على صفحة ممنوعة عليه
+  const firstTab =
+    (["overview", "details", "tasks", "report"] as const).find((k) =>
+      can(k === "report" ? "weekly" : (k as Scope))
+    ) || "overview";
+  const [tab, setTab] = useState<string>(firstTab);
+  const [backupOpen, setBackupOpen] = useState(false);
   const [refData, setRefData] = useState<RefData>(EMPTY_REF);
   const [loaded, setLoaded] = useState(false);
   const [lang, setLang] = useState<Lang>("ar");
@@ -247,10 +263,10 @@ export default function Dashboard({ me }: { me: Me }) {
             <div className="sb">{t("مركز أداء", "Adaa")}</div>
           </div>
 
-          <NavItem id="overview" icon="◱" label={["نظرة عامة", "Overview"]} />
-          <NavItem id="details" icon="◎" label={["المؤشرات التفصيلية", "KPI Details"]} />
-          <NavItem id="tasks" icon="✓" label={["المهام", "Tasks"]} />
-          {isAdmin && <NavItem id="report" icon="▤" label={["الإنجاز الأسبوعي", "Weekly Achievement"]} />}
+          {can("overview") && <NavItem id="overview" icon="◱" label={["نظرة عامة", "Overview"]} />}
+          {can("details") && <NavItem id="details" icon="◎" label={["المؤشرات التفصيلية", "KPI Details"]} />}
+          {can("tasks") && <NavItem id="tasks" icon="✓" label={["المهام", "Tasks"]} />}
+          {can("weekly") && <NavItem id="report" icon="▤" label={["الإنجاز الأسبوعي", "Weekly Achievement"]} />}
 
           <div className="rail-gap" />
 
@@ -258,14 +274,12 @@ export default function Dashboard({ me }: { me: Me }) {
             <span className="ic">⚙</span> {t("الإعدادات", "Settings")} <span className="cv">▾</span>
           </button>
           <div className={`subnav ${setOpen ? "show" : ""}`}>
-            {isAdmin && <SubItem id="entry" label={["المؤشرات والمستهدفات", "KPIs & Targets"]} />}
-            {isAdmin && <SubItem id="users" label={["المستخدمون والصلاحيات", "Users & Roles"]} />}
-            {isAdmin && <SubItem id="structure" label={["القطاعات والإدارات", "Sectors"]} />}
-            {isAdmin && (
-              <a className="sub-item" href="/api/export" download>
-                {t("نسخة احتياطية من البيانات", "Download backup")}
-              </a>
-            )}
+            {can("entry") && <SubItem id="entry" label={["المؤشرات والمستهدفات", "KPIs & Targets"]} />}
+            {can("users") && <SubItem id="users" label={["المستخدمون والصلاحيات", "Users & Roles"]} />}
+            {can("structure") && <SubItem id="structure" label={["القطاعات والإدارات", "Sectors"]} />}
+            <button className="sub-item" onClick={() => setBackupOpen(true)}>
+              {t("نسخة احتياطية من البيانات", "Download backup")}
+            </button>
             <button className="sub-item" onClick={() => setPwOpen(true)}>
               {t("تغيير كلمة المرور", "Change password")}
             </button>
@@ -300,8 +314,10 @@ export default function Dashboard({ me }: { me: Me }) {
             <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>
           ) : (
             <>
-              {tab === "overview" && <Overview me={me} refData={refData} onGo={goFromActivity} />}
-              {tab === "details" && (
+              {tab === "overview" && can("overview") && (
+                <Overview me={me} refData={refData} onGo={goFromActivity} />
+              )}
+              {tab === "details" && can("details") && (
                 <Details
                   isAdmin={isAdmin}
                   mySectorIds={me.sectorIds}
@@ -316,30 +332,31 @@ export default function Dashboard({ me }: { me: Me }) {
                   onFocusDone={() => setDetFocus(null)}
                 />
               )}
-              {tab === "entry" && isAdmin && <EntrySection me={me} refData={refData} reload={loadRef} />}
-              {tab === "tasks" && (
+              {tab === "entry" && can("entry") && <EntrySection me={me} refData={refData} reload={loadRef} />}
+              {tab === "tasks" && can("tasks") && (
                 <Tasks
                   meId={me.id}
                   isAdmin={isAdmin}
                   indicators={refData.indicators.map((i) => ({ id: i.id, name: i.name }))}
                   t={t}
+                  onlyMine={!can("tasks:all")}
                   focusId={taskFocus}
                   onFocusDone={() => setTaskFocus(null)}
                 />
               )}
-              {tab === "report" && isAdmin && <WeeklyPanel t={t} />}
-              {tab === "structure" && isAdmin && <SectorsManager refData={refData} reload={loadRef} />}
-              {tab === "users" && isAdmin && <UsersManager refData={refData} />}
+              {tab === "report" && can("weekly") && <WeeklyPanel t={t} />}
+              {tab === "structure" && can("structure") && <SectorsManager refData={refData} reload={loadRef} />}
+              {tab === "users" && can("users") && <UsersManager refData={refData} />}
             </>
           )}
         </main>
 
         {/* شريط التنقّل السفلي — يظهر على الجوال وحده بدل القائمة الجانبية */}
         <nav className="tabbar" aria-label={t("التنقل", "Navigation")}>
-          <TabBtn id="overview" icon="◱" label={["الرئيسية", "Home"]} />
-          <TabBtn id="details" icon="◎" label={["مؤشرات", "KPIs"]} />
-          <TabBtn id="tasks" icon="✓" label={["المهام", "Tasks"]} />
-          {isAdmin && <TabBtn id="report" icon="▤" label={["الأسبوعي", "Weekly"]} />}
+          {can("overview") && <TabBtn id="overview" icon="◱" label={["الرئيسية", "Home"]} />}
+          {can("details") && <TabBtn id="details" icon="◎" label={["مؤشرات", "KPIs"]} />}
+          {can("tasks") && <TabBtn id="tasks" icon="✓" label={["المهام", "Tasks"]} />}
+          {can("weekly") && <TabBtn id="report" icon="▤" label={["الأسبوعي", "Weekly"]} />}
           <button
             className={`tab-btn ${sheet ? "active" : ""}`}
             onClick={() => setSheet(true)}
@@ -362,14 +379,18 @@ export default function Dashboard({ me }: { me: Me }) {
                 <div className="rl">{isAdmin ? t("مدير الإدارة", "Admin") : t("مدير قطاع", "Sector Manager")}</div>
               </div>
             </div>
-            {isAdmin && <SheetItem id="entry" label={["المؤشرات والمستهدفات", "KPIs & Targets"]} />}
-            {isAdmin && <SheetItem id="users" label={["المستخدمون والصلاحيات", "Users & Roles"]} />}
-            {isAdmin && <SheetItem id="structure" label={["القطاعات والإدارات", "Sectors"]} />}
-            {isAdmin && (
-              <a className="sheet-item" href="/api/export" download onClick={() => setSheet(false)}>
-                {t("نسخة احتياطية من البيانات", "Download backup")}
-              </a>
-            )}
+            {can("entry") && <SheetItem id="entry" label={["المؤشرات والمستهدفات", "KPIs & Targets"]} />}
+            {can("users") && <SheetItem id="users" label={["المستخدمون والصلاحيات", "Users & Roles"]} />}
+            {can("structure") && <SheetItem id="structure" label={["القطاعات والإدارات", "Sectors"]} />}
+            <button
+              className="sheet-item"
+              onClick={() => {
+                setSheet(false);
+                setBackupOpen(true);
+              }}
+            >
+              {t("نسخة احتياطية من البيانات", "Download backup")}
+            </button>
             <button
               className="sheet-item"
               onClick={() => {
@@ -391,6 +412,9 @@ export default function Dashboard({ me }: { me: Me }) {
       )}
 
       {pwOpen && <PasswordModal onClose={() => setPwOpen(false)} t={t} />}
+      {backupOpen && (
+        <Backup me={me} refData={refData} t={t} onClose={() => setBackupOpen(false)} />
+      )}
     </LangCtx.Provider>
   );
 }
@@ -463,7 +487,8 @@ function PasswordModal({
 
 /* ============ أدوات مساعدة ============ */
 function visibleSectors(me: Me, refData: RefData): Sector[] {
-  if (me.role === "admin") return refData.sectors;
+  // «كل القطاعات» صلاحية صريحة — الدور وحده لم يعد يكفي
+  if (hasScope(me.scopes, "details:all")) return refData.sectors;
   return refData.sectors.filter((s) => me.sectorIds.includes(s.id));
 }
 function activeIndicators(refData: RefData): Indicator[] {
@@ -830,32 +855,41 @@ function Overview({
         />
       )}
 
-      <h2 className="section-title" id="ov-asg" style={{ marginTop: 28 }}>
-        {t("التكليفات", "Assignments")}
-        <span className="sec-note">
-          {t("الواردة من الديوان أو جهة أعلى", "Received from higher authority")}
-        </span>
-      </h2>
-      <Tasks
-        meId={me.id}
-        isAdmin={me.role === "admin"}
-        indicators={refData.indicators.map((i) => ({ id: i.id, name: i.name }))}
-        t={t}
-        kind="assignment"
-        focusId={asgFocus}
-        onFocusDone={() => setAsgFocus(null)}
-      />
+      {hasScope(me.scopes, "assignments") && (
+        <>
+          <h2 className="section-title" id="ov-asg" style={{ marginTop: 28 }}>
+            {t("التكليفات", "Assignments")}
+            <span className="sec-note">
+              {t("الواردة من الديوان أو جهة أعلى", "Received from higher authority")}
+            </span>
+          </h2>
+          <Tasks
+            meId={me.id}
+            isAdmin={me.role === "admin"}
+            indicators={refData.indicators.map((i) => ({ id: i.id, name: i.name }))}
+            t={t}
+            kind="assignment"
+            onlyMine={!hasScope(me.scopes, "tasks:all")}
+            focusId={asgFocus}
+            onFocusDone={() => setAsgFocus(null)}
+          />
+        </>
+      )}
 
-      <h2 className="section-title" style={{ marginTop: 28 }}>
-        {t("طلبات التغيير", "Change requests")}
-        <span className="sec-note">
-          {t(
-            "الواردة من منصة الرؤية · اللون بحسب اتفاقية مستوى الخدمة",
-            "From the Vision platform · coloured by SLA"
-          )}
-        </span>
-      </h2>
-      <Changes t={t} canEdit={me.role === "admin" || me.canChanges === true} />
+      {hasScope(me.scopes, "changes") && (
+        <>
+          <h2 className="section-title" style={{ marginTop: 28 }}>
+            {t("طلبات التغيير", "Change requests")}
+            <span className="sec-note">
+              {t(
+                "الواردة من منصة الرؤية · اللون بحسب اتفاقية مستوى الخدمة",
+                "From the Vision platform · coloured by SLA"
+              )}
+            </span>
+          </h2>
+          <Changes t={t} canEdit={hasScope(me.scopes, "changes:upload")} />
+        </>
+      )}
 
       <h2 className="section-title with-chips" style={{ marginTop: 28 }}>
         {t("الأداء العام للقطاعات", "Sector performance")}
@@ -1656,6 +1690,59 @@ function IndicatorsManager({ refData, reload }: { refData: RefData; reload: () =
   );
 }
 
+
+/* ============ اختيار الصلاحيات ============ */
+function ScopePicker({
+  value,
+  onChange,
+  t,
+}: {
+  value: string[];
+  onChange: (v: string[]) => void;
+  t: (ar: string, en: string) => string;
+}) {
+  const toggle = (k: string) =>
+    onChange(value.includes(k) ? value.filter((x) => x !== k) : [...value, k]);
+
+  return (
+    <div className="field" style={{ marginTop: 14 }}>
+      <label>
+        {t("الصلاحيات", "Permissions")}
+        <span className="opt" style={{ marginInlineStart: 8 }}>
+          {t("ما لم يُمنح لا يظهر له", "Anything not granted stays hidden")}
+        </span>
+      </label>
+      <div className="sc-tools">
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => onChange([...DEFAULT_SCOPES])}>
+          {t("الافتراضي", "Default")}
+        </button>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => onChange([...ALL_SCOPES])}>
+          {t("الكل", "All")}
+        </button>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={() => onChange([])}>
+          {t("مسح", "None")}
+        </button>
+      </div>
+      <div className="sc-grid">
+        {SCOPE_GROUPS.map((g) => (
+          <div className="sc-col" key={g.title}>
+            <div className="sc-h">{g.title}</div>
+            {g.items.map((it) => (
+              <label key={it.key} className={`sc-item ${value.includes(it.key) ? "on" : ""}`}>
+                <input type="checkbox" checked={value.includes(it.key)} onChange={() => toggle(it.key)} />
+                <span>
+                  <b>{it.label}</b>
+                  {it.note && <i>{it.note}</i>}
+                </span>
+              </label>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ============ المدراء والصلاحيات ============ */
 interface UserRow {
   id: string;
@@ -1666,7 +1753,7 @@ interface UserRow {
   role: Role;
   active: boolean;
   sectorIds: string[];
-  canChanges?: boolean;
+  scopes?: string[];
 }
 function UsersManager({ refData }: { refData: RefData }) {
   const { t } = useT();
@@ -1677,6 +1764,7 @@ function UsersManager({ refData }: { refData: RefData }) {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<Role>("manager");
   const [sectorIds, setSectorIds] = useState<string[]>([]);
+  const [scopes, setScopes] = useState<string[]>([...DEFAULT_SCOPES]);
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
   const [editing, setEditing] = useState<UserRow | null>(null);
@@ -1707,7 +1795,8 @@ function UsersManager({ refData }: { refData: RefData }) {
         username,
         password,
         role,
-        sectorIds: role === "manager" ? sectorIds : [],
+        sectorIds,
+        scopes,
       }),
     });
     const d = await res.json();
@@ -1720,6 +1809,7 @@ function UsersManager({ refData }: { refData: RefData }) {
       setPassword("");
       setRole("manager");
       setSectorIds([]);
+      setScopes([...DEFAULT_SCOPES]);
       load();
     }
   }
@@ -1764,8 +1854,8 @@ function UsersManager({ refData }: { refData: RefData }) {
         <h2 className="section-title">{t("إضافة مستخدم", "Add User")}</h2>
         <p className="muted" style={{ marginTop: -8, marginBottom: 16 }}>
           {t(
-            "مدير القطاع = يدخل بيانات قطاعاته فقط. مدير الإدارة = صلاحيات كاملة على كل القطاعات. اترك كلمة المرور فارغة وأعطِه اسم المستخدم فقط — يختار كلمته بنفسه عند أول دخول.",
-            "Sector Manager = assigned sectors only. Admin = full access. Leave the password blank and hand over the username only — the owner picks their password at first sign-in."
+            "الدور يحدّد الكتابة في قاعدة البيانات، والصلاحيات أدناه تحدّد ما يراه ويستخدمه. اتركي كلمة المرور فارغة وأعطيه اسم المستخدم فقط — يختار كلمته بنفسه عند أول دخول.",
+            "The role governs database writes; the permissions below govern what the person sees and uses. Leave the password blank — the owner picks it at first sign-in."
           )}
         </p>
         {err && <div className="alert alert-error">{err}</div>}
@@ -1816,26 +1906,27 @@ function UsersManager({ refData }: { refData: RefData }) {
               />
             </div>
             <div style={{ flex: "0 0 170px" }}>
-              <label>{t("الصلاحية", "Role")}</label>
+              <label>{t("مستوى الكتابة", "Write level")}</label>
               <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
-                <option value="manager">{t("مدير قطاع", "Sector Manager")}</option>
-                <option value="admin">{t("مدير الإدارة", "Admin")}</option>
+                <option value="manager">{t("يكتب في قطاعاته", "Writes to own sectors")}</option>
+                <option value="admin">{t("يكتب في كل القطاعات", "Writes to all sectors")}</option>
               </select>
             </div>
           </div>
-          {role === "manager" && (
-            <div className="field" style={{ marginTop: 12 }}>
-              <label>{t("القطاعات المسؤول عنها", "Assigned sectors")}</label>
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                {refData.sectors.map((s) => (
-                  <label key={s.id} className="checkbox-inline">
-                    <input type="checkbox" checked={sectorIds.includes(s.id)} onChange={() => toggleSector(s.id)} />
-                    {s.name}
-                  </label>
-                ))}
-              </div>
+          <div className="field" style={{ marginTop: 12 }}>
+            <label>{t("القطاعات المسؤول عنها", "Assigned sectors")}</label>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              {refData.sectors.map((s) => (
+                <label key={s.id} className="checkbox-inline">
+                  <input type="checkbox" checked={sectorIds.includes(s.id)} onChange={() => toggleSector(s.id)} />
+                  {s.name}
+                </label>
+              ))}
             </div>
-          )}
+          </div>
+
+          <ScopePicker value={scopes} onChange={setScopes} t={t} />
+
           <button className="btn" style={{ marginTop: 12 }}>
             {t("إضافة", "Add")}
           </button>
@@ -1861,8 +1952,8 @@ function UsersManager({ refData }: { refData: RefData }) {
             <th>{t("اسم المستخدم", "Username")}</th>
             <th>{t("الحساب", "Account")}</th>
             <th>{t("رقم الجوال", "Phone")}</th>
-            <th>{t("الصلاحية", "Role")}</th>
             <th>{t("القطاعات", "Sectors")}</th>
+            <th>{t("الصلاحيات", "Permissions")}</th>
             <th>{t("الحالة", "Status")}</th>
             <th></th>
           </tr>
@@ -1884,13 +1975,19 @@ function UsersManager({ refData }: { refData: RefData }) {
               <td dir="ltr" style={{ textAlign: "right" }} data-l={t("رقم الجوال", "Phone")}>
                 {u.phone}
               </td>
-              <td data-l={t("الصلاحية", "Role")}>
-                <span className={`badge ${u.role === "admin" ? "badge-admin" : "badge-manager"}`}>
-                  {u.role === "admin" ? t("مدير الإدارة", "Admin") : t("مدير قطاع", "Sector Manager")}
-                </span>
-              </td>
-              <td data-l={t("القطاعات", "Sectors")}>
-                {u.role === "manager" ? sectorNames(u.sectorIds) : t("الكل", "All")}
+              <td data-l={t("القطاعات", "Sectors")}>{sectorNames(u.sectorIds)}</td>
+              <td data-l={t("الصلاحيات", "Permissions")}>
+                {(u.scopes || []).length === 0 ? (
+                  <span className="muted">—</span>
+                ) : (
+                  <span className="sc-chips">
+                    {(u.scopes || []).map((k) => (
+                      <span className="sc-chip" key={k}>
+                        {scopeLabel(k)}
+                      </span>
+                    ))}
+                  </span>
+                )}
               </td>
               <td data-l={t("الحالة", "Status")}>
                 {u.active ? (
@@ -1947,7 +2044,7 @@ function EditUserModal({
   const [role, setRole] = useState<Role>(user.role);
   const [ids, setIds] = useState<string[]>(user.sectorIds || []);
   const [active, setActive] = useState(user.active);
-  const [canChanges, setCanChanges] = useState(user.canChanges === true);
+  const [scopes, setScopes] = useState<string[]>(user.scopes || []);
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -1982,9 +2079,9 @@ function EditUserModal({
         name,
         username,
         role,
-        sectorIds: role === "manager" ? ids : [],
+        sectorIds: ids,
         active,
-        canChanges,
+        scopes,
         password: pw || undefined,
       },
       t("حُفظ ✓", "Saved ✓")
@@ -2034,44 +2131,23 @@ function EditUserModal({
             autoComplete="off"
           />
 
-          <label>{t("الصلاحية", "Role")}</label>
+          <label>{t("مستوى الكتابة", "Write level")}</label>
           <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
-            <option value="manager">{t("مدير قطاع", "Sector Manager")}</option>
-            <option value="admin">{t("مدير الإدارة — صلاحية كاملة", "Admin — full access")}</option>
+            <option value="manager">{t("يكتب في قطاعاته", "Writes to own sectors")}</option>
+            <option value="admin">{t("يكتب في كل القطاعات", "Writes to all sectors")}</option>
           </select>
 
-          {role === "manager" && (
-            <>
-              <label>{t("القطاعات المسؤول عنها", "Assigned sectors")}</label>
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 4 }}>
-                {sectors.map((sc) => (
-                  <label key={sc.id} className="checkbox-inline">
-                    <input type="checkbox" checked={ids.includes(sc.id)} onChange={() => toggle(sc.id)} />
-                    {sc.name}
-                  </label>
-                ))}
-              </div>
-            </>
-          )}
-
-          <label style={{ marginTop: 14 }}>{t("صلاحيات إضافية", "Extra permissions")}</label>
-          <label className="checkbox-inline">
-            <input
-              type="checkbox"
-              checked={role === "admin" ? true : canChanges}
-              disabled={role === "admin"}
-              onChange={(e) => setCanChanges(e.target.checked)}
-            />
-            {t("يرفع ملف طلبات التغيير", "Can upload change requests")}
-          </label>
-          <div className="note-i" style={{ marginTop: 6 }}>
-            {role === "admin"
-              ? t("مدير الإدارة يملكها دائماً.", "Admins always have it.")
-              : t(
-                  "البقية يقرؤون طلبات التغيير وينسخونها ويصدّرونها Excel، لكن لا يرفعون الملف.",
-                  "Others can read and export change requests, but not upload."
-                )}
+          <label>{t("القطاعات المسؤول عنها", "Assigned sectors")}</label>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 4 }}>
+            {sectors.map((sc) => (
+              <label key={sc.id} className="checkbox-inline">
+                <input type="checkbox" checked={ids.includes(sc.id)} onChange={() => toggle(sc.id)} />
+                {sc.name}
+              </label>
+            ))}
           </div>
+
+          <ScopePicker value={scopes} onChange={setScopes} t={t} />
 
           <label style={{ marginTop: 14 }}>{t("حالة الحساب", "Account status")}</label>
           <label className="checkbox-inline">

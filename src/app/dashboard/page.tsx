@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { sb, whoAmI, type Me } from "@/lib/supa";
+import { ALL_SCOPES, DEFAULT_SCOPES } from "@/lib/scopes";
 import Dashboard from "./Dashboard";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [me, setMe] = useState<(Me & { canChanges?: boolean }) | null>(null);
+  const [me, setMe] = useState<(Me & { scopes?: string[] }) | null>(null);
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
@@ -15,10 +16,18 @@ export default function DashboardPage() {
       if (!u) {
         router.replace("/login");
       } else {
-        // صلاحية رفع طلبات التغيير تُقرأ حيّة من القاعدة لا من الجلسة،
-        // فتغييرها يسري فوراً. وإن لم تكن الدالة منصّبة بعد رجعت false.
-        const { data } = await sb().rpc("perf_can_changes");
-        setMe({ ...u, canChanges: data === true });
+        // الصلاحيات تُقرأ حيّة من القاعدة لا من الجلسة، فتغييرها يسري فوراً.
+        // ولو لم تكن الدالة منصّبة بعد (قبل تشغيل ملف الترقية) نرجع للسلوك
+        // القديم بحسب الدور، فلا تُقفل اللوحة على الجميع.
+        const { data, error } = await sb().rpc("perf_my_scopes");
+        const scopes = error
+          ? u.role === "admin"
+            ? [...ALL_SCOPES]
+            : [...DEFAULT_SCOPES]
+          : Array.isArray(data)
+            ? data
+            : [];
+        setMe({ ...u, scopes });
       }
       setChecked(true);
     });
@@ -33,7 +42,7 @@ export default function DashboardPage() {
         phone: "",
         role: me.role,
         sectorIds: me.sectorIds,
-        canChanges: me.canChanges,
+        scopes: me.scopes || [],
       }}
     />
   );
