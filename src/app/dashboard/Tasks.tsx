@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 type State = "ok" | "risk" | "done";
 type Priority = "high" | "mid";
 
+type Kind = "task" | "assignment";
 type Update = { id: string; text: string; byName: string; at: string };
 type Task = {
   id: string;
@@ -17,6 +18,7 @@ type Task = {
   dueDate: string;
   indicatorId?: string;
   state: State;
+  kind: Kind;
   updates: Update[];
   createdById: string;
   createdAt: string;
@@ -62,17 +64,39 @@ function leftText(t: Task): string {
   return `باقٍ ${arDays(d)}`;
 }
 
+/* اللوحة نفسها تخدم نوعين: المهام الداخلية البسيطة، والتكليفات الواردة
+   من الديوان أو جهة أعلى. الفرق في التسمية والمكان لا في الآلية. */
 export default function Tasks({
   meId,
   isAdmin,
   indicators,
   t,
+  kind = "task",
+  onlyMine = false,
+  focusId,
+  onFocusDone,
 }: {
   meId: string;
   isAdmin: boolean;
   indicators: Indicator[];
   t: (ar: string, en: string) => string;
+  kind?: Kind;
+  /** يرى ما أُسند إليه أو ما أنشأه وحده — ما لم يُمنح «كل المهام» */
+  onlyMine?: boolean;
+  /** فتح بند بعينه مباشرة (قادم من زر «عرض» في آخر التحديثات) */
+  focusId?: string | null;
+  onFocusDone?: () => void;
 }) {
+  const asg = kind === "assignment";
+  const L = {
+    one: asg ? t("تكليف", "Assignment") : t("مهمة", "Task"),
+    many: asg ? t("التكليفات", "Assignments") : t("المهام", "Tasks"),
+    add: asg ? t("تكليف جديد", "New assignment") : t("مهمة جديدة", "New task"),
+    none: asg ? t("لا توجد تكليفات بعد", "No assignments yet") : t("لا توجد مهام بعد", "No tasks yet"),
+    hint: asg
+      ? t("سجّلي أول تكليف وارد وأسنديه لمن يتابعه.", "Log the first assignment.")
+      : t("أنشئي أول مهمة وأسنديها لأحد المدراء.", "Create the first task and assign it."),
+  };
   const [tasks, setTasks] = useState<Task[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -83,14 +107,27 @@ export default function Tasks({
 
   const load = useCallback(async () => {
     const r = await apiFetch("/api/tasks").then((x) => x.json());
-    setTasks(r.tasks || []);
+    const all: Task[] = r.tasks || [];
+    setTasks(
+      all
+        .filter((x) => (x.kind === "assignment" ? "assignment" : "task") === kind)
+        .filter((x) => !onlyMine || x.assigneeId === meId || x.createdById === meId)
+    );
     setPeople(r.people || []);
     setLoaded(true);
-  }, []);
+  }, [kind, onlyMine, meId]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  // فتح البند المطلوب من «آخر التحديثات» متى ما وصلت البيانات
+  useEffect(() => {
+    if (!focusId || !loaded) return;
+    const hit = tasks.find((x) => x.id === focusId);
+    if (hit) setOpen(hit);
+    onFocusDone?.();
+  }, [focusId, loaded, tasks, onFocusDone]);
 
   const nameOf = useCallback(
     (id: string) => people.find((p) => p.id === id)?.name || "—",
@@ -123,7 +160,7 @@ export default function Tasks({
   }
 
   const COLS: { key: "main" | "week" | "late" | "done"; title: string; hint: string; color: string }[] = [
-    { key: "main", title: t("المهام", "Tasks"), hint: t("الأحدث أولاً", "Newest first"), color: "#016b5f" },
+    { key: "main", title: L.many, hint: t("الأحدث أولاً", "Newest first"), color: "#016b5f" },
     {
       key: "week",
       title: t("المتوقع تسليمها هذا الأسبوع", "Due this week"),
@@ -147,7 +184,7 @@ export default function Tasks({
         </div>
         <div style={{ flex: 1 }} />
         <button className="btn btn-sm" onClick={() => setCreating(true)}>
-          ＋ {t("مهمة جديدة", "New task")}
+          ＋ {L.add}
         </button>
       </div>
 
@@ -157,8 +194,8 @@ export default function Tasks({
         <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>
       ) : tasks.length === 0 ? (
         <div className="soon">
-          <b>{t("لا توجد مهام بعد", "No tasks yet")}</b>
-          {t("أنشئي أول مهمة وأسنديها لأحد المدراء.", "Create the first task and assign it.")}
+          <b>{L.none}</b>
+          {L.hint}
         </div>
       ) : (
         <div className="tboard">
@@ -220,6 +257,7 @@ export default function Tasks({
 
       {creating && (
         <NewTask
+          kind={kind}
           people={people}
           indicators={indicators}
           onClose={() => setCreating(false)}
@@ -342,20 +380,23 @@ function TaskDetail({
   );
 }
 
-/* ============ مهمة جديدة ============ */
+/* ============ بند جديد: مهمة أو تكليف ============ */
 function NewTask({
+  kind,
   people,
   indicators,
   onClose,
   onDone,
   t,
 }: {
+  kind: Kind;
   people: Person[];
   indicators: Indicator[];
   onClose: () => void;
   onDone: () => void;
   t: (ar: string, en: string) => string;
 }) {
+  const asg = kind === "assignment";
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [assigneeId, setAssigneeId] = useState(people[0]?.id || "");
@@ -371,7 +412,7 @@ function NewTask({
     const r = await apiFetch("/api/tasks", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ title, description, assigneeId, dueDate, priority, indicatorId }),
+      body: JSON.stringify({ title, description, assigneeId, dueDate, priority, indicatorId, kind }),
     }).then((x) => x.json());
     setBusy(false);
     if (r.error) {
@@ -387,7 +428,7 @@ function NewTask({
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal task-modal" onClick={(e) => e.stopPropagation()}>
         <div className="m-h">
-          <h3>{t("مهمة جديدة", "New task")}</h3>
+          <h3>{asg ? t("تكليف جديد", "New assignment") : t("مهمة جديدة", "New task")}</h3>
           <button className="mx" onClick={onClose} aria-label="close">
             ✕
           </button>
@@ -395,7 +436,7 @@ function NewTask({
         <div className="m-b">
           {err && <div className="alert alert-error">{err}</div>}
 
-          <label>{t("عنوان المهمة", "Title")}</label>
+          <label>{asg ? t("عنوان التكليف", "Title") : t("عنوان المهمة", "Title")}</label>
           <input value={title} onChange={(e) => setTitle(e.target.value)} />
 
           <label>
@@ -431,7 +472,8 @@ function NewTask({
           </div>
 
           <label>
-            {t("مرتبطة بمؤشر", "Linked KPI")} <span className="opt">{t("اختياري", "optional")}</span>
+            {asg ? t("مرتبط بمؤشر", "Linked KPI") : t("مرتبطة بمؤشر", "Linked KPI")}{" "}
+            <span className="opt">{t("اختياري", "optional")}</span>
           </label>
           <select value={indicatorId} onChange={(e) => setIndicatorId(e.target.value)}>
             <option value="">{t("بلا ربط", "None")}</option>
@@ -444,7 +486,11 @@ function NewTask({
 
           {who && (
             <div className="note-i">
-              🔔 {t(`يصل إشعار لـ ${who} فور الإنشاء، وتظهر المهمة عنده.`, `${who} will be notified.`)}
+              🔔{" "}
+              {t(
+                `يصل إشعار لـ ${who} فور الإنشاء، ويظهر ${asg ? "التكليف" : "المهمة"} عنده.`,
+                `${who} will be notified.`
+              )}
             </div>
           )}
         </div>
@@ -453,7 +499,7 @@ function NewTask({
             {t("إلغاء", "Cancel")}
           </button>
           <button className="btn btn-sm" onClick={submit} disabled={busy || !title.trim() || !assigneeId}>
-            {t("إنشاء المهمة", "Create task")}
+            {asg ? t("تسجيل التكليف", "Create assignment") : t("إنشاء المهمة", "Create task")}
           </button>
         </div>
       </div>

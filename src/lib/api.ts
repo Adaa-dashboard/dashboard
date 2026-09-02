@@ -29,6 +29,7 @@ const num = (v: unknown): number | null => {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 };
+const str = (v: unknown): string => (v === null || v === undefined ? "" : String(v).trim());
 const newId = () =>
   Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 
@@ -50,6 +51,7 @@ const rowTask = (r: Record<string, unknown>) => ({
   id: r.id, title: r.title, description: r.description ?? "",
   assigneeId: r.assignee_id, priority: r.priority, dueDate: r.due_date,
   indicatorId: r.indicator_id ?? undefined, state: r.state,
+  kind: r.kind === "assignment" ? "assignment" : "task",
   updates: Array.isArray(r.updates) ? r.updates : [],
   createdById: r.created_by_id, createdAt: r.created_at,
   completedAt: r.completed_at ?? undefined,
@@ -57,6 +59,18 @@ const rowTask = (r: Record<string, unknown>) => ({
 const rowNote = (r: Record<string, unknown>) => ({
   id: r.id, sectorId: r.sector_id, indicatorId: r.indicator_id, text: r.body,
   mentions: r.mentions || [], byId: r.by_id, byName: r.by_name, at: r.at,
+});
+/* طلبات التغيير الواردة من منصة الرؤية — مرآة للملف اليومي */
+const rowChange = (r: Record<string, unknown>) => ({
+  code: r.code, program: r.program ?? "", itemCode: r.item_code ?? "",
+  itemName: r.item_name ?? "", owner: r.owner_entity ?? "",
+  category: r.request_cat ?? "", reviewType: r.review_type ?? "",
+  classification: r.classification ?? "",
+  sla: r.sla_days === null ? null : Number(r.sla_days),
+  workDays: r.work_days === null ? null : Number(r.work_days),
+  status: r.status, firstSeen: r.first_seen, lastSeen: r.last_seen,
+  closedAt: r.closed_at ?? undefined, updatedAt: r.updated_at,
+  updatedBy: r.updated_by ?? "",
 });
 
 async function people() {
@@ -123,7 +137,9 @@ export async function apiFetch(path: string, init: Init = {}) {
 
     if (p === "/api/me") {
       const me = await whoAmI();
-      return ok({ user: me });
+      if (!me) return ok({ user: null });
+      const { data: sc } = await s.rpc("perf_my_scopes");
+      return ok({ user: { ...me, scopes: Array.isArray(sc) ? sc : [] } });
     }
 
     /* ---------------- المرجعيات ---------------- */
@@ -245,7 +261,7 @@ export async function apiFetch(path: string, init: Init = {}) {
         users: (data || []).map((u: Record<string, unknown>) => ({
           id: String(u.id), username: u.username, name: u.name, phone: u.phone,
           role: u.role, sectorIds: u.sector_ids || [], active: u.active,
-          hasPassword: u.has_password,
+          hasPassword: u.has_password, scopes: u.scopes || [],
         })),
       });
     }
@@ -254,6 +270,7 @@ export async function apiFetch(path: string, init: Init = {}) {
         p_id: null, p_username: body.username, p_name: body.name, p_phone: body.phone,
         p_role: body.role, p_sectors: body.sectorIds || [], p_active: true,
         p_password: body.password || null, p_clear_password: false,
+        p_scopes: Array.isArray(body.scopes) ? body.scopes : null,
       });
       if (error) return err("غير مصرّح", 403);
       if (data?.error === "dup_username") return err("اسم المستخدم مستخدَم مسبقًا", 400);
@@ -284,11 +301,14 @@ export async function apiFetch(path: string, init: Init = {}) {
           p_active: typeof body.active === "boolean" ? body.active : cur.active,
           p_password: body.password || null,
           p_clear_password: body.clearPassword === true,
+          p_scopes: Array.isArray(body.scopes) ? body.scopes : null,
         });
         if (error) return err("غير مصرّح", 403);
         if (data?.error === "dup_username") return err("اسم المستخدم مستخدَم مسبقًا", 400);
         if (data?.error === "short") return err("كلمة المرور لا تقل عن ٦ أحرف", 400);
         if (data?.error === "self_demote") return err("لا يمكنك سحب صلاحيتك من نفسك", 400);
+        if (data?.error === "self_scope")
+          return err("لا يمكنك سحب صلاحية «المستخدمون والصلاحيات» من نفسك", 400);
         if (data?.error === "self_disable") return err("لا يمكنك إيقاف حسابك الخاص", 400);
         return ok({ ok: true });
       }
@@ -309,6 +329,7 @@ export async function apiFetch(path: string, init: Init = {}) {
         assignee_id: body.assigneeId,
         priority: body.priority === "high" ? "high" : "mid",
         due_date: body.dueDate, indicator_id: body.indicatorId || null,
+        kind: body.kind === "assignment" ? "assignment" : "task",
         state: "ok", updates: [], created_by_id: me?.id || "",
       });
       if (error) return err(error.message, 403);
@@ -341,6 +362,79 @@ export async function apiFetch(path: string, init: Init = {}) {
         if (error) return err(error.message, 403);
         return ok({ ok: true });
       }
+    }
+
+    /* ---------------- طلبات التغيير (منصة الرؤية) ---------------- */
+    if (p === "/api/changes" && method === "GET") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const { data, error } = await s
+        .from("perf_change_requests")
+        .select("*")
+        .order("status")
+        .order("work_days", { ascending: false });
+      if (error) return err(error.message, 403);
+      return ok({ changes: (data || []).map(rowChange) });
+    }
+
+    /* رفع الملف اليومي: يحدّث الموجود، يضيف الجديد،
+       ويُغلق ما اختفى من الملف (أي ما تمت مراجعته). */
+    if (p === "/api/changes" && method === "POST") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const rows: Record<string, unknown>[] = Array.isArray(body.rows) ? body.rows : [];
+      const clean: { row: Record<string, unknown>; code: string }[] = rows
+        .map((r) => ({ row: r, code: String(r.code ?? "").trim() }))
+        .filter((x) => x.code);
+      if (!clean.length) return err("لم يُقرأ أي صف فيه «الرمز» من الملف", 400);
+
+      const today = new Date().toISOString().slice(0, 10);
+      const nowISO = new Date().toISOString();
+      const codes = [...new Set(clean.map((x) => x.code))];
+
+      // نحافظ على «أول ظهور» للطلبات المعروفة مسبقاً
+      const { data: prev } = await s
+        .from("perf_change_requests")
+        .select("code,first_seen")
+        .in("code", codes);
+      const firstSeen = new Map((prev || []).map((r) => [r.code as string, r.first_seen as string]));
+
+      const payload = clean.map(({ row: r, code }) => ({
+        code,
+        program: str(r.program),
+        item_code: str(r.itemCode),
+        item_name: str(r.itemName),
+        owner_entity: str(r.owner),
+        request_cat: str(r.category),
+        review_type: str(r.reviewType),
+        classification: str(r.classification),
+        sla_days: num(r.sla),
+        work_days: num(r.workDays),
+        status: "open",
+        first_seen: firstSeen.get(code) || today,
+        last_seen: today,
+        closed_at: null,
+        updated_at: nowISO,
+        updated_by: me.name || "",
+      }));
+
+      const { error } = await s.from("perf_change_requests").upsert(payload, { onConflict: "code" });
+      if (error) return err(error.message, 403);
+
+      // ما كان مفتوحاً ولم يعد في الملف ⇒ تمت مراجعته
+      const { data: openRows } = await s
+        .from("perf_change_requests")
+        .select("code")
+        .eq("status", "open");
+      const inFile = new Set(codes);
+      const gone = (openRows || []).map((r) => r.code as string).filter((c) => !inFile.has(c));
+      if (gone.length) {
+        await s
+          .from("perf_change_requests")
+          .update({ status: "closed", closed_at: today, updated_at: nowISO, updated_by: me.name || "" })
+          .in("code", gone);
+      }
+      return ok({ ok: true, saved: payload.length, closed: gone.length });
     }
 
     /* ---------------- الملاحظات ---------------- */
@@ -396,7 +490,12 @@ export async function apiFetch(path: string, init: Init = {}) {
       const secName = new Map((sec.data || []).map((x) => [x.id, x.name]));
       const indName = new Map((ind.data || []).map((x) => [x.id, x.name]));
       const since = seen.data?.at || "";
-      type Item = { id: string; kind: string; tone: string; title: string; sub: string; at: string; unread: boolean };
+      // sectorId/indicatorId/taskId يحملها زر «عرض» ليفتح مصدر التحديث
+      type Item = {
+        id: string; kind: string; tone: string; title: string; sub: string;
+        at: string; unread: boolean;
+        sectorId?: string; indicatorId?: string; taskId?: string;
+      };
       const items: Item[] = [];
       for (const m of ms.data || []) {
         if (m.actual === null) continue;
@@ -405,6 +504,7 @@ export async function apiFetch(path: string, init: Init = {}) {
           title: `تحديث ${indName.get(m.indicator_id) || ""}`,
           sub: `${secName.get(m.sector_id) || ""} · ${m.actual}`,
           at: m.updated_at, unread: !since || m.updated_at > since,
+          sectorId: m.sector_id, indicatorId: m.indicator_id,
         });
       }
       for (const n of nt.data || []) {
@@ -413,16 +513,21 @@ export async function apiFetch(path: string, init: Init = {}) {
           title: `${n.by_name} كتب ملاحظة`,
           sub: `${secName.get(n.sector_id) || ""} · ${indName.get(n.indicator_id) || ""}`,
           at: n.at, unread: !since || n.at > since,
+          sectorId: n.sector_id, indicatorId: n.indicator_id,
         });
       }
       for (const t of tk.data || []) {
         const done = t.state === "done";
+        const isAsg = t.kind === "assignment";
         items.push({
-          id: "t" + t.id, kind: "task", tone: done ? "good" : t.state === "risk" ? "bad" : "info",
-          title: done ? `اكتملت المهمة: ${t.title}` : t.title,
+          id: "t" + t.id,
+          kind: isAsg ? "assignment" : "task",
+          tone: done ? "good" : t.state === "risk" ? "bad" : "info",
+          title: done ? `${isAsg ? "اكتمل التكليف" : "اكتملت المهمة"}: ${t.title}` : t.title,
           sub: `تنتهي ${t.due_date}`,
           at: t.completed_at || t.created_at,
           unread: !since || (t.completed_at || t.created_at) > since,
+          taskId: t.id,
         });
       }
       items.sort((a, b) => (b.at || "").localeCompare(a.at || ""));

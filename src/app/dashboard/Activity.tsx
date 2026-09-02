@@ -4,7 +4,7 @@ import { apiFetch } from "@/lib/api";
 
 import { useCallback, useEffect, useState } from "react";
 
-type Item = {
+export type Item = {
   id: string;
   kind: string;
   tone: "bad" | "warn" | "good" | "info";
@@ -12,6 +12,9 @@ type Item = {
   sub: string;
   at: string;
   unread: boolean;
+  sectorId?: string;
+  indicatorId?: string;
+  taskId?: string;
 };
 
 const TONE: Record<string, string> = {
@@ -37,7 +40,14 @@ function when(iso: string): string {
   return d.toISOString().slice(0, 10);
 }
 
-export default function Activity({ t }: { t: (ar: string, en: string) => string }) {
+export default function Activity({
+  t,
+  onOpen,
+}: {
+  t: (ar: string, en: string) => string;
+  /** فتح مصدر التحديث: المؤشر أو الملاحظة أو المهمة */
+  onOpen?: (item: Item) => void;
+}) {
   const [items, setItems] = useState<Item[]>([]);
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
@@ -102,6 +112,15 @@ export default function Activity({ t }: { t: (ar: string, en: string) => string 
                     {when(x.at)}
                   </span>
                 </span>
+                {onOpen && (x.indicatorId || x.taskId) && (
+                  <button
+                    className="up-go"
+                    onClick={() => onOpen(x)}
+                    title={t("فتح مصدر التحديث", "Open source")}
+                  >
+                    {t("عرض", "Open")}
+                  </button>
+                )}
               </div>
             ))}
           </div>
