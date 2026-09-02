@@ -4118,3 +4118,225 @@ table.matrix thead th {
   font-size: 11px;
   font-weight: 800;
 }
+
+/* ============================================================
+   الهيكل التنظيمي · شارة التنبيهات · موعد الملاحظة
+   ============================================================ */
+.tl-b {
+  position: relative;
+}
+.tl-badge {
+  position: absolute;
+  top: -5px;
+  inset-inline-end: -5px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 99px;
+  background: #d34a4a;
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 17px;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+.tl-alh {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+
+.nb-due {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg2);
+}
+.nb-due .lb {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--g-800);
+}
+.nb-due input {
+  width: auto;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+.nb-due .tag {
+  background: #efeaff;
+  border: 1px solid #d9cffa;
+  color: #5b3fb8;
+  border-radius: 7px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.nb-due .clr {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+}
+.nb-due .hint {
+  font-size: 11px;
+  color: var(--muted);
+}
+.nb-item .s .due {
+  font-style: normal;
+  background: #efeaff;
+  color: #5b3fb8;
+  border-radius: 5px;
+  padding: 0 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  margin-inline-end: 6px;
+}
+
+.org-top {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.org-head {
+  background: linear-gradient(180deg, var(--g-800), var(--g-700));
+  color: #fff;
+  border-radius: 14px;
+  padding: 12px 26px;
+  text-align: center;
+  box-shadow: 0 8px 22px rgba(0, 88, 76, 0.18);
+}
+.org-head b {
+  display: block;
+  font-size: 15px;
+  font-family: "Noto Kufi Arabic", "Noto Sans Arabic", sans-serif;
+}
+.org-head span {
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.72);
+}
+.org-head-people {
+  justify-content: center;
+}
+.org-line {
+  width: 2px;
+  height: 22px;
+  background: var(--g-400);
+  margin: 0 auto;
+}
+.org-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  align-items: start;
+  gap: 12px;
+  border-top: 2px solid var(--g-400);
+  padding-top: 18px;
+  position: relative;
+}
+@media (max-width: 1000px) {
+  .org-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 620px) {
+  .org-grid {
+    grid-template-columns: 1fr;
+    border-top: none;
+    padding-top: 6px;
+  }
+}
+.org-col {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+  position: relative;
+}
+.org-col::before {
+  content: "";
+  position: absolute;
+  top: -18px;
+  inset-inline-start: 50%;
+  width: 2px;
+  height: 18px;
+  background: var(--g-400);
+}
+@media (max-width: 620px) {
+  .org-col::before {
+    display: none;
+  }
+}
+.org-sec {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 9px;
+  margin-bottom: 9px;
+  border-bottom: 1px solid var(--border);
+}
+.org-sec b {
+  flex: 1;
+  font-size: 13px;
+  color: var(--g-900);
+}
+.org-n {
+  background: var(--g-100);
+  color: var(--g-800);
+  border-radius: 99px;
+  min-width: 22px;
+  text-align: center;
+  padding: 1px 7px;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+.org-x {
+  display: flex;
+  gap: 2px;
+}
+.org-x button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 2px 3px;
+}
+.org-people {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.org-head-people {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+.org-p {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--text);
+  background: var(--bg2);
+  border-radius: 9px;
+  padding: 5px 8px;
+}
+.org-p .av {
+  flex: none;
+}
+.org-empty {
+  font-size: 11.5px;
+  color: var(--muted);
+  padding: 6px 2px;
+}
+.org-note {
+  margin-top: 16px;
+  font-size: 11.5px;
+  color: var(--muted);
+  text-align: center;
+}

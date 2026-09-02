@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadUserData, saveUserData } from "@/lib/userdata";
+import { parseWhen, whenLabel } from "@/lib/whenar";
 
 /* ============================================================
    ملاحظات شخصية — مجلدات وملاحظات، تُحفظ في المخزن الشخصي
@@ -16,6 +17,11 @@ export type Note = {
   body: string;
   createdAt: string;
   updatedAt: string;
+  /** موعد يظهر في التقويم — يُلتقط من النص أو يُضبط يدوياً */
+  due?: string;
+  dueTime?: string;
+  /** true = مأخوذ من النص، فيتغيّر معه. false = ضبطه المستخدم بنفسه */
+  dueAuto?: boolean;
 };
 export type Folder = { id: string; name: string };
 export type NotesData = { folders: Folder[]; notes: Note[] };
@@ -124,7 +130,25 @@ export default function Notes({
   function editNote(id: string, patch: Partial<Note>) {
     change((d) => ({
       ...d,
-      notes: d.notes.map((n) => (n.id === id ? { ...n, ...patch, updatedAt: new Date().toISOString() } : n)),
+      notes: d.notes.map((n) => {
+        if (n.id !== id) return n;
+        const next = { ...n, ...patch, updatedAt: new Date().toISOString() };
+        // النص تغيّر والموعد لم يُضبط يدوياً ⇒ أعِد قراءته من النص
+        const textChanged = "title" in patch || "body" in patch;
+        if (textChanged && next.dueAuto !== false) {
+          const w = parseWhen(`${next.title} ${next.body}`);
+          if (w) {
+            next.due = w.date;
+            next.dueTime = w.time;
+            next.dueAuto = true;
+          } else if (next.dueAuto) {
+            next.due = undefined;
+            next.dueTime = undefined;
+            next.dueAuto = undefined;
+          }
+        }
+        return next;
+      }),
     }));
   }
 
@@ -254,6 +278,9 @@ export default function Notes({
                     >
                       <b>{firstLine(n)}</b>
                       <span className="s">
+                        {n.due && (
+                          <em className="due">{whenLabel({ date: n.due, time: n.dueTime })}</em>
+                        )}
                         <i>{whenAr(n.updatedAt)}</i> {preview(n)}
                       </span>
                     </button>
@@ -297,6 +324,52 @@ export default function Notes({
                     placeholder={t("اكتبي هنا…", "Write here…")}
                     onChange={(e) => editNote(open.id, { body: e.target.value })}
                   />
+
+                  <div className="nb-due">
+                    <span className="lb">{t("في التقويم", "On calendar")}</span>
+                    <input
+                      type="date"
+                      value={open.due || ""}
+                      onChange={(e) =>
+                        editNote(open.id, {
+                          due: e.target.value || undefined,
+                          dueAuto: false,
+                          dueTime: e.target.value ? open.dueTime : undefined,
+                        })
+                      }
+                    />
+                    <input
+                      type="time"
+                      value={open.dueTime || ""}
+                      disabled={!open.due}
+                      onChange={(e) =>
+                        editNote(open.id, { dueTime: e.target.value || undefined, dueAuto: false })
+                      }
+                    />
+                    {open.due && (
+                      <>
+                        <span className="tag">
+                          {whenLabel({ date: open.due, time: open.dueTime })}
+                          {open.dueAuto && ` · ${t("من النص", "from text")}`}
+                        </span>
+                        <button
+                          className="clr"
+                          title={t("إزالة من التقويم", "Remove")}
+                          onClick={() =>
+                            editNote(open.id, { due: undefined, dueTime: undefined, dueAuto: false })
+                          }
+                        >
+                          ✕
+                        </button>
+                      </>
+                    )}
+                    {!open.due && (
+                      <span className="hint">
+                        {t("اكتبي «بكرة» أو «الأحد الساعة ٩» ويلتقطه بنفسه", "Write a date and it is picked up")}
+                      </span>
+                    )}
+                  </div>
+
                   <div className="nb-foot">{whenAr(open.updatedAt)}</div>
                 </>
               )}

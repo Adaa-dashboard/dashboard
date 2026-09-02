@@ -48,8 +48,7 @@ export const SCOPE_GROUPS: { title: string; items: { key: Scope; label: string; 
   {
     title: "الإعدادات",
     items: [
-      { key: "entry", label: "المؤشرات والمستهدفات" },
-      { key: "structure", label: "القطاعات والإدارات" },
+      { key: "structure", label: "الهيكل التنظيمي", note: "القطاعات وموظفوها" },
       { key: "users", label: "المستخدمون والصلاحيات" },
     ],
   },

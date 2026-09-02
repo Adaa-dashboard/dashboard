@@ -343,3 +343,23 @@ create policy "perf_ud_own" on public.perf_user_data
 
 grant select, insert, update, delete on public.perf_user_data to authenticated;
 revoke all on public.perf_user_data from anon;
+
+-- ============================================================
+--  ٨) قائمة الزملاء — الاسم والقطاع فقط
+--     يحتاجها الجميع: اسم المسؤول عن المهمة، والإشارة في الملاحظات،
+--     والهيكل التنظيمي. أما perf_list_users فتبقى محصورة بصلاحية
+--     «users» لأنها تكشف الجوال وحالة كلمة المرور والصلاحيات.
+-- ============================================================
+create or replace function public.perf_people()
+returns table (id text, name text, role text, sector_ids text[], active boolean)
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.perf_signed_in() then raise exception 'forbidden'; end if;
+  return query select u.id::text, u.display_name, u.role, u.sector_ids, u.active
+                 from public.perf_users u
+                where u.active
+                order by u.display_name;
+end;
+$$;
+revoke all on function public.perf_people() from public, anon;
+grant execute on function public.perf_people() to authenticated;

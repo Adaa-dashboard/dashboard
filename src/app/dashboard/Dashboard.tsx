@@ -10,6 +10,7 @@ import Changes from "./Changes";
 import Backup from "./Backup";
 import Tools from "./Tools";
 import MyPage from "./MyPage";
+import Structure from "./Structure";
 import {
   ALL_SCOPES,
   DEFAULT_SCOPES,
@@ -216,7 +217,7 @@ export default function Dashboard({ me }: { me: Me }) {
     tasks: ["المهام", "Tasks"],
     mypage: ["صفحتي", "My page"],
     report: ["الإنجاز الأسبوعي", "Weekly Achievement"],
-    structure: ["القطاعات والإدارات", "Sectors"],
+    structure: ["الهيكل التنظيمي", "Org chart"],
     users: ["المستخدمون والصلاحيات", "Users & Roles"],
   };
   const title = TITLES[tab] ?? TITLES.overview;
@@ -278,9 +279,8 @@ export default function Dashboard({ me }: { me: Me }) {
           </button>
           <div className={`subnav ${setOpen ? "show" : ""}`}>
             <SubItem id="mypage" label={["صفحتي", "My page"]} />
-            {can("entry") && <SubItem id="entry" label={["المؤشرات والمستهدفات", "KPIs & Targets"]} />}
             {can("users") && <SubItem id="users" label={["المستخدمون والصلاحيات", "Users & Roles"]} />}
-            {can("structure") && <SubItem id="structure" label={["القطاعات والإدارات", "Sectors"]} />}
+            {can("structure") && <SubItem id="structure" label={["الهيكل التنظيمي", "Org chart"]} />}
             <button className="sub-item" onClick={() => setBackupOpen(true)}>
               {t("نسخة احتياطية من البيانات", "Download backup")}
             </button>
@@ -337,7 +337,6 @@ export default function Dashboard({ me }: { me: Me }) {
                   onFocusDone={() => setDetFocus(null)}
                 />
               )}
-              {tab === "entry" && can("entry") && <EntrySection me={me} refData={refData} reload={loadRef} />}
               {tab === "tasks" && can("tasks") && (
                 <Tasks
                   meId={me.id}
@@ -351,7 +350,14 @@ export default function Dashboard({ me }: { me: Me }) {
               )}
               {tab === "mypage" && <MyPage me={me} refData={refData} t={t} />}
               {tab === "report" && can("weekly") && <WeeklyPanel t={t} />}
-              {tab === "structure" && can("structure") && <SectorsManager refData={refData} reload={loadRef} />}
+              {tab === "structure" && can("structure") && (
+                <Structure
+                  sectors={refData.sectors}
+                  canEdit={can("structure")}
+                  reload={loadRef}
+                  t={t}
+                />
+              )}
               {tab === "users" && can("users") && <UsersManager refData={refData} />}
             </>
           )}
@@ -386,9 +392,8 @@ export default function Dashboard({ me }: { me: Me }) {
               </div>
             </div>
             <SheetItem id="mypage" label={["صفحتي", "My page"]} />
-            {can("entry") && <SheetItem id="entry" label={["المؤشرات والمستهدفات", "KPIs & Targets"]} />}
             {can("users") && <SheetItem id="users" label={["المستخدمون والصلاحيات", "Users & Roles"]} />}
-            {can("structure") && <SheetItem id="structure" label={["القطاعات والإدارات", "Sectors"]} />}
+            {can("structure") && <SheetItem id="structure" label={["الهيكل التنظيمي", "Org chart"]} />}
             <button
               className="sheet-item"
               onClick={() => {
