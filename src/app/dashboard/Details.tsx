@@ -3,6 +3,7 @@
 import { apiFetch } from "@/lib/api";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { IconComment } from "./icons";
 import { Band, bandOf, tint } from "@/lib/calc";
 
 /* ============ الأنواع (نسخة الواجهة) ============ */
@@ -299,16 +300,20 @@ export default function Details({
             {t("حسب القطاع", "By sector")}
           </button>
         </div>
-        <div className="segs">
-          <button className={`sg ${scope == null ? "on" : ""}`} onClick={() => setScope(null)}>
-            {t("كل السنة", "Full year")}
-          </button>
+        {/* فلتر واحد بدل خمسة أزرار متجاورة كانت تزاحم الشريط */}
+        <select
+          className="dt-scope"
+          value={scope == null ? "" : String(scope)}
+          onChange={(e) => setScope(e.target.value === "" ? null : Number(e.target.value))}
+          aria-label={t("النطاق", "Scope")}
+        >
+          <option value="">{t("كل السنة", "Full year")}</option>
           {QUARTERS.map((n) => (
-            <button key={n} className={`sg ${scope === n ? "on" : ""}`} onClick={() => setScope(n)}>
-              Q{n}
-            </button>
+            <option key={n} value={n}>
+              {t(`الربع ${["الأول", "الثاني", "الثالث", "الرابع"][n - 1]}`, `Q${n}`)}
+            </option>
           ))}
-        </div>
+        </select>
         <input
           className="dt-q"
           placeholder={t("بحث…", "Search…")}
@@ -430,8 +435,10 @@ export default function Details({
                               className={`dt-note ${notes ? "has" : ""}`}
                               onClick={() => setNotesFor({ sectorId, indicatorId })}
                               title={t("ملاحظات", "Notes")}
+                              aria-label={t("ملاحظات", "Notes")}
                             >
-                              💬{notes ? ` ${notes}` : ""}
+                              <IconComment />
+                              {notes > 0 && <b>{notes}</b>}
                             </button>
                           </td>
                         </tr>

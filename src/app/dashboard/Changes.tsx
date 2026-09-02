@@ -134,7 +134,8 @@ export default function Changes({
 }) {
   const [items, setItems] = useState<Change[]>([]);
   const [loaded, setLoaded] = useState(false);
-  const [filter, setFilter] = useState<"open" | Tone | "all">("open");
+  // الافتراضي: الطلبات المفتوحة. الشرائح الثلاث تفلتر داخلها فقط.
+  const [filter, setFilter] = useState<Tone | null>(null);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -164,14 +165,8 @@ export default function Changes({
   }, [items]);
 
   const shown = useMemo(() => {
-    const list =
-      filter === "all"
-        ? items
-        : filter === "open"
-          ? items.filter((x) => x.status === "open")
-          : filter === "done"
-            ? items.filter((x) => x.status === "closed")
-            : items.filter((x) => x.status === "open" && toneOf(x) === filter);
+    const open = items.filter((x) => x.status === "open");
+    const list = filter ? open.filter((x) => toneOf(x) === filter) : open;
     const rank: Record<Tone, number> = { late: 0, near: 1, ok: 2, done: 3 };
     return [...list].sort(
       (a, b) => rank[toneOf(a)] - rank[toneOf(b)] || (b.workDays ?? -1) - (a.workDays ?? -1)
@@ -301,13 +296,10 @@ export default function Changes({
     URL.revokeObjectURL(url);
   }
 
-  const CHIPS: { key: "open" | Tone | "all"; label: string; n: number; c?: string }[] = [
-    { key: "open", label: t("المفتوحة", "Open"), n: stats.open },
+  const CHIPS: { key: Tone; label: string; n: number; c: string }[] = [
     { key: "late", label: t("متأخرة", "Overdue"), n: stats.late, c: TONE_COLOR.late },
     { key: "near", label: t("قاربت على الانتهاء", "Due soon"), n: stats.near, c: TONE_COLOR.near },
     { key: "ok", label: t("ضمن المدة", "On time"), n: stats.ok, c: TONE_COLOR.ok },
-    { key: "done", label: t("تمت مراجعتها", "Reviewed"), n: stats.done, c: TONE_COLOR.done },
-    { key: "all", label: t("الكل", "All"), n: items.length },
   ];
 
   return (
@@ -318,8 +310,8 @@ export default function Changes({
             <button
               key={c.key}
               className={`pill ${filter === c.key ? "on" : ""}`}
-              style={{ ["--c" as string]: c.c || "#016b5f" }}
-              onClick={() => setFilter(c.key)}
+              style={{ ["--c" as string]: c.c }}
+              onClick={() => setFilter(filter === c.key ? null : c.key)}
             >
               <i />
               {c.label}
@@ -374,7 +366,11 @@ export default function Changes({
               )}
         </div>
       ) : !shown.length ? (
-        <div className="empty">{t("لا طلبات في هذا التصنيف.", "Nothing here.")}</div>
+        <div className="empty">
+          {filter
+            ? t("لا طلبات في هذا التصنيف.", "Nothing here.")
+            : t("لا طلبات مفتوحة — تمت مراجعة الكل.", "No open requests.")}
+        </div>
       ) : (
         <div className="cr-tw">
           <table className="cr-tbl">

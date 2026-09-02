@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import Notes from "./Notes";
+import { IconCalc, IconCalendar, IconNote } from "./icons";
 
 /* ============================================================
    أدوات سريعة في زاوية الترويسة: حاسبة · تقويم · ملاحظات.
@@ -296,7 +297,7 @@ export default function Tools({ t, meId }: { t: (ar: string, en: string) => stri
         title={t("حاسبة", "Calculator")}
         aria-label={t("حاسبة", "Calculator")}
       >
-        🧮
+        <IconCalc />
       </button>
       <button
         className={`tl-b ${open === "cal" ? "on" : ""}`}
@@ -304,7 +305,7 @@ export default function Tools({ t, meId }: { t: (ar: string, en: string) => stri
         title={t("تقويم", "Calendar")}
         aria-label={t("تقويم", "Calendar")}
       >
-        📅
+        <IconCalendar />
       </button>
       <button
         className="tl-b"
@@ -315,7 +316,7 @@ export default function Tools({ t, meId }: { t: (ar: string, en: string) => stri
         title={t("ملاحظات", "Notes")}
         aria-label={t("ملاحظات", "Notes")}
       >
-        📝
+        <IconNote />
       </button>
 
       {open && (

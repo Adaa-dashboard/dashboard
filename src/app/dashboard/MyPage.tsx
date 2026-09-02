@@ -39,7 +39,7 @@ const CATALOG: { key: WidgetKey; label: string; note: string; needs?: string }[]
   { key: "summary", label: "ملخص سريع", note: "أرقام مهامك ومؤشراتك في سطر" },
   { key: "kpis", label: "مؤشرات قطاعاتي", note: "المستهدف مقابل المنجز", needs: "overview" },
   { key: "tasks", label: "مهامي", note: "المفتوحة والأقرب موعداً", needs: "tasks" },
-  { key: "assignments", label: "تكليفاتي", note: "الواردة من جهة أعلى", needs: "assignments" },
+  { key: "assignments", label: "التكاليف المسندة لي", note: "الواردة من جهة أعلى", needs: "assignments" },
   { key: "changes", label: "طلبات التغيير المتأخرة", note: "ما تجاوز مدّته", needs: "changes" },
   { key: "activity", label: "آخر التحديثات", note: "ما استجدّ في اللوحة" },
   { key: "notes", label: "ملاحظاتي", note: "آخر ما كتبته" },
@@ -200,7 +200,7 @@ export default function MyPage({
               </span>
               <span>
                 <b>{myAsg.filter((x) => x.state !== "done").length}</b>
-                {t("تكليفات", "assignments")}
+                {t("تكاليف", "assignments")}
               </span>
               {seesChanges && (
                 <span className="bad">
@@ -248,8 +248,8 @@ export default function MyPage({
       case "assignments":
         return (
           <div className="card mp-w" key={k}>
-            <h3>{t("تكليفاتي", "My assignments")}</h3>
-            <TaskList list={myAsg} empty={t("لا تكليفات عليك.", "No assignments.")} />
+            <h3>{t("التكاليف المسندة لي", "My assignments")}</h3>
+            <TaskList list={myAsg} empty={t("لا تكاليف عليك.", "No assignments.")} />
           </div>
         );
       case "changes":

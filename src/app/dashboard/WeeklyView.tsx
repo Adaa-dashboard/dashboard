@@ -232,7 +232,7 @@ export default function WeeklyView({
         )}
       </Section>
 
-      <Section title="المهام والتكليفات" count={report.tasks.length}>
+      <Section title="المهام والتكاليف" count={report.tasks.length}>
         {report.tasks.length === 0 ? (
           <div className="empty">لا توجد مهام مفتوحة.</div>
         ) : (

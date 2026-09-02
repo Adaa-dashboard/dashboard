@@ -183,7 +183,7 @@ export default function Notes({
       <div className="modal notes-modal" onClick={(e) => e.stopPropagation()}>
         <div className="m-h">
           <h3>{t("ملاحظاتي", "My notes")}</h3>
-          <span className={`nt-save ${saving}`}>
+          <span className={`nb-save ${saving}`}>
             {saving === "busy"
               ? t("يحفظ…", "Saving…")
               : saving === "ok"
@@ -200,22 +200,22 @@ export default function Notes({
         {!loaded ? (
           <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>
         ) : (
-          <div className="nt">
-            <aside className="nt-folders">
+          <div className="nb">
+            <aside className="nb-folders">
               <button
-                className={`nt-f ${folder === ALL ? "on" : ""}`}
+                className={`nb-f ${folder === ALL ? "on" : ""}`}
                 onClick={() => setFolder(ALL)}
               >
                 <span>📒 {t("كل الملاحظات", "All notes")}</span>
                 <b>{countIn(ALL)}</b>
               </button>
               {data.folders.map((f) => (
-                <div key={f.id} className={`nt-frow ${folder === f.id ? "on" : ""}`}>
-                  <button className="nt-f" onClick={() => setFolder(f.id)}>
+                <div key={f.id} className={`nb-frow ${folder === f.id ? "on" : ""}`}>
+                  <button className="nb-f" onClick={() => setFolder(f.id)}>
                     <span>📁 {f.name}</span>
                     <b>{countIn(f.id)}</b>
                   </button>
-                  <span className="nt-fx">
+                  <span className="nb-fx">
                     <button onClick={() => renameFolder(f)} title={t("إعادة تسمية", "Rename")}>
                       ✎
                     </button>
@@ -225,22 +225,22 @@ export default function Notes({
                   </span>
                 </div>
               ))}
-              <button className="nt-add-f" onClick={addFolder}>
+              <button className="nb-add-f" onClick={addFolder}>
                 ＋ {t("مجلد جديد", "New folder")}
               </button>
             </aside>
 
-            <section className="nt-list">
+            <section className="nb-list">
               <input
-                className="nt-q"
+                className="nb-q"
                 placeholder={t("بحث…", "Search…")}
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
               />
-              <button className="btn btn-sm nt-new" onClick={addNote}>
+              <button className="btn btn-sm nb-new" onClick={addNote}>
                 ＋ {t("ملاحظة جديدة", "New note")}
               </button>
-              <div className="nt-items">
+              <div className="nb-items">
                 {shown.length === 0 ? (
                   <div className="empty" style={{ padding: 20, fontSize: 13 }}>
                     {t("لا ملاحظات هنا بعد.", "No notes here yet.")}
@@ -249,7 +249,7 @@ export default function Notes({
                   shown.map((n) => (
                     <button
                       key={n.id}
-                      className={`nt-item ${openId === n.id ? "on" : ""}`}
+                      className={`nb-item ${openId === n.id ? "on" : ""}`}
                       onClick={() => setOpenId(n.id)}
                     >
                       <b>{firstLine(n)}</b>
@@ -262,16 +262,16 @@ export default function Notes({
               </div>
             </section>
 
-            <section className="nt-editor">
+            <section className="nb-editor">
               {!open ? (
                 <div className="empty" style={{ padding: 30 }}>
                   {t("اختاري ملاحظة أو أنشئي واحدة جديدة.", "Pick a note or create one.")}
                 </div>
               ) : (
                 <>
-                  <div className="nt-etop">
+                  <div className="nb-etop">
                     <input
-                      className="nt-title"
+                      className="nb-title"
                       value={open.title}
                       placeholder={t("العنوان", "Title")}
                       onChange={(e) => editNote(open.id, { title: e.target.value })}
@@ -292,12 +292,12 @@ export default function Notes({
                     </button>
                   </div>
                   <textarea
-                    className="nt-body"
+                    className="nb-body"
                     value={open.body}
                     placeholder={t("اكتبي هنا…", "Write here…")}
                     onChange={(e) => editNote(open.id, { body: e.target.value })}
                   />
-                  <div className="nt-foot">{whenAr(open.updatedAt)}</div>
+                  <div className="nb-foot">{whenAr(open.updatedAt)}</div>
                 </>
               )}
             </section>
