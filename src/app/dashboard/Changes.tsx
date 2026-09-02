@@ -124,7 +124,14 @@ function mapRows(grid: string[][]): Parsed {
   return { rows, skipped };
 }
 
-export default function Changes({ t }: { t: (ar: string, en: string) => string }) {
+export default function Changes({
+  t,
+  canEdit,
+}: {
+  t: (ar: string, en: string) => string;
+  /** الرفع لمن يسحب الملف من المنصة · والبقية يقرؤون ويصدّرون */
+  canEdit: boolean;
+}) {
   const [items, setItems] = useState<Change[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [filter, setFilter] = useState<"open" | Tone | "all">("open");
@@ -238,36 +245,52 @@ export default function Changes({ t }: { t: (ar: string, en: string) => string }
     }
   }
 
-  function exportCsv() {
-    const head = [
-      "الرمز",
-      "اسم البرنامج/الاستراتيجية",
-      "كود المبادرة / المؤشر",
-      "اسم المبادرة/ المؤشر",
-      "الجهة المالكة",
-      "فئة الطلب",
-      "نوع المراجعة",
-      "التصنيف",
-      "اتفاقية مستوى الخدمة",
-      "أيام العمل",
-      "المتبقي",
-      "الحالة",
-    ];
-    const body = shown.map((c) => [
-      c.code,
-      c.program,
-      c.itemCode,
-      c.itemName,
-      c.owner,
-      c.category,
-      c.reviewType,
-      c.classification,
-      c.sla ?? "",
-      c.workDays ?? "",
+  const HEAD = [
+    "الرمز",
+    "اسم البرنامج/الاستراتيجية",
+    "كود المبادرة / المؤشر",
+    "اسم المبادرة/ المؤشر",
+    "الجهة المالكة",
+    "فئة الطلب",
+    "نوع المراجعة",
+    "التصنيف",
+    "اتفاقية مستوى الخدمة",
+    "أيام العمل",
+    "المتبقي",
+    "الحالة",
+  ];
+
+  function statusText(c: Change): string {
+    if (c.status === "closed") return "تمت المراجعة";
+    const tn = toneOf(c);
+    return tn === "late" ? "متأخر" : tn === "near" ? "قارب على الانتهاء" : "ضمن المدة";
+  }
+
+  function bodyRows(): (string | number)[][] {
+    return shown.map((c) => [
+      c.code, c.program, c.itemCode, c.itemName, c.owner, c.category,
+      c.reviewType, c.classification, c.sla ?? "", c.workDays ?? "",
       c.sla != null && c.workDays != null ? c.sla - c.workDays : "",
-      c.status === "closed" ? "تمت المراجعة" : toneOf(c) === "late" ? "متأخر" : toneOf(c) === "near" ? "قارب على الانتهاء" : "ضمن المدة",
+      statusText(c),
     ]);
-    const csv = [head, ...body]
+  }
+
+  /** نسخ بفواصل Tab فيُلصق في إكسل وWord جدولاً حقيقياً */
+  async function copyTable() {
+    const tsv = [HEAD, ...bodyRows()]
+      .map((r) => r.map((x) => String(x).replace(/[\t\n]+/g, " ")).join("\t"))
+      .join("\n");
+    try {
+      await navigator.clipboard.writeText(tsv);
+      setErr("");
+      setMsg(t(`نُسخ ${shown.length} طلباً — الصقيه في إكسل أو Word`, "Copied"));
+    } catch {
+      setErr(t("تعذّر النسخ التلقائي — استخدمي «⬇ Excel».", "Copy failed — use Excel export."));
+    }
+  }
+
+  function exportCsv() {
+    const csv = [HEAD, ...bodyRows()]
       .map((r) => r.map((x) => (/[",\n]/.test(String(x)) ? `"${String(x).replace(/"/g, '""')}"` : String(x))).join(","))
       .join("\r\n");
     const url = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" }));
@@ -305,22 +328,31 @@ export default function Changes({ t }: { t: (ar: string, en: string) => string }
           ))}
         </span>
         <div style={{ flex: 1 }} />
-        <button className="btn btn-ghost btn-sm" onClick={() => setPasting(true)}>
-          {t("لصق الجدول", "Paste")}
+        {canEdit && (
+          <button className="btn btn-ghost btn-sm" onClick={() => setPasting(true)}>
+            {t("لصق الجدول", "Paste")}
+          </button>
+        )}
+        <button className="btn btn-ghost btn-sm" onClick={copyTable} disabled={!shown.length}>
+          {t("نسخ الجدول", "Copy")}
         </button>
         <button className="btn btn-ghost btn-sm" onClick={exportCsv} disabled={!shown.length}>
           ⬇ Excel
         </button>
-        <button className="btn btn-sm" onClick={() => fileRef.current?.click()} disabled={busy}>
-          {busy ? t("جارٍ الحفظ…", "Saving…") : t("⬆ رفع ملف المنصة", "Upload file")}
-        </button>
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".xlsx,.xls,.csv,.txt"
-          style={{ display: "none" }}
-          onChange={onFile}
-        />
+        {canEdit && (
+          <>
+            <button className="btn btn-sm" onClick={() => fileRef.current?.click()} disabled={busy}>
+              {busy ? t("جارٍ الحفظ…", "Saving…") : t("⬆ رفع ملف المنصة", "Upload file")}
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".xlsx,.xls,.csv,.txt"
+              style={{ display: "none" }}
+              onChange={onFile}
+            />
+          </>
+        )}
       </div>
 
       {err && <div className="alert alert-error">{err}</div>}
@@ -331,10 +363,15 @@ export default function Changes({ t }: { t: (ar: string, en: string) => string }
       ) : !items.length ? (
         <div className="soon">
           <b>{t("لا توجد طلبات تغيير بعد", "No change requests yet")}</b>
-          {t(
-            "ارفعي ملف المتابعة اليومي المسحوب من منصة الرؤية، أو انسخي الجدول من البريد والصقيه.",
-            "Upload the daily platform file, or paste the table."
-          )}
+          {canEdit
+            ? t(
+                "ارفعي ملف المتابعة اليومي المسحوب من منصة الرؤية، أو انسخي الجدول من البريد والصقيه.",
+                "Upload the daily platform file, or paste the table."
+              )
+            : t(
+                "تظهر هنا فور رفع ملف المتابعة اليومي.",
+                "They appear once the daily file is uploaded."
+              )}
         </div>
       ) : !shown.length ? (
         <div className="empty">{t("لا طلبات في هذا التصنيف.", "Nothing here.")}</div>

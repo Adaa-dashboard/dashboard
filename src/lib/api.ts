@@ -137,7 +137,9 @@ export async function apiFetch(path: string, init: Init = {}) {
 
     if (p === "/api/me") {
       const me = await whoAmI();
-      return ok({ user: me });
+      if (!me) return ok({ user: null });
+      const { data: canCh } = await s.rpc("perf_can_changes");
+      return ok({ user: { ...me, canChanges: canCh === true } });
     }
 
     /* ---------------- المرجعيات ---------------- */
@@ -259,7 +261,7 @@ export async function apiFetch(path: string, init: Init = {}) {
         users: (data || []).map((u: Record<string, unknown>) => ({
           id: String(u.id), username: u.username, name: u.name, phone: u.phone,
           role: u.role, sectorIds: u.sector_ids || [], active: u.active,
-          hasPassword: u.has_password,
+          hasPassword: u.has_password, canChanges: u.can_changes === true,
         })),
       });
     }
@@ -268,6 +270,7 @@ export async function apiFetch(path: string, init: Init = {}) {
         p_id: null, p_username: body.username, p_name: body.name, p_phone: body.phone,
         p_role: body.role, p_sectors: body.sectorIds || [], p_active: true,
         p_password: body.password || null, p_clear_password: false,
+        p_can_changes: body.canChanges === true,
       });
       if (error) return err("غير مصرّح", 403);
       if (data?.error === "dup_username") return err("اسم المستخدم مستخدَم مسبقًا", 400);
@@ -298,6 +301,8 @@ export async function apiFetch(path: string, init: Init = {}) {
           p_active: typeof body.active === "boolean" ? body.active : cur.active,
           p_password: body.password || null,
           p_clear_password: body.clearPassword === true,
+          p_can_changes:
+            typeof body.canChanges === "boolean" ? body.canChanges : cur.can_changes === true,
         });
         if (error) return err("غير مصرّح", 403);
         if (data?.error === "dup_username") return err("اسم المستخدم مستخدَم مسبقًا", 400);

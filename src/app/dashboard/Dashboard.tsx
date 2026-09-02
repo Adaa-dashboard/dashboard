@@ -36,6 +36,8 @@ interface Me {
   hasPassword?: boolean;
   role: Role;
   sectorIds: string[];
+  /** يرفع ملف طلبات التغيير (مدير الإدارة يملكها دائماً) */
+  canChanges?: boolean;
 }
 interface Sector {
   id: string;
@@ -248,7 +250,7 @@ export default function Dashboard({ me }: { me: Me }) {
           <NavItem id="overview" icon="◱" label={["نظرة عامة", "Overview"]} />
           <NavItem id="details" icon="◎" label={["المؤشرات التفصيلية", "KPI Details"]} />
           <NavItem id="tasks" icon="✓" label={["المهام", "Tasks"]} />
-          <NavItem id="report" icon="▤" label={["الإنجاز الأسبوعي", "Weekly Achievement"]} />
+          {isAdmin && <NavItem id="report" icon="▤" label={["الإنجاز الأسبوعي", "Weekly Achievement"]} />}
 
           <div className="rail-gap" />
 
@@ -325,7 +327,7 @@ export default function Dashboard({ me }: { me: Me }) {
                   onFocusDone={() => setTaskFocus(null)}
                 />
               )}
-              {tab === "report" && <WeeklyPanel t={t} />}
+              {tab === "report" && isAdmin && <WeeklyPanel t={t} />}
               {tab === "structure" && isAdmin && <SectorsManager refData={refData} reload={loadRef} />}
               {tab === "users" && isAdmin && <UsersManager refData={refData} />}
             </>
@@ -337,7 +339,7 @@ export default function Dashboard({ me }: { me: Me }) {
           <TabBtn id="overview" icon="◱" label={["الرئيسية", "Home"]} />
           <TabBtn id="details" icon="◎" label={["مؤشرات", "KPIs"]} />
           <TabBtn id="tasks" icon="✓" label={["المهام", "Tasks"]} />
-          <TabBtn id="report" icon="▤" label={["الأسبوعي", "Weekly"]} />
+          {isAdmin && <TabBtn id="report" icon="▤" label={["الأسبوعي", "Weekly"]} />}
           <button
             className={`tab-btn ${sheet ? "active" : ""}`}
             onClick={() => setSheet(true)}
@@ -853,7 +855,7 @@ function Overview({
           )}
         </span>
       </h2>
-      <Changes t={t} />
+      <Changes t={t} canEdit={me.role === "admin" || me.canChanges === true} />
 
       <h2 className="section-title with-chips" style={{ marginTop: 28 }}>
         {t("الأداء العام للقطاعات", "Sector performance")}
@@ -1664,6 +1666,7 @@ interface UserRow {
   role: Role;
   active: boolean;
   sectorIds: string[];
+  canChanges?: boolean;
 }
 function UsersManager({ refData }: { refData: RefData }) {
   const { t } = useT();
@@ -1944,6 +1947,7 @@ function EditUserModal({
   const [role, setRole] = useState<Role>(user.role);
   const [ids, setIds] = useState<string[]>(user.sectorIds || []);
   const [active, setActive] = useState(user.active);
+  const [canChanges, setCanChanges] = useState(user.canChanges === true);
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -1980,6 +1984,7 @@ function EditUserModal({
         role,
         sectorIds: role === "manager" ? ids : [],
         active,
+        canChanges,
         password: pw || undefined,
       },
       t("حُفظ ✓", "Saved ✓")
@@ -2048,6 +2053,25 @@ function EditUserModal({
               </div>
             </>
           )}
+
+          <label style={{ marginTop: 14 }}>{t("صلاحيات إضافية", "Extra permissions")}</label>
+          <label className="checkbox-inline">
+            <input
+              type="checkbox"
+              checked={role === "admin" ? true : canChanges}
+              disabled={role === "admin"}
+              onChange={(e) => setCanChanges(e.target.checked)}
+            />
+            {t("يرفع ملف طلبات التغيير", "Can upload change requests")}
+          </label>
+          <div className="note-i" style={{ marginTop: 6 }}>
+            {role === "admin"
+              ? t("مدير الإدارة يملكها دائماً.", "Admins always have it.")
+              : t(
+                  "البقية يقرؤون طلبات التغيير وينسخونها ويصدّرونها Excel، لكن لا يرفعون الملف.",
+                  "Others can read and export change requests, but not upload."
+                )}
+          </div>
 
           <label style={{ marginTop: 14 }}>{t("حالة الحساب", "Account status")}</label>
           <label className="checkbox-inline">
