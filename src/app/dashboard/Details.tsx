@@ -45,6 +45,9 @@ interface Props {
   targetOf: (sectorId: string, indicatorId: string, quarter: number | null) => number | null;
   t: (ar: string, en: string) => string;
   reload: () => void;
+  /** فتح مؤشر بعينه قادماً من زر «عرض» في آخر التحديثات */
+  focus?: { indicatorId: string; sectorId?: string; notes?: boolean } | null;
+  onFocusDone?: () => void;
 }
 
 const QUARTERS = [1, 2, 3, 4];
@@ -84,6 +87,8 @@ export default function Details({
   targetOf,
   t,
   reload,
+  focus,
+  onFocusDone,
 }: Props) {
   const [by, setBy] = useState<"indicator" | "sector">("indicator");
   const [scope, setScope] = useState<number | null>(null); // null = كل السنة
@@ -114,6 +119,19 @@ export default function Details({
   useEffect(() => {
     load();
   }, [load]);
+
+  // القادم من «آخر التحديثات»: افتحي مجموعة المؤشر، وافتحي ملاحظاته إن طُلبت
+  useEffect(() => {
+    if (!focus || loading) return; // ننتظر وصول الصفوف وإلا لم يوجد ما نمرّر إليه
+    setBy("indicator");
+    setQ("");
+    setOpen((o) => ({ ...o, [focus.indicatorId]: true }));
+    if (focus.notes && focus.sectorId)
+      setNotesFor({ sectorId: focus.sectorId, indicatorId: focus.indicatorId });
+    const el = document.getElementById(`dtg-${focus.indicatorId}`);
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+    onFocusDone?.();
+  }, [focus, loading, onFocusDone]);
 
   const year = useMemo(() => {
     let max = 0;
@@ -311,7 +329,7 @@ export default function Details({
         <div className="empty">{t("لا نتائج مطابقة.", "No matches.")}</div>
       ) : (
         groups.map((g) => (
-          <section className={`dt-g ${isOpen(g.id) ? "open" : ""}`} key={g.id}>
+          <section className={`dt-g ${isOpen(g.id) ? "open" : ""}`} key={g.id} id={`dtg-${g.id}`}>
             <button className="dt-gh" onClick={() => setOpen((s) => ({ ...s, [g.id]: !isOpen(g.id) }))}>
               <span className="dt-caret">▾</span>
               <h3>{g.name}</h3>

@@ -5,7 +5,8 @@ import { asset } from "@/lib/base";
 import { apiFetch } from "@/lib/api";
 
 import { createContext, useContext, useCallback, useEffect, useMemo, useState } from "react";
-import Activity from "./Activity";
+import Activity, { type Item as ActivityItem } from "./Activity";
+import Changes from "./Changes";
 import Tasks from "./Tasks";
 import WeeklyPanel from "./WeeklyPanel";
 import Details from "./Details";
@@ -164,6 +165,24 @@ export default function Dashboard({ me }: { me: Me }) {
     loadRef();
   }, [loadRef]);
 
+  // من زر «عرض» في آخر التحديثات: ننتقل للصفحة ونفتح البند نفسه
+  const [detFocus, setDetFocus] = useState<
+    { indicatorId: string; sectorId?: string; notes?: boolean } | null
+  >(null);
+  const [taskFocus, setTaskFocus] = useState<string | null>(null);
+
+  function goFromActivity(it: ActivityItem) {
+    if (it.taskId) {
+      setTaskFocus(it.taskId);
+      setTab("tasks");
+      return;
+    }
+    if (it.indicatorId) {
+      setDetFocus({ indicatorId: it.indicatorId, sectorId: it.sectorId, notes: it.kind === "note" });
+      setTab("details");
+    }
+  }
+
   async function logout() {
     await apiFetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
@@ -174,7 +193,7 @@ export default function Dashboard({ me }: { me: Me }) {
     overview: ["نظرة عامة", "Overview"],
     details: ["المؤشرات التفصيلية", "KPI Details"],
     entry: ["المؤشرات والمستهدفات", "KPIs & Targets"],
-    tasks: ["المهام والتكليفات", "Tasks"],
+    tasks: ["المهام", "Tasks"],
     report: ["الإنجاز الأسبوعي", "Weekly Achievement"],
     structure: ["القطاعات والإدارات", "Sectors"],
     users: ["المستخدمون والصلاحيات", "Users & Roles"],
@@ -228,7 +247,7 @@ export default function Dashboard({ me }: { me: Me }) {
 
           <NavItem id="overview" icon="◱" label={["نظرة عامة", "Overview"]} />
           <NavItem id="details" icon="◎" label={["المؤشرات التفصيلية", "KPI Details"]} />
-          <NavItem id="tasks" icon="✓" label={["المهام والتكليفات", "Tasks"]} />
+          <NavItem id="tasks" icon="✓" label={["المهام", "Tasks"]} />
           <NavItem id="report" icon="▤" label={["الإنجاز الأسبوعي", "Weekly Achievement"]} />
 
           <div className="rail-gap" />
@@ -279,7 +298,7 @@ export default function Dashboard({ me }: { me: Me }) {
             <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>
           ) : (
             <>
-              {tab === "overview" && <Overview me={me} refData={refData} />}
+              {tab === "overview" && <Overview me={me} refData={refData} onGo={goFromActivity} />}
               {tab === "details" && (
                 <Details
                   isAdmin={isAdmin}
@@ -291,6 +310,8 @@ export default function Dashboard({ me }: { me: Me }) {
                   targetOf={(sid, iid, q) => tgtForScope(refData, tkey(sid, iid), q)}
                   t={t}
                   reload={loadRef}
+                  focus={detFocus}
+                  onFocusDone={() => setDetFocus(null)}
                 />
               )}
               {tab === "entry" && isAdmin && <EntrySection me={me} refData={refData} reload={loadRef} />}
@@ -300,6 +321,8 @@ export default function Dashboard({ me }: { me: Me }) {
                   isAdmin={isAdmin}
                   indicators={refData.indicators.map((i) => ({ id: i.id, name: i.name }))}
                   t={t}
+                  focusId={taskFocus}
+                  onFocusDone={() => setTaskFocus(null)}
                 />
               )}
               {tab === "report" && <WeeklyPanel t={t} />}
@@ -535,7 +558,15 @@ const SCOPES: { key: string; label: string; en: string; q: number | null }[] = [
   { key: "q3", label: "الربع الثالث", en: "Q3", q: 3 },
   { key: "q4", label: "الربع الرابع", en: "Q4", q: 4 },
 ];
-function Overview({ me, refData }: { me: Me; refData: RefData }) {
+function Overview({
+  me,
+  refData,
+  onGo,
+}: {
+  me: Me;
+  refData: RefData;
+  onGo: (item: ActivityItem) => void;
+}) {
   const { t, lang } = useT();
   const sectors = visibleSectors(me, refData);
   const indicators = activeIndicators(refData);
@@ -543,7 +574,7 @@ function Overview({ me, refData }: { me: Me; refData: RefData }) {
   const [scope, setScope] = useState("year");
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [loading, setLoading] = useState(true);
-  const [openSector, setOpenSector] = useState<string | null>(null);
+  const [asgFocus, setAsgFocus] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string | null>(null); // اسم الحالة
   const [openIndicator, setOpenIndicator] = useState<(Indicator & { num: number }) | null>(null);
 
@@ -604,10 +635,6 @@ function Overview({ me, refData }: { me: Me; refData: RefData }) {
 
   const shownInd = statusFilter ? indData.filter((d) => d.bandLabel === statusFilter) : indData;
 
-  function sectorAch(sectorId: string): number | null {
-    const vals = indicators.map((ind) => achOf(sectorId, ind.id)).filter((v): v is number => v != null);
-    return avg(vals) == null ? null : Math.round(avg(vals)!);
-  }
 
   function exportCsv() {
     const header = ["القطاع", "المؤشر", "الوحدة", "المستهدف", "المنجز", "نسبة الإنجاز %", "آخر تحديث"];
@@ -720,7 +747,18 @@ function Overview({ me, refData }: { me: Me; refData: RefData }) {
           />
         </div>
 
-        <Activity t={t} />
+        <Activity
+          t={t}
+          onOpen={(it) => {
+            // التكليفات معروضة في هذه الصفحة نفسها، فلا داعي للانتقال
+            if (it.kind === "assignment" && it.taskId) {
+              setAsgFocus(it.taskId);
+              document.getElementById("ov-asg")?.scrollIntoView({ behavior: "smooth", block: "start" });
+              return;
+            }
+            onGo(it);
+          }}
+        />
       </div>
 
       <h2 className="section-title with-chips">
@@ -790,6 +828,33 @@ function Overview({ me, refData }: { me: Me; refData: RefData }) {
         />
       )}
 
+      <h2 className="section-title" id="ov-asg" style={{ marginTop: 28 }}>
+        {t("التكليفات", "Assignments")}
+        <span className="sec-note">
+          {t("الواردة من الديوان أو جهة أعلى", "Received from higher authority")}
+        </span>
+      </h2>
+      <Tasks
+        meId={me.id}
+        isAdmin={me.role === "admin"}
+        indicators={refData.indicators.map((i) => ({ id: i.id, name: i.name }))}
+        t={t}
+        kind="assignment"
+        focusId={asgFocus}
+        onFocusDone={() => setAsgFocus(null)}
+      />
+
+      <h2 className="section-title" style={{ marginTop: 28 }}>
+        {t("طلبات التغيير", "Change requests")}
+        <span className="sec-note">
+          {t(
+            "الواردة من منصة الرؤية · اللون بحسب اتفاقية مستوى الخدمة",
+            "From the Vision platform · coloured by SLA"
+          )}
+        </span>
+      </h2>
+      <Changes t={t} />
+
       <h2 className="section-title with-chips" style={{ marginTop: 28 }}>
         {t("الأداء العام للقطاعات", "Sector performance")}
         {rangeTabs}
@@ -802,40 +867,6 @@ function Overview({ me, refData }: { me: Me; refData: RefData }) {
         />
       </div>
 
-      <h2 className="section-title" style={{ marginTop: 28 }}>
-        {t("تفاصيل القطاعات", "Sector Details")}
-      </h2>
-      <div className="sector-list">
-        {sectors.map((s) => {
-          const ach = sectorAch(s.id);
-          const band = bandOf(ach, bands);
-          const isOpen = openSector === s.id;
-          return (
-            <div key={s.id} className="sector-panel">
-              <button className="sector-head" onClick={() => setOpenSector(isOpen ? null : s.id)}>
-                <span className="sector-arrow">{isOpen ? "▼" : "◀"}</span>
-                <span className="sector-name">{s.name}</span>
-                <span
-                  className="sector-pct"
-                  style={{ background: band ? tint(band.color) : "var(--bg2)", color: band?.color ?? "#8a9a95" }}
-                >
-                  {ach != null ? `${ach}%` : "—"}
-                </span>
-              </button>
-              {isOpen && (
-                <SectorDetail
-                  sector={s}
-                  indicators={indicators}
-                  latest={latest}
-                  scopeQ={scopeQ}
-                  bands={bands}
-                  refData={refData}
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }
@@ -876,60 +907,6 @@ function DetailCells({
       </td>
       <td className="mini muted">{updated || "—"}</td>
     </>
-  );
-}
-
-function SectorDetail({
-  sector,
-  indicators,
-  latest,
-  scopeQ,
-  bands,
-  refData,
-}: {
-  sector: Sector;
-  indicators: Indicator[];
-  latest: Map<string, Measurement>;
-  scopeQ: number | null;
-  bands: Band[];
-  refData: RefData;
-}) {
-  const { t, lang } = useT();
-  return (
-    <div className="sector-detail" style={{ overflowX: "auto" }}>
-      <table className="detail-table">
-        <thead>
-          <tr className="sub-head">
-            <th className="ind-col">{t("المؤشر", "KPI")}</th>
-            <DetailHead />
-          </tr>
-        </thead>
-        <tbody>
-          {indicators.map((ind, i) => {
-            const key = tkey(sector.id, ind.id);
-            const m = latest.get(key);
-            const tgt = tgtForScope(refData, key, scopeQ);
-            const r = evaluate(m?.actual, tgt, bands);
-            return (
-              <tr key={ind.id}>
-                <td className="ind-col">
-                  <strong>KPI {i + 1}</strong> · {ind.name}{" "}
-                  <span className="muted">({ind.unit === "percent" ? "%" : t("عدد", "num")})</span>
-                </td>
-                <DetailCells
-                  target={fmtValue(tgt, ind.unit)}
-                  actual={fmtValue(m?.actual, ind.unit)}
-                  pct={r.achievement != null ? `${Math.round(r.achievement)}%` : "—"}
-                  updated={fmtDate(m?.updatedAt, lang)}
-                  bg={r.bg}
-                  color={r.color}
-                />
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
   );
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { SeriesPoint } from "@/lib/analytics";
 
 /* درجات الأخضر لمسارات القطاعات — لكل قطاع درجة ونمط خط،
@@ -19,12 +19,19 @@ export interface Line {
   points: SeriesPoint[];
 }
 
-const VB_W = 1000;
-const VB_H = 272;
-const X0 = 70;
-const X1 = 900;
-const Y_TOP = 40;
-const Y_BOT = 226;
+/* الرسم يُقاس بعرض حاويته الحقيقي (1:1 مع بكسل الشاشة) بدل viewBox ثابت
+   يتمدّد أو ينكمش. كان العرض الثابت 1000 يعني أن خطاً مكتوباً بـ 11px
+   يصير ~5px داخل بطاقة نصف الشاشة فلا يُقرأ، ويصير ضخماً في بطاقة كاملة.
+   بهذه الطريقة حجم الخط ثابت بالبكسل مهما اتّسعت البطاقة أو ضاقت. */
+const VB_H = 250;
+const PAD_S = 48; // مساحة أرقام المحور
+const PAD_E = 56; // مساحة قيمة آخر نقطة
+const Y_TOP = 28;
+const Y_BOT = 200;
+
+const F_AXIS = "600 14px 'Noto Sans Arabic', sans-serif";
+const F_VAL = "800 16px 'Noto Kufi Arabic', sans-serif";
+const F_LBL = "700 14px 'Noto Sans Arabic', sans-serif";
 
 function yOf(v: number, min: number, max: number) {
   const t = (v - min) / Math.max(1, max - min);
@@ -42,9 +49,30 @@ export function LineChart({
   emptyText: string;
 }) {
   const [hover, setHover] = useState<number | null>(null);
+  const [w, setW] = useState(760);
+  const roRef = useRef<ResizeObserver | null>(null);
+  // ref دالة لا كائن: الحاوية قد تظهر متأخرة (حالة «لا توجد قياسات» أولاً)
+  const setNode = useCallback((el: HTMLDivElement | null) => {
+    roRef.current?.disconnect();
+    roRef.current = null;
+    if (!el) return;
+    const read = () => setW(Math.max(320, Math.round(el.clientWidth)));
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    roRef.current = ro;
+    read();
+  }, []);
+
+  const X0 = PAD_S;
+  const X1 = Math.max(PAD_S + 60, w - PAD_E);
 
   const all = lines.flatMap((l) => l.points.map((p) => p.value)).filter((v): v is number => v != null);
-  if (!all.length || labels.length < 2) return <div className="empty">{emptyText}</div>;
+  if (!all.length || labels.length < 2)
+    return (
+      <div className="chart-wrap" ref={setNode}>
+        <div className="empty">{emptyText}</div>
+      </div>
+    );
 
   const rawMin = Math.min(...all);
   const rawMax = Math.max(...all);
@@ -59,14 +87,21 @@ export function LineChart({
   const step = (X1 - X0) / (n - 1);
 
   return (
-    <div className="chart-wrap">
-      <svg viewBox={`0 0 ${VB_W} ${VB_H}`} width="100%" style={{ display: "block", height: "auto" }} role="img" aria-label={emptyText}>
+    <div className="chart-wrap" ref={setNode}>
+      <svg
+        viewBox={`0 0 ${w} ${VB_H}`}
+        width="100%"
+        height={VB_H}
+        style={{ display: "block" }}
+        role="img"
+        aria-label={emptyText}
+      >
         <g stroke="#eef2f1" strokeWidth={1}>
           {grid.map((g) => (
             <line key={g} x1={X0} y1={yOf(g, min, max)} x2={X1} y2={yOf(g, min, max)} />
           ))}
         </g>
-        <g fill="#8a9a95" textAnchor="end" style={{ font: "400 11px 'Noto Sans Arabic', sans-serif", direction: "ltr" }}>
+        <g fill="#6d7f7a" textAnchor="end" style={{ font: F_AXIS, direction: "ltr" }}>
           {grid.map((g) => (
             <text key={g} x={X0 - 10} y={yOf(g, min, max) + 4}>
               {g}
@@ -123,7 +158,7 @@ export function LineChart({
           )}
         </g>
 
-        <g textAnchor="start" style={{ font: "800 13px 'Noto Kufi Arabic', sans-serif", direction: "ltr" }}>
+        <g textAnchor="start" style={{ font: F_VAL, direction: "ltr" }}>
           {lines.map((l) => {
             let lastIdx = -1;
             l.points.forEach((p, i) => {
@@ -141,11 +176,11 @@ export function LineChart({
 
         <g
           textAnchor="middle"
-          style={{ font: "700 12.5px 'Noto Sans Arabic', sans-serif", direction: "ltr" }}
-          fill="#4b5a55"
+          style={{ font: F_LBL, direction: "ltr" }}
+          fill="#3f4f4a"
         >
           {labels.map((lb, i) => (
-            <text key={lb} x={xs[i]} y={Y_BOT + 26}>
+            <text key={lb} x={xs[i]} y={Y_BOT + 28}>
               {lb}
             </text>
           ))}
@@ -168,7 +203,7 @@ export function LineChart({
       </svg>
 
       {hover != null && (
-        <div className="chart-tip" style={{ insetInlineStart: `${(xs[hover] / VB_W) * 100}%` }}>
+        <div className="chart-tip" style={{ insetInlineStart: `${(xs[hover] / w) * 100}%` }}>
           <span className="h">{labels[hover]}</span>
           {lines.map((l) => (
             <span className="r" key={l.name}>
