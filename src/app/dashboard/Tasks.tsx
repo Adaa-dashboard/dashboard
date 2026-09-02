@@ -49,12 +49,14 @@ function arDays(n: number) {
   return `${n} يومًا`;
 }
 
-/** العمود الذي تقع فيه المهمة: مكتملة · متأخرة · هذا الأسبوع · بقية المهام. */
-function columnOf(t: Task): "done" | "late" | "week" | "main" {
+/** العمود الذي يقع فيه البند: مكتمل · متأخر · هذا الأسبوع · البقية.
+    التكاليف بلا عمود «هذا الأسبوع»، فما يقع فيه يذهب للعمود الأول
+    وإلا اختفى من اللوحة تماماً. */
+function columnOf(t: Task, withWeek = true): "done" | "late" | "week" | "main" {
   if (t.state === "done") return "done";
   const d = daysBetween(t.dueDate, todayISO());
   if (d < 0) return "late";
-  if (d <= 7) return "week";
+  if (withWeek && d <= 7) return "week";
   return "main";
 }
 
@@ -74,6 +76,7 @@ export default function Tasks({
   indicators,
   t,
   kind = "task",
+  limit = 0,
   onlyMine = false,
   focusId,
   onFocusDone,
@@ -83,6 +86,8 @@ export default function Tasks({
   indicators: Indicator[];
   t: (ar: string, en: string) => string;
   kind?: Kind;
+  /** أعلى عدد بطاقات في كل عمود قبل «عرض الكل» — 0 = بلا حدّ */
+  limit?: number;
   /** يرى ما أُسند إليه أو ما أنشأه وحده — ما لم يُمنح «كل المهام» */
   onlyMine?: boolean;
   /** فتح بند بعينه مباشرة (قادم من زر «عرض» في آخر التحديثات) */
@@ -106,6 +111,7 @@ export default function Tasks({
   const [open, setOpen] = useState<Task | null>(null);
   const [creating, setCreating] = useState(false);
   const [err, setErr] = useState("");
+  const [showAll, setShowAll] = useState(false);
 
   const load = useCallback(async () => {
     const r = await apiFetch("/api/tasks").then((x) => x.json());
@@ -139,13 +145,13 @@ export default function Tasks({
   const cols = useMemo(() => {
     const src = onlyDone ? tasks.filter((x) => x.state === "done") : tasks;
     const g: Record<string, Task[]> = { main: [], week: [], late: [], done: [] };
-    for (const x of src) g[columnOf(x)].push(x);
+    for (const x of src) g[columnOf(x, !asg)].push(x);
     g.main.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     g.week.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
     g.late.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
     g.done.sort((a, b) => (b.completedAt || "").localeCompare(a.completedAt || ""));
     return g;
-  }, [tasks, onlyDone]);
+  }, [tasks, onlyDone, asg]);
 
   async function saveReply(task: Task, updateId: string, text: string) {
     const r = await apiFetch(`/api/tasks/${task.id}`, {
@@ -231,8 +237,8 @@ export default function Tasks({
                 <b className="cnt">{cols[c.key].length}</b>
               </div>
               <div className="tcol-s">{c.hint}</div>
-              {cols[c.key].map((x) => {
-                const late = columnOf(x) === "late";
+              {(limit && !showAll ? cols[c.key].slice(0, limit) : cols[c.key]).map((x) => {
+                const late = columnOf(x, !asg) === "late";
                 const col = late ? STATE_COLOR.late : STATE_COLOR[x.state];
                 return (
                   <button key={x.id} className={`tk ${x.assigneeId === meId ? "mine" : ""}`} onClick={() => setOpen(x)}>
@@ -265,6 +271,22 @@ export default function Tasks({
             </div>
           ))}
         </div>
+      )}
+
+      {limit > 0 && !onlyDone && tasks.length > 0 && (
+        (() => {
+          const hidden = (["main", "week", "late", "done"] as const)
+            .filter((k) => COLS.some((c) => c.key === k))
+            .reduce((n, k) => n + Math.max(0, cols[k].length - limit), 0);
+          if (!hidden && !showAll) return null;
+          return (
+            <div className="tb-more" onClick={() => setShowAll(!showAll)}>
+              {showAll
+                ? t("عرض أقل ▴", "Show less ▴")
+                : t(`عرض الكل (${hidden} أخرى) ▾`, `Show all (${hidden} more) ▾`)}
+            </div>
+          );
+        })()
       )}
 
       {open && (

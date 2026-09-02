@@ -881,6 +881,7 @@ function Overview({
             indicators={refData.indicators.map((i) => ({ id: i.id, name: i.name }))}
             t={t}
             kind="assignment"
+            limit={3}
             onlyMine={!hasScope(me.scopes, "tasks:all")}
             focusId={asgFocus}
             onFocusDone={() => setAsgFocus(null)}
