@@ -871,9 +871,6 @@ function Overview({
         <>
           <h2 className="section-title" id="ov-asg" style={{ marginTop: 28 }}>
             {t("التكاليف", "Assignments")}
-            <span className="sec-note">
-              {t("الواردة من الديوان أو جهة أعلى", "Received from higher authority")}
-            </span>
           </h2>
           <Tasks
             meId={me.id}
@@ -893,12 +890,6 @@ function Overview({
         <>
           <h2 className="section-title" style={{ marginTop: 28 }}>
             {t("طلبات التغيير", "Change requests")}
-            <span className="sec-note">
-              {t(
-                "الواردة من منصة الرؤية · اللون بحسب اتفاقية مستوى الخدمة",
-                "From the Vision platform · coloured by SLA"
-              )}
-            </span>
           </h2>
           <Changes t={t} canEdit={hasScope(me.scopes, "changes:upload")} />
         </>
@@ -1719,12 +1710,7 @@ function ScopePicker({
 
   return (
     <div className="field" style={{ marginTop: 14 }}>
-      <label>
-        {t("الصلاحيات", "Permissions")}
-        <span className="opt" style={{ marginInlineStart: 8 }}>
-          {t("ما لم يُمنح لا يظهر له", "Anything not granted stays hidden")}
-        </span>
-      </label>
+      <label>{t("الصلاحيات", "Permissions")}</label>
       <div className="sc-tools">
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => onChange([...DEFAULT_SCOPES])}>
           {t("الافتراضي", "Default")}
