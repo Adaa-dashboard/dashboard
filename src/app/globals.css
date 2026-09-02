@@ -3100,12 +3100,6 @@ table.matrix thead th {
 /* ============================================================
    طلبات التغيير (منصة الرؤية)
    ============================================================ */
-.sec-note {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--muted);
-  margin-inline-start: 10px;
-}
 .cr {
   margin-bottom: 22px;
 }
