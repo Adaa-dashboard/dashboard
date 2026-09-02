@@ -74,9 +74,11 @@ const rowChange = (r: Record<string, unknown>) => ({
 });
 
 async function people() {
-  const { data } = await sb().rpc("perf_list_users");
+  // perf_people متاحة لكل مسجَّل — قائمة الأسماء يحتاجها الجميع،
+  // بخلاف perf_list_users المحصورة بصلاحية «المستخدمون والصلاحيات»
+  const { data } = await sb().rpc("perf_people");
   return (data || []).map((u: Record<string, unknown>) => ({
-    id: String(u.id), name: u.name, role: u.role,
+    id: String(u.id), name: u.name, role: u.role, sectorIds: u.sector_ids || [],
   }));
 }
 
@@ -133,6 +135,12 @@ export async function apiFetch(path: string, init: Init = {}) {
       if (data?.error === "short") return err("كلمة المرور الجديدة لا تقل عن ٦ أحرف", 400);
       if (data?.error) return err("تعذّر التغيير", 400);
       return ok({ ok: true });
+    }
+
+    if (p === "/api/people" && method === "GET") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      return ok({ people: await people() });
     }
 
     if (p === "/api/me") {

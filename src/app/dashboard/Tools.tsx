@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import Notes from "./Notes";
+import Notes, { EMPTY_NOTES, firstLine, type NotesData } from "./Notes";
+import { loadUserData } from "@/lib/userdata";
 import { IconCalc, IconCalendar, IconNote } from "./icons";
 
 /* ============================================================
@@ -153,33 +154,118 @@ function Calc({ t }: { t: (ar: string, en: string) => string }) {
 /* ---------------- التقويم ---------------- */
 type Due = { id: string; title: string; dueDate: string; kind?: string; state: string };
 
+/** حدث في التقويم: مهمة أو تكليف أو موعد كُتب في ملاحظة */
+export type Ev = {
+  id: string;
+  date: string;
+  time?: string;
+  title: string;
+  sort: "task" | "assignment" | "note";
+  tone: "late" | "soon" | "ok" | "note" | "done";
+};
+
+const todayStr = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+const dayDiff = (a: string, b: string) =>
+  Math.round((new Date(a + "T00:00:00").getTime() - new Date(b + "T00:00:00").getTime()) / 86400000);
+
+const EV_COLOR: Record<Ev["tone"], string> = {
+  late: "#d34a4a",
+  soon: "#e0971a",
+  ok: "#016b5f",
+  note: "#7b5bd6",
+  done: "#c9d6d2",
+};
+
+/** يجمع مهام المستخدم وتكاليفه ومواعيد ملاحظاته في قائمة واحدة */
+export function useEvents(meId: string) {
+  const [evs, setEvs] = useState<Ev[]>([]);
+
+  const load = useCallback(async () => {
+    const out: Ev[] = [];
+    const now = todayStr();
+    try {
+      const d = await apiFetch("/api/tasks").then((r) => r.json());
+      const all = (d.tasks || []) as (Due & { assigneeId: string; createdById: string })[];
+      for (const x of all) {
+        if (!x.dueDate) continue;
+        if (x.assigneeId !== meId && x.createdById !== meId) continue;
+        const diff = dayDiff(x.dueDate, now);
+        out.push({
+          id: "t" + x.id,
+          date: x.dueDate,
+          title: x.title,
+          sort: x.kind === "assignment" ? "assignment" : "task",
+          tone: x.state === "done" ? "done" : diff < 0 ? "late" : diff <= 3 ? "soon" : "ok",
+        });
+      }
+    } catch {
+      /* بلا اتصال — نكتفي بالملاحظات */
+    }
+    try {
+      const nd = await loadUserData<NotesData>("notes", EMPTY_NOTES);
+      for (const n of nd.notes || []) {
+        if (!n.due) continue;
+        out.push({
+          id: "n" + n.id,
+          date: n.due,
+          time: n.dueTime,
+          title: firstLine(n),
+          sort: "note",
+          tone: "note",
+        });
+      }
+    } catch {
+      /* لا شيء */
+    }
+    out.sort((a, b) => (a.date + (a.time || "")).localeCompare(b.date + (b.time || "")));
+    setEvs(out);
+  }, [meId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return { evs, reload: load };
+}
+
+/** ما يستحق تنبيهاً: متأخر · يقترب خلال ثلاثة أيام · موعد اليوم أو غداً */
+export function alertsOf(evs: Ev[]): Ev[] {
+  const now = todayStr();
+  return evs.filter((e) => {
+    if (e.tone === "done") return false;
+    const d = dayDiff(e.date, now);
+    if (e.sort === "note") return d >= 0 && d <= 1;
+    return d <= 3;
+  });
+}
+
 export function Cal({ t, meId }: { t: (ar: string, en: string) => string; meId: string }) {
   const today = new Date();
   const [y, setY] = useState(today.getFullYear());
   const [m, setM] = useState(today.getMonth());
-  const [items, setItems] = useState<Due[]>([]);
   const [pick, setPick] = useState<string | null>(null);
-
-  useEffect(() => {
-    apiFetch("/api/tasks")
-      .then((r) => r.json())
-      .then((d) => {
-        const all = (d.tasks || []) as (Due & { assigneeId: string; createdById: string })[];
-        setItems(all.filter((x) => x.assigneeId === meId || x.createdById === meId));
-      })
-      .catch(() => setItems([]));
-  }, [meId]);
+  const { evs } = useEvents(meId);
+  const alerts = useMemo(() => alertsOf(evs), [evs]);
 
   const byDay = useMemo(() => {
-    const map = new Map<string, Due[]>();
-    for (const x of items) {
-      if (!x.dueDate) continue;
-      const arr = map.get(x.dueDate) || [];
+    const map = new Map<string, Ev[]>();
+    for (const x of evs) {
+      const arr = map.get(x.date) || [];
       arr.push(x);
-      map.set(x.dueDate, arr);
+      map.set(x.date, arr);
     }
     return map;
-  }, [items]);
+  }, [evs]);
+
+  const dotColor = (dayIso: string) => {
+    const list = byDay.get(dayIso) || [];
+    const rank: Ev["tone"][] = ["late", "soon", "note", "ok", "done"];
+    for (const r of rank) if (list.some((e) => e.tone === r)) return EV_COLOR[r];
+    return EV_COLOR.ok;
+  };
 
   const first = new Date(y, m, 1);
   const lead = first.getDay();
@@ -236,7 +322,7 @@ export function Cal({ t, meId }: { t: (ar: string, en: string) => string; meId: 
               onClick={() => setPick(pick === iso(d) ? null : iso(d))}
             >
               {d}
-              {byDay.has(iso(d)) && <i />}
+              {byDay.has(iso(d)) && <i style={{ background: dotColor(iso(d)) }} />}
             </button>
           )
         )}
@@ -247,20 +333,55 @@ export function Cal({ t, meId }: { t: (ar: string, en: string) => string; meId: 
             <ul>
               {picked.map((x) => (
                 <li key={x.id}>
-                  <i className={x.state === "done" ? "done" : ""} />
+                  <i style={{ background: EV_COLOR[x.tone] }} />
                   {x.title}
-                  <span>{x.kind === "assignment" ? t("تكليف", "Assignment") : t("مهمة", "Task")}</span>
+                  <span>
+                    {x.time ? x.time + " · " : ""}
+                    {x.sort === "note"
+                      ? t("موعد", "Event")
+                      : x.sort === "assignment"
+                        ? t("تكليف", "Assignment")
+                        : t("مهمة", "Task")}
+                  </span>
                 </li>
               ))}
             </ul>
           ) : (
             <p>{t("لا شيء في هذا اليوم.", "Nothing on this day.")}</p>
           )
+        ) : alerts.length ? (
+          <>
+            <div className="tl-alh">{t("تنبيهات", "Alerts")}</div>
+            <ul>
+              {alerts.slice(0, 6).map((x) => {
+                const d = dayDiff(x.date, todayStr());
+                return (
+                  <li key={x.id}>
+                    <i style={{ background: EV_COLOR[x.tone] }} />
+                    {x.title}
+                    <span>
+                      {d < 0
+                        ? t(`متأخرة ${-d} يوم`, `${-d}d late`)
+                        : d === 0
+                          ? t("اليوم", "today")
+                          : d === 1
+                            ? t("غداً", "tomorrow")
+                            : t(`خلال ${d} أيام`, `in ${d}d`)}
+                      {x.time ? ` · ${x.time}` : ""}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
         ) : (
           <p>
-            {items.length
-              ? t("النقاط أيام تنتهي فيها مهامك — اضغطي يوماً لعرضها.", "Dots mark your due dates.")
-              : t("لا مهام مسندة إليك بمواعيد.", "No dated tasks assigned to you.")}
+            {evs.length
+              ? t("لا تنبيهات — النقاط أيام فيها مواعيد، اضغطي يوماً لعرضها.", "No alerts.")
+              : t(
+                  "لا مواعيد بعد. اكتبي في الملاحظات «بكرة الساعة ٩ اجتماع» فيظهر هنا.",
+                  "Write a date in a note and it appears here."
+                )}
           </p>
         )}
       </div>
@@ -273,6 +394,9 @@ export default function Tools({ t, meId }: { t: (ar: string, en: string) => stri
   const [open, setOpen] = useState<"" | "calc" | "cal">("");
   const [notes, setNotes] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
+  // عدّاد على زر التقويم حتى يُرى التنبيه بلا فتحه
+  const { evs, reload: reloadEvents } = useEvents(meId);
+  const alertCount = useMemo(() => alertsOf(evs).length, [evs]);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -306,6 +430,7 @@ export default function Tools({ t, meId }: { t: (ar: string, en: string) => stri
         aria-label={t("تقويم", "Calendar")}
       >
         <IconCalendar />
+        {alertCount > 0 && <b className="tl-badge">{alertCount}</b>}
       </button>
       <button
         className="tl-b"
@@ -325,7 +450,15 @@ export default function Tools({ t, meId }: { t: (ar: string, en: string) => stri
         </div>
       )}
 
-      {notes && <Notes t={t} onClose={() => setNotes(false)} />}
+      {notes && (
+        <Notes
+          t={t}
+          onClose={() => {
+            setNotes(false);
+            reloadEvents();
+          }}
+        />
+      )}
     </div>
   );
 }
