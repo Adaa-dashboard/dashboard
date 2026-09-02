@@ -8,6 +8,8 @@ import { createContext, useContext, useCallback, useEffect, useMemo, useState } 
 import Activity, { type Item as ActivityItem } from "./Activity";
 import Changes from "./Changes";
 import Backup from "./Backup";
+import Tools from "./Tools";
+import MyPage from "./MyPage";
 import {
   ALL_SCOPES,
   DEFAULT_SCOPES,
@@ -212,6 +214,7 @@ export default function Dashboard({ me }: { me: Me }) {
     details: ["المؤشرات التفصيلية", "KPI Details"],
     entry: ["المؤشرات والمستهدفات", "KPIs & Targets"],
     tasks: ["المهام", "Tasks"],
+    mypage: ["صفحتي", "My page"],
     report: ["الإنجاز الأسبوعي", "Weekly Achievement"],
     structure: ["القطاعات والإدارات", "Sectors"],
     users: ["المستخدمون والصلاحيات", "Users & Roles"],
@@ -274,6 +277,7 @@ export default function Dashboard({ me }: { me: Me }) {
             <span className="ic">⚙</span> {t("الإعدادات", "Settings")} <span className="cv">▾</span>
           </button>
           <div className={`subnav ${setOpen ? "show" : ""}`}>
+            <SubItem id="mypage" label={["صفحتي", "My page"]} />
             {can("entry") && <SubItem id="entry" label={["المؤشرات والمستهدفات", "KPIs & Targets"]} />}
             {can("users") && <SubItem id="users" label={["المستخدمون والصلاحيات", "Users & Roles"]} />}
             {can("structure") && <SubItem id="structure" label={["القطاعات والإدارات", "Sectors"]} />}
@@ -308,6 +312,7 @@ export default function Dashboard({ me }: { me: Me }) {
             <div className="hsep" />
             <h1>{t(title[0], title[1])}</h1>
             <div className="grow" />
+            <Tools t={t} meId={me.id} />
           </div>
 
           {!loaded ? (
@@ -344,6 +349,7 @@ export default function Dashboard({ me }: { me: Me }) {
                   onFocusDone={() => setTaskFocus(null)}
                 />
               )}
+              {tab === "mypage" && <MyPage me={me} refData={refData} t={t} />}
               {tab === "report" && can("weekly") && <WeeklyPanel t={t} />}
               {tab === "structure" && can("structure") && <SectorsManager refData={refData} reload={loadRef} />}
               {tab === "users" && can("users") && <UsersManager refData={refData} />}
@@ -379,6 +385,7 @@ export default function Dashboard({ me }: { me: Me }) {
                 <div className="rl">{isAdmin ? t("مدير الإدارة", "Admin") : t("مدير قطاع", "Sector Manager")}</div>
               </div>
             </div>
+            <SheetItem id="mypage" label={["صفحتي", "My page"]} />
             {can("entry") && <SheetItem id="entry" label={["المؤشرات والمستهدفات", "KPIs & Targets"]} />}
             {can("users") && <SheetItem id="users" label={["المستخدمون والصلاحيات", "Users & Roles"]} />}
             {can("structure") && <SheetItem id="structure" label={["القطاعات والإدارات", "Sectors"]} />}

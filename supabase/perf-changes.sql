@@ -312,3 +312,34 @@ begin
   return jsonb_build_object('ok', true);
 end;
 $$;
+
+-- ============================================================
+--  ٧) مخزن شخصي لكل مستخدم
+--     ملاحظاته الخاصة وإعداد صفحته الخاصة. كل صف يخصّ صاحبه
+--     وحده: السياسة تقارن بـ app_user_id الخاص بجلسته، فلا يقرأ
+--     أحد ملاحظات أحد ولو حاول من خارج الواجهة.
+-- ============================================================
+create or replace function public.perf_my_id()
+returns bigint language sql stable security definer set search_path = public as $$
+  select app_user_id from public.perf_sessions where user_id = auth.uid();
+$$;
+revoke all on function public.perf_my_id() from public, anon;
+grant execute on function public.perf_my_id() to authenticated;
+
+create table if not exists public.perf_user_data (
+  app_user_id bigint not null references public.perf_users (id) on delete cascade,
+  key         text   not null,           -- 'notes' · 'mypage'
+  value       jsonb  not null default '{}'::jsonb,
+  updated_at  timestamptz not null default now(),
+  primary key (app_user_id, key)
+);
+alter table public.perf_user_data enable row level security;
+
+drop policy if exists "perf_ud_own" on public.perf_user_data;
+create policy "perf_ud_own" on public.perf_user_data
+  for all to authenticated
+  using (app_user_id = public.perf_my_id())
+  with check (app_user_id = public.perf_my_id());
+
+grant select, insert, update, delete on public.perf_user_data to authenticated;
+revoke all on public.perf_user_data from anon;
