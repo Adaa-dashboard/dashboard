@@ -3,12 +3,14 @@
 import { apiFetch } from "@/lib/api";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { IconReply } from "./icons";
 
 type State = "ok" | "risk" | "done";
 type Priority = "high" | "mid";
 
 type Kind = "task" | "assignment";
-type Update = { id: string; text: string; byName: string; at: string };
+type Reply = { id: string; text: string; byName: string; at: string };
+type Update = { id: string; text: string; byName: string; at: string; replies?: Reply[] };
 type Task = {
   id: string;
   title: string;
@@ -64,7 +66,7 @@ function leftText(t: Task): string {
   return `باقٍ ${arDays(d)}`;
 }
 
-/* اللوحة نفسها تخدم نوعين: المهام الداخلية البسيطة، والتكليفات الواردة
+/* اللوحة نفسها تخدم نوعين: المهام الداخلية البسيطة، والتكاليف الواردة
    من الديوان أو جهة أعلى. الفرق في التسمية والمكان لا في الآلية. */
 export default function Tasks({
   meId,
@@ -90,9 +92,9 @@ export default function Tasks({
   const asg = kind === "assignment";
   const L = {
     one: asg ? t("تكليف", "Assignment") : t("مهمة", "Task"),
-    many: asg ? t("التكليفات", "Assignments") : t("المهام", "Tasks"),
+    many: asg ? t("التكاليف", "Assignments") : t("المهام", "Tasks"),
     add: asg ? t("تكليف جديد", "New assignment") : t("مهمة جديدة", "New task"),
-    none: asg ? t("لا توجد تكليفات بعد", "No assignments yet") : t("لا توجد مهام بعد", "No tasks yet"),
+    none: asg ? t("لا توجد تكاليف بعد", "No assignments yet") : t("لا توجد مهام بعد", "No tasks yet"),
     hint: asg
       ? t("سجّلي أول تكليف وارد وأسنديه لمن يتابعه.", "Log the first assignment.")
       : t("أنشئي أول مهمة وأسنديها لأحد المدراء.", "Create the first task and assign it."),
@@ -145,6 +147,26 @@ export default function Tasks({
     return g;
   }, [tasks, onlyDone]);
 
+  async function saveReply(task: Task, updateId: string, text: string) {
+    const r = await apiFetch(`/api/tasks/${task.id}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ replyTo: updateId, text }),
+    }).then((x) => x.json());
+    if (r.error) {
+      setErr(r.error);
+      return;
+    }
+    const fresh = await apiFetch("/api/tasks").then((x) => x.json());
+    const all: Task[] = fresh.tasks || [];
+    setTasks(
+      all
+        .filter((x) => (x.kind === "assignment" ? "assignment" : "task") === kind)
+        .filter((x) => !onlyMine || x.assigneeId === meId || x.createdById === meId)
+    );
+    setOpen(all.find((x) => x.id === task.id) || null);
+  }
+
   async function saveState(task: Task, state: State, text: string) {
     const r = await apiFetch(`/api/tasks/${task.id}`, {
       method: "PATCH",
@@ -159,7 +181,7 @@ export default function Tasks({
     load();
   }
 
-  const COLS: { key: "main" | "week" | "late" | "done"; title: string; hint: string; color: string }[] = [
+  const ALL_COLS: { key: "main" | "week" | "late" | "done"; title: string; hint: string; color: string }[] = [
     { key: "main", title: L.many, hint: t("الأحدث أولاً", "Newest first"), color: "#016b5f" },
     {
       key: "week",
@@ -170,6 +192,8 @@ export default function Tasks({
     { key: "late", title: t("المتأخرة", "Overdue"), hint: t("تجاوزت موعدها", "Past due"), color: "#d34a4a" },
     { key: "done", title: t("المكتملة", "Completed"), hint: t("أُغلقت", "Closed"), color: "#5aaba2" },
   ];
+  // التكاليف ترد من جهة أعلى ومواعيدها معلومة، فعمود «هذا الأسبوع» زائد فيها
+  const COLS = asg ? ALL_COLS.filter((c) => c.key !== "week") : ALL_COLS;
 
   return (
     <div>
@@ -251,6 +275,7 @@ export default function Tasks({
           canEdit={isAdmin || open.assigneeId === meId || open.createdById === meId}
           onClose={() => setOpen(null)}
           onSave={saveState}
+          onReply={saveReply}
           t={t}
         />
       )}
@@ -280,6 +305,7 @@ function TaskDetail({
   canEdit,
   onClose,
   onSave,
+  onReply,
   t,
 }: {
   task: Task;
@@ -288,10 +314,13 @@ function TaskDetail({
   canEdit: boolean;
   onClose: () => void;
   onSave: (task: Task, state: State, text: string) => void;
+  onReply: (task: Task, updateId: string, text: string) => void;
   t: (ar: string, en: string) => string;
 }) {
   const [state, setState] = useState<State>(task.state);
   const [text, setText] = useState("");
+  const [replyTo, setReplyTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
   const late = columnOf(task) === "late";
 
   return (
@@ -347,6 +376,55 @@ function TaskDetail({
                     <b>{u.byName}</b>
                     <span className="dt ltr">{u.at.slice(0, 16).replace("T", " ")}</span>
                     <p>{u.text}</p>
+
+                    {(u.replies || []).map((r) => (
+                      <div className="rp" key={r.id}>
+                        <span className="av s">{(r.byName || "?").trim().charAt(0)}</span>
+                        <div>
+                          <b>{r.byName}</b>
+                          <span className="dt ltr">{r.at.slice(0, 16).replace("T", " ")}</span>
+                          <p>{r.text}</p>
+                        </div>
+                      </div>
+                    ))}
+
+                    {replyTo === u.id ? (
+                      <div className="rp-box">
+                        <textarea
+                          rows={2}
+                          autoFocus
+                          value={replyText}
+                          onChange={(e) => setReplyText(e.target.value)}
+                          placeholder={t("اكتبي ردّك…", "Write your reply…")}
+                        />
+                        <div className="rp-act">
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => {
+                              setReplyTo(null);
+                              setReplyText("");
+                            }}
+                          >
+                            {t("إلغاء", "Cancel")}
+                          </button>
+                          <button
+                            className="btn btn-sm"
+                            disabled={!replyText.trim()}
+                            onClick={() => {
+                              onReply(task, u.id, replyText.trim());
+                              setReplyTo(null);
+                              setReplyText("");
+                            }}
+                          >
+                            {t("إرسال", "Send")}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button className="rp-btn" onClick={() => setReplyTo(u.id)}>
+                        <IconReply /> {t("رد", "Reply")}
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

@@ -346,10 +346,23 @@ export async function apiFetch(path: string, init: Init = {}) {
         const me = await whoAmI();
         const { data: cur } = await s.from("perf_tasks").select("*").eq("id", id).maybeSingle();
         if (!cur) return err("المهمة غير موجودة", 404);
-        const updates = Array.isArray(cur.updates) ? [...cur.updates] : [];
-        if (body.text && String(body.text).trim()) {
+        type Rep = { id: string; text: string; byId: string; byName: string; at: string };
+        type Upd = Rep & { replies?: Rep[] };
+        const updates: Upd[] = Array.isArray(cur.updates) ? [...cur.updates] : [];
+        const text = String(body.text ?? "").trim();
+        if (text && body.replyTo) {
+          // ردّ على تحديث بعينه — يبقى تحته لا في آخر القائمة
+          const i = updates.findIndex((u) => u.id === body.replyTo);
+          if (i < 0) return err("التحديث غير موجود", 404);
+          const reps = Array.isArray(updates[i].replies) ? [...(updates[i].replies as Rep[])] : [];
+          reps.push({
+            id: newId(), text,
+            byId: me?.id || "", byName: me?.name || "", at: new Date().toISOString(),
+          });
+          updates[i] = { ...updates[i], replies: reps };
+        } else if (text) {
           updates.push({
-            id: newId(), text: String(body.text).trim(),
+            id: newId(), text,
             byId: me?.id || "", byName: me?.name || "", at: new Date().toISOString(),
           });
         }

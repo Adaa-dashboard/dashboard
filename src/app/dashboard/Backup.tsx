@@ -9,7 +9,7 @@ import { evaluate, type Band } from "@/lib/calc";
 /* ============================================================
    نسخة احتياطية شخصية — لكل مستخدم، بلا صلاحية خاصة.
    الغاية أن يبقى عمله بين يديه لو انقطع الاتصال باللوحة:
-   قياساته وملاحظاته ومهامه وتكليفاته وما يتصل به.
+   قياساته وملاحظاته ومهامه وتكاليفه وما يتصل به.
    تُبنى في المتصفح من نفس البيانات المعروضة له، فلا تكشف
    النسخة شيئاً لا يراه أصلاً.
    ============================================================ */
@@ -192,7 +192,7 @@ export default function Backup({
     { name: "معلومات النسخة", rows: infoRows() },
     { name: "المؤشرات", rows: kpiRows() },
     { name: "المهام", rows: taskRows("task") },
-    { name: "التكليفات", rows: taskRows("assignment") },
+    { name: "التكاليف", rows: taskRows("assignment") },
     { name: "الملاحظات", rows: noteRows() },
     ...(seesChanges ? [{ name: "طلبات التغيير", rows: changeRows() }] : []),
   ];
@@ -275,7 +275,7 @@ export default function Backup({
           {err && <div className="alert alert-error">{err}</div>}
           <p className="bk-note">
             {t(
-              "نسخة بكل ما يخصّك في اللوحة: قياسات قطاعاتك وملاحظاتك ومهامك وتكليفاتك — تحفظينها عندك فتبقى بين يديك لو انقطع الاتصال باللوحة.",
+              "نسخة بكل ما يخصّك في اللوحة: قياسات قطاعاتك وملاحظاتك ومهامك وتكاليفك — تحفظينها عندك فتبقى بين يديك لو انقطع الاتصال باللوحة.",
               "Everything that concerns you in the dashboard, saved on your device."
             )}
           </p>
@@ -292,7 +292,7 @@ export default function Backup({
                   {t("مهام", "Tasks")} <b>{counts.tasks}</b>
                 </span>
                 <span>
-                  {t("تكليفات", "Assignments")} <b>{counts.asg}</b>
+                  {t("تكاليف", "Assignments")} <b>{counts.asg}</b>
                 </span>
                 <span>
                   {t("ملاحظات", "Notes")} <b>{counts.notes}</b>

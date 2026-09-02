@@ -784,7 +784,7 @@ function Overview({
         <Activity
           t={t}
           onOpen={(it) => {
-            // التكليفات معروضة في هذه الصفحة نفسها، فلا داعي للانتقال
+            // التكاليف معروضة في هذه الصفحة نفسها، فلا داعي للانتقال
             if (it.kind === "assignment" && it.taskId) {
               setAsgFocus(it.taskId);
               document.getElementById("ov-asg")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -865,7 +865,7 @@ function Overview({
       {hasScope(me.scopes, "assignments") && (
         <>
           <h2 className="section-title" id="ov-asg" style={{ marginTop: 28 }}>
-            {t("التكليفات", "Assignments")}
+            {t("التكاليف", "Assignments")}
             <span className="sec-note">
               {t("الواردة من الديوان أو جهة أعلى", "Received from higher authority")}
             </span>

@@ -33,7 +33,7 @@ export const SCOPE_GROUPS: { title: string; items: { key: Scope; label: string; 
   {
     title: "بنود نظرة عامة",
     items: [
-      { key: "assignments", label: "التكليفات", note: "الواردة من جهة أعلى" },
+      { key: "assignments", label: "التكاليف", note: "الواردة من جهة أعلى" },
       { key: "changes", label: "طلبات التغيير", note: "عرض ونسخ وتصدير" },
       { key: "changes:upload", label: "رفع ملف طلبات التغيير", note: "لمن يسحب الملف من منصة الرؤية" },
     ],
