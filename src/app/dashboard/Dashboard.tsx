@@ -11,7 +11,6 @@ import Backup from "./Backup";
 import Tools from "./Tools";
 import MyPage from "./MyPage";
 import Structure from "./Structure";
-import AssignmentsBar from "./AssignmentsBar";
 import {
   ALL_SCOPES,
   DEFAULT_SCOPES,
@@ -869,17 +868,25 @@ function Overview({
       )}
 
       {hasScope(me.scopes, "assignments") && (
-        <div style={{ marginTop: 26 }}>
-          <AssignmentsBar
+        <>
+          <h2 className="section-title" id="ov-asg" style={{ marginTop: 28 }}>
+            {t("التكاليف", "Assignments")}
+            <span className="sec-note">
+              {t("الواردة من الديوان أو جهة أعلى", "Received from higher authority")}
+            </span>
+          </h2>
+          <Tasks
             meId={me.id}
             isAdmin={me.role === "admin"}
             indicators={refData.indicators.map((i) => ({ id: i.id, name: i.name }))}
+            t={t}
+            kind="assignment"
+            limit={3}
             onlyMine={!hasScope(me.scopes, "tasks:all")}
             focusId={asgFocus}
             onFocusDone={() => setAsgFocus(null)}
-            t={t}
           />
-        </div>
+        </>
       )}
 
       {hasScope(me.scopes, "changes") && (
