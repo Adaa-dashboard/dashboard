@@ -277,7 +277,7 @@ export default function Tasks({
         </div>
       )}
 
-      {limit > 0 && !onlyDone && tasks.length > 0 && (
+      {limit > 0 && tasks.length > 0 && (
         (() => {
           const hidden = (["main", "week", "late", "done"] as const)
             .filter((k) => COLS.some((c) => c.key === k))
