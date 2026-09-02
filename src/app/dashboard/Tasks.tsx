@@ -241,7 +241,11 @@ export default function Tasks({
                 const late = columnOf(x, !asg) === "late";
                 const col = late ? STATE_COLOR.late : STATE_COLOR[x.state];
                 return (
-                  <button key={x.id} className={`tk ${x.assigneeId === meId ? "mine" : ""}`} onClick={() => setOpen(x)}>
+                  <button
+                    key={x.id}
+                    className={`tk ${asg ? "sm" : ""} ${x.assigneeId === meId ? "mine" : ""}`}
+                    onClick={() => setOpen(x)}
+                  >
                     <span className="tk-t">{x.title}</span>
                     <span className="tk-m">
                       <span className="av s">{(nameOf(x.assigneeId) || "?").trim().charAt(0)}</span>
