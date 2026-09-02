@@ -4340,3 +4340,28 @@ table.matrix thead th {
   color: var(--muted);
   text-align: center;
 }
+
+/* «عرض الكل» تحت لوحة التكاليف وجدول طلبات التغيير — نفس نمط التحديثات */
+.tb-more,
+.cr-more {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--g-700);
+  cursor: pointer;
+  padding: 10px;
+  border-top: 1px solid var(--border);
+  margin-top: 2px;
+  user-select: none;
+}
+.tb-more:hover,
+.cr-more:hover {
+  background: var(--g-50);
+}
+.cr-more {
+  margin-top: 0;
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 14px 14px;
+  background: var(--panel);
+}

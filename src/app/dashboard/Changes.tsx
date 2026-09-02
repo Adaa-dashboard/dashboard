@@ -139,6 +139,7 @@ export default function Changes({
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const [pasting, setPasting] = useState(false);
   const [pasted, setPasted] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -388,7 +389,7 @@ export default function Changes({
               </tr>
             </thead>
             <tbody>
-              {shown.map((c) => {
+              {(showAll ? shown : shown.slice(0, 3)).map((c) => {
                 const tone = toneOf(c);
                 const left = c.sla != null && c.workDays != null ? c.sla - c.workDays : null;
                 return (
@@ -429,6 +430,15 @@ export default function Changes({
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* خارج حاوية التمرير حتى لا يزحف مع الجدول العريض */}
+      {loaded && shown.length > 3 && (
+        <div className="cr-more" onClick={() => setShowAll(!showAll)}>
+          {showAll
+            ? t("عرض أقل ▴", "Show less ▴")
+            : t(`عرض الكل (${shown.length - 3} أخرى) ▾`, `Show all (${shown.length - 3} more) ▾`)}
         </div>
       )}
 
