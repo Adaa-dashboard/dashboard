@@ -79,6 +79,7 @@ async function people() {
   const { data } = await sb().rpc("perf_people");
   return (data || []).map((u: Record<string, unknown>) => ({
     id: String(u.id), name: u.name, role: u.role, sectorIds: u.sector_ids || [],
+    isLead: u.is_lead === true,
   }));
 }
 
@@ -270,6 +271,7 @@ export async function apiFetch(path: string, init: Init = {}) {
           id: String(u.id), username: u.username, name: u.name, phone: u.phone,
           role: u.role, sectorIds: u.sector_ids || [], active: u.active,
           hasPassword: u.has_password, scopes: u.scopes || [],
+          isLead: u.is_lead === true,
         })),
       });
     }
@@ -279,6 +281,7 @@ export async function apiFetch(path: string, init: Init = {}) {
         p_role: body.role, p_sectors: body.sectorIds || [], p_active: true,
         p_password: body.password || null, p_clear_password: false,
         p_scopes: Array.isArray(body.scopes) ? body.scopes : null,
+        p_is_lead: body.isLead === true,
       });
       if (error) return err("غير مصرّح", 403);
       if (data?.error === "dup_username") return err("اسم المستخدم مستخدَم مسبقًا", 400);
@@ -310,6 +313,7 @@ export async function apiFetch(path: string, init: Init = {}) {
           p_password: body.password || null,
           p_clear_password: body.clearPassword === true,
           p_scopes: Array.isArray(body.scopes) ? body.scopes : null,
+          p_is_lead: typeof body.isLead === "boolean" ? body.isLead : null,
         });
         if (error) return err("غير مصرّح", 403);
         if (data?.error === "dup_username") return err("اسم المستخدم مستخدَم مسبقًا", 400);
@@ -500,13 +504,14 @@ export async function apiFetch(path: string, init: Init = {}) {
         );
         return ok({ ok: true });
       }
-      const [ms, nt, tk, sec, ind, seen] = await Promise.all([
+      const [ms, nt, tk, sec, ind, seen, tlog] = await Promise.all([
         s.from("perf_measurements").select("*").order("updated_at", { ascending: false }).limit(30),
         s.from("perf_notes").select("*").order("at", { ascending: false }).limit(20),
         s.from("perf_tasks").select("*").order("created_at", { ascending: false }).limit(20),
         s.from("perf_sectors").select("id,name"),
         s.from("perf_indicators").select("id,name"),
         s.from("perf_last_seen").select("at").eq("app_user_id", Number(me.id)).maybeSingle(),
+        s.from("perf_target_log").select("*").order("at", { ascending: false }).limit(20),
       ]);
       const secName = new Map((sec.data || []).map((x) => [x.id, x.name]));
       const indName = new Map((ind.data || []).map((x) => [x.id, x.name]));
@@ -549,6 +554,18 @@ export async function apiFetch(path: string, init: Init = {}) {
           at: t.completed_at || t.created_at,
           unread: !since || (t.completed_at || t.created_at) > since,
           taskId: t.id,
+        });
+      }
+      // تغيير المستهدف يعني المدير أكثر من غيره — يظهر بلونٍ منبّه
+      const fmtT = (v: unknown) =>
+        v === null || v === undefined ? "—" : Array.isArray(v) ? v.join(" · ") : String(v);
+      for (const g of tlog.data || []) {
+        items.push({
+          id: "g" + g.id, kind: "target", tone: "warn",
+          title: `${g.by_name} عدّل مستهدف ${indName.get(g.indicator_id) || ""}`,
+          sub: `${secName.get(g.sector_id) || ""} · من ${fmtT(g.old_value)} إلى ${fmtT(g.new_value)}`,
+          at: g.at, unread: !since || g.at > since,
+          sectorId: g.sector_id, indicatorId: g.indicator_id,
         });
       }
       items.sort((a, b) => (b.at || "").localeCompare(a.at || ""));

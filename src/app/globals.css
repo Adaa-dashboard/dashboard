@@ -4391,3 +4391,71 @@ table.matrix thead th {
   padding-top: 6px;
   font-size: 10.5px;
 }
+
+/* مدير القطاع · زر تعديل المستهدفات */
+.org-p.lead {
+  background: var(--g-50);
+  border: 1px solid var(--g-100);
+  font-weight: 700;
+}
+.org-p b {
+  margin-inline-start: auto;
+  background: var(--g-700);
+  color: #fff;
+  border-radius: 6px;
+  padding: 1px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.u-lead {
+  background: var(--g-50);
+  border: 1px solid var(--g-100);
+  color: var(--g-800);
+  border-radius: 6px;
+  padding: 1px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  margin-inline-start: 7px;
+  white-space: nowrap;
+}
+.dt-gear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.dt-gear:hover {
+  background: var(--g-50);
+  color: var(--g-700);
+  border-color: var(--g-400);
+}
+.dt-gear.on {
+  background: var(--g-700);
+  border-color: var(--g-700);
+  color: #fff;
+}
+.dt-tgt input {
+  width: 84px;
+  padding: 5px 8px;
+  font-size: 12.5px;
+  text-align: center;
+}
+.dt-tgt.busy input {
+  border-color: var(--g-400);
+}
+.dt-tgt.ok input {
+  border-color: #1a9d5c;
+  background: #f0fbf5;
+}
+.dt-tgt.err input {
+  border-color: #d34a4a;
+  background: #fdf2f2;
+}

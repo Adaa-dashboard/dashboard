@@ -335,6 +335,35 @@ export default function Dashboard({ me }: { me: Me }) {
                   reload={loadRef}
                   focus={detFocus}
                   onFocusDone={() => setDetFocus(null)}
+                  targetSectors={
+                    can("targets")
+                      ? can("details:all")
+                        ? refData.sectors.map((x) => x.id)
+                        : me.sectorIds
+                      : []
+                  }
+                  onSaveTarget={async (sid, iid, value, quarter) => {
+                    // في الوضع الربعي نعدّل خانة الربع وحده ونُبقي البقية
+                    const key = tkey(sid, iid);
+                    const cur = refData.targets[key];
+                    let next: number | number[] | null = value;
+                    if (refData.targetMode === "quarterly" && quarter) {
+                      const arr = Array.isArray(cur)
+                        ? [...cur]
+                        : [0, 0, 0, 0].map(() => (typeof cur === "number" ? cur / 4 : 0));
+                      arr[quarter - 1] = value ?? 0;
+                      next = arr;
+                    }
+                    const res = await apiFetch("/api/targets", {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ targets: { [key]: next } }),
+                    });
+                    const d = await res.json().catch(() => ({}));
+                    if (!res.ok) return d.error || "تعذّر الحفظ";
+                    await loadRef();
+                    return null;
+                  }}
                 />
               )}
               {tab === "tasks" && can("tasks") && (
@@ -1753,6 +1782,8 @@ interface UserRow {
   active: boolean;
   sectorIds: string[];
   scopes?: string[];
+  /** مدير القطاع — يظهر أولاً في الهيكل التنظيمي */
+  isLead?: boolean;
 }
 function UsersManager({ refData }: { refData: RefData }) {
   const { t } = useT();
@@ -1764,6 +1795,7 @@ function UsersManager({ refData }: { refData: RefData }) {
   const [role, setRole] = useState<Role>("manager");
   const [sectorIds, setSectorIds] = useState<string[]>([]);
   const [scopes, setScopes] = useState<string[]>([...DEFAULT_SCOPES]);
+  const [isLead, setIsLead] = useState(false);
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
   const [editing, setEditing] = useState<UserRow | null>(null);
@@ -1796,6 +1828,7 @@ function UsersManager({ refData }: { refData: RefData }) {
         role,
         sectorIds,
         scopes,
+        isLead,
       }),
     });
     const d = await res.json();
@@ -1809,6 +1842,7 @@ function UsersManager({ refData }: { refData: RefData }) {
       setRole("manager");
       setSectorIds([]);
       setScopes([...DEFAULT_SCOPES]);
+      setIsLead(false);
       load();
     }
   }
@@ -1905,6 +1939,23 @@ function UsersManager({ refData }: { refData: RefData }) {
               />
             </div>
             <div style={{ flex: "0 0 170px" }}>
+              <label>{t("المنصب", "Position")}</label>
+              <select
+                value={isLead ? "lead" : "member"}
+                onChange={(e) => {
+                  const lead = e.target.value === "lead";
+                  setIsLead(lead);
+                  // مدير القطاع يعدّل مستهدفات قطاعه افتراضياً
+                  setScopes((sc) =>
+                    lead ? [...new Set([...sc, "targets"])] : sc.filter((x) => x !== "targets")
+                  );
+                }}
+              >
+                <option value="member">{t("موظف في القطاع", "Team member")}</option>
+                <option value="lead">{t("مدير القطاع", "Sector lead")}</option>
+              </select>
+            </div>
+            <div style={{ flex: "0 0 170px" }}>
               <label>{t("مستوى الكتابة", "Write level")}</label>
               <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
                 <option value="manager">{t("يكتب في قطاعاته", "Writes to own sectors")}</option>
@@ -1960,7 +2011,10 @@ function UsersManager({ refData }: { refData: RefData }) {
         <tbody>
           {shown.map((u) => (
             <tr key={u.id}>
-              <td className="u-name">{u.name}</td>
+              <td className="u-name">
+                {u.name}
+                {u.isLead && <span className="u-lead">{t("مدير قطاع", "Lead")}</span>}
+              </td>
               <td dir="ltr" style={{ textAlign: "right" }} data-l={t("اسم المستخدم", "Username")}>
                 {u.username || <span className="muted">—</span>}
               </td>
@@ -2044,6 +2098,7 @@ function EditUserModal({
   const [ids, setIds] = useState<string[]>(user.sectorIds || []);
   const [active, setActive] = useState(user.active);
   const [scopes, setScopes] = useState<string[]>(user.scopes || []);
+  const [isLead, setIsLead] = useState(user.isLead === true);
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -2081,6 +2136,7 @@ function EditUserModal({
         sectorIds: ids,
         active,
         scopes,
+        isLead,
         password: pw || undefined,
       },
       t("حُفظ ✓", "Saved ✓")
@@ -2129,6 +2185,21 @@ function EditUserModal({
             style={{ textAlign: "left" }}
             autoComplete="off"
           />
+
+          <label>{t("المنصب", "Position")}</label>
+          <select
+            value={isLead ? "lead" : "member"}
+            onChange={(e) => {
+              const lead = e.target.value === "lead";
+              setIsLead(lead);
+              setScopes((sc) =>
+                lead ? [...new Set([...sc, "targets"])] : sc.filter((x) => x !== "targets")
+              );
+            }}
+          >
+            <option value="member">{t("موظف في القطاع", "Team member")}</option>
+            <option value="lead">{t("مدير القطاع", "Sector lead")}</option>
+          </select>
 
           <label>{t("مستوى الكتابة", "Write level")}</label>
           <select value={role} onChange={(e) => setRole(e.target.value as Role)}>

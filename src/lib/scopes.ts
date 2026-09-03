@@ -17,6 +17,7 @@ export type Scope =
   | "structure"
   | "tasks"
   | "tasks:all"
+  | "targets"
   | "weekly"
   | "users";
 
@@ -42,6 +43,7 @@ export const SCOPE_GROUPS: { title: string; items: { key: Scope; label: string; 
     title: "توسعة",
     items: [
       { key: "details:all", label: "كل القطاعات", note: "بدل قطاعاته وحدها" },
+      { key: "targets", label: "تعديل المستهدفات", note: "في قطاعاته — لمدير القطاع" },
       { key: "tasks:all", label: "كل المهام", note: "بدل مهامه وحدها" },
     ],
   },

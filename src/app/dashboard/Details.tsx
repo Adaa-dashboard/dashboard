@@ -3,7 +3,7 @@
 import { apiFetch } from "@/lib/api";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { IconComment } from "./icons";
+import { IconComment, IconGear } from "./icons";
 import { Band, bandOf, tint } from "@/lib/calc";
 
 /* ============ الأنواع (نسخة الواجهة) ============ */
@@ -49,6 +49,9 @@ interface Props {
   /** فتح مؤشر بعينه قادماً من زر «عرض» في آخر التحديثات */
   focus?: { indicatorId: string; sectorId?: string; notes?: boolean } | null;
   onFocusDone?: () => void;
+  /** القطاعات التي يملك فيها تعديل المستهدف — فارغة = لا يملك */
+  targetSectors?: string[];
+  onSaveTarget?: (sectorId: string, indicatorId: string, value: number | null, quarter: number | null) => Promise<string | null>;
 }
 
 const QUARTERS = [1, 2, 3, 4];
@@ -90,6 +93,8 @@ export default function Details({
   reload,
   focus,
   onFocusDone,
+  targetSectors = [],
+  onSaveTarget,
 }: Props) {
   const [by, setBy] = useState<"indicator" | "sector">("indicator");
   const [scope, setScope] = useState<number | null>(null); // null = كل السنة
@@ -100,6 +105,8 @@ export default function Details({
   const [notesFor, setNotesFor] = useState<{ sectorId: string; indicatorId: string } | null>(null);
   const [noteCount, setNoteCount] = useState<Record<string, number>>({});
   const [saving, setSaving] = useState<Record<string, "busy" | "ok" | "err">>({});
+  const [tgtMode, setTgtMode] = useState(false);
+  const canTarget = (sid: string) => !!onSaveTarget && targetSectors.includes(sid);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -320,6 +327,16 @@ export default function Details({
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
+        {targetSectors.length > 0 && onSaveTarget && (
+          <button
+            className={`dt-gear ${tgtMode ? "on" : ""}`}
+            onClick={() => setTgtMode(!tgtMode)}
+            title={t("تعديل المستهدفات", "Edit targets")}
+            aria-label={t("تعديل المستهدفات", "Edit targets")}
+          >
+            <IconGear />
+          </button>
+        )}
         <button className="btn btn-ghost btn-sm" onClick={exportCSV}>
           ⬇ Excel
         </button>
@@ -327,6 +344,15 @@ export default function Details({
           🖨 {t("طباعة", "Print")}
         </button>
       </div>
+
+      {tgtMode && (
+        <div className="filter-note">
+          {t(
+            "وضع تعديل المستهدفات — التعديل يُسجَّل باسمك ويظهر في آخر التحديثات عند مدير الإدارة.",
+            "Target edit mode — changes are logged under your name."
+          )}
+        </div>
+      )}
 
       {loading ? (
         <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>
@@ -373,8 +399,31 @@ export default function Details({
                       return (
                         <tr key={it.id}>
                           <td className="dt-name">{it.name}</td>
-                          <td className="ltr" data-l={t("المستهدف", "Target")}>
-                            {num(c.target)}
+                          <td
+                            className={`ltr dt-tgt ${saving["T" + c.key] || ""}`}
+                            data-l={t("المستهدف", "Target")}
+                          >
+                            {tgtMode && canTarget(sectorId) ? (
+                              <input
+                                type="number"
+                                className="ltr"
+                                defaultValue={c.target ?? ""}
+                                placeholder="—"
+                                key={`T${c.key}-${c.target ?? ""}`}
+                                onBlur={async (e) => {
+                                  const raw = e.target.value.trim();
+                                  const v = raw === "" ? null : Number(raw);
+                                  if (v === (c.target ?? null)) return;
+                                  const k = "T" + c.key;
+                                  setSaving((x) => ({ ...x, [k]: "busy" }));
+                                  const errMsg = await onSaveTarget!(sectorId, indicatorId, v, scope);
+                                  setSaving((x) => ({ ...x, [k]: errMsg ? "err" : "ok" }));
+                                  if (!errMsg) setTimeout(() => setSaving((x) => ({ ...x, [k]: undefined as never })), 1200);
+                                }}
+                              />
+                            ) : (
+                              num(c.target)
+                            )}
                           </td>
                           <td className={`dt-act ${st ? st : ""}`} data-l={t("الفعلي", "Actual")}>
                             {editable ? (
