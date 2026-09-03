@@ -10,7 +10,7 @@ import { apiFetch } from "@/lib/api";
    ============================================================ */
 
 type Sector = { id: string; name: string };
-type Person = { id: string; name: string; role: string; sectorIds: string[] };
+type Person = { id: string; name: string; role: string; sectorIds: string[]; isLead?: boolean };
 
 export default function Structure({
   sectors,
@@ -39,7 +39,11 @@ export default function Structure({
     load();
   }, [load]);
 
-  const inSector = (sid: string) => people.filter((p) => (p.sectorIds || []).includes(sid));
+  // مدير القطاع أولاً ثم البقية بالاسم
+  const inSector = (sid: string) =>
+    people
+      .filter((p) => (p.sectorIds || []).includes(sid))
+      .sort((a, b) => Number(!!b.isLead) - Number(!!a.isLead) || a.name.localeCompare(b.name, "ar"));
   // من لا قطاع له يُعرض تحت الإدارة مباشرة — مدير الإدارة ومن يتبعه
   const head = people.filter((p) => (p.sectorIds || []).length === 0);
 
@@ -165,9 +169,10 @@ export default function Structure({
                   ) : (
                     <div className="org-people">
                       {list.map((p) => (
-                        <span className="org-p" key={p.id}>
+                        <span className={`org-p ${p.isLead ? "lead" : ""}`} key={p.id}>
                           <i className="av s">{(p.name || "?").trim().charAt(0)}</i>
                           {p.name}
+                          {p.isLead && <b>{t("مدير القطاع", "Lead")}</b>}
                         </span>
                       ))}
                     </div>
