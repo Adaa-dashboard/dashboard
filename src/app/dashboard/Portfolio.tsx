@@ -7,6 +7,7 @@ import { loadUserData, saveUserData } from "@/lib/userdata";
 import { sb } from "@/lib/supa";
 import { Cal } from "./Tools";
 import { EMPTY_NOTES, firstLine, preview, whenAr, type NotesData } from "./Notes";
+import { PIcon, IconPicker } from "./pickicons";
 
 /* ============================================================
    محفظتي — الصفحة الشخصية لكل موظف.
@@ -80,19 +81,19 @@ type WDef = {
 };
 
 export const WIDGETS: WDef[] = [
-  { key: "tasks", label: "مهامي", group: "top", icon: "✓", color: "#016b5f" },
-  { key: "calendar", label: "التقويم", group: "top", icon: "◷", color: "#1a9d5c" },
-  { key: "notes", label: "ملاحظاتي", group: "top", icon: "✎", color: "#c9a020" },
-  { key: "projects", label: "المشاريع الاستراتيجية", group: "projects", icon: "★", color: "#0f8a8a", section: "projects" },
-  { key: "strategies", label: "البرامج والاستراتيجيات", group: "ops", icon: "▤", color: "#016b5f", section: "entities" },
-  { key: "quarterly", label: "التقارير الربعية", group: "ops", icon: "◷", color: "#1a9d5c", section: "entities" },
-  { key: "contrib", label: "المساهمات في الخطة التشغيلية", group: "ops", icon: "◈", color: "#7a5cd1", section: "contrib" },
-  { key: "changes", label: "طلبات التغيير", group: "ops", icon: "⇄", color: "#c9a020", section: "changes" },
-  { key: "reverse", label: "طلبات العكس", group: "ops", icon: "↺", color: "#e07a3a", section: "reverse" },
-  { key: "workflow", label: "طلبات تحديث سير العمل", group: "ops", icon: "⚙", color: "#a24160", section: "workflow" },
+  { key: "tasks", label: "مهامي", group: "top", icon: "clipboard", color: "#016b5f" },
+  { key: "calendar", label: "التقويم", group: "top", icon: "calendar", color: "#1a9d5c" },
+  { key: "notes", label: "ملاحظاتي", group: "top", icon: "note", color: "#c9a020" },
+  { key: "projects", label: "المشاريع الاستراتيجية", group: "projects", icon: "rocket", color: "#0f8a8a", section: "projects" },
+  { key: "strategies", label: "البرامج والاستراتيجيات", group: "ops", icon: "map", color: "#016b5f", section: "entities" },
+  { key: "quarterly", label: "التقارير الربعية", group: "ops", icon: "calendar-check", color: "#1a9d5c", section: "entities" },
+  { key: "contrib", label: "المساهمات في الخطة التشغيلية", group: "ops", icon: "puzzle", color: "#7a5cd1", section: "contrib" },
+  { key: "changes", label: "طلبات التغيير", group: "ops", icon: "exchange", color: "#c9a020", section: "changes" },
+  { key: "reverse", label: "طلبات العكس", group: "ops", icon: "undo", color: "#e07a3a", section: "reverse" },
+  { key: "workflow", label: "طلبات تحديث سير العمل", group: "ops", icon: "workflow", color: "#a24160", section: "workflow" },
 ];
 const BASE_MAP: Record<string, WDef> = Object.fromEntries(WIDGETS.map((w) => [w.key, w]));
-const ICONS = ["◆", "★", "▲", "●", "■", "✎", "⚑", "⚙", "⇄", "◷", "▤", "◈"];
+
 const CCOLORS = ["#016b5f", "#1a9d5c", "#2f7fd1", "#7a5cd1", "#a24160", "#c9a020", "#e07a3a", "#0f8a8a"];
 
 /* ---------------- تفضيلات الصفحة ---------------- */
@@ -113,6 +114,8 @@ type Prefs = {
   sections: CustomSec[];
   /** تاريخ الانضمام لأداء — يظهر في رأس الصفحة */
   joined: string;
+  /** تغيير اسم أو أيقونة أو لون أي بند — بما فيه الأصلية */
+  look: Record<string, { label?: string; icon?: string; color?: string }>;
 };
 const DEFAULT_PREFS: Prefs = {
   mode: "tiles",
@@ -125,6 +128,7 @@ const DEFAULT_PREFS: Prefs = {
   custom: [],
   sections: [],
   joined: "",
+  look: {},
 };
 
 /* أعمدة كل قسم — تُستعمل في الجداول وفي نافذة الإدخال */
@@ -672,6 +676,7 @@ function Tile({
   warn,
   onOpen,
   onHide,
+  onEdit,
   dragProps,
 }: {
   w: WDef;
@@ -681,6 +686,7 @@ function Tile({
   warn?: string;
   onOpen: () => void;
   onHide: () => void;
+  onEdit: () => void;
   dragProps: Rec;
 }) {
   const r = 18;
@@ -689,6 +695,16 @@ function Tile({
     <div className="tile" onClick={onOpen} {...dragProps}>
       <span className="grip" title="اسحب" onClick={(e) => e.stopPropagation()}>
         ⋮⋮
+      </span>
+      <span
+        className="edit"
+        title="تغيير الاسم والأيقونة"
+        onClick={(e) => {
+          e.stopPropagation();
+          onEdit();
+        }}
+      >
+        ✎
       </span>
       <span
         className="hide"
@@ -721,7 +737,7 @@ function Tile({
       </div>
       {warn ? <span className="warn">{warn}</span> : null}
       <div className="ic3" style={{ background: w.color }}>
-        {w.icon}
+        <PIcon id={w.icon} size={19} />
       </div>
       <h4>{w.label}</h4>
       <div className="sb2">{sub}</div>
@@ -1028,6 +1044,7 @@ export default function Portfolio({
   const [addW, setAddW] = useState<string | null>(null);
   const [addSec, setAddSec] = useState(false);
   const [editJoin, setEditJoin] = useState(false);
+  const [editLook, setEditLook] = useState<string | null>(null);
 
   useEffect(() => {
     void loadUserData<Partial<Prefs>>("portfolio", {}).then((d) => {
@@ -1056,10 +1073,13 @@ export default function Portfolio({
   }, [prefs.order, prefs.hidden, allKeys]);
 
   const WMAP: Record<string, WDef> = useMemo(() => {
-    const m = { ...BASE_MAP };
+    const m: Record<string, WDef> = { ...BASE_MAP };
     for (const c of prefs.custom) m[c.key] = { key: c.key, label: c.label, group: c.group, icon: c.icon, color: c.color, section: c.key };
+    for (const [k, v] of Object.entries(prefs.look || {})) {
+      if (m[k]) m[k] = { ...m[k], ...(v.label ? { label: v.label } : {}), ...(v.icon ? { icon: v.icon } : {}), ...(v.color ? { color: v.color } : {}) };
+    }
     return m;
-  }, [prefs.custom]);
+  }, [prefs.custom, prefs.look]);
 
   const entities = pf.of("entities");
   const contrib = pf.of("contrib");
@@ -1197,14 +1217,19 @@ export default function Portfolio({
         <div className="ch">
           {arrange && <span className="grip">⋮⋮</span>}
           <span className="dot" style={{ background: w.color }}>
-            {w.icon}
+            <PIcon id={w.icon} size={13} />
           </span>
           <h3>{w.label}</h3>
           {["tasks", "calendar", "notes"].includes(k) ? null : <span className="n">{st.count}</span>}
           {arrange && (
-            <span className="hide" onClick={() => patch({ hidden: [...prefs.hidden, k] })}>
-              ✕
-            </span>
+            <>
+              <span className="edit" title={t("تغيير الاسم والأيقونة", "Rename / icon")} onClick={() => setEditLook(k)}>
+                ✎
+              </span>
+              <span className="hide" onClick={() => patch({ hidden: [...prefs.hidden, k] })}>
+                ✕
+              </span>
+            </>
           )}
         </div>
         <div className="cb">{bodyOf(k)}</div>
@@ -1257,6 +1282,7 @@ export default function Portfolio({
               warn={st.warn}
               onOpen={() => setOpen(k)}
               onHide={() => patch({ hidden: [...prefs.hidden, k] })}
+              onEdit={() => setEditLook(k)}
               dragProps={{
                 draggable: arrange,
                 onDragStart: () => setDrag(k),
@@ -1432,7 +1458,7 @@ export default function Portfolio({
           <div className="modal wide" onClick={(e) => e.stopPropagation()}>
             <div className="m-h">
               <span className="dot" style={{ background: openW.color }}>
-                {openW.icon}
+                <PIcon id={openW.icon} size={13} />
               </span>
               <h3>{openW.label}</h3>
               <button className="mx" onClick={() => setOpen(null)} aria-label="close">
@@ -1472,6 +1498,43 @@ export default function Portfolio({
             });
             setAddW(null);
           }}
+        />
+      )}
+
+      {editLook && WMAP[editLook] && (
+        <EditLook
+          t={t}
+          w={WMAP[editLook]}
+          custom={editLook.startsWith("cw-")}
+          onClose={() => setEditLook(null)}
+          onSave={(label, icon, color) => {
+            if (editLook.startsWith("cw-")) {
+              patch({
+                custom: prefs.custom.map((c) => (c.key === editLook ? { ...c, label, icon, color } : c)),
+              });
+            } else {
+              patch({ look: { ...prefs.look, [editLook]: { label, icon, color } } });
+            }
+            setEditLook(null);
+          }}
+          onReset={() => {
+            const nx = { ...prefs.look };
+            delete nx[editLook];
+            patch({ look: nx });
+            setEditLook(null);
+          }}
+          onDelete={
+            editLook.startsWith("cw-")
+              ? () => {
+                  if (!confirm(t("حذف هذا البند وبياناته؟", "Delete item and its data?"))) return;
+                  patch({
+                    custom: prefs.custom.filter((c) => c.key !== editLook),
+                    order: prefs.order.filter((k) => k !== editLook),
+                  });
+                  setEditLook(null);
+                }
+              : undefined
+          }
         />
       )}
 
@@ -1661,7 +1724,7 @@ function AddWidget({
   onAdd: (label: string, icon: string, color: string) => void;
 }) {
   const [label, setLabel] = useState("");
-  const [icon, setIcon] = useState(ICONS[0]);
+  const [icon, setIcon] = useState("target");
   const [color, setColor] = useState(CCOLORS[0]);
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -1679,13 +1742,7 @@ function AddWidget({
           </label>
         </div>
         <div className="sec3">{t("الأيقونة", "Icon")}</div>
-        <div className="sws">
-          {ICONS.map((i) => (
-            <span key={i} className={`ico2 ${icon === i ? "on" : ""}`} onClick={() => setIcon(i)}>
-              {i}
-            </span>
-          ))}
-        </div>
+        <IconPicker value={icon} onPick={setIcon} t={t} />
         <div className="sec3">{t("اللون", "Color")}</div>
         <div className="sws">
           {CCOLORS.map((c) => (
@@ -1733,6 +1790,73 @@ function AddSection({ t, onClose, onAdd }: { t: T; onClose: () => void; onAdd: (
           </button>
           <button className="btn" disabled={!label.trim()} onClick={() => onAdd(label.trim())}>
             {t("إضافة", "Add")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- تغيير اسم البند وأيقونته ولونه ---------------- */
+function EditLook({
+  t,
+  w,
+  custom,
+  onClose,
+  onSave,
+  onReset,
+  onDelete,
+}: {
+  t: T;
+  w: WDef;
+  custom: boolean;
+  onClose: () => void;
+  onSave: (label: string, icon: string, color: string) => void;
+  onReset: () => void;
+  onDelete?: () => void;
+}) {
+  const [label, setLabel] = useState(w.label);
+  const [icon, setIcon] = useState(w.icon);
+  const [color, setColor] = useState(w.color);
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="m-h">
+          <h3>{t("تعديل البند", "Edit item")}</h3>
+          <button className="mx" onClick={onClose} aria-label="close">
+            ✕
+          </button>
+        </div>
+        <div className="sx-form">
+          <label>
+            <span>{t("الاسم", "Name")}</span>
+            <input value={label} onChange={(e) => setLabel(e.target.value)} />
+          </label>
+        </div>
+        <div className="sec3">{t("الأيقونة", "Icon")}</div>
+        <IconPicker value={icon} onPick={setIcon} t={t} />
+        <div className="sec3">{t("اللون", "Color")}</div>
+        <div className="sws">
+          {CCOLORS.map((c) => (
+            <span key={c} className={`sw2 ${color === c ? "on" : ""}`} style={{ background: c }} onClick={() => setColor(c)} />
+          ))}
+          <label className="more3">
+            <input type="color" value={color} onChange={(e) => setColor(e.target.value)} />
+          </label>
+        </div>
+        <div className="m-f">
+          {onDelete && (
+            <button className="btn btn-danger" onClick={onDelete}>
+              {t("حذف البند", "Delete")}
+            </button>
+          )}
+          {!custom && (
+            <button className="btn btn-ghost" onClick={onReset}>
+              {t("الافتراضي", "Reset")}
+            </button>
+          )}
+          <button className="btn" onClick={() => onSave(label.trim() || w.label, icon, color)}>
+            {t("حفظ", "Save")}
           </button>
         </div>
       </div>
