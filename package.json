@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:pages": "BASE_PATH=/dashboard/perf next build && rm -rf perf && cp -r out perf",
     "start": "next start",
     "lint": "next lint"
   },
