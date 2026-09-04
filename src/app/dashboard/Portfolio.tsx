@@ -30,6 +30,43 @@ const num = (v: unknown, d = 0) => {
 const txt = (v: unknown) => (v === null || v === undefined ? "" : String(v));
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
+/* صياغة العدد بالعربية: يوم · يومان · أيام · يوماً */
+function arCount(n: number, w: [string, string, string, string]) {
+  if (n === 1) return w[0];
+  if (n === 2) return w[1];
+  if (n >= 3 && n <= 10) return `${n} ${w[2]}`;
+  return `${n} ${w[3]}`;
+}
+/** الفرق بالسنوات والأشهر والأيام — بحساب أطوال الأشهر الحقيقية */
+function since(iso: string): { y: number; m: number; d: number } | null {
+  if (!iso) return null;
+  const a = new Date(iso);
+  if (isNaN(a.getTime())) return null;
+  const b = new Date();
+  if (a > b) return null;
+  let y = b.getFullYear() - a.getFullYear();
+  let m = b.getMonth() - a.getMonth();
+  let d = b.getDate() - a.getDate();
+  if (d < 0) {
+    m--;
+    d += new Date(b.getFullYear(), b.getMonth(), 0).getDate();
+  }
+  if (m < 0) {
+    y--;
+    m += 12;
+  }
+  return { y, m, d };
+}
+function sinceLabel(iso: string): string {
+  const s = since(iso);
+  if (!s) return "";
+  const parts: string[] = [];
+  if (s.y) parts.push(arCount(s.y, ["سنة", "سنتان", "سنوات", "سنة"]));
+  if (s.m) parts.push(arCount(s.m, ["شهر", "شهران", "أشهر", "شهراً"]));
+  if (s.d) parts.push(arCount(s.d, ["يوم", "يومان", "أيام", "يوماً"]));
+  return parts.length ? parts.join(" و") : "اليوم";
+}
+
 /* ---------------- الويدجت المتاحة ---------------- */
 export type WKey = string;
 
@@ -74,6 +111,8 @@ type Prefs = {
   bgDim: number;
   custom: CustomW[];
   sections: CustomSec[];
+  /** تاريخ الانضمام لأداء — يظهر في رأس الصفحة */
+  joined: string;
 };
 const DEFAULT_PREFS: Prefs = {
   mode: "tiles",
@@ -85,6 +124,7 @@ const DEFAULT_PREFS: Prefs = {
   bgDim: 35,
   custom: [],
   sections: [],
+  joined: "",
 };
 
 /* أعمدة كل قسم — تُستعمل في الجداول وفي نافذة الإدخال */
@@ -987,6 +1027,7 @@ export default function Portfolio({
   const [taskCount, setTaskCount] = useState<number | null>(null);
   const [addW, setAddW] = useState<string | null>(null);
   const [addSec, setAddSec] = useState(false);
+  const [editJoin, setEditJoin] = useState(false);
 
   useEffect(() => {
     void loadUserData<Partial<Prefs>>("portfolio", {}).then((d) => {
@@ -1251,12 +1292,34 @@ export default function Portfolio({
 
       <div className="pf-hero">
         <div className="av">{(me.name || "?").trim().charAt(0)}</div>
-        <div>
-          <h1>{t("محفظتي", "My portfolio")}</h1>
-          <div className="sb">
-            {me.name}
-            {me.jobTitle ? ` · ${me.jobTitle}` : ""}
-          </div>
+        <div className="who">
+          <h1>{me.name}</h1>
+          <div className="sb">{me.jobTitle || t("عضو فريق إدارة عمليات الأداء", "Team member")}</div>
+          {editJoin ? (
+            <div className="joinedit">
+              <input
+                type="date"
+                autoFocus
+                defaultValue={prefs.joined}
+                onChange={(e) => patch({ joined: e.target.value })}
+                onBlur={() => setEditJoin(false)}
+              />
+              <button className="btn2" onClick={() => setEditJoin(false)}>
+                {t("تم", "Done")}
+              </button>
+            </div>
+          ) : (
+            <button className="joined" onClick={() => setEditJoin(true)}>
+              {prefs.joined ? (
+                <>
+                  {t("أدائي منذ", "At Adaa since")} <b>{prefs.joined}</b>
+                  <em>{sinceLabel(prefs.joined)}</em>
+                </>
+              ) : (
+                <>+ {t("أضف تاريخ انضمامك لأداء", "Add your join date")}</>
+              )}
+            </button>
+          )}
         </div>
         <div className="acts">
           <span className="viewtog">
