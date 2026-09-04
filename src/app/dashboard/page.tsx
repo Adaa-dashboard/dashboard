@@ -8,7 +8,7 @@ import Dashboard from "./Dashboard";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [me, setMe] = useState<(Me & { scopes?: string[] }) | null>(null);
+  const [me, setMe] = useState<(Me & { scopes?: string[]; jobTitle?: string }) | null>(null);
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
@@ -19,15 +19,16 @@ export default function DashboardPage() {
         // الصلاحيات تُقرأ حيّة من القاعدة لا من الجلسة، فتغييرها يسري فوراً.
         // ولو لم تكن الدالة منصّبة بعد (قبل تشغيل ملف الترقية) نرجع للسلوك
         // القديم بحسب الدور، فلا تُقفل اللوحة على الجميع.
-        const { data, error } = await sb().rpc("perf_my_scopes");
+        const { data, error } = await sb().rpc("perf_me");
+        const card = Array.isArray(data) ? data[0] : data;
         const scopes = error
           ? u.role === "admin"
             ? [...ALL_SCOPES]
             : [...DEFAULT_SCOPES]
-          : Array.isArray(data)
-            ? data
+          : Array.isArray(card?.scopes)
+            ? card.scopes
             : [];
-        setMe({ ...u, scopes });
+        setMe({ ...u, scopes, jobTitle: card?.job_title || "" });
       }
       setChecked(true);
     });
@@ -43,6 +44,7 @@ export default function DashboardPage() {
         role: me.role,
         sectorIds: me.sectorIds,
         scopes: me.scopes || [],
+        jobTitle: me.jobTitle || "",
       }}
     />
   );

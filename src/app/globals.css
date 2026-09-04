@@ -4459,3 +4459,26 @@ table.matrix thead th {
   border-color: #d34a4a;
   background: #fdf2f2;
 }
+
+/* المسمّى الوظيفي */
+.u-job {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.org-p .who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.org-p .who em {
+  font-style: normal;
+  line-height: 1.35;
+}
+.org-p .who small {
+  font-size: 10.5px;
+  color: var(--muted);
+  line-height: 1.35;
+}

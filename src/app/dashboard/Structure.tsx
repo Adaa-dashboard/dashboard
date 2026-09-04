@@ -10,7 +10,10 @@ import { apiFetch } from "@/lib/api";
    ============================================================ */
 
 type Sector = { id: string; name: string };
-type Person = { id: string; name: string; role: string; sectorIds: string[]; isLead?: boolean };
+type Person = {
+  id: string; name: string; role: string; sectorIds: string[];
+  isLead?: boolean; jobTitle?: string;
+};
 
 export default function Structure({
   sectors,
@@ -136,7 +139,10 @@ export default function Structure({
                 {head.map((p) => (
                   <span className="org-p" key={p.id}>
                     <i className="av s">{(p.name || "?").trim().charAt(0)}</i>
-                    {p.name}
+                    <span className="who">
+                      <em>{p.name}</em>
+                      {p.jobTitle && <small>{p.jobTitle}</small>}
+                    </span>
                   </span>
                 ))}
               </div>
@@ -171,7 +177,10 @@ export default function Structure({
                       {list.map((p) => (
                         <span className={`org-p ${p.isLead ? "lead" : ""}`} key={p.id}>
                           <i className="av s">{(p.name || "?").trim().charAt(0)}</i>
-                          {p.name}
+                          <span className="who">
+                            <em>{p.name}</em>
+                            {p.jobTitle && <small>{p.jobTitle}</small>}
+                          </span>
                           {p.isLead && <b>{t("مدير القطاع", "Lead")}</b>}
                         </span>
                       ))}
