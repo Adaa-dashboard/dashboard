@@ -1053,6 +1053,22 @@ export default function Portfolio({
     });
   }, []);
 
+  /* أمر «رتّب صفحتي حسب الأهمية» من المساعد */
+  useEffect(() => {
+    const h = (e: Event) => {
+      const list = (e as CustomEvent).detail as string[];
+      if (!Array.isArray(list) || !list.length) return;
+      setPrefs((old) => {
+        const rest = old.order.filter((k) => !list.includes(k));
+        const next = { ...old, order: [...list.filter((k) => old.order.includes(k) || true), ...rest] };
+        void saveUserData("portfolio", next);
+        return next;
+      });
+    };
+    window.addEventListener("pf-reorder", h);
+    return () => window.removeEventListener("pf-reorder", h);
+  }, []);
+
   const patch = useCallback((p: Partial<Prefs>) => {
     setPrefs((old) => {
       const next = { ...old, ...p };
