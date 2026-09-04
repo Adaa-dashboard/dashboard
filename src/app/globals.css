@@ -5980,6 +5980,56 @@ table.matrix thead th {
   color: rgba(255, 255, 255, 0.82);
   margin-top: 2px;
 }
+.pf-hero .who {
+  min-width: 0;
+}
+/* أدائي منذ … — تُضغط لضبط التاريخ */
+.pf-hero .joined {
+  margin-top: 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  color: #fff;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.pf-hero .joined:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+.pf-hero .joined b {
+  font-weight: 800;
+  direction: ltr;
+}
+.pf-hero .joined em {
+  font-style: normal;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--pf);
+  border-radius: 999px;
+  padding: 1px 9px;
+  font-weight: 700;
+}
+.pf-hero .joinedit {
+  margin-top: 7px;
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+.pf-hero .joinedit input {
+  width: auto;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  border-radius: 9px;
+  padding: 5px 9px;
+  font: inherit;
+  font-size: 12px;
+  color-scheme: dark;
+}
 .pf-hero .acts {
   margin-inline-start: auto;
   display: flex;
