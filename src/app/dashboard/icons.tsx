@@ -126,3 +126,7 @@ export const IconProj = nav('<rect x="3.2" y="4.2" width="17.6" height="16.6" rx
 export const IconSettings = nav(
   '<circle cx="12" cy="12" r="3"/><path d="M4 12h2M18 12h2M12 4v2M12 18v2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M17.7 6.3l-1.4 1.4M7.7 16.3l-1.4 1.4"/>',
 );
+
+export const IconFolder = nav(
+  '<path d="M3.4 7.6a2 2 0 0 1 2-2h3.4l2 2.2h7.8a2 2 0 0 1 2 2v8.6a2 2 0 0 1-2 2H5.4a2 2 0 0 1-2-2z"/><path d="M3.4 11.4h17.2"/>',
+);
