@@ -783,3 +783,77 @@ insert into public.perf_items (section, id, ord, data) values
 on conflict (section, id) do update
    set data = excluded.data, ord = excluded.ord
  where public.perf_items.data->>'demo' is distinct from 'false';
+
+
+-- ============================================================
+--  ١٢) محفظتي — لوحة كل موظف الشخصية
+--      صفوف كل مستخدم على حدة: جهاته وتقاريرها الربعية،
+--      مساهماته في الخطة التشغيلية، طلباته، ومشاريعه.
+--      يقرؤها صاحبها ومديره فقط، ويكتبها صاحبها وحده.
+-- ============================================================
+create table if not exists public.perf_portfolio (
+  app_user_id bigint not null,
+  section     text   not null,   -- entities | contrib | changes | reverse | workflow | projects
+  id          text   not null,
+  ord         int    not null default 100,
+  data        jsonb  not null default '{}'::jsonb,
+  updated_at  timestamptz not null default now(),
+  primary key (app_user_id, section, id)
+);
+
+alter table public.perf_portfolio enable row level security;
+grant select, insert, update, delete on public.perf_portfolio to authenticated;
+
+-- من يرى محفظة من: صاحبها · مدير الإدارة · مدير القطاع لموظفي قطاعه
+create or replace function public.perf_can_see_portfolio(p_uid bigint)
+returns boolean language sql stable security definer set search_path = public as $$
+  select p_uid = public.perf_my_id()
+      or public.perf_has_scope('users')
+      or exists (
+           select 1
+             from public.perf_users me
+             join public.perf_users u on u.id = p_uid
+            where me.id = public.perf_my_id()
+              and me.is_lead
+              and u.sector_ids && me.sector_ids);
+$$;
+revoke all on function public.perf_can_see_portfolio(bigint) from public, anon;
+grant execute on function public.perf_can_see_portfolio(bigint) to authenticated;
+
+drop policy if exists "perf_pf_read" on public.perf_portfolio;
+create policy "perf_pf_read" on public.perf_portfolio
+  for select to authenticated
+  using (public.perf_can_see_portfolio(app_user_id));
+
+-- الكتابة لصاحب المحفظة وحده — ولا يكتب أحد في محفظة غيره ولو كان مديره
+drop policy if exists "perf_pf_write" on public.perf_portfolio;
+create policy "perf_pf_write" on public.perf_portfolio
+  for all to authenticated
+  using (app_user_id = public.perf_my_id())
+  with check (app_user_id = public.perf_my_id());
+
+-- ------------------------------------------------------------
+--  خلفية الصفحة الشخصية — مساحة تخزين عامة القراءة،
+--  والكتابة لكل مستخدم في مجلده وحده. تُنشأ فقط على Supabase
+--  (المخطط storage غير موجود في قواعد الاختبار المحلية).
+-- ------------------------------------------------------------
+do $$
+begin
+  if exists (select 1 from information_schema.schemata where schema_name = 'storage') then
+    execute $q$ insert into storage.buckets (id, name, public)
+                values ('portfolio','portfolio', true)
+                on conflict (id) do nothing $q$;
+    execute $q$ drop policy if exists "pf_bg_read" on storage.objects $q$;
+    execute $q$ create policy "pf_bg_read" on storage.objects
+                for select using (bucket_id = 'portfolio') $q$;
+    execute $q$ drop policy if exists "pf_bg_insert" on storage.objects $q$;
+    execute $q$ create policy "pf_bg_insert" on storage.objects
+                for insert to authenticated with check (bucket_id = 'portfolio') $q$;
+    execute $q$ drop policy if exists "pf_bg_update" on storage.objects $q$;
+    execute $q$ create policy "pf_bg_update" on storage.objects
+                for update to authenticated using (bucket_id = 'portfolio' and owner = auth.uid()) $q$;
+    execute $q$ drop policy if exists "pf_bg_delete" on storage.objects $q$;
+    execute $q$ create policy "pf_bg_delete" on storage.objects
+                for delete to authenticated using (bucket_id = 'portfolio' and owner = auth.uid()) $q$;
+  end if;
+end $$;

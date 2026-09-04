@@ -10,7 +10,8 @@ import Activity, { type Item as ActivityItem } from "./Activity";
 import Changes from "./Changes";
 import Backup from "./Backup";
 import Tools from "./Tools";
-import MyPage from "./MyPage";
+import Portfolio from "./Portfolio";
+import Notes from "./Notes";
 import Structure from "./Structure";
 import {
   ALL_SCOPES,
@@ -43,6 +44,7 @@ import {
   IconOut,
   IconProj,
   IconSettings,
+  IconFolder,
 } from "./icons";
 import WeeklyPanel from "./WeeklyPanel";
 import Details from "./Details";
@@ -76,6 +78,8 @@ interface Me {
   scopes: string[];
   /** المسمّى الوظيفي — يظهر تحت الاسم */
   jobTitle?: string;
+  /** مدير قطاع — يُسند المهام ويتابع موظفيه */
+  isLead?: boolean;
 }
 interface Sector {
   id: string;
@@ -174,6 +178,7 @@ export default function Dashboard({ me }: { me: Me }) {
   const [setOpen, setSetOpen] = useState(false);
   const t = useCallback((ar: string, en: string) => (lang === "en" ? en : ar), [lang]);
   const [pwOpen, setPwOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
   const [sheet, setSheet] = useState(false); // ورقة الإعدادات على الجوال
   // طيّ الشريط الجانبي — الحالة تبقى بين الجلسات لكل متصفح
   const [railCol, setRailCol] = useState(false);
@@ -269,7 +274,7 @@ export default function Dashboard({ me }: { me: Me }) {
     details: ["المؤشرات التفصيلية", "KPI Details"],
     entry: ["المؤشرات والمستهدفات", "KPIs & Targets"],
     tasks: ["المهام", "Tasks"],
-    mypage: ["صفحتي", "My page"],
+    mypage: ["محفظتي", "My portfolio"],
     report: ["الإنجاز الأسبوعي", "Weekly Achievement"],
     structure: ["الهيكل التنظيمي", "Org chart"],
     users: ["المستخدمون والصلاحيات", "Users & Roles"],
@@ -365,7 +370,12 @@ export default function Dashboard({ me }: { me: Me }) {
           )}
 
           {(can("tasks") || can("weekly")) && <div className="rail-sep" />}
-          {can("tasks") && <NavItem id="tasks" icon={<IconTask />} label={["المهام", "Tasks"]} />}
+          <NavItem id="mypage" icon={<IconFolder />} label={["محفظتي", "My portfolio"]} />
+          {/* صفحة «المهام» المستقلة لمن يُسند ويتابع: مدير الإدارة ومدير القطاع.
+              وبقية الموظفين يرون مهامهم داخل محفظتهم. */}
+          {can("tasks") && (isAdmin || me.isLead || can("tasks:all")) && (
+            <NavItem id="tasks" icon={<IconTask />} label={["المهام", "Tasks"]} />
+          )}
           {can("weekly") && <NavItem id="report" icon={<IconWeek />} label={["الإنجاز الأسبوعي", "Weekly Achievement"]} />}
 
           <div className="rail-gap" />
@@ -377,7 +387,7 @@ export default function Dashboard({ me }: { me: Me }) {
             <span className="lb">{t("الإعدادات", "Settings")}</span> <span className="cv">▾</span>
           </button>
           <div className={`subnav ${setOpen ? "show" : ""}`}>
-            <SubItem id="mypage" label={["صفحتي", "My page"]} />
+            <SubItem id="mypage" label={["محفظتي", "My portfolio"]} />
             {can("users") && <SubItem id="users" label={["المستخدمون والصلاحيات", "Users & Roles"]} />}
             {can("structure") && <SubItem id="structure" label={["الهيكل التنظيمي", "Org chart"]} />}
             <button className="sub-item" onClick={() => setBackupOpen(true)}>
@@ -479,7 +489,7 @@ export default function Dashboard({ me }: { me: Me }) {
                   onFocusDone={() => setTaskFocus(null)}
                 />
               )}
-              {tab === "mypage" && <MyPage me={me} refData={refData} t={t} />}
+              {tab === "mypage" && <Portfolio me={me} t={t} onOpenNotes={() => setNotesOpen(true)} />}
               {tab === "report" && can("weekly") && <WeeklyPanel t={t} />}
               {tab === "structure" && can("structure") && (
                 <Structure
@@ -516,6 +526,8 @@ export default function Dashboard({ me }: { me: Me }) {
         </nav>
       </div>
 
+      {notesOpen && <Notes t={t} onClose={() => setNotesOpen(false)} />}
+
       {sheet && (
         <div className="sheet-wrap" onClick={() => setSheet(false)}>
           <div className="sheet" onClick={(e) => e.stopPropagation()}>
@@ -532,7 +544,7 @@ export default function Dashboard({ me }: { me: Me }) {
             {SECTION_NAV.map(([key]) =>
               can(key) ? <SheetItem key={key} id={key} label={SECTION_TITLE[key]} /> : null,
             )}
-            <SheetItem id="mypage" label={["صفحتي", "My page"]} />
+            <SheetItem id="mypage" label={["محفظتي", "My portfolio"]} />
             {can("users") && <SheetItem id="users" label={["المستخدمون والصلاحيات", "Users & Roles"]} />}
             {can("structure") && <SheetItem id="structure" label={["الهيكل التنظيمي", "Org chart"]} />}
             <button

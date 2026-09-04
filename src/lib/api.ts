@@ -407,6 +407,64 @@ export async function apiFetch(path: string, init: Init = {}) {
       }
     }
 
+    /* ---------------- محفظتي — صفوف كل موظف ----------------
+       القراءة يحرسها RLS (صاحبها ومديره)، والكتابة لصاحبها وحده. */
+    if (p === "/api/portfolio" && method === "GET") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const section = q.get("section") || "";
+      const uid = q.get("user") || me.id;
+      let qq = s.from("perf_portfolio").select("*").eq("app_user_id", uid);
+      if (section) qq = qq.eq("section", section);
+      const { data, error } = await qq.order("ord");
+      if (error) return err(error.message, 403);
+      return ok({
+        items: (data || []).map((r: Record<string, unknown>) => ({
+          section: String(r.section),
+          id: String(r.id),
+          ord: Number(r.ord ?? 100),
+          data: (r.data || {}) as Record<string, unknown>,
+          updatedAt: r.updated_at,
+        })),
+      });
+    }
+    if (p === "/api/portfolio" && (method === "POST" || method === "PUT")) {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const rows = (Array.isArray(body.items) ? body.items : [body]) as Record<string, unknown>[];
+      const payload = rows
+        .filter((r) => str(r.section))
+        .map((r) => ({
+          app_user_id: Number(me.id),
+          section: str(r.section),
+          id: str(r.id) || "pf-" + newId(),
+          ord: num(r.ord) ?? 100,
+          data: r.data ?? {},
+          updated_at: new Date().toISOString(),
+        }));
+      if (!payload.length) return err("لا يوجد بند", 400);
+      const { error } = await s
+        .from("perf_portfolio")
+        .upsert(payload, { onConflict: "app_user_id,section,id" });
+      if (error) return err(error.message, 403);
+      return ok({ ok: true, ids: payload.map((r) => r.id) });
+    }
+    if (p === "/api/portfolio" && method === "DELETE") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const section = q.get("section") || "";
+      const id = q.get("id") || "";
+      if (!section || !id) return err("لا يوجد بند", 400);
+      const { error } = await s
+        .from("perf_portfolio")
+        .delete()
+        .eq("app_user_id", me.id)
+        .eq("section", section)
+        .eq("id", id);
+      if (error) return err(error.message, 403);
+      return ok({ ok: true });
+    }
+
     /* ---------------- أقسام نظرة عامة الخمسة ----------------
        جدول واحد لكل الأقسام: القراءة والكتابة يحرسهما RLS حسب
        صلاحية القسم نفسه، فلا حاجة لفحص إضافي هنا. */
