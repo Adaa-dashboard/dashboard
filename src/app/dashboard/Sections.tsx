@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { writeXlsx } from "@/lib/sheet";
@@ -597,6 +598,150 @@ function NationalDetail({ it, t }: { it: Item; t: T }) {
         </div>
       </div>
     </div>
+  );
+}
+
+/* ------------------------------------------------------------
+   بطاقتا «نظرة عامة» — معلومات عامة فقط، والأسماء والتفاصيل
+   كلها في صفحة كل قسم. الوطنية يميناً والمؤسسية يساراً.
+   ------------------------------------------------------------ */
+function KV({ label, n, tot, tone }: { label: string; n: number; tot: number; tone?: string }) {
+  return (
+    <div className="kv">
+      <span className="t">{label}</span>
+      <span className="mb">
+        <i className={tone || ""} style={{ width: `${tot ? (n / tot) * 100 : 0}%` }} />
+      </span>
+      <b>{AR(n)}</b>
+    </div>
+  );
+}
+
+function GCell({ k, children }: { k: string; children: ReactNode }) {
+  return (
+    <div className="gc">
+      <div className="k">{k}</div>
+      <div className="v">{children}</div>
+    </div>
+  );
+}
+
+export function StrategyBox({
+  section,
+  t,
+  onOpen,
+}: {
+  section: "natstrat" | "inststrat";
+  t: T;
+  onOpen: () => void;
+}) {
+  const { items, loaded } = useItems(section);
+  const title = SECTION_TITLE[section];
+
+  const box = (body: ReactNode) => (
+    <div className="sx-box">
+      <div className="hd">
+        <h3>{t(title[0], title[1])}</h3>
+        <button className="lnk" onClick={onOpen}>
+          {t("التفاصيل", "Details")} ‹
+        </button>
+      </div>
+      <div className="bd">{body}</div>
+    </div>
+  );
+
+  if (!loaded) return box(<div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>);
+  if (!items.length)
+    return box(
+      <div className="sx-none">{t("لا توجد بيانات بعد — تُضاف من صفحة القسم.", "No data yet.")}</div>,
+    );
+
+  const tot = items.length;
+  const last = items.map((x) => txt(x.data.updated)).sort().slice(-1)[0] || "—";
+
+  if (section === "natstrat") {
+    const c = [0, 0, 0, 0];
+    for (const it of items) c[natStage(it.data) - 1]++;
+    const meas = Math.round(items.reduce((a, x) => a + numOf(x.data.meas), 0) / tot);
+    const tech = items.filter((x) => x.data.tech).length;
+    const rep = items.reduce((a, x) => a + numOf(x.data.kpisRep), 0);
+    const all = items.reduce((a, x) => a + numOf(x.data.kpisTot), 0);
+    return box(
+      <>
+        <div className="head-row">
+          <div className="big">
+            <b>{AR(tot)}</b>
+            <span>{t("استراتيجية وطنية", "national")}</span>
+          </div>
+          <div className="side">
+            {NAT_STEPS.map((s, i) => (
+              <KV key={s} label={s} n={c[i]} tot={tot} tone={i >= 2 ? "g" : ""} />
+            ))}
+          </div>
+        </div>
+        <div className="gen">
+          <GCell k={t("متوسط قابلية القياس", "Avg. measurability")}>
+            <span className="meas">
+              <span className={`n ${measTone(meas)}`}>{AR(meas)}٪</span>
+              <span className="bar">
+                <i className={measTone(meas)} style={{ width: `${meas}%` }} />
+              </span>
+            </span>
+          </GCell>
+          <GCell k={t("مقبولة فنياً", "Technically accepted")}>
+            {AR(tech)} <em>{`${t("من", "of")} ${AR(tot)}`}</em>
+          </GCell>
+          <GCell k={t("المؤشرات الممثَّلة", "Represented KPIs")}>
+            {AR(rep)} <em>{`${t("من", "of")} ${AR(all)}`}</em>
+          </GCell>
+          <GCell k={t("آخر تحديث", "Last update")}>
+            <span className="dt">{last}</span>
+          </GCell>
+        </div>
+      </>,
+    );
+  }
+
+  const at = (n: number) => items.filter((x) => instStage(x.data) === n).length;
+  const arrived = items.filter((x) => instStage(x.data) >= 1).length;
+  const live = items.filter((x) => instStage(x.data) >= INST_STAGES.length).length;
+  const pct = Math.round((live / tot) * 100);
+  const goals = items.reduce((a, x) => a + numOf(x.data.goals), 0);
+  const kpis = items.reduce((a, x) => a + numOf(x.data.kpis), 0);
+  return box(
+    <>
+      <div className="head-row">
+        <div className="big">
+          <b>{AR(tot)}</b>
+          <span>{t("استراتيجية مؤسسية", "institutional")}</span>
+        </div>
+        <div className="side">
+          <KV label={t("وصلت المركز", "Received")} n={arrived} tot={tot} />
+          <KV label={INST_STAGES[1]} n={at(2)} tot={tot} />
+          <KV label={INST_STAGES[2]} n={at(3)} tot={tot} />
+          <KV label={t("فُعِّل قياسها", "Measurement live")} n={live} tot={tot} tone="g" />
+        </div>
+      </div>
+      <div className="gen">
+        <GCell k={t("نسبة تفعيل القياس", "Measurement live %")}>
+          <span className="meas">
+            <span className="n hi">{AR(pct)}٪</span>
+            <span className="bar">
+              <i className="hi" style={{ width: `${pct}%` }} />
+            </span>
+          </span>
+        </GCell>
+        <GCell k={t("لم تصل بعد", "Not received")}>
+          {AR(tot - arrived)} <em>{t("جهة", "entities")}</em>
+        </GCell>
+        <GCell k={t("الأهداف · المؤشرات", "Goals · KPIs")}>
+          {AR(goals)} <em>· {AR(kpis)}</em>
+        </GCell>
+        <GCell k={t("آخر تحديث", "Last update")}>
+          <span className="dt">{last}</span>
+        </GCell>
+      </div>
+    </>,
   );
 }
 
