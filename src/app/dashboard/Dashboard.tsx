@@ -11,6 +11,7 @@ import Changes from "./Changes";
 import Backup from "./Backup";
 import Tools from "./Tools";
 import Portfolio from "./Portfolio";
+import Assistant, { PinnedBar, usePins } from "./Assistant";
 import Notes from "./Notes";
 import Structure from "./Structure";
 import {
@@ -179,6 +180,7 @@ export default function Dashboard({ me }: { me: Me }) {
   const t = useCallback((ar: string, en: string) => (lang === "en" ? en : ar), [lang]);
   const [pwOpen, setPwOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
+  const pins = usePins();
   const [sheet, setSheet] = useState(false); // ورقة الإعدادات على الجوال
   // طيّ الشريط الجانبي — الحالة تبقى بين الجلسات لكل متصفح
   const [railCol, setRailCol] = useState(false);
@@ -427,6 +429,8 @@ export default function Dashboard({ me }: { me: Me }) {
             <Tools t={t} meId={me.id} />
           </div>
 
+          <PinnedBar pins={pins.pins} onRemove={pins.remove} t={t} />
+
           {!loaded ? (
             <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>
           ) : (
@@ -525,6 +529,8 @@ export default function Dashboard({ me }: { me: Me }) {
           </button>
         </nav>
       </div>
+
+      <Assistant me={me} t={t} onPin={pins.add} />
 
       {notesOpen && <Notes t={t} onClose={() => setNotesOpen(false)} />}
 
