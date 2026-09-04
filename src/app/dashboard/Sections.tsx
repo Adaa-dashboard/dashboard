@@ -36,7 +36,10 @@ const NAT_STEPS = ["طور الإعداد/التحديث", "قيد المراج�
 const NAT_WHERE = ["لدى الجهة المالكة", "لدى اللجنة الاستراتيجية", "اللجنة الاستراتيجية", "اعتماد نهائي"];
 const INST_STAGES = ["وصلت المركز", "قيد المراجعة", "معالجة الملاحظات", "اعتُمدت", "فُعِّل القياس"];
 
-const AR = (n: number | string) => String(n).replace(/[0-9]/g, (d) => "٠١٢٣٤٥٦٧٨٩"[Number(d)]);
+/* الأرقام كلها لاتينية (1 2 3) بطلب المستخدمة — كانت تُحوَّل
+   إلى هندية (١ ٢ ٣). الدالة باقية مكانها فلو رجع الطلب يوماً
+   يكفي تعديلها هنا وحدها. */
+const AR = (n: number | string) => String(n);
 const numOf = (v: unknown, dflt = 0) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : dflt;
@@ -562,15 +565,15 @@ function NationalDetail({ it, t }: { it: Item; t: T }) {
           <div className="lg">
             <span>
               <i className="hi" />
-              {t("مرتفعة ≥٩٠٪", "High")}
+              {t("مرتفعة ≥ 90٪", "High")}
             </span>
             <span>
               <i className="mid" />
-              {t("متوسطة ٧٠–٨٩٪", "Medium")}
+              {t("متوسطة 70–89٪", "Medium")}
             </span>
             <span>
               <i className="low" />
-              {t("منخفضة أقل من ٧٠٪", "Low")}
+              {t("منخفضة أقل من 70٪", "Low")}
             </span>
           </div>
         </div>
@@ -905,7 +908,7 @@ const FIELDS: Record<Exclude<SectionKey, "outputs">, Field[]> = {
     { k: "name", label: "الاستراتيجية" },
     { k: "owner", label: "الجهة المالكة" },
     { k: "domain", label: "النطاق (التوطين · الحج · الفضاء…)" },
-    { k: "stage", label: "حالة الاعتماد (١ إعداد · ٢ مراجعة · ٣ اللجنة · ٤ مجلس الوزراء)", kind: "num" },
+    { k: "stage", label: "حالة الاعتماد (1 إعداد · 2 مراجعة · 3 اللجنة · 4 مجلس الوزراء)", kind: "num" },
     { k: "tech", label: "مقبولة فنياً؟", kind: "bool" },
     { k: "meas", label: "قابلية القياس ٪", kind: "num" },
     { k: "note", label: "أبرز الملاحظات", kind: "area" },
@@ -926,7 +929,7 @@ const FIELDS: Record<Exclude<SectionKey, "outputs">, Field[]> = {
     { k: "owner", label: "الجهة" },
     { k: "goals", label: "عدد الأهداف", kind: "num" },
     { k: "kpis", label: "عدد المؤشرات", kind: "num" },
-    { k: "stage", label: "المرحلة (١..٥)", kind: "num" },
+    { k: "stage", label: "المرحلة (1..5)", kind: "num" },
     { k: "status", label: "الحالة" },
     { k: "note", label: "ملاحظة", kind: "area" },
     { k: "updated", label: "آخر تحديث", kind: "date" },
