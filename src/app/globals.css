@@ -4491,13 +4491,26 @@ table.matrix thead th {
 .rail {
   position: sticky;
   transition: flex-basis 0.18s ease;
+  /* الزوايا الداخلية مستديرة، والتمرير انتقل إلى .rail-in
+     حتى لا يُقتطع زر الطيّ المعلَّق على الحافة */
+  border-radius: 26px 0 0 26px;
+  overflow: visible;
+  padding: 0;
+}
+.rail-in {
+  height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 26px 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-radius: inherit;
 }
 .rail-tog {
-  /* داخل الشريط لا معلَّقاً على حافته: الشريط فيه overflow-y
-     فأي عنصر يخرج عن عرضه يُقتطع. */
   position: absolute;
-  top: 14px;
-  inset-inline-end: 8px;
+  top: 74px;
+  inset-inline-end: -15px;
   width: 28px;
   height: 28px;
   border-radius: 50%;
@@ -4505,25 +4518,25 @@ table.matrix thead th {
   cursor: pointer;
   display: grid;
   place-items: center;
-  font-size: 14px;
   line-height: 1;
   background: #06a685;
   color: #fff;
-  box-shadow: 0 4px 12px rgba(6, 166, 133, 0.42);
+  box-shadow: 0 5px 14px rgba(6, 166, 133, 0.45);
   z-index: 6;
+  transition: background 0.15s, transform 0.15s;
+}
+.rail-tog svg {
+  display: block;
 }
 .rail-tog:hover {
   background: #05b491;
+  transform: scale(1.08);
 }
 .rail.col {
-  flex: 0 0 66px;
-  padding-inline: 9px;
+  flex: 0 0 70px;
 }
-.rail.col .rail-tog {
-  inset-inline-end: 19px;
-}
-.rail.col {
-  padding-top: 56px;
+.rail.col .rail-in {
+  padding-inline: 11px;
 }
 .rail.col .rail-brand,
 .rail.col .subnav,
@@ -4539,10 +4552,6 @@ table.matrix thead th {
 }
 .rail.col .whoami {
   justify-content: center;
-}
-.rail .rail-brand {
-  /* فراغ لزر الطيّ في الزاوية */
-  padding-inline-end: 42px;
 }
 .rail .nav-item .ic {
   display: inline-flex;
@@ -4763,6 +4772,12 @@ table.matrix thead th {
   font-size: 11px;
   color: #8a9a95;
   direction: ltr;
+}
+.sx-note b {
+  display: block;
+  color: var(--g-900);
+  font-size: 12px;
+  margin-bottom: 3px;
 }
 .sx-note {
   margin-top: 9px;
@@ -5084,7 +5099,9 @@ table.matrix thead th {
   font-size: 12px;
   color: var(--muted);
 }
-.sx-form input {
+.sx-form input,
+.sx-form textarea {
+  width: 100%;
   border: 1px solid var(--border);
   border-radius: 9px;
   padding: 8px 11px;
@@ -5139,4 +5156,499 @@ table.matrix thead th {
   background: #f3f6f5;
   color: #6d7f7a;
   border: 1px solid var(--border);
+}
+
+/* ============================================================
+   جلسات مراجعة الأداء — لوحة جانبية + بطاقة لكل جهة
+   ============================================================ */
+.sx-sess {
+  display: grid;
+  grid-template-columns: 1fr 262px;
+  gap: 18px;
+  align-items: start;
+}
+.sx-sess .sx-side {
+  background: #f2f9f7;
+  border: 1px solid #dfeeea;
+  border-radius: 16px;
+  padding: 18px 16px;
+  text-align: center;
+  order: 2;
+}
+.sx-ring {
+  display: block;
+  margin: 0 auto;
+}
+.sx-ring-t {
+  font-family: "Noto Kufi Arabic", sans-serif;
+  font-weight: 800;
+  font-size: 25px;
+}
+.sx-side .ttl {
+  margin-top: 12px;
+  font-family: "Noto Kufi Arabic", sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--g-900);
+}
+.sx-side .sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.sx-side .lgd {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+}
+.sx-side .rw {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 7px 11px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.sx-side .rw b {
+  margin-inline-start: auto;
+  color: var(--ink);
+  font-size: 12.5px;
+}
+.sx-side .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.sx-side .dot.done {
+  background: #1a9d5c;
+}
+.sx-side .dot.live {
+  background: var(--g-700);
+}
+.sx-side .dot.idle {
+  background: #c9d6d2;
+}
+.sx-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-width: 0;
+  order: 1;
+}
+.sx-card {
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: #fff;
+  padding: 11px 14px 12px;
+}
+.sx-card.wide {
+  background: #fbfdfc;
+}
+
+/* بطاقات الاستراتيجيات المؤسسية */
+.sx-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+/* سطر مختصر — الاستراتيجيات الوطنية في نظرة عامة */
+.sx-rows.tight {
+  gap: 0;
+  border-top: 1px solid #eef2f1;
+  margin-top: 12px;
+}
+.sx-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 4px;
+  border-bottom: 1px solid #f2f6f5;
+  font-size: 12.5px;
+}
+.sx-line:last-child {
+  border-bottom: none;
+}
+.sx-line .n {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* خمس بطاقات عدّ */
+.sx-nums.five {
+  grid-template-columns: auto repeat(4, 1fr);
+}
+
+/* شريط قابلية القياس */
+.sx-meas {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.sx-meas b {
+  font-size: 12px;
+  min-width: 34px;
+}
+.sx-meas .bar {
+  display: block;
+  width: 96px;
+  height: 8px;
+  border-radius: 99px;
+  background: #eef2f1;
+  overflow: hidden;
+}
+.sx-meas .bar i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+}
+.sx-meas.hi b {
+  color: #1a9d5c;
+}
+.sx-meas.hi .bar i {
+  background: #1a9d5c;
+}
+.sx-meas.mid b {
+  color: #e0971a;
+}
+.sx-meas.mid .bar i {
+  background: #e0971a;
+}
+.sx-meas.low b {
+  color: #d34a4a;
+}
+.sx-meas.low .bar i {
+  background: #d34a4a;
+}
+
+/* نقاط المراحل داخل الجدول */
+.sx-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sx-dots i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #e3eae8;
+  position: relative;
+}
+.sx-dots i.ok {
+  background: #1a9d5c;
+}
+.sx-dots i.now {
+  background: #e0971a;
+}
+.sx-dots i + i::before {
+  content: "";
+  position: absolute;
+  inset-inline-end: 9px;
+  top: 4px;
+  width: 4px;
+  height: 1.5px;
+  background: #e3eae8;
+}
+.sx-dots i.ok + i::before,
+.sx-dots i.now::before {
+  background: #1a9d5c;
+}
+
+/* شريط أدوات الصفحة */
+.sx-tb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.sx-tb input,
+.sx-tb select {
+  /* القاعدة العامة تعطي الحقول width:100% فتنزل كل واحدة سطراً */
+  width: auto;
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 8px 11px;
+  font: inherit;
+  font-size: 12.5px;
+  background: #fff;
+  color: var(--ink);
+}
+.sx-tb .sx-search {
+  width: 240px;
+  max-width: 100%;
+}
+
+/* بطاقات التجميع في صفحة الاستراتيجيات الوطنية */
+.sx-groups {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.sx-grp {
+  background: #f2f9f7;
+  border: 1px solid #dfeeea;
+  border-radius: 14px;
+  padding: 13px 15px;
+}
+.sx-grp.dark {
+  background: linear-gradient(160deg, var(--g-800), var(--g-700));
+  border-color: transparent;
+  color: #fff;
+}
+.sx-grp .hd {
+  font-family: "Noto Kufi Arabic", sans-serif;
+  font-weight: 700;
+  font-size: 12.5px;
+  color: var(--g-900);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.sx-grp.dark .hd {
+  color: #fff;
+}
+.sx-grp .hd b {
+  margin-inline-start: auto;
+  font-size: 17px;
+}
+.sx-grp .chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.sx-grp .chips span {
+  font-size: 10.5px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 2px 9px;
+  color: #4e615c;
+}
+.sx-grp.dark .chips span {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+.sx-grp .chips .more {
+  opacity: 0.75;
+}
+
+/* جدول الأقسام */
+.tbl-wrap {
+  overflow-x: auto;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+}
+.sx-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  min-width: 760px;
+  background: #fff;
+}
+.sx-tbl th {
+  background: var(--g-800);
+  color: #fff;
+  padding: 10px 9px;
+  font-size: 11.5px;
+  text-align: start;
+  white-space: nowrap;
+}
+.sx-tbl th.c {
+  text-align: center;
+}
+.sx-tbl td {
+  border-bottom: 1px solid #eef2f1;
+  padding: 10px 9px;
+  vertical-align: middle;
+}
+.sx-tbl td.c {
+  text-align: center;
+}
+.sx-tbl tr:last-child td {
+  border-bottom: none;
+}
+.sx-tbl tbody tr {
+  cursor: pointer;
+}
+.sx-tbl tbody tr:hover {
+  background: #f7fbfa;
+}
+.sx-tbl tbody tr.on {
+  background: #eef7f4;
+}
+.sx-tbl .nm {
+  font-weight: 700;
+  color: var(--ink);
+}
+.sx-tbl .own {
+  font-size: 10.5px;
+  color: #8a9a95;
+}
+.sx-tbl .note {
+  color: #4e615c;
+  line-height: 1.7;
+}
+.sx-tag {
+  border-radius: 7px;
+  padding: 2px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.sx-tag.ok {
+  background: #e7f5ee;
+  color: #14663f;
+  border: 1px solid #bfe3d0;
+}
+.sx-tag.no {
+  background: #fdeeee;
+  color: #a83232;
+  border: 1px solid #f3cfcf;
+}
+
+/* بطاقة التفاصيل */
+.sx-det {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 14px;
+  margin-top: 16px;
+  border-top: 2px dashed #d9e8e4;
+  padding-top: 16px;
+}
+.sx-det .col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.sx-det .box {
+  background: #f7fbfa;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  padding: 12px 14px;
+}
+.sx-det .box .k {
+  font-size: 10.5px;
+  color: #8a9a95;
+}
+.sx-det .box .v {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.6;
+}
+.sx-det .two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.sx-det .ringbox {
+  text-align: center;
+}
+.sx-det .ringbox .k {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--g-900);
+  font-weight: 700;
+}
+.sx-det .ringbox .lg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 9px;
+  font-size: 10.5px;
+  color: var(--muted);
+  align-items: flex-start;
+}
+.sx-det .ringbox .lg i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-inline-end: 6px;
+}
+.sx-det .ringbox .lg i.hi {
+  background: #1a9d5c;
+}
+.sx-det .ringbox .lg i.mid {
+  background: #e0971a;
+}
+.sx-det .ringbox .lg i.low {
+  background: #d34a4a;
+}
+.sx-note.big {
+  padding: 12px 14px;
+}
+.sx-form textarea {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 8px 11px;
+  font: inherit;
+  font-size: 13px;
+  background: #fff;
+  color: var(--ink);
+  resize: vertical;
+}
+.sx-form label.ck {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 12.5px;
+}
+.sx-form label.ck input {
+  width: 16px;
+  height: 16px;
+}
+
+@media (max-width: 1000px) {
+  .sx-sess {
+    grid-template-columns: 1fr;
+  }
+  .sx-sess .sx-side {
+    order: 0;
+  }
+  .sx-nums.five {
+    grid-template-columns: 1fr 1fr;
+  }
+  .sx-groups {
+    grid-template-columns: 1fr;
+  }
+  .sx-det {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 900px) {
+  /* في النطاق الضيق يصير الشريط صفّاً — والغلاف الداخلي يتبعه */
+  .rail {
+    border-radius: 0;
+  }
+  .rail-in {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 0;
+    height: auto;
+    overflow: visible;
+  }
+  .rail-tog {
+    display: none;
+  }
 }

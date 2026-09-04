@@ -24,7 +24,8 @@ import Tasks from "./Tasks";
 import {
   SectionPage,
   Sessions,
-  Strategies,
+  NationalStrategies,
+  InstStrategies,
   Projects,
   Outputs,
   SECTION_TITLE,
@@ -340,10 +341,13 @@ export default function Dashboard({ me }: { me: Me }) {
             title={railCol ? t("توسيع القائمة", "Expand") : t("طيّ القائمة", "Collapse")}
             aria-label={railCol ? "expand" : "collapse"}
           >
-            {/* مثلّثان لا سهما «‹ ›»: الأخيران يُقلبان تلقائياً في RTL
+            {/* سهم مرسوم لا حرفاً: «‹ ›» يُقلبان تلقائياً في RTL
                 فيشيران للجهة الخاطئة */}
-            {railCol ? "◂" : "▸"}
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              {railCol ? <path d="M15 5 8 12l7 7" /> : <path d="M9 5l7 7-7 7" />}
+            </svg>
           </button>
+          <div className="rail-in">
           <div className="rail-brand">
             <div className="nm">{t("إدارة عمليات الأداء", "Performance Operations")}</div>
             <div className="sb">{t("مركز أداء", "Adaa")}</div>
@@ -398,6 +402,7 @@ export default function Dashboard({ me }: { me: Me }) {
             <button className="out" onClick={logout} title={t("خروج", "Logout")} aria-label="logout">
               ⏻
             </button>
+          </div>
           </div>
         </aside>
 
@@ -1033,9 +1038,8 @@ function Overview({
               </button>
             </h2>
             {key === "sessions" && <Sessions t={t} limit={2} onMore={() => onOpenTab(key)} />}
-            {(key === "natstrat" || key === "inststrat") && (
-              <Strategies section={key} t={t} limit={3} onMore={() => onOpenTab(key)} />
-            )}
+            {key === "natstrat" && <NationalStrategies t={t} limit={3} onMore={() => onOpenTab(key)} />}
+            {key === "inststrat" && <InstStrategies t={t} limit={3} onMore={() => onOpenTab(key)} />}
             {key === "projects" && <Projects t={t} />}
             {key === "outputs" && <Outputs t={t} />}
           </div>
