@@ -4,6 +4,7 @@ import { asset } from "@/lib/base";
 
 import { apiFetch } from "@/lib/api";
 
+import type { ReactElement, ReactNode } from "react";
 import { createContext, useContext, useCallback, useEffect, useMemo, useState } from "react";
 import Activity, { type Item as ActivityItem } from "./Activity";
 import Changes from "./Changes";
@@ -20,6 +21,27 @@ import {
   type Scope,
 } from "@/lib/scopes";
 import Tasks from "./Tasks";
+import {
+  SectionPage,
+  Sessions,
+  Strategies,
+  Projects,
+  Outputs,
+  SECTION_TITLE,
+  type SectionKey,
+} from "./Sections";
+import {
+  IconOverview,
+  IconKpi,
+  IconTask,
+  IconWeek,
+  IconSess,
+  IconNat,
+  IconInst,
+  IconOut,
+  IconProj,
+  IconSettings,
+} from "./icons";
 import WeeklyPanel from "./WeeklyPanel";
 import Details from "./Details";
 import { LineChart, Line as ChartLine, SECTOR_STYLES } from "./Charts";
@@ -124,6 +146,15 @@ function tgtEff(refData: RefData, key: string, q: number): number | null {
 }
 const GAUGE_TRACK = "#e9f1ef";
 
+/* الأقسام الخمسة في القائمة الجانبية — الترتيب هو ترتيب ظهورها */
+const SECTION_NAV: [SectionKey, (p: { size?: number }) => ReactElement][] = [
+  ["sessions", IconSess],
+  ["natstrat", IconNat],
+  ["inststrat", IconInst],
+  ["outputs", IconOut],
+  ["projects", IconProj],
+];
+
 export default function Dashboard({ me }: { me: Me }) {
   const router = useRouter();
   const isAdmin = me.role === "admin";
@@ -142,6 +173,25 @@ export default function Dashboard({ me }: { me: Me }) {
   const t = useCallback((ar: string, en: string) => (lang === "en" ? en : ar), [lang]);
   const [pwOpen, setPwOpen] = useState(false);
   const [sheet, setSheet] = useState(false); // ورقة الإعدادات على الجوال
+  // طيّ الشريط الجانبي — الحالة تبقى بين الجلسات لكل متصفح
+  const [railCol, setRailCol] = useState(false);
+  useEffect(() => {
+    try {
+      setRailCol(localStorage.getItem("railCol") === "1");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  function toggleRail() {
+    setRailCol((v) => {
+      try {
+        localStorage.setItem("railCol", v ? "0" : "1");
+      } catch {
+        /* ignore */
+      }
+      return !v;
+    });
+  }
 
   useEffect(() => {
     const savedLang = typeof window !== "undefined" ? localStorage.getItem("lang") : null;
@@ -221,13 +271,33 @@ export default function Dashboard({ me }: { me: Me }) {
     report: ["الإنجاز الأسبوعي", "Weekly Achievement"],
     structure: ["الهيكل التنظيمي", "Org chart"],
     users: ["المستخدمون والصلاحيات", "Users & Roles"],
+    sessions: SECTION_TITLE.sessions,
+    natstrat: SECTION_TITLE.natstrat,
+    inststrat: SECTION_TITLE.inststrat,
+    outputs: SECTION_TITLE.outputs,
+    projects: SECTION_TITLE.projects,
   };
   const title = TITLES[tab] ?? TITLES.overview;
 
-  function NavItem({ id, icon, label }: { id: string; icon: string; label: [string, string] }) {
+  function NavItem({
+    id,
+    icon,
+    label,
+    small,
+  }: {
+    id: string;
+    icon: ReactNode;
+    label: [string, string];
+    small?: boolean;
+  }) {
+    const name = t(label[0], label[1]);
     return (
-      <button className={`nav-item ${tab === id ? "active" : ""}`} onClick={() => setTab(id)}>
-        <span className="ic">{icon}</span> {t(label[0], label[1])}
+      <button
+        className={`nav-item ${small ? "sub" : ""} ${tab === id ? "active" : ""}`}
+        onClick={() => setTab(id)}
+        title={name}
+      >
+        <span className="ic">{icon}</span> <span className="lb">{name}</span>
       </button>
     );
   }
@@ -263,21 +333,43 @@ export default function Dashboard({ me }: { me: Me }) {
   return (
     <LangCtx.Provider value={{ lang, t }}>
       <div className="shell">
-        <aside className="rail">
+        <aside className={`rail ${railCol ? "col" : ""}`}>
+          <button
+            className="rail-tog"
+            onClick={toggleRail}
+            title={railCol ? t("توسيع القائمة", "Expand") : t("طيّ القائمة", "Collapse")}
+            aria-label={railCol ? "expand" : "collapse"}
+          >
+            {/* مثلّثان لا سهما «‹ ›»: الأخيران يُقلبان تلقائياً في RTL
+                فيشيران للجهة الخاطئة */}
+            {railCol ? "◂" : "▸"}
+          </button>
           <div className="rail-brand">
             <div className="nm">{t("إدارة عمليات الأداء", "Performance Operations")}</div>
             <div className="sb">{t("مركز أداء", "Adaa")}</div>
           </div>
 
-          {can("overview") && <NavItem id="overview" icon="◱" label={["نظرة عامة", "Overview"]} />}
-          {can("details") && <NavItem id="details" icon="◎" label={["المؤشرات التفصيلية", "KPI Details"]} />}
-          {can("tasks") && <NavItem id="tasks" icon="✓" label={["المهام", "Tasks"]} />}
-          {can("weekly") && <NavItem id="report" icon="▤" label={["الإنجاز الأسبوعي", "Weekly Achievement"]} />}
+          {can("overview") && <NavItem id="overview" icon={<IconOverview />} label={["نظرة عامة", "Overview"]} />}
+          {can("details") && <NavItem id="details" icon={<IconKpi />} label={["المؤشرات التفصيلية", "KPI Details"]} />}
+
+          {/* الأقسام الخمسة — متفرّعة من المؤشرات التفصيلية */}
+          {SECTION_NAV.map(([key, Ic]) =>
+            can(key) ? (
+              <NavItem key={key} id={key} icon={<Ic size={16} />} label={SECTION_TITLE[key]} small />
+            ) : null,
+          )}
+
+          {(can("tasks") || can("weekly")) && <div className="rail-sep" />}
+          {can("tasks") && <NavItem id="tasks" icon={<IconTask />} label={["المهام", "Tasks"]} />}
+          {can("weekly") && <NavItem id="report" icon={<IconWeek />} label={["الإنجاز الأسبوعي", "Weekly Achievement"]} />}
 
           <div className="rail-gap" />
 
           <button className={`nav-item ${setOpen ? "open" : ""}`} onClick={() => setSetOpen(!setOpen)}>
-            <span className="ic">⚙</span> {t("الإعدادات", "Settings")} <span className="cv">▾</span>
+            <span className="ic">
+              <IconSettings />
+            </span>{" "}
+            <span className="lb">{t("الإعدادات", "Settings")}</span> <span className="cv">▾</span>
           </button>
           <div className={`subnav ${setOpen ? "show" : ""}`}>
             <SubItem id="mypage" label={["صفحتي", "My page"]} />
@@ -324,7 +416,7 @@ export default function Dashboard({ me }: { me: Me }) {
           ) : (
             <>
               {tab === "overview" && can("overview") && (
-                <Overview me={me} refData={refData} onGo={goFromActivity} />
+                <Overview me={me} refData={refData} onGo={goFromActivity} onOpenTab={setTab} />
               )}
               {tab === "details" && can("details") && (
                 <Details
@@ -392,6 +484,11 @@ export default function Dashboard({ me }: { me: Me }) {
                 />
               )}
               {tab === "users" && can("users") && <UsersManager refData={refData} />}
+              {SECTION_NAV.map(([key]) =>
+                tab === key && can(key) ? (
+                  <SectionPage key={key} section={key} canEdit={can("sections:edit")} t={t} />
+                ) : null,
+              )}
             </>
           )}
         </main>
@@ -426,6 +523,9 @@ export default function Dashboard({ me }: { me: Me }) {
                 </div>
               </div>
             </div>
+            {SECTION_NAV.map(([key]) =>
+              can(key) ? <SheetItem key={key} id={key} label={SECTION_TITLE[key]} /> : null,
+            )}
             <SheetItem id="mypage" label={["صفحتي", "My page"]} />
             {can("users") && <SheetItem id="users" label={["المستخدمون والصلاحيات", "Users & Roles"]} />}
             {can("structure") && <SheetItem id="structure" label={["الهيكل التنظيمي", "Org chart"]} />}
@@ -636,10 +736,12 @@ function Overview({
   me,
   refData,
   onGo,
+  onOpenTab,
 }: {
   me: Me;
   refData: RefData;
   onGo: (item: ActivityItem) => void;
+  onOpenTab: (tab: string) => void;
 }) {
   const { t, lang } = useT();
   const sectors = visibleSectors(me, refData);
@@ -919,6 +1021,25 @@ function Overview({
             onFocusDone={() => setAsgFocus(null)}
           />
         </>
+      )}
+
+      {SECTION_NAV.map(([key]) =>
+        hasScope(me.scopes, key) ? (
+          <div key={key}>
+            <h2 className="section-title sx-title" style={{ marginTop: 28 }}>
+              {t(SECTION_TITLE[key][0], SECTION_TITLE[key][1])}
+              <button className="sx-link" onClick={() => onOpenTab(key)}>
+                {t("المزيد من التفاصيل", "More details")} ‹
+              </button>
+            </h2>
+            {key === "sessions" && <Sessions t={t} limit={2} onMore={() => onOpenTab(key)} />}
+            {(key === "natstrat" || key === "inststrat") && (
+              <Strategies section={key} t={t} limit={3} onMore={() => onOpenTab(key)} />
+            )}
+            {key === "projects" && <Projects t={t} />}
+            {key === "outputs" && <Outputs t={t} />}
+          </div>
+        ) : null,
       )}
 
       {hasScope(me.scopes, "changes") && (
