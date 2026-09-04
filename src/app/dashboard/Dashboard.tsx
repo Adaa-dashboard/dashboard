@@ -24,8 +24,7 @@ import Tasks from "./Tasks";
 import {
   SectionPage,
   Sessions,
-  NationalStrategies,
-  InstStrategies,
+  StrategyBox,
   Projects,
   Outputs,
   SECTION_TITLE,
@@ -1028,7 +1027,32 @@ function Overview({
         </>
       )}
 
-      {SECTION_NAV.map(([key]) =>
+      {hasScope(me.scopes, "sessions") && (
+        <>
+          <h2 className="section-title sx-title" style={{ marginTop: 28 }}>
+            {t(SECTION_TITLE.sessions[0], SECTION_TITLE.sessions[1])}
+            <button className="sx-link" onClick={() => onOpenTab("sessions")}>
+              {t("المزيد من التفاصيل", "More details")} ‹
+            </button>
+          </h2>
+          <Sessions t={t} limit={2} onMore={() => onOpenTab("sessions")} />
+        </>
+      )}
+
+      {/* الاستراتيجيتان جنب بعض: معلومات عامة فقط، والأسماء
+          والتفاصيل كلها في صفحة كل قسم */}
+      {(hasScope(me.scopes, "natstrat") || hasScope(me.scopes, "inststrat")) && (
+        <div className="sx-two" style={{ marginTop: 28 }}>
+          {hasScope(me.scopes, "natstrat") && (
+            <StrategyBox section="natstrat" t={t} onOpen={() => onOpenTab("natstrat")} />
+          )}
+          {hasScope(me.scopes, "inststrat") && (
+            <StrategyBox section="inststrat" t={t} onOpen={() => onOpenTab("inststrat")} />
+          )}
+        </div>
+      )}
+
+      {(["outputs", "projects"] as const).map((key) =>
         hasScope(me.scopes, key) ? (
           <div key={key}>
             <h2 className="section-title sx-title" style={{ marginTop: 28 }}>
@@ -1037,11 +1061,7 @@ function Overview({
                 {t("المزيد من التفاصيل", "More details")} ‹
               </button>
             </h2>
-            {key === "sessions" && <Sessions t={t} limit={2} onMore={() => onOpenTab(key)} />}
-            {key === "natstrat" && <NationalStrategies t={t} limit={3} onMore={() => onOpenTab(key)} />}
-            {key === "inststrat" && <InstStrategies t={t} limit={3} onMore={() => onOpenTab(key)} />}
-            {key === "projects" && <Projects t={t} />}
-            {key === "outputs" && <Outputs t={t} />}
+            {key === "projects" ? <Projects t={t} /> : <Outputs t={t} />}
           </div>
         ) : null,
       )}

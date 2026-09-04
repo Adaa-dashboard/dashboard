@@ -5652,3 +5652,207 @@ table.matrix thead th {
     display: none;
   }
 }
+
+/* ============================================================
+   بطاقتا الاستراتيجيات في نظرة عامة — جنب بعض، معلومات عامة فقط
+   ============================================================ */
+.sx-two {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 14px;
+}
+.sx-box {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: #fff;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.sx-box .hd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 16px;
+  border-bottom: 1px solid #eef2f1;
+}
+.sx-box .hd h3 {
+  margin: 0;
+  font-family: "Noto Kufi Arabic", sans-serif;
+  font-weight: 800;
+  font-size: 14px;
+  color: var(--g-900);
+}
+.sx-box .hd .lnk {
+  margin-inline-start: auto;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--g-700);
+  background: #eef7f4;
+  border: 1px solid #d9e8e4;
+  border-radius: 9px;
+  padding: 4px 11px;
+  cursor: pointer;
+}
+.sx-box .hd .lnk:hover {
+  background: #e3f1ed;
+}
+.sx-box .bd {
+  padding: 15px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+}
+.sx-box .head-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.sx-box .big {
+  background: linear-gradient(160deg, var(--g-800), var(--g-700));
+  color: #fff;
+  border-radius: 14px;
+  padding: 12px 18px;
+  text-align: center;
+  min-width: 112px;
+  flex: none;
+}
+.sx-box .big b {
+  display: block;
+  font-family: "Noto Kufi Arabic", sans-serif;
+  font-weight: 800;
+  font-size: 29px;
+  line-height: 1.05;
+}
+.sx-box .big span {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.78);
+}
+.sx-box .side {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.sx-box .kv {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12px;
+  color: #4e615c;
+}
+.sx-box .kv .t {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sx-box .kv b {
+  font-size: 13px;
+  color: var(--ink);
+  min-width: 22px;
+  text-align: center;
+}
+.sx-box .kv .mb {
+  width: 74px;
+  height: 7px;
+  border-radius: 99px;
+  background: #eef2f1;
+  overflow: hidden;
+  flex: none;
+}
+.sx-box .kv .mb i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--g-700);
+}
+.sx-box .kv .mb i.g {
+  background: #1a9d5c;
+}
+.sx-box .gen {
+  border-top: 1px dashed #dfeeea;
+  padding-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  margin-top: auto;
+}
+.sx-box .gc {
+  background: #f7fbfa;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.sx-box .gc .k {
+  font-size: 10.5px;
+  color: #8a9a95;
+  margin-bottom: 2px;
+}
+.sx-box .gc .v {
+  font-family: "Noto Kufi Arabic", sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--g-900);
+}
+.sx-box .gc .v em {
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.sx-box .gc .v .dt {
+  font-size: 12.5px;
+  direction: ltr;
+  display: inline-block;
+}
+.sx-box .meas {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.sx-box .meas .n {
+  font-family: "Noto Kufi Arabic", sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+}
+.sx-box .meas .n.hi {
+  color: #1a9d5c;
+}
+.sx-box .meas .n.mid {
+  color: #e0971a;
+}
+.sx-box .meas .n.low {
+  color: #d34a4a;
+}
+.sx-box .meas .bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 99px;
+  background: #eef2f1;
+  overflow: hidden;
+}
+.sx-box .meas .bar i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--g-700);
+}
+.sx-box .meas .bar i.hi {
+  background: #1a9d5c;
+}
+.sx-box .meas .bar i.mid {
+  background: #e0971a;
+}
+.sx-box .meas .bar i.low {
+  background: #d34a4a;
+}
+.sx-none {
+  font-size: 12.5px;
+  color: var(--muted);
+  padding: 18px 4px;
+  text-align: center;
+}
