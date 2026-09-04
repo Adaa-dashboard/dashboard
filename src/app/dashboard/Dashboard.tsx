@@ -27,6 +27,8 @@ import {
   StrategyBox,
   Projects,
   Outputs,
+  useCollapse,
+  CollapseBtn,
   SECTION_TITLE,
   type SectionKey,
 } from "./Sections";
@@ -874,6 +876,35 @@ function Overview({
     [sectors, measurements, refData.periods, range, year, targetOf]
   );
 
+  /* عنوان قسم قابل للطيّ — السهم يخفي محتواه ويبقى العنوان.
+     الحالة في متصفح المستخدم وحده. */
+  function Sec({
+    id,
+    title,
+    extra,
+    chips,
+    children,
+  }: {
+    id: string;
+    title: string;
+    extra?: ReactNode;
+    chips?: ReactNode;
+    children: ReactNode;
+  }) {
+    const { open, toggle } = useCollapse(id);
+    return (
+      <>
+        <h2 className={`section-title sx-title ${chips ? "with-chips" : ""}`} style={{ marginTop: 28 }}>
+          <CollapseBtn open={open} toggle={toggle} t={t} />
+          {title}
+          {chips}
+          {extra}
+        </h2>
+        {open && children}
+      </>
+    );
+  }
+
   const rangeTabs = (
     <span className="vtabs">
       <button className={`vtab ${range === "quarter" ? "on" : ""}`} onClick={() => setRange("quarter")}>
@@ -941,8 +972,10 @@ function Overview({
         />
       </div>
 
-      <h2 className="section-title with-chips">
-        {t("حالة المؤشرات", "KPI status")}
+      <Sec
+        id="kpis"
+        title={t("حالة المؤشرات", "KPI status")}
+        chips={
         <span className="pills">
           {bands.map((b) => (
             <button
@@ -957,7 +990,8 @@ function Overview({
             </button>
           ))}
         </span>
-      </h2>
+        }
+      >
 
       {statusFilter && (
         <div className="filter-note">
@@ -995,6 +1029,7 @@ function Overview({
           ))}
         </div>
       )}
+      </Sec>
 
       {openIndicator && (
         <IndicatorModal
@@ -1009,10 +1044,8 @@ function Overview({
       )}
 
       {hasScope(me.scopes, "assignments") && (
-        <>
-          <h2 className="section-title" id="ov-asg" style={{ marginTop: 28 }}>
-            {t("التكاليف", "Assignments")}
-          </h2>
+        <div id="ov-asg">
+          <Sec id="assignments" title={t("التكاليف", "Assignments")}>
           <Tasks
             meId={me.id}
             isAdmin={me.role === "admin"}
@@ -1024,19 +1057,22 @@ function Overview({
             focusId={asgFocus}
             onFocusDone={() => setAsgFocus(null)}
           />
-        </>
+          </Sec>
+        </div>
       )}
 
       {hasScope(me.scopes, "sessions") && (
-        <>
-          <h2 className="section-title sx-title" style={{ marginTop: 28 }}>
-            {t(SECTION_TITLE.sessions[0], SECTION_TITLE.sessions[1])}
+        <Sec
+          id="sessions"
+          title={t(SECTION_TITLE.sessions[0], SECTION_TITLE.sessions[1])}
+          extra={
             <button className="sx-link" onClick={() => onOpenTab("sessions")}>
               {t("المزيد من التفاصيل", "More details")} ‹
             </button>
-          </h2>
+          }
+        >
           <Sessions t={t} limit={4} />
-        </>
+        </Sec>
       )}
 
       {/* الاستراتيجيتان جنب بعض: معلومات عامة فقط، والأسماء
@@ -1054,38 +1090,36 @@ function Overview({
 
       {(["outputs", "projects"] as const).map((key) =>
         hasScope(me.scopes, key) ? (
-          <div key={key}>
-            <h2 className="section-title sx-title" style={{ marginTop: 28 }}>
-              {t(SECTION_TITLE[key][0], SECTION_TITLE[key][1])}
+          <Sec
+            key={key}
+            id={key}
+            title={t(SECTION_TITLE[key][0], SECTION_TITLE[key][1])}
+            extra={
               <button className="sx-link" onClick={() => onOpenTab(key)}>
                 {t("المزيد من التفاصيل", "More details")} ‹
               </button>
-            </h2>
+            }
+          >
             {key === "projects" ? <Projects t={t} /> : <Outputs t={t} />}
-          </div>
+          </Sec>
         ) : null,
       )}
 
       {hasScope(me.scopes, "changes") && (
-        <>
-          <h2 className="section-title" style={{ marginTop: 28 }}>
-            {t("طلبات التغيير", "Change requests")}
-          </h2>
+        <Sec id="changes" title={t("طلبات التغيير", "Change requests")}>
           <Changes t={t} canEdit={hasScope(me.scopes, "changes:upload")} />
-        </>
+        </Sec>
       )}
 
-      <h2 className="section-title with-chips" style={{ marginTop: 28 }}>
-        {t("الأداء العام للقطاعات", "Sector performance")}
-        {rangeTabs}
-      </h2>
-      <div className="card" style={{ marginBottom: 22 }}>
-        <LineChart
-          lines={sectorLines}
-          labels={(sectorLines[0]?.points || []).map((p) => p.label)}
-          emptyText={t("لا توجد قياسات كافية لرسم مسارات القطاعات بعد.", "Not enough measurements yet.")}
-        />
-      </div>
+      <Sec id="sectors" title={t("الأداء العام للقطاعات", "Sector performance")} chips={rangeTabs}>
+        <div className="card" style={{ marginBottom: 22 }}>
+          <LineChart
+            lines={sectorLines}
+            labels={(sectorLines[0]?.points || []).map((p) => p.label)}
+            emptyText={t("لا توجد قياسات كافية لرسم مسارات القطاعات بعد.", "Not enough measurements yet.")}
+          />
+        </div>
+      </Sec>
 
     </div>
   );

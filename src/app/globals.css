@@ -4581,6 +4581,12 @@ table.matrix thead th {
 .rail.col .nav-item.sub::before {
   display: none;
 }
+/* البند المختار من الخمسة: القاعدة أعلاه تأتي بعد .nav-item.active
+   وبنفس قوّتها، فكانت تغلبها فيصير النص والأيقونة بيضاء على خلفية
+   بيضاء — أي بند مختار بلا محتوى ظاهر. */
+.nav-item.sub.active {
+  color: var(--g-800);
+}
 .rail-sep {
   height: 1px;
   background: rgba(255, 255, 255, 0.14);
@@ -5855,4 +5861,42 @@ table.matrix thead th {
   color: var(--muted);
   padding: 18px 4px;
   text-align: center;
+}
+
+/* ============================================================
+   طيّ أقسام نظرة عامة — سهم صغير أول كل عنوان
+   ============================================================ */
+.sec-tog {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: #f7fbfa;
+  color: var(--g-700);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+  margin-inline-end: 8px;
+  transition: transform 0.16s, background 0.16s;
+}
+.sec-tog:hover {
+  background: #eef7f4;
+}
+.sec-tog.closed {
+  transform: rotate(-90deg);
+}
+.sec-tog svg {
+  display: block;
+}
+.section-title .sec-tog {
+  vertical-align: middle;
+}
+/* السهم داخل رأس بطاقتَي الاستراتيجيات */
+.sx-box .hd .sec-tog {
+  margin-inline-end: 2px;
+}
+.sx-box.closed {
+  align-self: start;
 }

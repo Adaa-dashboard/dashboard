@@ -99,6 +99,48 @@ export function useItems(section: SectionKey, enabled = true) {
   return { items, loaded, error, reload: load, save, remove };
 }
 
+/* ------------------------------------------------------------
+   طيّ الأقسام — الحالة محفوظة في متصفح كل مستخدم وحده،
+   فما يطويه أحد لا يؤثر على غيره ولا يُحفظ في القاعدة.
+   ------------------------------------------------------------ */
+export function useCollapse(key: string) {
+  const [open, setOpen] = useState(true);
+  useEffect(() => {
+    try {
+      setOpen(localStorage.getItem(`ovSec:${key}`) !== "0");
+    } catch {
+      /* ignore */
+    }
+  }, [key]);
+  const toggle = useCallback(() => {
+    setOpen((v) => {
+      try {
+        localStorage.setItem(`ovSec:${key}`, v ? "0" : "1");
+      } catch {
+        /* ignore */
+      }
+      return !v;
+    });
+  }, [key]);
+  return { open, toggle };
+}
+
+/** سهم الطيّ — يوضع أول العنوان */
+export function CollapseBtn({ open, toggle, t }: { open: boolean; toggle: () => void; t: T }) {
+  return (
+    <button
+      className={`sec-tog ${open ? "" : "closed"}`}
+      onClick={toggle}
+      aria-expanded={open}
+      title={open ? t("طيّ القسم", "Collapse") : t("فتح القسم", "Expand")}
+    >
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M5 9l7 7 7-7" />
+      </svg>
+    </button>
+  );
+}
+
 /* ---------------- قطع مشتركة ---------------- */
 
 /** حلقة نسبة — القوس يتحرّك بالإكمال وحده */
@@ -638,16 +680,18 @@ export function StrategyBox({
 }) {
   const { items, loaded } = useItems(section);
   const title = SECTION_TITLE[section];
+  const { open, toggle } = useCollapse(section);
 
   const box = (body: ReactNode) => (
-    <div className="sx-box">
+    <div className={`sx-box ${open ? "" : "closed"}`}>
       <div className="hd">
+        <CollapseBtn open={open} toggle={toggle} t={t} />
         <h3>{t(title[0], title[1])}</h3>
         <button className="lnk" onClick={onOpen}>
           {t("التفاصيل", "Details")} ‹
         </button>
       </div>
-      <div className="bd">{body}</div>
+      {open && <div className="bd">{body}</div>}
     </div>
   );
 
