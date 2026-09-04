@@ -31,15 +31,12 @@ const txt = (v: unknown) => (v === null || v === undefined ? "" : String(v));
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
 /* ---------------- الويدجت المتاحة ---------------- */
-export type WKey =
-  | "tasks" | "calendar" | "notes"
-  | "projects" | "strategies" | "quarterly" | "contrib"
-  | "changes" | "reverse" | "workflow";
+export type WKey = string;
 
 type WDef = {
   key: WKey;
   label: string;
-  group: "top" | "projects" | "ops";
+  group: string;
   icon: string;
   color: string;
   section?: string; // قسم البيانات في perf_portfolio
@@ -57,17 +54,26 @@ export const WIDGETS: WDef[] = [
   { key: "reverse", label: "طلبات العكس", group: "ops", icon: "↺", color: "#e07a3a", section: "reverse" },
   { key: "workflow", label: "طلبات تحديث سير العمل", group: "ops", icon: "⚙", color: "#a24160", section: "workflow" },
 ];
-const WMAP: Record<string, WDef> = Object.fromEntries(WIDGETS.map((w) => [w.key, w])) as Record<string, WDef>;
+const BASE_MAP: Record<string, WDef> = Object.fromEntries(WIDGETS.map((w) => [w.key, w]));
+const ICONS = ["◆", "★", "▲", "●", "■", "✎", "⚑", "⚙", "⇄", "◷", "▤", "◈"];
+const CCOLORS = ["#016b5f", "#1a9d5c", "#2f7fd1", "#7a5cd1", "#a24160", "#c9a020", "#e07a3a", "#0f8a8a"];
 
 /* ---------------- تفضيلات الصفحة ---------------- */
+/** بند يضيفه المستخدم بنفسه — مفتاحه يبدأ بـ cw- وبياناته في قسم بالاسم نفسه */
+export type CustomW = { key: string; label: string; icon: string; color: string; group: string };
+/** قسم يضيفه المستخدم فوق «الأعمال التشغيلية» أو تحته */
+export type CustomSec = { id: string; label: string };
+
 type Prefs = {
   mode: "tiles" | "table";
   layout: "two" | "one" | "three" | "main";
-  order: WKey[];
-  hidden: WKey[];
+  order: string[];
+  hidden: string[];
   color: string;
   bg: string;
   bgDim: number;
+  custom: CustomW[];
+  sections: CustomSec[];
 };
 const DEFAULT_PREFS: Prefs = {
   mode: "tiles",
@@ -77,6 +83,8 @@ const DEFAULT_PREFS: Prefs = {
   color: "#00584c",
   bg: "",
   bgDim: 35,
+  custom: [],
+  sections: [],
 };
 
 /* أعمدة كل قسم — تُستعمل في الجداول وفي نافذة الإدخال */
@@ -109,6 +117,13 @@ const COLS: Record<string, Col[]> = {
   workflow: [
     { k: "code", label: "رقم الطلب", w: 2 },
     { k: "status", label: "الحالة", kind: "sel", opts: ["قيد العمل", "مغلقة"] },
+  ],
+  custom: [
+    { k: "name", label: "البند", w: 3 },
+    { k: "status", label: "الحالة", kind: "sel", opts: ["قيد العمل", "بانتظار", "مكتمل"] },
+    { k: "pct", label: "نسبة الإنجاز ٪", kind: "num" },
+    { k: "note", label: "ملاحظة", w: 2 },
+    { k: "date", label: "التاريخ", kind: "date" },
   ],
   projects: [
     { k: "name", label: "اسم المشروع", w: 2 },
@@ -405,6 +420,7 @@ function NotesWidget({ t, onOpen }: { t: T; onOpen: () => void }) {
 /* ---------------- جدول قسم ---------------- */
 function SectionTable({
   section,
+  sectionKey,
   rows,
   t,
   onSave,
@@ -412,13 +428,15 @@ function SectionTable({
   onImport,
 }: {
   section: string;
+  sectionKey?: string;
   rows: Row[];
   t: T;
   onSave: (id: string, data: Rec) => void;
   onDelete: (id: string) => void;
   onImport: () => void;
 }) {
-  const cols = COLS[section] || [];
+  const cols = COLS[section] || COLS.custom;
+  void sectionKey;
   const [edit, setEdit] = useState<Row | "new" | null>(null);
   return (
     <>
@@ -967,6 +985,8 @@ export default function Portfolio({
   const [drag, setDrag] = useState<WKey | null>(null);
   const [imp, setImp] = useState<string | null>(null);
   const [taskCount, setTaskCount] = useState<number | null>(null);
+  const [addW, setAddW] = useState<string | null>(null);
+  const [addSec, setAddSec] = useState(false);
 
   useEffect(() => {
     void loadUserData<Partial<Prefs>>("portfolio", {}).then((d) => {
@@ -984,11 +1004,21 @@ export default function Portfolio({
   }, []);
 
   /* الترتيب: ما في الإعدادات أولاً ثم أي ويدجت جديدة */
+  const allKeys = useMemo(
+    () => [...WIDGETS.map((w) => w.key), ...prefs.custom.map((c) => c.key)],
+    [prefs.custom],
+  );
   const order = useMemo(() => {
-    const known = prefs.order.filter((k) => WMAP[k]);
-    const rest = WIDGETS.map((w) => w.key).filter((k) => !known.includes(k));
+    const known = prefs.order.filter((k) => allKeys.includes(k));
+    const rest = allKeys.filter((k) => !known.includes(k));
     return [...known, ...rest].filter((k) => !prefs.hidden.includes(k));
-  }, [prefs.order, prefs.hidden]);
+  }, [prefs.order, prefs.hidden, allKeys]);
+
+  const WMAP: Record<string, WDef> = useMemo(() => {
+    const m = { ...BASE_MAP };
+    for (const c of prefs.custom) m[c.key] = { key: c.key, label: c.label, group: c.group, icon: c.icon, color: c.color, section: c.key };
+    return m;
+  }, [prefs.custom]);
 
   const entities = pf.of("entities");
   const contrib = pf.of("contrib");
@@ -998,7 +1028,9 @@ export default function Portfolio({
   const projects = pf.of("projects");
 
   const dataOf = (k: WKey): Row[] =>
-    k === "strategies" || k === "quarterly"
+    k.startsWith("cw-")
+      ? pf.of(k)
+      : k === "strategies" || k === "quarterly"
       ? entities
       : k === "contrib"
         ? contrib
@@ -1072,8 +1104,10 @@ export default function Portfolio({
   /* جسم كل ويدجت */
   function bodyOf(k: WKey): ReactNode {
     const w = WMAP[k];
+    if (!w) return null;
     const rows = dataOf(k);
     const sec = w.section || "";
+    void sec;
     const save = (id: string, data: Rec) => void pf.save(sec, id, data, rows.length + 1);
     const del = (id: string) => {
       if (confirm(t("حذف هذا البند؟", "Delete?"))) void pf.remove(sec, id);
@@ -1096,7 +1130,8 @@ export default function Portfolio({
     if (k === "contrib" && prefs.mode === "tiles" && open !== k) return <Contrib rows={contrib} t={t} />;
     return (
       <SectionTable
-        section={sec}
+        section={k.startsWith("cw-") ? "custom" : sec}
+        sectionKey={sec}
         rows={rows}
         t={t}
         onSave={save}
@@ -1147,16 +1182,22 @@ export default function Portfolio({
     setDrag(null);
   }
 
-  const group = (g: WDef["group"]) => order.filter((k) => WMAP[k].group === g);
+  const group = (g: string) => order.filter((k) => WMAP[k]?.group === g);
 
-  function renderGroup(keys: WKey[]) {
-    if (!keys.length) return null;
+  function renderGroup(keys: WKey[], addTo?: string) {
+    if (!keys.length && !addTo) return null;
     if (prefs.mode === "table" || prefs.layout === "one") {
       return (
         <div className="pf-one">
           {keys.map((k) => (
             <Card key={k} k={k} />
           ))}
+          {addTo && (
+            <button className="tile add wide" onClick={() => setAddW(addTo)}>
+              <span className="pl">+</span>
+              {t("إضافة بند", "Add item")}
+            </button>
+          )}
         </div>
       );
     }
@@ -1184,6 +1225,12 @@ export default function Portfolio({
             />
           );
         })}
+        {addTo && (
+          <button className="tile add" onClick={() => setAddW(addTo)}>
+            <span className="pl">+</span>
+            {t("إضافة بند", "Add item")}
+          </button>
+        )}
       </div>
     );
   }
@@ -1278,25 +1325,44 @@ export default function Portfolio({
         ))}
       </div>
 
-      {group("projects").length > 0 && (
-        <>
-          <div className="sect">
-            <h2>{t("المشاريع الاستراتيجية", "Strategic projects")}</h2>
-            <span className="ln" />
-          </div>
-          {renderGroup(group("projects"))}
-        </>
-      )}
+      <div className="sect">
+        <h2>{t("المشاريع الاستراتيجية", "Strategic projects")}</h2>
+        <span className="ln" />
+      </div>
+      {renderGroup(group("projects"), "projects")}
 
-      {group("ops").length > 0 && (
-        <>
+      <div className="sect">
+        <h2>{t("الأعمال التشغيلية", "Operational work")}</h2>
+        <span className="ln" />
+      </div>
+      {renderGroup(group("ops"), "ops")}
+
+      {prefs.sections.map((sc) => (
+        <div key={sc.id}>
           <div className="sect">
-            <h2>{t("الأعمال التشغيلية", "Operational work")}</h2>
+            <h2>{sc.label}</h2>
             <span className="ln" />
+            <button
+              className="secx"
+              title={t("حذف القسم", "Delete section")}
+              onClick={() => {
+                if (!confirm(t("حذف هذا القسم؟ بنوده تنتقل للأعمال التشغيلية.", "Delete section?"))) return;
+                patch({
+                  sections: prefs.sections.filter((x) => x.id !== sc.id),
+                  custom: prefs.custom.map((c) => (c.group === sc.id ? { ...c, group: "ops" } : c)),
+                });
+              }}
+            >
+              ✕
+            </button>
           </div>
-          {renderGroup(group("ops"))}
-        </>
-      )}
+          {renderGroup(group(sc.id), sc.id)}
+        </div>
+      ))}
+
+      <button className="pf-addsec" onClick={() => setAddSec(true)}>
+        + {t("إضافة قسم جديد", "Add a section")}
+      </button>
 
       {openW && (
         <div className="modal-overlay" onClick={() => setOpen(null)}>
@@ -1331,6 +1397,32 @@ export default function Portfolio({
         <CustomModal prefs={prefs} t={t} meId={me.id} onClose={() => setCustom(false)} onChange={patch} />
       )}
 
+      {addW && (
+        <AddWidget
+          t={t}
+          onClose={() => setAddW(null)}
+          onAdd={(label, icon, color) => {
+            const key = "cw-" + newId();
+            patch({
+              custom: [...prefs.custom, { key, label, icon, color, group: addW }],
+              order: [...order, key, ...prefs.hidden],
+            });
+            setAddW(null);
+          }}
+        />
+      )}
+
+      {addSec && (
+        <AddSection
+          t={t}
+          onClose={() => setAddSec(false)}
+          onAdd={(label) => {
+            patch({ sections: [...prefs.sections, { id: "sec-" + newId(), label }] });
+            setAddSec(false);
+          }}
+        />
+      )}
+
       {imp && (
         <ImportModal
           section={imp}
@@ -1358,7 +1450,7 @@ function ImportModal({
   onClose: () => void;
   onRows: (rows: Rec[]) => void;
 }) {
-  const cols = COLS[section] || [];
+  const cols = COLS[section] || COLS.custom;
   const [aoa, setAoa] = useState<string[][]>([]);
   const [map, setMap] = useState<Record<string, number>>({});
   const [head, setHead] = useState(true);
@@ -1490,6 +1582,96 @@ function ImportModal({
             </div>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- إضافة بند تشغيلي جديد ---------------- */
+function AddWidget({
+  t,
+  onClose,
+  onAdd,
+}: {
+  t: T;
+  onClose: () => void;
+  onAdd: (label: string, icon: string, color: string) => void;
+}) {
+  const [label, setLabel] = useState("");
+  const [icon, setIcon] = useState(ICONS[0]);
+  const [color, setColor] = useState(CCOLORS[0]);
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="m-h">
+          <h3>{t("بند جديد", "New item")}</h3>
+          <button className="mx" onClick={onClose} aria-label="close">
+            ✕
+          </button>
+        </div>
+        <div className="sx-form">
+          <label>
+            <span>{t("اسم البند", "Name")}</span>
+            <input autoFocus value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t("مثال: طلبات الدعم", "e.g. Support requests")} />
+          </label>
+        </div>
+        <div className="sec3">{t("الأيقونة", "Icon")}</div>
+        <div className="sws">
+          {ICONS.map((i) => (
+            <span key={i} className={`ico2 ${icon === i ? "on" : ""}`} onClick={() => setIcon(i)}>
+              {i}
+            </span>
+          ))}
+        </div>
+        <div className="sec3">{t("اللون", "Color")}</div>
+        <div className="sws">
+          {CCOLORS.map((c) => (
+            <span key={c} className={`sw2 ${color === c ? "on" : ""}`} style={{ background: c }} onClick={() => setColor(c)} />
+          ))}
+        </div>
+        <div className="pf-hint">
+          {t("يُنشأ له جدول بأعمدة: البند · الحالة · النسبة · ملاحظة · التاريخ.", "A table is created for it.")}
+        </div>
+        <div className="m-f">
+          <button className="btn btn-ghost" onClick={onClose}>
+            {t("إلغاء", "Cancel")}
+          </button>
+          <button className="btn" disabled={!label.trim()} onClick={() => onAdd(label.trim(), icon, color)}>
+            {t("إضافة", "Add")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- إضافة قسم ---------------- */
+function AddSection({ t, onClose, onAdd }: { t: T; onClose: () => void; onAdd: (label: string) => void }) {
+  const [label, setLabel] = useState("");
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="m-h">
+          <h3>{t("قسم جديد", "New section")}</h3>
+          <button className="mx" onClick={onClose} aria-label="close">
+            ✕
+          </button>
+        </div>
+        <div className="sx-form">
+          <label>
+            <span>{t("اسم القسم", "Section name")}</span>
+            <input autoFocus value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t("مثال: أعمال المبادرات", "e.g. Initiatives")} />
+          </label>
+        </div>
+        <div className="pf-hint">{t("يظهر تحت الأعمال التشغيلية، وتضيف بنوده من زر «+» داخله.", "Appears below operational work.")}</div>
+        <div className="m-f">
+          <button className="btn btn-ghost" onClick={onClose}>
+            {t("إلغاء", "Cancel")}
+          </button>
+          <button className="btn" disabled={!label.trim()} onClick={() => onAdd(label.trim())}>
+            {t("إضافة", "Add")}
+          </button>
+        </div>
       </div>
     </div>
   );
