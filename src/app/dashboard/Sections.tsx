@@ -37,15 +37,16 @@ const NAT_STEPS = ["طور الإعداد/التحديث", "قيد المراج�
 const NAT_WHERE = ["لدى الجهة المالكة", "لدى اللجنة الاستراتيجية", "اللجنة الاستراتيجية", "اعتماد نهائي"];
 const INST_STAGES = ["وصلت المركز", "قيد المراجعة", "معالجة الملاحظات", "اعتُمدت", "فُعِّل القياس"];
 
-/* الأرقام كلها لاتينية (1 2 3) بطلب المستخدمة — كانت تُحوَّل
-   إلى هندية (١ ٢ ٣). الدالة باقية مكانها فلو رجع الطلب يوماً
-   يكفي تعديلها هنا وحدها. */
-const AR = (n: number | string) => String(n);
+/* الأرقام كلها لاتينية (1 2 3) بطلب المستخدمة. الدالة تحوّل
+   الأرقام الهندية إن وردت في نص مُدخَل، فيتوحّد الشكل مهما
+   كُتبت البيانات. */
+const lat = (v: string) => v.replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)));
+const AR = (n: number | string) => lat(String(n));
 const numOf = (v: unknown, dflt = 0) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : dflt;
 };
-const txt = (v: unknown) => (v === null || v === undefined ? "" : String(v));
+const txt = (v: unknown) => (v === null || v === undefined ? "" : lat(String(v)));
 /* لون نطاق القياس: مرتفعة ≥٩٠ · متوسطة ٧٠–٨٩ · منخفضة أقل من ٧٠ */
 const measTone = (v: number) => (v >= 90 ? "hi" : v >= 70 ? "mid" : "low");
 
@@ -238,7 +239,7 @@ function sessOf(d: Rec) {
   return { names, dates, done, full: names.length };
 }
 
-export function Sessions({ limit, t, onMore }: { limit?: number; t: T; onMore?: () => void }) {
+export function Sessions({ limit, t }: { limit?: number; t: T }) {
   const { items, loaded } = useItems("sessions");
   const [all, setAll] = useState(false);
   const shown = limit && !all ? items.slice(0, limit) : items;
@@ -312,10 +313,10 @@ export function Sessions({ limit, t, onMore }: { limit?: number; t: T; onMore?: 
           );
         })}
         {limit && items.length > limit && (
-          <button className="sx-more" onClick={onMore ? onMore : () => setAll(!all)}>
-            {onMore || !all
-              ? `${t("عرض الكل", "Show all")} (${AR(items.length - (limit || 0))} ${t("أخرى", "more")}) ▾`
-              : `${t("عرض أقل", "Show less")} ▴`}
+          <button className="sx-more" onClick={() => setAll(!all)}>
+            {all
+              ? `${t("عرض أقل", "Show less")} ▴`
+              : `${t("عرض الكل", "Show all")} (${AR(items.length - limit)} ${t("أخرى", "more")}) ▾`}
           </button>
         )}
       </div>

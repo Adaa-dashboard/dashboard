@@ -1035,7 +1035,7 @@ function Overview({
               {t("المزيد من التفاصيل", "More details")} ‹
             </button>
           </h2>
-          <Sessions t={t} limit={2} onMore={() => onOpenTab("sessions")} />
+          <Sessions t={t} limit={4} />
         </>
       )}
 
