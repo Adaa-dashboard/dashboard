@@ -691,3 +691,102 @@ revoke all on function public.perf_save_user(
 grant execute on function public.perf_save_user(
   text, text, text, text, text, text[], boolean, text, boolean, text[], boolean, text)
   to authenticated;
+
+
+-- ============================================================
+--  ١١) أقسام نظرة عامة الخمسة
+--      جلسات مراجعة الأداء · الاستراتيجيات الوطنية ·
+--      الاستراتيجيات المؤسسية · المخرجات الوطنية · المشاريع
+--
+--      جدول واحد لكل الأقسام: المفتاح (القسم، المعرّف) والمحتوى
+--      في عمود jsonb. اخترناه لأن تفاصيل كل قسم لم تُحسم بعد —
+--      فإضافة حقل أو تغيير اسمه لاحقاً لا يحتاج ترحيلاً جديداً
+--      ولا يمسّ ما هو محفوظ.
+-- ============================================================
+create table if not exists public.perf_items (
+  section    text not null,
+  id         text not null,
+  ord        int  not null default 100,
+  data       jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now(),
+  updated_by text,
+  primary key (section, id)
+);
+
+alter table public.perf_items enable row level security;
+grant select, insert, update, delete on public.perf_items to authenticated;
+
+-- القراءة: من يملك صلاحية القسم نفسه (اسم القسم هو اسم الصلاحية)
+drop policy if exists "perf_items_read" on public.perf_items;
+create policy "perf_items_read" on public.perf_items
+  for select to authenticated
+  using (public.perf_has_scope(section));
+
+-- الكتابة: صلاحية القسم + صلاحية تحرير الأقسام
+drop policy if exists "perf_items_write" on public.perf_items;
+create policy "perf_items_write" on public.perf_items
+  for all to authenticated
+  using (public.perf_has_scope(section) and public.perf_has_scope('sections:edit'))
+  with check (public.perf_has_scope(section) and public.perf_has_scope('sections:edit'));
+
+-- ------------------------------------------------------------
+--  الصلاحيات الجديدة:
+--    sessions       جلسات مراجعة الأداء
+--    natstrat       الاستراتيجيات الوطنية
+--    inststrat      الاستراتيجيات المؤسسية
+--    outputs        المخرجات الوطنية
+--    projects       المشاريع الاستراتيجية
+--    sections:edit  تحرير بيانات هذه الأقسام
+--  العرض يُمنح لكل حساب نشط (أقسام معلوماتية للإدارة كلها)،
+--  والتحرير لمدير الإدارة وحده — وما بعدها من الواجهة.
+-- ------------------------------------------------------------
+update public.perf_users
+   set scopes = (select array(select distinct unnest(
+         coalesce(scopes,'{}') ||
+         array['sessions','natstrat','inststrat','outputs','projects'])))
+ where active
+   and not (coalesce(scopes,'{}') @> array['sessions']);
+
+update public.perf_users
+   set scopes = (select array(select distinct unnest(
+         coalesce(scopes,'{}') || array['sections:edit'])))
+ where active
+   and coalesce(scopes,'{}') @> array['users']
+   and not (coalesce(scopes,'{}') @> array['sections:edit']);
+
+-- ------------------------------------------------------------
+--  بيانات مبدئية — تُدرَج مرة واحدة فقط، ولا تُكتب فوق شيء.
+--  الغرض أن تظهر الأقسام بشكلها النهائي قبل ورود البيانات
+--  الحقيقية من الإدارات المعنية.
+-- ------------------------------------------------------------
+insert into public.perf_items (section, id, ord, data)
+select * from (values
+  ('sessions','ses-1',1,'{"entity":"وزارة الصحة","quarter":"الربع الثالث ٢٠٢٦","stages":[{"n":"تحديد الجهة","d":"2026-07-05"},{"n":"طلب البيانات","d":"2026-07-18"},{"n":"تحليل الأداء","d":"2026-08-02"},{"n":"إعداد العرض","d":"2026-08-20"},{"n":"عقد الجلسة","d":""}],"done":3}'::jsonb),
+  ('sessions','ses-2',2,'{"entity":"وزارة التعليم","quarter":"الربع الثالث ٢٠٢٦","stages":[{"n":"تحديد الجهة","d":"2026-07-05"},{"n":"طلب البيانات","d":"2026-07-22"},{"n":"تحليل الأداء","d":""},{"n":"إعداد العرض","d":""},{"n":"عقد الجلسة","d":""}],"done":2}'::jsonb),
+  ('sessions','ses-3',3,'{"entity":"وزارة النقل","quarter":"الربع الثالث ٢٠٢٦","stages":[{"n":"تحديد الجهة","d":"2026-07-05"},{"n":"طلب البيانات","d":"2026-07-15"},{"n":"تحليل الأداء","d":"2026-07-30"},{"n":"إعداد العرض","d":"2026-08-12"},{"n":"عقد الجلسة","d":"2026-08-28"}],"done":5}'::jsonb),
+  ('sessions','ses-4',4,'{"entity":"وزارة البلديات والإسكان","quarter":"الربع الثالث ٢٠٢٦","stages":[{"n":"تحديد الجهة","d":"2026-07-05"},{"n":"طلب البيانات","d":""},{"n":"تحليل الأداء","d":""},{"n":"إعداد العرض","d":""},{"n":"عقد الجلسة","d":""}],"done":1}'::jsonb)
+) as v(section,id,ord,data)
+where not exists (select 1 from public.perf_items where section = 'sessions');
+
+insert into public.perf_items (section, id, ord, data)
+select * from (values
+  ('natstrat','nat-1',1,'{"name":"الاستراتيجية الوطنية للصناعة","owner":"وزارة الصناعة والثروة المعدنية","goals":7,"kpis":34,"stage":3,"status":"قيد المراجعة الفنية","note":"بانتظار تحديث مستهدفات ثلاثة مؤشرات","updated":"2026-09-03"}'::jsonb),
+  ('natstrat','nat-2',2,'{"name":"الاستراتيجية الوطنية للنقل والخدمات اللوجستية","owner":"وزارة النقل","goals":6,"kpis":28,"stage":4,"status":"معتمدة","note":"فُعّل قياس ٢٢ مؤشراً","updated":"2026-09-01"}'::jsonb),
+  ('natstrat','nat-3',3,'{"name":"الاستراتيجية الوطنية للإسكان","owner":"وزارة البلديات والإسكان","goals":5,"kpis":21,"stage":2,"status":"عند الجهة لمعالجة الملاحظات","note":"أُرسلت الملاحظات بتاريخ ٢٠٢٦-٠٨-٢٤","updated":"2026-08-24"}'::jsonb)
+) as v(section,id,ord,data)
+where not exists (select 1 from public.perf_items where section = 'natstrat');
+
+insert into public.perf_items (section, id, ord, data)
+select * from (values
+  ('inststrat','ins-1',1,'{"name":"استراتيجية وزارة التعليم المؤسسية","owner":"وزارة التعليم","goals":6,"kpis":24,"stage":2,"status":"عند المركز للمراجعة","updated":"2026-09-04"}'::jsonb),
+  ('inststrat','ins-2',2,'{"name":"استراتيجية هيئة الحكومة الرقمية","owner":"هيئة الحكومة الرقمية","goals":5,"kpis":19,"stage":3,"status":"عند الجهة لمعالجة الملاحظات","updated":"2026-09-03"}'::jsonb),
+  ('inststrat','ins-3',3,'{"name":"استراتيجية المركز الوطني للتخصيص","owner":"المركز الوطني للتخصيص","goals":4,"kpis":16,"stage":5,"status":"معتمدة · فُعِّل القياس","updated":"2026-08-27"}'::jsonb)
+) as v(section,id,ord,data)
+where not exists (select 1 from public.perf_items where section = 'inststrat');
+
+insert into public.perf_items (section, id, ord, data)
+select * from (values
+  ('projects','prj-1',1,'{"name":"مشروع دعم وتفعيل وقياس الاستراتيجيات الوطنية والأداء المؤسسي","status":"جارٍ التنفيذ","planned":30,"actual":26,"period":"أبريل ٢٠٢٦ – سبتمبر ٢٠٢٧","months":18,"elapsed":6}'::jsonb),
+  ('projects','prj-2',2,'{"name":"مشروع الحج والعمرة","status":"جارٍ التنفيذ","planned":0,"actual":0,"period":"","months":0,"elapsed":0}'::jsonb)
+) as v(section,id,ord,data)
+where not exists (select 1 from public.perf_items where section = 'projects');

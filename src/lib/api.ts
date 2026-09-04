@@ -60,6 +60,14 @@ const rowNote = (r: Record<string, unknown>) => ({
   id: r.id, sectorId: r.sector_id, indicatorId: r.indicator_id, text: r.body,
   mentions: r.mentions || [], byId: r.by_id, byName: r.by_name, at: r.at,
 });
+/* بنود الأقسام الخمسة — المحتوى في data وشكله يختلف حسب القسم */
+const rowItem = (r: Record<string, unknown>) => ({
+  id: String(r.id),
+  ord: Number(r.ord ?? 100),
+  data: (r.data || {}) as Record<string, unknown>,
+  updatedAt: r.updated_at,
+  updatedBy: r.updated_by ?? "",
+});
 /* طلبات التغيير الواردة من منصة الرؤية — مرآة للملف اليومي */
 const rowChange = (r: Record<string, unknown>) => ({
   code: r.code, program: r.program ?? "", itemCode: r.item_code ?? "",
@@ -397,6 +405,53 @@ export async function apiFetch(path: string, init: Init = {}) {
         if (error) return err(error.message, 403);
         return ok({ ok: true });
       }
+    }
+
+    /* ---------------- أقسام نظرة عامة الخمسة ----------------
+       جدول واحد لكل الأقسام: القراءة والكتابة يحرسهما RLS حسب
+       صلاحية القسم نفسه، فلا حاجة لفحص إضافي هنا. */
+    if (p === "/api/items" && method === "GET") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const section = q.get("section") || "";
+      if (!section) return err("لا يوجد قسم", 400);
+      const { data, error } = await s
+        .from("perf_items")
+        .select("*")
+        .eq("section", section)
+        .order("ord");
+      if (error) return err(error.message, 403);
+      return ok({ items: (data || []).map(rowItem) });
+    }
+    if (p === "/api/items" && (method === "POST" || method === "PUT")) {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const section = str(body.section);
+      if (!section) return err("لا يوجد قسم", 400);
+      const id = str(body.id) || "it-" + newId();
+      const { error } = await s.from("perf_items").upsert(
+        {
+          section,
+          id,
+          ord: num(body.ord) ?? 100,
+          data: body.data ?? {},
+          updated_at: new Date().toISOString(),
+          updated_by: me.name || me.username || "",
+        },
+        { onConflict: "section,id" },
+      );
+      if (error) return err(error.message, 403);
+      return ok({ ok: true, id });
+    }
+    if (p === "/api/items" && method === "DELETE") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const section = q.get("section") || "";
+      const id = q.get("id") || "";
+      if (!section || !id) return err("لا يوجد بند", 400);
+      const { error } = await s.from("perf_items").delete().eq("section", section).eq("id", id);
+      if (error) return err(error.message, 403);
+      return ok({ ok: true });
     }
 
     /* ---------------- طلبات التغيير (منصة الرؤية) ---------------- */

@@ -83,3 +83,46 @@ export function IconGear(p: { size?: number }) {
     </svg>
   );
 }
+
+/* ============================================================
+   أيقونات القائمة الجانبية — بديل الرموز النصية (◱ ◎ ✓ ▤)
+   التي كانت تختلف من متصفح لآخر ولا تدلّ على معناها
+   ============================================================ */
+function nav(d: string) {
+  const C = (p: { size?: number }) => {
+    const s = p.size ?? 18;
+    return (
+      <svg {...base} width={s} height={s} strokeWidth={1.75} dangerouslySetInnerHTML={{ __html: d }} />
+    );
+  };
+  C.displayName = "NavIcon";
+  return C;
+}
+
+/* الصفحات الرئيسية */
+export const IconOverview = nav(
+  '<path d="M3.6 17a8.4 8.4 0 1 1 16.8 0"/><path d="M12 17l4.2-4.6"/><circle cx="12" cy="17" r="1.5" fill="currentColor" stroke="none"/>',
+);
+export const IconKpi = nav('<path d="M3.5 20.5h17"/><path d="M6.5 20.5v-5M11 20.5V8.5M15.5 20.5v-8M20 20.5V4.5"/>');
+export const IconTask = nav(
+  '<rect x="5" y="4.2" width="14" height="16.8" rx="3"/><path d="M9 4.2V3.4A1.4 1.4 0 0 1 10.4 2h3.2A1.4 1.4 0 0 1 15 3.4v.8"/><path d="M8.9 13.2l2.2 2.2 4.2-4.4"/>',
+);
+export const IconWeek = nav(
+  '<rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 7.5h8"/><path d="M8.5 17v-2.6M12 17v-4.6M15.5 17v-1.6"/>',
+);
+
+/* الأقسام الخمسة */
+export const IconSess = nav('<path d="M4 5.5h16v10.5H12.8L9 19.6V16H4z"/><path d="M8.4 10.6l2.1 2.1 4.4-4.5"/>');
+export const IconNat = nav('<path d="M6 21V4.2"/><path d="M6 4.6h11.4l-2.2 3.4 2.2 3.4H6"/>');
+export const IconInst = nav(
+  '<rect x="3.4" y="8.6" width="7.6" height="12.4" rx="1.6"/><rect x="12.6" y="3.4" width="8" height="17.6" rx="1.6"/><path d="M6 12.2h2.4M6 15.6h2.4M15.4 7h2.4M15.4 10.6h2.4M15.4 14.2h2.4"/>',
+);
+export const IconOut = nav(
+  '<path d="M20.5 8.6v8.2L12 21l-8.5-4.2V8.6"/><path d="M3.5 8.6L12 4.4l8.5 4.2L12 12.8z"/><path d="M12 12.8V21"/>',
+);
+export const IconProj = nav('<rect x="3.2" y="4.2" width="17.6" height="16.6" rx="3"/><path d="M7 9h7.6M7 12.6h10M7 16.2h5.4"/>');
+
+/* الإعدادات وما تحتها */
+export const IconSettings = nav(
+  '<circle cx="12" cy="12" r="3"/><path d="M4 12h2M18 12h2M12 4v2M12 18v2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M17.7 6.3l-1.4 1.4M7.7 16.3l-1.4 1.4"/>',
+);

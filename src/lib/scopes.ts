@@ -13,6 +13,12 @@ export type Scope =
   | "changes:upload"
   | "details"
   | "details:all"
+  | "sessions"
+  | "natstrat"
+  | "inststrat"
+  | "outputs"
+  | "projects"
+  | "sections:edit"
   | "entry"
   | "structure"
   | "tasks"
@@ -29,6 +35,17 @@ export const SCOPE_GROUPS: { title: string; items: { key: Scope; label: string; 
       { key: "details", label: "المؤشرات التفصيلية", note: "قطاعاته المسندة له" },
       { key: "tasks", label: "المهام", note: "المهام المسندة له" },
       { key: "weekly", label: "الإنجاز الأسبوعي" },
+    ],
+  },
+  {
+    title: "الأقسام المتفرّعة من المؤشرات",
+    items: [
+      { key: "sessions", label: "جلسات مراجعة الأداء" },
+      { key: "natstrat", label: "الاستراتيجيات الوطنية" },
+      { key: "inststrat", label: "الاستراتيجيات المؤسسية" },
+      { key: "outputs", label: "المخرجات الوطنية" },
+      { key: "projects", label: "المشاريع الاستراتيجية" },
+      { key: "sections:edit", label: "تحرير بيانات هذه الأقسام", note: "الإضافة والتعديل والحذف" },
     ],
   },
   {
