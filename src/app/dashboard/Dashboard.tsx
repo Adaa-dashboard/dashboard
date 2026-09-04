@@ -50,6 +50,8 @@ interface Me {
   sectorIds: string[];
   /** الصلاحيات الممنوحة لهذا الحساب */
   scopes: string[];
+  /** المسمّى الوظيفي — يظهر تحت الاسم */
+  jobTitle?: string;
 }
 interface Sector {
   id: string;
@@ -297,7 +299,9 @@ export default function Dashboard({ me }: { me: Me }) {
             <div className="av">{(me.name || "?").trim().charAt(0)}</div>
             <div>
               <div className="nm">{me.name}</div>
-              <div className="rl">{isAdmin ? t("مدير الإدارة", "Admin") : t("مدير قطاع", "Sector Manager")}</div>
+              <div className="rl">
+                {me.jobTitle || (isAdmin ? t("مدير الإدارة", "Admin") : t("مدير قطاع", "Sector Manager"))}
+              </div>
             </div>
             <button className="out" onClick={logout} title={t("خروج", "Logout")} aria-label="logout">
               ⏻
@@ -417,7 +421,9 @@ export default function Dashboard({ me }: { me: Me }) {
               <div className="av">{(me.name || "?").trim().charAt(0)}</div>
               <div>
                 <div className="nm">{me.name}</div>
-                <div className="rl">{isAdmin ? t("مدير الإدارة", "Admin") : t("مدير قطاع", "Sector Manager")}</div>
+                <div className="rl">
+                  {me.jobTitle || (isAdmin ? t("مدير الإدارة", "Admin") : t("مدير قطاع", "Sector Manager"))}
+                </div>
               </div>
             </div>
             <SheetItem id="mypage" label={["صفحتي", "My page"]} />
@@ -1784,6 +1790,7 @@ interface UserRow {
   scopes?: string[];
   /** مدير القطاع — يظهر أولاً في الهيكل التنظيمي */
   isLead?: boolean;
+  jobTitle?: string;
 }
 function UsersManager({ refData }: { refData: RefData }) {
   const { t } = useT();
@@ -1796,6 +1803,7 @@ function UsersManager({ refData }: { refData: RefData }) {
   const [sectorIds, setSectorIds] = useState<string[]>([]);
   const [scopes, setScopes] = useState<string[]>([...DEFAULT_SCOPES]);
   const [isLead, setIsLead] = useState(false);
+  const [jobTitle, setJobTitle] = useState("");
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
   const [editing, setEditing] = useState<UserRow | null>(null);
@@ -1829,6 +1837,7 @@ function UsersManager({ refData }: { refData: RefData }) {
         sectorIds,
         scopes,
         isLead,
+        jobTitle,
       }),
     });
     const d = await res.json();
@@ -1843,6 +1852,7 @@ function UsersManager({ refData }: { refData: RefData }) {
       setSectorIds([]);
       setScopes([...DEFAULT_SCOPES]);
       setIsLead(false);
+      setJobTitle("");
       load();
     }
   }
@@ -1911,6 +1921,16 @@ function UsersManager({ refData }: { refData: RefData }) {
             <div>
               <label>{t("الاسم", "Name")}</label>
               <input value={name} onChange={(e) => setName(e.target.value)} />
+            </div>
+            <div>
+              <label>
+                {t("المسمّى الوظيفي", "Job title")} <span className="opt">{t("اختياري", "optional")}</span>
+              </label>
+              <input
+                value={jobTitle}
+                onChange={(e) => setJobTitle(e.target.value)}
+                placeholder={t("مثال: أخصائي قياس أداء", "e.g. Performance Analyst")}
+              />
             </div>
             <div>
               <label>{t("اسم المستخدم", "Username")}</label>
@@ -2014,6 +2034,7 @@ function UsersManager({ refData }: { refData: RefData }) {
               <td className="u-name">
                 {u.name}
                 {u.isLead && <span className="u-lead">{t("مدير قطاع", "Lead")}</span>}
+                {u.jobTitle && <span className="u-job">{u.jobTitle}</span>}
               </td>
               <td dir="ltr" style={{ textAlign: "right" }} data-l={t("اسم المستخدم", "Username")}>
                 {u.username || <span className="muted">—</span>}
@@ -2099,6 +2120,7 @@ function EditUserModal({
   const [active, setActive] = useState(user.active);
   const [scopes, setScopes] = useState<string[]>(user.scopes || []);
   const [isLead, setIsLead] = useState(user.isLead === true);
+  const [jobTitle, setJobTitle] = useState(user.jobTitle || "");
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -2137,6 +2159,7 @@ function EditUserModal({
         active,
         scopes,
         isLead,
+        jobTitle,
         password: pw || undefined,
       },
       t("حُفظ ✓", "Saved ✓")
@@ -2184,6 +2207,15 @@ function EditUserModal({
             dir="ltr"
             style={{ textAlign: "left" }}
             autoComplete="off"
+          />
+
+          <label>
+            {t("المسمّى الوظيفي", "Job title")} <span className="opt">{t("اختياري", "optional")}</span>
+          </label>
+          <input
+            value={jobTitle}
+            onChange={(e) => setJobTitle(e.target.value)}
+            placeholder={t("مثال: أخصائي قياس أداء", "e.g. Performance Analyst")}
           />
 
           <label>{t("المنصب", "Position")}</label>

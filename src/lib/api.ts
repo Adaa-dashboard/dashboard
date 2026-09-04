@@ -79,7 +79,7 @@ async function people() {
   const { data } = await sb().rpc("perf_people");
   return (data || []).map((u: Record<string, unknown>) => ({
     id: String(u.id), name: u.name, role: u.role, sectorIds: u.sector_ids || [],
-    isLead: u.is_lead === true,
+    isLead: u.is_lead === true, jobTitle: u.job_title || "",
   }));
 }
 
@@ -147,8 +147,16 @@ export async function apiFetch(path: string, init: Init = {}) {
     if (p === "/api/me") {
       const me = await whoAmI();
       if (!me) return ok({ user: null });
-      const { data: sc } = await s.rpc("perf_my_scopes");
-      return ok({ user: { ...me, scopes: Array.isArray(sc) ? sc : [] } });
+      const { data: card } = await s.rpc("perf_me");
+      const c = Array.isArray(card) ? card[0] : card;
+      return ok({
+        user: {
+          ...me,
+          scopes: Array.isArray(c?.scopes) ? c.scopes : [],
+          jobTitle: c?.job_title || "",
+          isLead: c?.is_lead === true,
+        },
+      });
     }
 
     /* ---------------- المرجعيات ---------------- */
@@ -271,7 +279,7 @@ export async function apiFetch(path: string, init: Init = {}) {
           id: String(u.id), username: u.username, name: u.name, phone: u.phone,
           role: u.role, sectorIds: u.sector_ids || [], active: u.active,
           hasPassword: u.has_password, scopes: u.scopes || [],
-          isLead: u.is_lead === true,
+          isLead: u.is_lead === true, jobTitle: u.job_title || "",
         })),
       });
     }
@@ -282,6 +290,7 @@ export async function apiFetch(path: string, init: Init = {}) {
         p_password: body.password || null, p_clear_password: false,
         p_scopes: Array.isArray(body.scopes) ? body.scopes : null,
         p_is_lead: body.isLead === true,
+        p_job_title: typeof body.jobTitle === "string" ? body.jobTitle : null,
       });
       if (error) return err("غير مصرّح", 403);
       if (data?.error === "dup_username") return err("اسم المستخدم مستخدَم مسبقًا", 400);
@@ -314,6 +323,7 @@ export async function apiFetch(path: string, init: Init = {}) {
           p_clear_password: body.clearPassword === true,
           p_scopes: Array.isArray(body.scopes) ? body.scopes : null,
           p_is_lead: typeof body.isLead === "boolean" ? body.isLead : null,
+          p_job_title: typeof body.jobTitle === "string" ? body.jobTitle : null,
         });
         if (error) return err("غير مصرّح", 403);
         if (data?.error === "dup_username") return err("اسم المستخدم مستخدَم مسبقًا", 400);
