@@ -6,7 +6,7 @@ import { loadUserData, saveUserData } from "@/lib/userdata";
 import { PIcon } from "./pickicons";
 
 /* ============================================================
-   المساعد — يجيب من بيانات اللوحة نفسها، بلا أي خدمة خارجية:
+   المساعد الذكي — يجيب من بيانات اللوحة نفسها، بلا أي خدمة خارجية:
    لا يخرج من المتصفح شيء، ولا يحتاج مفتاحاً ولا موافقة أمنية.
    مبنيّ ليصير مصدر الجواب نموذجاً لاحقاً بلا تغيير الواجهة:
    يكفي استبدال answer() بنداء الخادم.
@@ -347,9 +347,9 @@ export default function Assistant({ me, t, onPin }: { me: Me; t: T; onPin: (p: P
 
   return (
     <>
-      <button className="ai-fab" onClick={() => setOpen(true)} title={t("المساعد", "Assistant")} aria-label="assistant">
+      <button className="ai-fab" onClick={() => setOpen(true)} title={t("المساعد الذكي", "Assistant")} aria-label="assistant">
         <PIcon id="idea" size={20} />
-        <span>{t("المساعد", "Ask")}</span>
+        <span>{t("المساعد الذكي", "Ask")}</span>
       </button>
 
       {open && (
@@ -359,7 +359,7 @@ export default function Assistant({ me, t, onPin }: { me: Me; t: T; onPin: (p: P
               <span className="ai-dot">
                 <PIcon id="idea" size={14} />
               </span>
-              <h3>{t("المساعد", "Assistant")}</h3>
+              <h3>{t("المساعد الذكي", "Assistant")}</h3>
               <button className="mx" onClick={() => setOpen(false)} aria-label="close">
                 ✕
               </button>
