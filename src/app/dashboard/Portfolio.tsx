@@ -8,6 +8,7 @@ import { sb } from "@/lib/supa";
 import { Cal } from "./Tools";
 import { EMPTY_NOTES, firstLine, preview, whenAr, type NotesData } from "./Notes";
 import { PIcon, IconPicker } from "./pickicons";
+import { IconGear } from "./icons";
 
 /* ============================================================
    محفظتي — الصفحة الشخصية لكل موظف.
@@ -920,6 +921,219 @@ function EntitiesModal({
   );
 }
 
+/* ---------------- من يرى محفظتي ----------------
+   المحفظة خاصة بصاحبها: لا يراها مديره ولا أي أحد إلا بمنحٍ منه.
+   المنح للاطّلاع فقط — لا يكتب الممنوح له شيئاً، والحراسة في RLS. */
+type Grant = { userId: string; name: string; jobTitle?: string; scopes: string[]; at?: string };
+
+/* خيارات المنح بأقسام perf_portfolio لا بالويدجت:
+   «البرامج والاستراتيجيات» و«التقارير الربعية» يقرآن قسم entities
+   نفسه، فلا يمكن فصلهما — جُمعا في خيار واحد صراحةً بدل إيهام
+   المستخدم بأنه فصلهما وهو لم يفعل. */
+const SHARE_OPTS: { k: string; label: string }[] = [
+  { k: "tasks", label: "مهامي" },
+  { k: "entities", label: "الجهات — البرامج والاستراتيجيات والتقارير الربعية" },
+  { k: "projects", label: "المشاريع الاستراتيجية" },
+  { k: "contrib", label: "المساهمات في الخطة التشغيلية" },
+  { k: "changes", label: "طلبات التغيير" },
+  { k: "reverse", label: "طلبات العكس" },
+  { k: "workflow", label: "طلبات تحديث سير العمل" },
+];
+
+function GrantsBox({ prefs, meId, t }: { prefs: Prefs; meId: string; t: T }) {
+  const [grants, setGrants] = useState<Grant[]>([]);
+  const [people, setPeople] = useState<{ id: string; name: string }[]>([]);
+  const [who, setWho] = useState("");
+  const [sel, setSel] = useState<string[]>(["*"]);
+  const [msg, setMsg] = useState("");
+
+  const opts = useMemo(
+    () => [...SHARE_OPTS, ...prefs.custom.map((c) => ({ k: c.key, label: c.label }))],
+    [prefs.custom],
+  );
+
+  const load = useCallback(async () => {
+    const [g, ppl] = await Promise.all([
+      apiFetch("/api/portfolio/grants").then((r) => r.json()).catch(() => ({})),
+      apiFetch("/api/people").then((r) => r.json()).catch(() => ({})),
+    ]);
+    setGrants(Array.isArray(g.grants) ? g.grants : []);
+    setPeople((ppl.people || []).filter((x: Rec) => String(x.id) !== meId));
+  }, [meId]);
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const all = sel.includes("*");
+  const toggle = (k: string) =>
+    setSel((old) => (old.includes(k) ? old.filter((x) => x !== k) : [...old.filter((x) => x !== "*"), k]));
+
+  async function give() {
+    if (!who) {
+      setMsg(t("اختر الشخص أولاً", "Pick a person"));
+      return;
+    }
+    const scopes = all ? ["*"] : sel;
+    if (!scopes.length) {
+      setMsg(t("اختر ما تريد مشاركته", "Pick what to share"));
+      return;
+    }
+    const r = await apiFetch("/api/portfolio/grants", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: who, scopes }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      setMsg(d.error || t("تعذّر الحفظ", "Failed"));
+      return;
+    }
+    setWho("");
+    setSel(["*"]);
+    setMsg("");
+    await load();
+  }
+
+  async function drop(id: string, name: string) {
+    if (!confirm(t(`سحب صلاحية ${name} على محفظتك؟`, `Revoke ${name}?`))) return;
+    await apiFetch(`/api/portfolio/grants?user=${encodeURIComponent(id)}`, { method: "DELETE" });
+    await load();
+  }
+
+  const label = (g: Grant) =>
+    g.scopes.includes("*")
+      ? t("كل المحفظة", "Everything")
+      : g.scopes.map((k) => opts.find((o) => o.k === k)?.label || k).join(" · ");
+
+  return (
+    <>
+      <div className="sec3">{t("من يرى محفظتي", "Who can see my portfolio")}</div>
+      <p className="gr-hint">
+        {t(
+          "محفظتك خاصة بك — لا يراها مديرك ولا أي أحد. امنح من تختاره اطّلاعاً عليها (بديلك أثناء الإجازة مثلاً)، وحدّد ما يراه، واسحبه متى شئت. المنح للاطّلاع فقط: لا يعدّل أحد في محفظتك.",
+          "Your portfolio is private. Grant read access to whoever you choose.",
+        )}
+      </p>
+
+      {grants.length > 0 && (
+        <div className="gr-list">
+          {grants.map((g) => (
+            <div className="gr-row" key={g.userId}>
+              <b>{g.name}</b>
+              <span>{label(g)}</span>
+              <button onClick={() => drop(g.userId, g.name)} title={t("سحب الصلاحية", "Revoke")}>
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="gr-add">
+        <select value={who} onChange={(e) => setWho(e.target.value)}>
+          <option value="">{t("— اختر شخصاً —", "— Pick a person —")}</option>
+          {people.map((x) => (
+            <option key={x.id} value={x.id}>
+              {x.name}
+            </option>
+          ))}
+        </select>
+        <div className="gr-scopes">
+          <label className={all ? "on" : ""}>
+            <input type="checkbox" checked={all} onChange={() => setSel(all ? [] : ["*"])} />
+            {t("كل المحفظة", "Everything")}
+          </label>
+          {opts.map((o) => (
+            <label key={o.k} className={!all && sel.includes(o.k) ? "on" : ""}>
+              <input
+                type="checkbox"
+                disabled={all}
+                checked={all || sel.includes(o.k)}
+                onChange={() => toggle(o.k)}
+              />
+              {o.label}
+            </label>
+          ))}
+        </div>
+        <button className="btn btn-sm" onClick={give}>
+          {t("منح الصلاحية", "Grant")}
+        </button>
+        {msg && <div className="gr-msg">{msg}</div>}
+      </div>
+      <p className="gr-hint sm">
+        {t(
+          "ملاحظاتك وتقويمك يبقيان خاصين بك دائماً ولا يشملهما المنح.",
+          "Your notes and calendar are never shared.",
+        )}
+      </p>
+    </>
+  );
+}
+
+/* ---------------- محفظة شورِكت معي (اطّلاع فقط) ---------------- */
+function SharedView({ owner, t, onBack }: { owner: Grant; t: T; onBack: () => void }) {
+  const pf = usePortfolio(owner.userId);
+  const bySection = useMemo(() => {
+    const m: Record<string, Row[]> = {};
+    for (const r of pf.rows) (m[r.section] = m[r.section] || []).push(r);
+    return m;
+  }, [pf.rows]);
+
+  const secLabel = (k: string) => SHARE_OPTS.find((o) => o.k === k)?.label || k;
+
+  return (
+    <div className="pf shared">
+      <div className="sh-head">
+        <button className="btn2" onClick={onBack}>
+          ← {t("رجوع لمحفظتي", "Back")}
+        </button>
+        <div>
+          <b>{owner.name}</b>
+          {owner.jobTitle && <em>{owner.jobTitle}</em>}
+        </div>
+        <span className="sh-tag">{t("اطّلاع فقط", "Read only")}</span>
+      </div>
+
+      {!pf.loaded ? (
+        <div className="pf-none">{t("جارٍ التحميل...", "Loading...")}</div>
+      ) : !Object.keys(bySection).length ? (
+        <div className="pf-none">{t("لا يوجد ما يُعرض في الأقسام المشتركة معك.", "Nothing shared yet.")}</div>
+      ) : (
+        Object.entries(bySection).map(([sec, rows]) => {
+          const cols = COLS[sec] || [{ k: "name", label: "البند" }];
+          return (
+            <div className="sh-sec" key={sec}>
+              <h3>
+                {secLabel(sec)} <b>{rows.length}</b>
+              </h3>
+              <div className="tblwrap">
+                <table>
+                  <thead>
+                    <tr>
+                      {cols.map((c) => (
+                        <th key={c.k}>{c.label}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r) => (
+                      <tr key={r.id}>
+                        {cols.map((c) => (
+                          <td key={c.k}>{txt(r.data?.[c.k]) || "—"}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
 /* ---------------- نافذة التخصيص ---------------- */
 const SWATCHES = [
   "#00584c", "#016b5f", "#1a9d5c", "#0f8a8a", "#2f7fd1", "#123a6b",
@@ -964,7 +1178,7 @@ function CustomModal({
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="m-h">
-          <h3>🎨 {t("تخصيص محفظتي", "Customize")}</h3>
+          <h3>{t("تخصيص محفظتي", "Customize")}</h3>
           <button className="mx" onClick={onClose} aria-label="close">
             ✕
           </button>
@@ -1033,6 +1247,8 @@ function CustomModal({
           </>
         )}
 
+        <GrantsBox prefs={prefs} meId={meId} t={t} />
+
         <div className="sec3">{t("قالب الترتيب", "Layout")}</div>
         <div className="lays">
           {(
@@ -1099,6 +1315,16 @@ export default function Portfolio({
   const [addSec, setAddSec] = useState(false);
   const [editJoin, setEditJoin] = useState(false);
   const [editLook, setEditLook] = useState<string | null>(null);
+  /* محافظ منحني أصحابها الاطّلاع عليها */
+  const [shared, setShared] = useState<Grant[]>([]);
+  const [viewing, setViewing] = useState<Grant | null>(null);
+
+  useEffect(() => {
+    void apiFetch("/api/portfolio/grants")
+      .then((r) => r.json())
+      .then((d) => setShared(Array.isArray(d.shared) ? d.shared : []))
+      .catch(() => setShared([]));
+  }, []);
 
   useEffect(() => {
     void loadUserData<Partial<Prefs>>("portfolio", {}).then((d) => {
@@ -1381,6 +1607,8 @@ export default function Portfolio({
     );
   }
 
+  if (viewing) return <SharedView owner={viewing} t={t} onBack={() => setViewing(null)} />;
+
   if (!ready || !pf.loaded) return <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>;
 
   const openW = open ? WMAP[open] : null;
@@ -1393,6 +1621,17 @@ export default function Portfolio({
           className="pf-bg"
           style={{ backgroundImage: `url(${prefs.bg})`, ["--dim" as string]: `${prefs.bgDim / 100}` } as React.CSSProperties}
         />
+      )}
+
+      {shared.length > 0 && (
+        <div className="pf-shared">
+          <b>{t("محافظ شورِكت معي", "Shared with me")}</b>
+          {shared.map((g) => (
+            <button key={g.userId} onClick={() => setViewing(g)}>
+              {g.name}
+            </button>
+          ))}
+        </div>
       )}
 
       <div className="pf-hero">
@@ -1435,8 +1674,8 @@ export default function Portfolio({
               ▤ {t("جداول", "Tables")}
             </span>
           </span>
-          <button className="btn2" onClick={() => setCustom(true)}>
-            🎨 {t("تخصيص", "Customize")}
+          <button className="btn2 solid" onClick={() => setCustom(true)}>
+            <IconGear size={15} /> {t("تخصيص", "Customize")}
           </button>
           <button className={`btn2 ${arrange ? "solid" : ""}`} onClick={() => setArrange(!arrange)}>
             {arrange ? `✓ ${t("تم الترتيب", "Done")}` : `⋮⋮ ${t("ترتيب", "Arrange")}`}

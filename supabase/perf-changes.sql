@@ -879,3 +879,108 @@ end;
 $$;
 revoke all on function public.perf_people() from public, anon;
 grant execute on function public.perf_people() to authenticated;
+
+-- ============================================================
+--  ١٤) محفظتي: خاصة بصاحبها وحده + منح صريح لمن يختاره
+--
+--  تغيير في السياسة: كان مدير الإدارة (صلاحية users) ومدير القطاع
+--  يريان محافظ موظفيهم. صار لا أحد يرى محفظة غيره — ولو كان مديره —
+--  إلا بمنحٍ صريح من صاحبها، يحدّد فيه الأقسام ويسحبه متى شاء.
+--  (بطلب المستخدمة صراحةً)
+-- ============================================================
+create table if not exists public.perf_portfolio_grants (
+  owner_id   bigint not null,
+  grantee_id bigint not null,
+  -- أقسام perf_portfolio المسموح بها · و'tasks' للمهام · و'*' للكل
+  scopes     text[] not null default array['*'],
+  note       text,
+  created_at timestamptz not null default now(),
+  primary key (owner_id, grantee_id),
+  constraint perf_pfg_not_self check (owner_id <> grantee_id)
+);
+alter table public.perf_portfolio_grants enable row level security;
+grant select, insert, update, delete on public.perf_portfolio_grants to authenticated;
+
+-- صاحب المحفظة يقرأ ويكتب منْحه هو
+drop policy if exists "perf_pfg_owner" on public.perf_portfolio_grants;
+create policy "perf_pfg_owner" on public.perf_portfolio_grants
+  for all to authenticated
+  using (owner_id = public.perf_my_id())
+  with check (owner_id = public.perf_my_id());
+
+-- والممنوح له يقرأ ما مُنح له — ليعرف أي محفظة شورِكت معه
+drop policy if exists "perf_pfg_grantee" on public.perf_portfolio_grants;
+create policy "perf_pfg_grantee" on public.perf_portfolio_grants
+  for select to authenticated
+  using (grantee_id = public.perf_my_id());
+
+-- ------------------------------------------------------------
+--  من يرى ماذا — بقسمه لا بمحفظته كاملة
+-- ------------------------------------------------------------
+create or replace function public.perf_can_see_pf(p_uid bigint, p_section text)
+returns boolean language sql stable security definer set search_path = public as $$
+  select p_uid = public.perf_my_id()
+      or exists (
+           select 1 from public.perf_portfolio_grants g
+            where g.owner_id = p_uid
+              and g.grantee_id = public.perf_my_id()
+              and (g.scopes @> array['*'] or g.scopes @> array[p_section]));
+$$;
+revoke all on function public.perf_can_see_pf(bigint, text) from public, anon;
+grant execute on function public.perf_can_see_pf(bigint, text) to authenticated;
+
+-- الدالة القديمة تبقى (قد تُستدعى من مكان آخر) لكن بلا مسار المدير
+create or replace function public.perf_can_see_portfolio(p_uid bigint)
+returns boolean language sql stable security definer set search_path = public as $$
+  select p_uid = public.perf_my_id()
+      or exists (
+           select 1 from public.perf_portfolio_grants g
+            where g.owner_id = p_uid and g.grantee_id = public.perf_my_id());
+$$;
+
+drop policy if exists "perf_pf_read" on public.perf_portfolio;
+create policy "perf_pf_read" on public.perf_portfolio
+  for select to authenticated
+  using (public.perf_can_see_pf(app_user_id, section));
+
+-- الكتابة تبقى لصاحب المحفظة وحده — المنح للاطّلاع لا للتعديل
+drop policy if exists "perf_pf_write" on public.perf_portfolio;
+create policy "perf_pf_write" on public.perf_portfolio
+  for all to authenticated
+  using (app_user_id = public.perf_my_id())
+  with check (app_user_id = public.perf_my_id());
+
+-- ------------------------------------------------------------
+--  القوائم — تُرجع الأسماء، وperf_users بلا سياسة قراءة
+-- ------------------------------------------------------------
+drop function if exists public.perf_pf_grants();
+create or replace function public.perf_pf_grants()
+returns table (user_id text, name text, job_title text, scopes text[], created_at timestamptz)
+language plpgsql security definer set search_path = public as $$
+begin
+  if public.perf_my_id() is null then raise exception 'forbidden'; end if;
+  return query select u.id::text, u.display_name, u.job_title, g.scopes, g.created_at
+                 from public.perf_portfolio_grants g
+                 join public.perf_users u on u.id = g.grantee_id
+                where g.owner_id = public.perf_my_id()
+                order by u.display_name;
+end;
+$$;
+revoke all on function public.perf_pf_grants() from public, anon;
+grant execute on function public.perf_pf_grants() to authenticated;
+
+drop function if exists public.perf_pf_shared();
+create or replace function public.perf_pf_shared()
+returns table (user_id text, name text, job_title text, scopes text[], created_at timestamptz)
+language plpgsql security definer set search_path = public as $$
+begin
+  if public.perf_my_id() is null then raise exception 'forbidden'; end if;
+  return query select u.id::text, u.display_name, u.job_title, g.scopes, g.created_at
+                 from public.perf_portfolio_grants g
+                 join public.perf_users u on u.id = g.owner_id
+                where g.grantee_id = public.perf_my_id() and u.active
+                order by u.display_name;
+end;
+$$;
+revoke all on function public.perf_pf_shared() from public, anon;
+grant execute on function public.perf_pf_shared() to authenticated;
