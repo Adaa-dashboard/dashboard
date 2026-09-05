@@ -106,7 +106,7 @@ export type CustomW = { key: string; label: string; icon: string; color: string;
 export type CustomSec = { id: string; label: string };
 
 type Prefs = {
-  mode: "tiles" | "table" | "board";
+  mode: "tiles" | "table";
   layout: "two" | "one" | "three" | "main";
   order: string[];
   hidden: string[];
@@ -119,8 +119,6 @@ type Prefs = {
   joined: string;
   /** تغيير اسم أو أيقونة أو لون أي بند — بما فيه الأصلية */
   look: Record<string, { label?: string; icon?: string; color?: string }>;
-  /** سمة لوحة الأداء حين mode = board */
-  board: "exec" | "dark";
   /** علامة ترحيل الترتيب الافتراضي الجديد */
   v2?: boolean;
 };
@@ -136,7 +134,6 @@ const DEFAULT_PREFS: Prefs = {
   sections: [],
   joined: "",
   look: {},
-  board: "exec",
 };
 
 /* أعمدة كل قسم — تُستعمل في الجداول وفي نافذة الإدخال */
@@ -911,237 +908,6 @@ function EntitiesModal({
   );
 }
 
-/* ---------------- لوحة الأداء ----------------
-   قالب يعرض المحفظة رسوماً بدل بطاقات. الرسوم مرسومة SVG بيدنا لا
-   بمكتبة: أخفّ، وتتبع ألوان أداء، وتنضبط في RTL وفي الوضع الداكن —
-   ومكتبات الرسوم تعاند في الثلاثة. */
-type Seg = { k: string; v: number; c: string };
-
-function Donut({ segs, size = 108, center, sub }: { segs: Seg[]; size?: number; center?: string; sub?: string }) {
-  const R = 50;
-  const C = 2 * Math.PI * R;
-  const total = segs.reduce((a, x) => a + x.v, 0);
-  let off = 0;
-  return (
-    <svg width={size} height={size} viewBox="0 0 120 120" className="bi-donut">
-      <circle cx="60" cy="60" r={R} fill="none" stroke="var(--line2)" strokeWidth="22" />
-      {total > 0 &&
-        segs.map((sg) => {
-          const len = (sg.v / total) * C;
-          const el = (
-            <circle
-              key={sg.k}
-              cx="60" cy="60" r={R} fill="none" stroke={sg.c} strokeWidth="22"
-              strokeDasharray={`${len} ${C - len}`}
-              strokeDashoffset={-off}
-              transform="rotate(-90 60 60)"
-            />
-          );
-          off += len;
-          return el;
-        })}
-      {center !== undefined && (
-        <>
-          <text x="60" y="58" textAnchor="middle" fontSize="21" fontWeight="800" fill="currentColor">{center}</text>
-          {sub && <text x="60" y="74" textAnchor="middle" fontSize="10" fill="currentColor" opacity="0.62">{sub}</text>}
-        </>
-      )}
-    </svg>
-  );
-}
-
-function Legend({ segs }: { segs: Seg[] }) {
-  return (
-    <div className="bi-lg">
-      {segs.map((sg) => (
-        <span key={sg.k}>
-          <i style={{ background: sg.c }} />
-          {sg.k}
-          <b>{sg.v}</b>
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function Gauge({ pct, label, color = "#1a9d5c" }: { pct: number; label: string; color?: string }) {
-  const p = Math.max(0, Math.min(100, pct));
-  /* طول القوس نصف الدائري بنصف قطر 52 */
-  const LEN = Math.PI * 52;
-  return (
-    <svg width="150" height="96" viewBox="0 0 120 74" className="bi-gauge">
-      <path d="M8 62a52 52 0 0 1 104 0" fill="none" stroke="var(--line2)" strokeWidth="11" strokeLinecap="round" />
-      <path
-        d="M8 62a52 52 0 0 1 104 0"
-        fill="none" stroke={color} strokeWidth="11" strokeLinecap="round"
-        strokeDasharray={`${(p / 100) * LEN} 999`}
-      />
-      <text x="60" y="52" textAnchor="middle" fontSize="22" fontWeight="800" fill="currentColor">{p}%</text>
-      <text x="60" y="70" textAnchor="middle" fontSize="10" fill="currentColor" opacity="0.62">{label}</text>
-    </svg>
-  );
-}
-
-function Bars({ data, color }: { data: { k: string; v: number }[]; color: string }) {
-  const max = Math.max(1, ...data.map((d) => d.v));
-  return (
-    <div className="bi-bars">
-      {data.map((d) => (
-        <div key={d.k}>
-          <b>{d.v}</b>
-          <i style={{ height: `${(d.v / max) * 96}px`, background: color }} />
-          {d.k}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-const BOARD_C = ["#00584c", "#1a9d5c", "#29a361", "#7fd0bd", "#c9a020"];
-
-function PerfBoard({
-  theme, entities, contrib, changes, projects, tasks, taskCount, t, onOpen, onEnts,
-}: {
-  theme: "exec" | "dark";
-  entities: Row[]; contrib: Row[]; changes: Row[]; projects: Row[];
-  tasks: { state: string; dueDate: string }[];
-  taskCount: number | null;
-  t: T;
-  onOpen: (k: string) => void;
-  onEnts: () => void;
-}) {
-  const today = new Date().toISOString().slice(0, 10);
-  const openT = tasks.filter((x) => x.state !== "done");
-  const lateT = openT.filter((x) => x.dueDate && x.dueDate < today);
-  const doneT = tasks.filter((x) => x.state === "done");
-  const lateCh = changes.filter((r) => txt(r.data.status) === "متأخر").length;
-  const commit = changes.length ? Math.round(((changes.length - lateCh) / changes.length) * 100) : 0;
-  const kpis = entities.reduce((a, r) => a + num(r.data.kpis), 0);
-  const quarters = [0, 1, 2, 3].map((i) => ({
-    k: `ر${i + 1}`,
-    v: entities.filter((r) => (Array.isArray(r.data.q) ? r.data.q : [])[i]).length,
-  }));
-  const contribSegs: Seg[] = ["مؤشر", "مبادرة", "مكاسب سريعة"].map((k, i) => ({
-    k, v: contrib.filter((r) => txt(r.data.kind) === k).length, c: BOARD_C[i === 2 ? 4 : i],
-  }));
-  const taskSegs: Seg[] = [
-    { k: t("مكتملة", "Done"), v: doneT.length, c: BOARD_C[1] },
-    { k: t("قيد العمل", "Open"), v: openT.length - lateT.length, c: BOARD_C[3] },
-    { k: t("متأخرة", "Late"), v: lateT.length, c: "#d34a4a" },
-  ];
-  const empty = !entities.length && !contrib.length && !changes.length && !tasks.length && !projects.length;
-
-  const qOf = (r: Row) => {
-    const q: unknown[] = Array.isArray(r.data.q) ? r.data.q : [];
-    const cur = Math.floor(new Date().getMonth() / 3);
-    return q[cur] ? "g" : q.some(Boolean) ? "a" : "r";
-  };
-  const qTxt = (c: string) =>
-    c === "g" ? t("مكتمل", "Done") : c === "a" ? t("جارٍ", "In progress") : t("لم يبدأ", "Not started");
-
-  if (empty)
-    return (
-      <div className="bi-board" data-bi={theme}>
-        <div className="pf-none">
-          {t(
-            "لوحة الأداء تُبنى من بيانات محفظتك — أضف جهاتك ومهامك ومساهماتك أولاً وسترى الرسوم هنا.",
-            "The board is built from your portfolio data — add your entities and tasks first.",
-          )}
-        </div>
-      </div>
-    );
-
-  return (
-    <div className="bi-board" data-bi={theme}>
-      <div className="bi-kpis">
-        <div className="bi-k clickable" onClick={onEnts}>
-          <div className="lb">{t("جهاتي", "My entities")}</div>
-          <div className="vl">{entities.length}</div>
-          <div className="sb">{kpis ? `${kpis} ${t("مؤشراً", "KPIs")}` : t("اضغط لإدارة القائمة", "Manage")}</div>
-        </div>
-        <div className="bi-k g2 clickable" onClick={() => onOpen("tasks")}>
-          <div className="lb">{t("مهامي المفتوحة", "Open tasks")}</div>
-          <div className="vl">{taskCount === null ? "—" : taskCount}</div>
-          <div className="sb">{lateT.length ? `${t("منها", "incl.")} ${lateT.length} ${t("متأخرة", "late")}` : t("لا متأخرات", "none late")}</div>
-        </div>
-        <div className="bi-k g3 clickable" onClick={() => onOpen("changes")}>
-          <div className="lb">{t("طلبات التغيير", "Change requests")}</div>
-          <div className="vl">{changes.length}</div>
-          <div className="sb">{lateCh ? `${lateCh} ${t("خارج المدة", "overdue")}` : t("كلها في الوقت", "all on time")}</div>
-        </div>
-        <div className="bi-k g4 clickable" onClick={() => onOpen("projects")}>
-          <div className="lb">{t("المشاريع الاستراتيجية", "Projects")}</div>
-          <div className="vl">{projects.length}</div>
-          <div className="sb">{t("مشارك فيها", "participating")}</div>
-        </div>
-      </div>
-
-      <div className="bi-row">
-        <div className="bi-c">
-          <h4>{t("التقارير الربعية — اكتمال الجهات", "Quarterly reports")}</h4>
-          <Bars data={quarters} color={theme === "dark" ? "#35b39c" : "#00584c"} />
-        </div>
-        <div className="bi-c">
-          <h4>{t("نسبة التزامي بطلبات التغيير", "On-time rate")}</h4>
-          <div className="bi-mid">
-            {changes.length ? (
-              <Gauge pct={commit} label={t("في الوقت", "on time")} color={theme === "dark" ? "#35b39c" : "#1a9d5c"} />
-            ) : (
-              <div className="pf-none sm">{t("لا توجد طلبات بعد", "No requests yet")}</div>
-            )}
-          </div>
-        </div>
-        <div className="bi-c">
-          <h4>{t("مساهماتي في الخطة التشغيلية", "My contributions")}</h4>
-          <div className="bi-mid">
-            <Donut segs={contribSegs} />
-            <Legend segs={contribSegs} />
-          </div>
-        </div>
-      </div>
-
-      <div className="bi-row two">
-        <div className="bi-c">
-          <h4>{t("حالة مهامي", "Task status")}</h4>
-          <div className="bi-mid">
-            <Donut segs={taskSegs} center={String(tasks.length)} sub={t("مهمة", "tasks")} />
-            <Legend segs={taskSegs} />
-          </div>
-        </div>
-        <div className="bi-c">
-          <h4>{t("جهاتي — الربع الحالي", "My entities — this quarter")}</h4>
-          {entities.length ? (
-            <div className="bi-tw">
-              <table className="bi-tbl">
-                <thead>
-                  <tr>
-                    <th>{t("الجهة", "Entity")}</th>
-                    <th>{t("المؤشرات", "KPIs")}</th>
-                    <th>{t("الربع الحالي", "This quarter")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {entities.slice(0, 6).map((r) => (
-                    <tr key={r.id}>
-                      <td>{txt(r.data.name) || "—"}</td>
-                      <td>{num(r.data.kpis) || "—"}</td>
-                      <td>
-                        <span className={`bi-pill pl-${qOf(r)}`}>{qTxt(qOf(r))}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="pf-none sm">{t("لا توجد جهات بعد", "No entities yet")}</div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /* ---------------- من يرى محفظتي ----------------
    المحفظة خاصة بصاحبها: لا يراها مديره ولا أي أحد إلا بمنحٍ منه.
    المنح للاطّلاع فقط — لا يكتب الممنوح له شيئاً، والحراسة في RLS. */
@@ -1470,7 +1236,7 @@ function CustomModal({
 
         <GrantsBox prefs={prefs} meId={meId} t={t} />
 
-        <div className="sec3">{t("قالب الصفحة", "Page template")}</div>
+        <div className="sec3">{t("قالب الترتيب", "Layout")}</div>
         <div className="lays">
           {(
             [
@@ -1480,34 +1246,8 @@ function CustomModal({
               ["main", "رئيسي وجانبي", "بند عريض وآخر جانبه"],
             ] as const
           ).map(([k, n, d]) => (
-            <div
-              key={k}
-              className={`lay ${prefs.mode !== "board" && prefs.layout === k ? "on" : ""}`}
-              onClick={() => onChange({ layout: k, mode: prefs.mode === "board" ? "tiles" : prefs.mode })}
-            >
+            <div key={k} className={`lay ${prefs.layout === k ? "on" : ""}`} onClick={() => onChange({ layout: k })}>
               <div className={`wf wf-${k}`}>
-                <i />
-                <i />
-                <i />
-              </div>
-              <div className="nm2">{n}</div>
-              <div className="ds">{d}</div>
-            </div>
-          ))}
-          {/* قالبا لوحة الأداء — يبدّلان جسم الصفحة رسوماً، والشريط
-              العلوي (الاسم والمسمّى والإعدادات) يبقى كما هو */}
-          {(
-            [
-              ["exec", "لوحة تنفيذية", "رسوم وأرقام على أبيض"],
-              ["dark", "لوحة داكنة", "نفس الرسوم على خلفية داكنة"],
-            ] as const
-          ).map(([b, n, d]) => (
-            <div
-              key={b}
-              className={`lay ${prefs.mode === "board" && prefs.board === b ? "on" : ""}`}
-              onClick={() => onChange({ mode: "board", board: b })}
-            >
-              <div className={`wf wf-bi ${b === "dark" ? "dk" : ""}`}>
                 <i />
                 <i />
                 <i />
@@ -1562,25 +1302,9 @@ export default function Portfolio({
   const [addSec, setAddSec] = useState(false);
   const [editJoin, setEditJoin] = useState(false);
   const [editLook, setEditLook] = useState<string | null>(null);
-  /* مهام لوحة الأداء — تُجلب عند اختيار قالب اللوحة وحده */
-  const [boardTasks, setBoardTasks] = useState<{ state: string; dueDate: string }[]>([]);
   /* محافظ منحني أصحابها الاطّلاع عليها */
   const [shared, setShared] = useState<Grant[]>([]);
   const [viewing, setViewing] = useState<Grant | null>(null);
-
-  useEffect(() => {
-    if (prefs.mode !== "board") return;
-    void apiFetch("/api/tasks")
-      .then((r) => r.json())
-      .then((d) =>
-        setBoardTasks(
-          ((d.tasks || []) as Rec[])
-            .filter((x) => String(x.assigneeId) === me.id)
-            .map((x) => ({ state: txt(x.state), dueDate: txt(x.dueDate) })),
-        ),
-      )
-      .catch(() => setBoardTasks([]));
-  }, [prefs.mode, me.id]);
 
   useEffect(() => {
     void apiFetch("/api/portfolio/grants")
@@ -1933,9 +1657,6 @@ export default function Portfolio({
             <span className={prefs.mode === "tiles" ? "on" : ""} onClick={() => patch({ mode: "tiles" })}>
               ◫ {t("بطاقات", "Tiles")}
             </span>
-            <span className={prefs.mode === "board" ? "on" : ""} onClick={() => patch({ mode: "board" })}>
-              ◪ {t("لوحة", "Board")}
-            </span>
             <span className={prefs.mode === "table" ? "on" : ""} onClick={() => patch({ mode: "table" })}>
               ▤ {t("جداول", "Tables")}
             </span>
@@ -1992,67 +1713,50 @@ export default function Portfolio({
         </div>
       )}
 
-      {prefs.mode === "board" ? (
-        <PerfBoard
-          theme={prefs.board}
-          entities={entities}
-          contrib={contrib}
-          changes={changes}
-          projects={projects}
-          tasks={boardTasks}
-          taskCount={taskCount}
-          t={t}
-          onOpen={(k) => setOpen(k as WKey)}
-          onEnts={() => setEnts(true)}
-        />
-      ) : (
-        <>
-        <div className={`pf-top ${prefs.mode === "table" || prefs.layout === "one" ? "one" : ""}`}>
-          {group("top").map((k) => (
-            <Card key={k} k={k} wide={k === "tasks"} />
-          ))}
-        </div>
-
-        <div className="sect">
-          <h2>{t("المشاريع الاستراتيجية", "Strategic projects")}</h2>
-          <span className="ln" />
-        </div>
-        {renderGroup(group("projects"), "projects")}
-
-        <div className="sect">
-          <h2>{t("الأعمال التشغيلية", "Operational work")}</h2>
-          <span className="ln" />
-        </div>
-        {renderGroup(group("ops"), "ops")}
-
-        {prefs.sections.map((sc) => (
-          <div key={sc.id}>
-            <div className="sect">
-              <h2>{sc.label}</h2>
-              <span className="ln" />
-              <button
-                className="secx"
-                title={t("حذف القسم", "Delete section")}
-                onClick={() => {
-                  if (!confirm(t("حذف هذا القسم؟ بنوده تنتقل للأعمال التشغيلية.", "Delete section?"))) return;
-                  patch({
-                    sections: prefs.sections.filter((x) => x.id !== sc.id),
-                    custom: prefs.custom.map((c) => (c.group === sc.id ? { ...c, group: "ops" } : c)),
-                  });
-                }}
-              >
-                ✕
-              </button>
-            </div>
-            {renderGroup(group(sc.id), sc.id)}
-          </div>
+      <div className={`pf-top ${prefs.mode === "table" || prefs.layout === "one" ? "one" : ""}`}>
+        {group("top").map((k) => (
+          <Card key={k} k={k} wide={k === "tasks"} />
         ))}
+      </div>
 
-        <button className="pf-addsec" onClick={() => setAddSec(true)}>
-          + {t("إضافة قسم جديد", "Add a section")}
-        </button>
-        </>
-      )}
+      <div className="sect">
+        <h2>{t("المشاريع الاستراتيجية", "Strategic projects")}</h2>
+        <span className="ln" />
+      </div>
+      {renderGroup(group("projects"), "projects")}
+
+      <div className="sect">
+        <h2>{t("الأعمال التشغيلية", "Operational work")}</h2>
+        <span className="ln" />
+      </div>
+      {renderGroup(group("ops"), "ops")}
+
+      {prefs.sections.map((sc) => (
+        <div key={sc.id}>
+          <div className="sect">
+            <h2>{sc.label}</h2>
+            <span className="ln" />
+            <button
+              className="secx"
+              title={t("حذف القسم", "Delete section")}
+              onClick={() => {
+                if (!confirm(t("حذف هذا القسم؟ بنوده تنتقل للأعمال التشغيلية.", "Delete section?"))) return;
+                patch({
+                  sections: prefs.sections.filter((x) => x.id !== sc.id),
+                  custom: prefs.custom.map((c) => (c.group === sc.id ? { ...c, group: "ops" } : c)),
+                });
+              }}
+            >
+              ✕
+            </button>
+          </div>
+          {renderGroup(group(sc.id), sc.id)}
+        </div>
+      ))}
+
+      <button className="pf-addsec" onClick={() => setAddSec(true)}>
+        + {t("إضافة قسم جديد", "Add a section")}
+      </button>
 
       {openW && (
         <div className="modal-overlay" onClick={() => setOpen(null)}>
