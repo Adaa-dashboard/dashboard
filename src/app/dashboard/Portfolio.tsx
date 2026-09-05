@@ -260,7 +260,7 @@ function dueLabel(d: string, t: T) {
 
 function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) => void }) {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [filter, setFilter] = useState<"all" | "late" | "done">("all");
+  const [filter, setFilter] = useState<"all" | "boss" | "self">("all");
   const [open, setOpen] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [adding, setAdding] = useState(false);
@@ -282,25 +282,17 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
 
   const isBoss = (x: Task) => x.createdById !== me.id;
 
-  /* الأعمدة نفسها المستعملة في صفحة المهام: متأخرة · هذا الأسبوع ·
-     البقية · المكتملة — فالموظف يرى مهامه بنفس التقسيم أينما كان.
-     مُعرَّفة قبل shown لأن فلتر «المتأخرة» يعتمد عليها */
-  const colOf = (x: Task): "done" | "late" | "week" | "main" => {
+  /* ثلاثة أعمدة: المهام (مفتوحة وموعدها لم يمضِ) · المتأخرة · المكتملة.
+     التقسيم بالحالة، والشرائح فوقه تقسّم بالمصدر — فلا يتكرر المعنى. */
+  const colOf = (x: Task): "open" | "late" | "done" => {
     if (x.state === "done") return "done";
-    const d = x.dueDate ? Math.round((new Date(x.dueDate).getTime() - new Date(new Date().toISOString().slice(0, 10)).getTime()) / 86400000) : 99;
-    if (d < 0) return "late";
-    if (d <= 7) return "week";
-    return "main";
+    const d = x.dueDate
+      ? Math.round((new Date(x.dueDate).getTime() - new Date(new Date().toISOString().slice(0, 10)).getTime()) / 86400000)
+      : 99;
+    return d < 0 ? "late" : "open";
   };
 
-  const openTasks = tasks.filter((x) => x.state !== "done");
-  const lateTasks = openTasks.filter((x) => colOf(x) === "late");
-  const shown = tasks.filter((x) => {
-    if (filter === "done") return x.state === "done";
-    if (x.state === "done") return false;
-    if (filter === "late") return colOf(x) === "late";
-    return true;
-  });
+  const shown = tasks.filter((x) => (filter === "boss" ? isBoss(x) : filter === "self" ? !isBoss(x) : true));
 
   async function addUpdate(id: string) {
     const text = draft.trim();
@@ -346,10 +338,9 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
     </span>
   );
 
-  const COLS: { key: "late" | "week" | "main" | "done"; title: string; color: string }[] = [
+  const COLS: { key: "open" | "late" | "done"; title: string; color: string }[] = [
+    { key: "open", title: t("المهام", "Tasks"), color: "#016b5f" },
     { key: "late", title: t("المتأخرة", "Overdue"), color: "#d34a4a" },
-    { key: "week", title: t("خلال أسبوع", "This week"), color: "#e0971a" },
-    { key: "main", title: t("البقية", "Later"), color: "#016b5f" },
     { key: "done", title: t("المكتملة", "Completed"), color: "#5aaba2" },
   ];
 
@@ -418,17 +409,13 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
   return (
     <>
       <div className="tfil">
-        {chip("all", t("المهام", "Tasks"), openTasks.length)}
-        {chip("late", t("المتأخرة", "Overdue"), lateTasks.length)}
-        {chip("done", t("المكتملة", "Done"), tasks.filter((x) => x.state === "done").length)}
+        {chip("all", t("الكل", "All"), tasks.length)}
+        {chip("boss", t("مهام موكلة لي", "Assigned to me"), tasks.filter(isBoss).length)}
+        {chip("self", t("مهامي", "My own"), tasks.filter((x) => !isBoss(x)).length)}
       </div>
 
       <div className="tkboard">
-        {COLS.filter((c) =>
-          filter === "done" ? c.key === "done"
-          : filter === "late" ? c.key === "late"
-          : c.key !== "done",
-        ).map((c) => {
+        {COLS.map((c) => {
           const list = shown.filter((x) => colOf(x) === c.key);
           const vis = moreCol[c.key] ? list : list.slice(0, LIMIT);
           return (
