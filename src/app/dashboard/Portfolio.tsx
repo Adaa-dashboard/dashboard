@@ -118,6 +118,8 @@ type Prefs = {
   joined: string;
   /** تغيير اسم أو أيقونة أو لون أي بند — بما فيه الأصلية */
   look: Record<string, { label?: string; icon?: string; color?: string }>;
+  /** علامة ترحيل الترتيب الافتراضي الجديد */
+  v2?: boolean;
 };
 const DEFAULT_PREFS: Prefs = {
   mode: "tiles",
@@ -262,6 +264,10 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
   const [draft, setDraft] = useState("");
   const [adding, setAdding] = useState(false);
   const [newT, setNewT] = useState({ title: "", dueDate: "" });
+  /* حدّ العرض خمسة، وما زاد خلف زر — في الأعمدة وفي تحديثات المهمة */
+  const [moreCol, setMoreCol] = useState<Record<string, boolean>>({});
+  const [moreUpd, setMoreUpd] = useState<Record<string, boolean>>({});
+  const LIMIT = 5;
 
   const load = useCallback(async () => {
     const d = await apiFetch("/api/tasks").then((r) => r.json()).catch(() => ({}));
@@ -374,13 +380,20 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
         </div>
         {open === x.id && (
           <div className="upd">
-            {ups.map((u, i) => (
+            {(moreUpd[x.id] ? ups : ups.slice(-LIMIT)).map((u, i) => (
               <div className="u" key={i}>
                 <b>{u.byName || ""}:</b>
                 <span>{u.text}</span>
                 <span className="d">{txt(u.at).slice(0, 10)}</span>
               </div>
             ))}
+            {ups.length > LIMIT && (
+              <button className="moreln" onClick={() => setMoreUpd({ ...moreUpd, [x.id]: !moreUpd[x.id] })}>
+                {moreUpd[x.id]
+                  ? t("عرض أقل", "Show less")
+                  : `${t("عرض تحديثات أخرى", "More updates")} (${ups.length - LIMIT})`}
+              </button>
+            )}
             <div className="updbox">
               <input
                 value={draft}
@@ -412,15 +425,23 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
           const list = shown.filter((x) => colOf(x) === c.key);
           if (filter !== "done" && c.key === "done") return null;
           if (filter === "done" && c.key !== "done") return null;
+          const vis = moreCol[c.key] ? list : list.slice(0, LIMIT);
           return (
             <div className="tkcol" key={c.key}>
               <div className="h" style={{ ["--c" as string]: c.color }}>
                 {c.title}
                 <b>{list.length}</b>
               </div>
-              {list.map((x) => (
+              {vis.map((x) => (
                 <TaskCard key={x.id} x={x} />
               ))}
+              {list.length > LIMIT && (
+                <button className="moreln" onClick={() => setMoreCol({ ...moreCol, [c.key]: !moreCol[c.key] })}>
+                  {moreCol[c.key]
+                    ? t("عرض أقل", "Show less")
+                    : `${t("عرض مهام أخرى", "More tasks")} (${list.length - LIMIT})`}
+                </button>
+              )}
               {!list.length && <div className="pf-none sm">—</div>}
             </div>
           );
@@ -460,12 +481,12 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
 /* ---------------- ملاحظاتي ---------------- */
 function NotesWidget({ t, onOpen }: { t: T; onOpen: () => void }) {
   const [data, setData] = useState<NotesData>(EMPTY_NOTES);
+  const [all, setAll] = useState(false);
   useEffect(() => {
     void loadUserData<NotesData>("notes", EMPTY_NOTES).then((d) => setData(d || EMPTY_NOTES));
   }, []);
-  const list = [...(data.notes || [])]
-    .sort((a, b) => txt(b.updatedAt).localeCompare(txt(a.updatedAt)))
-    .slice(0, 4);
+  const sorted = [...(data.notes || [])].sort((a, b) => txt(b.updatedAt).localeCompare(txt(a.updatedAt)));
+  const list = all ? sorted : sorted.slice(0, 5);
   return (
     <>
       <div className="nts">
@@ -478,6 +499,11 @@ function NotesWidget({ t, onOpen }: { t: T; onOpen: () => void }) {
         ))}
         {!list.length && <div className="pf-none">{t("لا توجد ملاحظات بعد.", "No notes yet.")}</div>}
       </div>
+      {sorted.length > 5 && (
+        <button className="moreln" onClick={() => setAll(!all)}>
+          {all ? t("عرض أقل", "Show less") : `${t("عرض ملاحظات أخرى", "More notes")} (${sorted.length - 5})`}
+        </button>
+      )}
       <div className="addrow" onClick={onOpen}>
         + {t("ملاحظة جديدة", "New note")}
       </div>
@@ -1072,7 +1098,16 @@ export default function Portfolio({
 
   useEffect(() => {
     void loadUserData<Partial<Prefs>>("portfolio", {}).then((d) => {
-      setPrefs({ ...DEFAULT_PREFS, ...(d || {}) });
+      const p = { ...DEFAULT_PREFS, ...(d || {}) } as Prefs & { v2?: boolean };
+      /* ترحيل مرة واحدة: كان «مهامي» أول الصف، وصار التقويم
+         والملاحظات فوقه — نصلح الترتيب المحفوظ ولا نمسّ بقيته */
+      if (!p.v2) {
+        const top = ["calendar", "notes", "tasks"];
+        p.order = [...top.filter((k) => !p.hidden.includes(k)), ...p.order.filter((k) => !top.includes(k))];
+        p.v2 = true;
+        void saveUserData("portfolio", p);
+      }
+      setPrefs(p);
       setReady(true);
     });
   }, []);

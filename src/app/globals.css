@@ -7246,7 +7246,8 @@ table.matrix thead th {
 .ai-fab {
   position: fixed;
   inset-block-end: 22px;
-  inset-inline-start: 22px;
+  /* جهة اليسار — أوضح ولا يزاحم شريط التنقّل */
+  inset-inline-end: 22px;
   z-index: 40;
   display: flex;
   align-items: center;
@@ -7636,4 +7637,27 @@ table.matrix thead th {
   .pf-top {
     grid-template-columns: 1fr;
   }
+}
+
+/* «عرض أخرى» — حدّ خمسة في القوائم داخل المحفظة */
+.pf .moreln {
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--pf);
+  background: transparent;
+  border: none;
+  border-top: 1px dashed var(--border);
+  padding: 7px 4px 2px;
+  margin-top: 4px;
+  cursor: pointer;
+}
+.pf .moreln:hover {
+  color: var(--g-900);
+}
+.pf .tk2c.boss .moreln {
+  color: rgba(255, 255, 255, 0.9);
+  border-top-color: rgba(255, 255, 255, 0.28);
 }
