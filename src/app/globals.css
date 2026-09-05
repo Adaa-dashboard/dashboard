@@ -8367,3 +8367,182 @@ table.matrix thead th {
 @media (max-width: 560px) {
   .undo-bar .k { display: none; }
 }
+
+/* ============ الاستراتيجيات الوطنية — مربعات مجمّعة ============
+   أسلوب عرض الإدارة: كل استراتيجية مربّع صغير، والمربعات مجمَّعة
+   تحت حالة الاعتماد ومعها سطر يشرح ما يعمله المركز عندها */
+.nsq-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.nsq-kpis .k {
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  padding: 12px 15px;
+  background: var(--panel);
+}
+.nsq-kpis .t { font-size: 11.5px; color: var(--muted); font-weight: 700; }
+.nsq-kpis .v {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.4;
+  color: var(--gt-900);
+  font-family: "Noto Kufi Arabic", sans-serif;
+}
+.nsq-kpis .s { font-size: 11px; color: var(--muted); }
+.nsq-kpis .pb {
+  height: 5px;
+  border-radius: 99px;
+  background: var(--line2);
+  margin-top: 7px;
+  overflow: hidden;
+}
+.nsq-kpis .pb i { display: block; height: 100%; background: var(--g-700); border-radius: 99px; }
+
+.nsq-grp { margin-bottom: 20px; }
+.nsq-grp > .hd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-bottom: 9px;
+  margin-bottom: 12px;
+  border-bottom: 2px solid var(--c, var(--g-700));
+}
+.nsq-grp > .hd h3 {
+  margin: 0;
+  font-size: 14px;
+  font-family: "Noto Kufi Arabic", sans-serif;
+  color: var(--gt-900);
+}
+.nsq-grp > .hd b {
+  background: var(--c, var(--g-700));
+  color: #fff;
+  border-radius: 999px;
+  padding: 1px 11px;
+  font-size: 12px;
+  font-weight: 800;
+}
+.nsq-grp > .hd .doing {
+  margin-inline-start: auto;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.nsq-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+  gap: 10px;
+}
+.nsq {
+  position: relative;
+  text-align: start;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  padding: 10px 12px;
+  font: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-height: 92px;
+  transition: border-color 0.14s, transform 0.1s;
+}
+.nsq:hover { border-color: var(--g-400); transform: translateY(-1px); }
+.nsq.on { border-color: var(--g-700); box-shadow: 0 0 0 2px var(--tint); }
+.nsq .n {
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.55;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.nsq .o { font-size: 10.5px; color: var(--muted); overflow-wrap: anywhere; }
+.nsq .m {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: auto;
+  padding-top: 6px;
+}
+.nsq .m b { font-size: 11.5px; font-weight: 800; flex: none; }
+.nsq .m i {
+  flex: 1;
+  height: 5px;
+  border-radius: 99px;
+  background: var(--line2);
+  overflow: hidden;
+}
+.nsq .m i em { display: block; height: 100%; border-radius: 99px; }
+.nsq .m .hi { color: #1a9d5c; background: #1a9d5c; }
+.nsq .m .mid { color: #e0971a; background: #e0971a; }
+.nsq .m .low { color: #d34a4a; background: #d34a4a; }
+.nsq .m b.hi, .nsq .m b.mid, .nsq .m b.low { background: none; }
+/* شارة صغيرة للاستراتيجية غير المقبولة فنياً */
+.nsq .flag {
+  position: absolute;
+  top: 9px;
+  inset-inline-end: 9px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+
+/* مراحل المراجعة داخل بطاقة التفاصيل */
+.nat-track { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 4px; }
+.stg-c {
+  position: relative;
+  background: transparent;
+  border: none;
+  font: inherit;
+  padding: 16px 2px 0;
+  text-align: center;
+  cursor: default;
+}
+.stg-c.ed { cursor: pointer; }
+.stg-c::before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  inset-inline: 0;
+  height: 2px;
+  background: var(--line2);
+}
+.stg-c:first-child::before { inset-inline-start: 50%; }
+.stg-c:last-child::before { inset-inline-end: 50%; }
+.stg-c i {
+  position: absolute;
+  top: 0;
+  inset-inline-start: calc(50% - 6px);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #c9d4d1;
+  box-shadow: 0 0 0 1px var(--line2);
+}
+.stg-c.s1 i { background: var(--warn); box-shadow: 0 0 0 1px var(--warn); }
+.stg-c.s2 i { background: var(--g-700); box-shadow: 0 0 0 1px var(--g-700); }
+.stg-c.ed:hover i { box-shadow: 0 0 0 4px rgba(1, 107, 95, 0.16); }
+.stg-c span { display: block; font-size: 10.5px; color: var(--muted); line-height: 1.5; }
+.stg-c em {
+  display: block;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--ink-2);
+}
+.stg-c.s1 em { color: #a5720c; }
+.stg-c.s2 em { color: var(--ok-tx); }
+.sx-det .hint { font-size: 11px; color: var(--muted); margin-top: 8px; text-align: center; }
+
+@media (max-width: 1100px) {
+  .nsq-kpis { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 700px) {
+  .nsq-kpis { grid-template-columns: 1fr; }
+  .nsq-grp > .hd .doing { margin-inline-start: 0; width: 100%; }
+}
