@@ -984,3 +984,68 @@ end;
 $$;
 revoke all on function public.perf_pf_shared() from public, anon;
 grant execute on function public.perf_pf_shared() to authenticated;
+
+-- ============================================================
+--  ١٥) المهام: من يقرؤها ومن يعدّلها
+--
+--  كانت القراءة مفتوحة لكل من سجّل دخوله (perf_signed_in) والتصفية
+--  في الواجهة وحدها — فمهام أي موظف كانت تُقرأ من خارج الشاشة.
+--  والتعديل كذلك. هنا نضيّقهما دون كسر ما يحتاجه المديرون.
+--
+--  يقرأ المهمة: صاحبها · من أسندها · صاحب tasks:all (مدير الإدارة)
+--  · مدير القطاع لموظفي قطاعه · ومن منحه صاحبها مهامه من «محفظتي».
+--  والتكاليف الواردة (kind='assignment') تبقى لكل من له صلاحية
+--  «التكاليف» لأنها قسم مشترك في «نظرة عامة» لا مهمة شخصية.
+-- ============================================================
+create or replace function public.perf_can_see_task(
+  p_assignee text, p_creator text, p_kind text
+) returns boolean language sql stable security definer set search_path = public as $$
+  select
+      (coalesce(p_kind, 'task') = 'assignment' and public.perf_has_scope('assignments'))
+   or public.perf_has_scope('tasks:all')
+   or p_assignee = public.perf_my_id()::text
+   or p_creator  = public.perf_my_id()::text
+   or exists (select 1
+                from public.perf_users me
+                join public.perf_users u on u.id::text = p_assignee
+               where me.id = public.perf_my_id()
+                 and me.is_lead
+                 and u.sector_ids && me.sector_ids)
+   or exists (select 1
+                from public.perf_portfolio_grants g
+               where g.owner_id::text = p_assignee
+                 and g.grantee_id = public.perf_my_id()
+                 and (g.scopes @> array['*'] or g.scopes @> array['tasks']));
+$$;
+revoke all on function public.perf_can_see_task(text, text, text) from public, anon;
+grant execute on function public.perf_can_see_task(text, text, text) to authenticated;
+
+drop policy if exists "perf_tasks_read" on public.perf_tasks;
+create policy "perf_tasks_read" on public.perf_tasks
+  for select to authenticated
+  using (public.perf_can_see_task(assignee_id, created_by_id, kind));
+
+-- التعديل أضيق من القراءة: المنح للاطّلاع فقط، فلا يعدّل الممنوح له
+create or replace function public.perf_can_edit_task(
+  p_assignee text, p_creator text, p_kind text
+) returns boolean language sql stable security definer set search_path = public as $$
+  select
+      (coalesce(p_kind, 'task') = 'assignment' and public.perf_has_scope('assignments'))
+   or public.perf_has_scope('tasks:all')
+   or p_assignee = public.perf_my_id()::text
+   or p_creator  = public.perf_my_id()::text
+   or exists (select 1
+                from public.perf_users me
+                join public.perf_users u on u.id::text = p_assignee
+               where me.id = public.perf_my_id()
+                 and me.is_lead
+                 and u.sector_ids && me.sector_ids);
+$$;
+revoke all on function public.perf_can_edit_task(text, text, text) from public, anon;
+grant execute on function public.perf_can_edit_task(text, text, text) to authenticated;
+
+drop policy if exists "perf_tasks_update" on public.perf_tasks;
+create policy "perf_tasks_update" on public.perf_tasks
+  for update to authenticated
+  using (public.perf_can_edit_task(assignee_id, created_by_id, kind))
+  with check (public.perf_can_edit_task(assignee_id, created_by_id, kind));
