@@ -5,7 +5,7 @@ import { asset } from "@/lib/base";
 import { apiFetch } from "@/lib/api";
 
 import type { ReactElement, ReactNode } from "react";
-import { createContext, useContext, useCallback, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import Activity, { type Item as ActivityItem } from "./Activity";
 import Changes from "./Changes";
 import Backup from "./Backup";
@@ -171,7 +171,44 @@ export default function Dashboard({ me }: { me: Me }) {
     (["overview", "details", "tasks", "report"] as const).find((k) =>
       can(k === "report" ? "weekly" : (k as Scope))
     ) || "overview";
-  const [tab, setTab] = useState<string>(firstTab);
+  const [tab, setTabRaw] = useState<string>(firstTab);
+  /* الرجوع داخل المنصة:
+     الصفحات تبديل حالة لا انتقال روابط، فزر رجوع المتصفح كان يخرج من
+     اللوحة كلها. الآن كل انتقال يضيف سجلاً في المتصفح، وسهم الرجوع
+     في الصفحة يستدعي history.back() نفسه — فالاثنان يعملان معاً */
+  const tabRef = useRef<string>(firstTab);
+  const backRef = useRef<string[]>([]);
+  const [canBack, setCanBack] = useState(false);
+
+  const setTab = useCallback((next: string) => {
+    if (tabRef.current === next) return;
+    backRef.current.push(tabRef.current);
+    tabRef.current = next;
+    setCanBack(true);
+    setTabRaw(next);
+    try {
+      window.history.pushState({ t: next }, "");
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const goBack = useCallback(() => {
+    if (backRef.current.length) window.history.back();
+  }, []);
+
+  useEffect(() => {
+    const onPop = () => {
+      const prev = backRef.current.pop();
+      if (prev !== undefined) {
+        tabRef.current = prev;
+        setTabRaw(prev);
+      }
+      setCanBack(backRef.current.length > 0);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
   const [backupOpen, setBackupOpen] = useState(false);
   const [refData, setRefData] = useState<RefData>(EMPTY_REF);
   const [loaded, setLoaded] = useState(false);
@@ -443,6 +480,19 @@ export default function Dashboard({ me }: { me: Me }) {
 
         <main className="main-area">
           <div className="page-head">
+            {canBack && (
+              <button
+                className="tl-b back-b"
+                onClick={goBack}
+                title={t("رجوع للصفحة السابقة", "Back")}
+                aria-label={t("رجوع", "Back")}
+              >
+                {/* السهم لا يُقلب تلقائياً، فيُرسم حسب اتجاه اللغة */}
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                  {lang === "en" ? <path d="M15 5l-7 7 7 7" /> : <path d="M9 5l7 7-7 7" />}
+                </svg>
+              </button>
+            )}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img className="hlogo" src={asset("/adaa-logo.png")} alt="أداء — المركز الوطني لقياس أداء الأجهزة العامة" />
             <div className="hsep" />
