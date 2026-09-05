@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { writeXlsx } from "@/lib/sheet";
 
@@ -91,6 +91,10 @@ const txt = (v: unknown) => (v === null || v === undefined ? "" : lat(String(v))
 /* لون نطاق القياس: مرتفعة ≥٩٠ · متوسطة ٧٠–٨٩ · منخفضة أقل من ٧٠ */
 const measTone = (v: number) => (v >= 90 ? "hi" : v >= 70 ? "mid" : "low");
 
+/* خطوة تراجع واحدة: ما كان عليه البند قبل التغيير (null = لم يكن موجوداً) */
+type UndoStep = { kind: "edit" | "add" | "delete"; id: string; label: string; before: Rec | null; ord: number };
+const UNDO_MAX = 30;
+
 /* ---------------- تحميل بنود قسم ---------------- */
 export function useItems(section: SectionKey, enabled = true) {
   const [items, setItems] = useState<Item[]>([]);
@@ -110,7 +114,24 @@ export function useItems(section: SectionKey, enabled = true) {
     void load();
   }, [load]);
 
-  const save = useCallback(
+  /* التراجع: قبل كل حفظ أو حذف نلتقط الحالة السابقة للبند.
+     المكدّس في الذاكرة — يُفرَّغ بإعادة تحميل الصفحة، والسجل
+     الدائم هو audit_log في قاعدة البيانات. */
+  const undoRef = useRef<UndoStep[]>([]);
+  const [undoTop, setUndoTop] = useState<UndoStep | null>(null);
+  const itemsRef = useRef<Item[]>([]);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  const push = useCallback((st: UndoStep) => {
+    undoRef.current.push(st);
+    if (undoRef.current.length > UNDO_MAX) undoRef.current.shift();
+    setUndoTop(st);
+  }, []);
+
+  /* الكتابة الخام — لا تسجّل خطوة تراجع، فيستعملها التراجع نفسه */
+  const put = useCallback(
     async (id: string, data: Rec, ord: number) => {
       const r = await apiFetch("/api/items", {
         method: "POST",
@@ -125,7 +146,7 @@ export function useItems(section: SectionKey, enabled = true) {
     [section, load],
   );
 
-  const remove = useCallback(
+  const del = useCallback(
     async (id: string) => {
       const r = await apiFetch(`/api/items?section=${section}&id=${encodeURIComponent(id)}`, {
         method: "DELETE",
@@ -137,7 +158,56 @@ export function useItems(section: SectionKey, enabled = true) {
     [section, load],
   );
 
-  return { items, loaded, error, reload: load, save, remove };
+  const save = useCallback(
+    async (id: string, data: Rec, ord: number) => {
+      const before = itemsRef.current.find((x: Item) => x.id === id) || null;
+      const err = await put(id, data, ord);
+      if (err) return err;
+      push({
+        kind: before ? "edit" : "add",
+        id,
+        label: txt(data.owner) || txt(data.name) || txt(data.entity) || id,
+        before: before ? { ...before.data } : null,
+        ord: before ? before.ord : ord,
+      });
+      return null;
+    },
+    [put, push],
+  );
+
+  const remove = useCallback(
+    async (id: string) => {
+      const before = itemsRef.current.find((x: Item) => x.id === id) || null;
+      const err = await del(id);
+      if (err) return err;
+      if (before)
+        push({
+          kind: "delete",
+          id,
+          label: txt(before.data.owner) || txt(before.data.name) || txt(before.data.entity) || id,
+          before: { ...before.data },
+          ord: before.ord,
+        });
+      return null;
+    },
+    [del, push],
+  );
+
+  /* التراجع يمشي عكس الخطوة: المحذوف يُعاد · المعدَّل يرجع لقيمته
+     · والمضاف يُحذف. ولا يسجّل خطوة جديدة فلا يدور في حلقة. */
+  const undo = useCallback(async () => {
+    const st = undoRef.current.pop();
+    setUndoTop(undoRef.current[undoRef.current.length - 1] || null);
+    if (!st) return null;
+    const err = st.before ? await put(st.id, st.before, st.ord) : await del(st.id);
+    return err;
+  }, [put, del]);
+
+  /* إخفاء الشريط دون إفراغ المكدّس — الخطوة تبقى قابلة للتراجع
+     من الشريط التالي إن حدث تغيير آخر */
+  const dismissUndo = useCallback(() => setUndoTop(null), []);
+
+  return { items, loaded, error, reload: load, save, remove, undo, undoTop, dismissUndo };
 }
 
 /* ------------------------------------------------------------
@@ -236,6 +306,58 @@ function Dots({ n, done }: { n: number; done: number }) {
         <i key={i} className={i < done ? "ok" : i === done ? "now" : ""} />
       ))}
     </span>
+  );
+}
+
+/* شريط التراجع — يظهر بعد أي تعديل أو حذف، ويعمل Ctrl+Z ما دام ظاهراً.
+   لا يختفي تلقائياً: قد ينتبه المستخدم للخطأ بعد دقيقة لا بعد ثانيتين. */
+function UndoBar({
+  step, onUndo, onClose, t,
+}: {
+  step: UndoStep | null;
+  onUndo: () => void;
+  onClose: () => void;
+  t: T;
+}) {
+  useEffect(() => {
+    if (!step) return;
+    const h = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      const typing = el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
+      if (typing) return; // داخل الحقول يبقى تراجع المتصفح النصي كما هو
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        onUndo();
+      }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [step, onUndo]);
+
+  if (!step) return null;
+  const what =
+    step.kind === "delete"
+      ? t("حُذف", "Deleted")
+      : step.kind === "add"
+        ? t("أُضيف", "Added")
+        : t("عُدِّل", "Edited");
+  return (
+    <div className="undo-bar" role="status">
+      <span className="w">
+        {what} <b>{step.label}</b>
+      </span>
+      <button className="u" onClick={onUndo}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20.5 8H9a6 6 0 0 0 0 12h5" />
+          <path d="M20.5 8l-5-5M20.5 8l-5 5" />
+        </svg>
+        {t("تراجع", "Undo")}
+      </button>
+      <span className="k">Ctrl+Z</span>
+      <button className="x" onClick={onClose} aria-label={t("إخفاء", "Dismiss")}>
+        ✕
+      </button>
+    </div>
   );
 }
 
@@ -474,7 +596,7 @@ export function NationalStrategies({ limit, t, onMore }: { limit?: number; t: T;
 }
 
 function NationalPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
-  const { items, loaded, save } = useItems("natstrat");
+  const { items, loaded, save, undo, undoTop, dismissUndo } = useItems("natstrat");
   const [q, setQ] = useState("");
   const [f, setF] = useState("");
   const [open, setOpen] = useState<string | null>(null);
@@ -641,6 +763,8 @@ function NationalPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
         ))}
         {canEdit && <em>{t("اضغط على أي نقطة لتغيير حالتها", "Click a dot to change its state")}</em>}
       </div>
+
+      <UndoBar step={undoTop} onUndo={() => void undo()} onClose={dismissUndo} t={t} />
 
       {cur && <NationalDetail it={cur} t={t} />}
     </>
@@ -1075,7 +1199,7 @@ function InstSector({
 
 /* صفحة المتابعة — بطاقات افتراضاً، والجدول الشامل خيار للمقارنة والتصدير */
 function InstPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
-  const { items, loaded, save, remove, reload } = useItems("inststrat");
+  const { items, loaded, save, remove, reload, undo, undoTop, dismissUndo } = useItems("inststrat");
   const [q, setQ] = useState("");
   const [f, setF] = useState("");
   const [view, setView] = useState<"cards" | "table">("cards");
@@ -1217,6 +1341,8 @@ function InstPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
           </table>
         </div>
       )}
+
+      <UndoBar step={undoTop} onUndo={() => void undo()} onClose={dismissUndo} t={t} />
 
       {edit && (
         <InstForm
@@ -1430,11 +1556,12 @@ export function SectionPage({ section, canEdit, t }: { section: SectionKey; canE
 
 /* جدول تحرير مبسّط أسفل الصفحة — لمن يملك «تحرير بيانات هذه الأقسام» */
 function ItemsEditor({ section, t, onChanged }: { section: SectionKey; t: T; onChanged: () => void }) {
-  const { items, loaded, remove, reload } = useItems(section);
+  const { items, loaded, remove, reload, undo, undoTop, dismissUndo } = useItems(section);
   const [edit, setEdit] = useState<Item | null>(null);
   if (!loaded || !items.length) return null;
   return (
     <>
+      <UndoBar step={undoTop} onUndo={() => void undo()} onClose={dismissUndo} t={t} />
       <h3 className="sx-sub">{t("تحرير البنود", "Edit items")}</h3>
       <div className="sx-edit">
         {items.map((it) => (
