@@ -6323,9 +6323,22 @@ table.matrix thead th {
 /* البطاقات المختصرة — ثلاث في الصف، ومتساوية الارتفاع */
 .pf .tiles {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* «عمودان» هو الافتراضي في DEFAULT_PREFS، والعدد يأتي من قالب
+     الترتيب المختار — كان التنسيق مكتوباً لعنصر .pf-body لا يُرسم
+     أصلاً، فلم يكن للقالب أي أثر */
+  grid-template-columns: repeat(2, 1fr);
   gap: 12px;
   align-items: stretch;
+}
+.pf .tiles.lay-two {
+  grid-template-columns: repeat(2, 1fr);
+}
+.pf .tiles.lay-three {
+  grid-template-columns: repeat(3, 1fr);
+}
+/* رئيسي وجانبي: البند الأول يأخذ ثلثي العرض */
+.pf .tiles.lay-main {
+  grid-template-columns: 2fr 1fr;
 }
 .pf .tile {
   border: 1px solid var(--border);
@@ -7186,11 +7199,10 @@ table.matrix thead th {
 }
 
 @media (max-width: 1100px) {
-  .pf .tiles {
+  .pf .tiles,
+  .pf .tiles.lay-three,
+  .pf .tiles.lay-main {
     grid-template-columns: repeat(2, 1fr);
-  }
-  .pf-body.lay-three {
-    column-count: 2;
   }
   .lays {
     grid-template-columns: repeat(2, 1fr);
@@ -7200,13 +7212,11 @@ table.matrix thead th {
   .pf .kpis {
     grid-template-columns: 1fr;
   }
-  .pf .tiles {
+  .pf .tiles,
+  .pf .tiles.lay-two,
+  .pf .tiles.lay-three,
+  .pf .tiles.lay-main {
     grid-template-columns: 1fr;
-  }
-  .pf-body.lay-two,
-  .pf-body.lay-three,
-  .pf-body.lay-main {
-    column-count: 1;
   }
   .pf .c3 {
     grid-template-columns: 1fr;
@@ -7944,4 +7954,178 @@ table.matrix thead th {
 }
 .sh-sec .tblwrap {
   overflow-x: auto;
+}
+
+/* ============ لوحة الأداء (قالب الرسوم) ============ */
+/* معاينة القالب في نافذة التخصيص */
+.lay .wf-bi {
+  flex-direction: column;
+  gap: 3px;
+}
+.lay .wf-bi i:first-child {
+  flex: 0 0 12px;
+  background: var(--g-700);
+}
+.lay .wf-bi i:nth-child(2) {
+  flex: 1;
+  background: #cfe0dc;
+}
+.lay .wf-bi i:nth-child(3) {
+  flex: 1;
+  background: #e2ecea;
+}
+.lay .wf-bi.dk {
+  background: #142622;
+  border-color: #2a4b44;
+}
+.lay .wf-bi.dk i:first-child {
+  background: #35b39c;
+}
+.lay .wf-bi.dk i:nth-child(2) {
+  background: #22403a;
+}
+.lay .wf-bi.dk i:nth-child(3) {
+  background: #1b332e;
+}
+
+/* اللوحة نفسها — سماتها متغيّرات تُقلب بـ data-bi
+   فلا يتكرّر أي قاعدة بين الفاتح والداكن */
+.bi-board {
+  --bi-card: var(--panel);
+  --bi-soft: var(--soft);
+  --bi-bd: var(--border);
+  --bi-tx: var(--text);
+  --bi-h: var(--gt-900);
+  border-radius: 18px;
+  color: var(--bi-tx);
+}
+.bi-board[data-bi="dark"] {
+  --bi-card: #17302b;
+  --bi-soft: #142824;
+  --bi-bd: #2a4b44;
+  --bi-tx: #e8f1ef;
+  --bi-h: #cfe9e2;
+  /* اللوحة الداكنة تُختار حتى والصفحة فاتحة، فتُقلب رموز المسارات
+     والشارات هنا لا في :root — وإلا ظهر مسار العدّاد أبيض عليها */
+  --line2: #22403a;
+  --ok-bg: #10352a;
+  --ok-tx: #6fd7a5;
+  --dgr-bg: #3a1d1d;
+  --dgr-tx: #f0a3a3;
+  background: #101d1b;
+  border: 1px solid #24403a;
+  padding: 18px;
+}
+.bi-board .pf-none {
+  color: var(--bi-tx);
+  opacity: 0.7;
+}
+
+.bi-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.bi-k {
+  border-radius: 15px;
+  padding: 13px 16px;
+  background: linear-gradient(150deg, #00584c, #008b84);
+  color: #fff;
+}
+.bi-k.g2 { background: linear-gradient(150deg, #016b5f, #29a361); }
+.bi-k.g3 { background: linear-gradient(150deg, #b8860b, #e0a200); }
+.bi-k.g4 { background: linear-gradient(150deg, #8a3a4e, #c25a72); }
+.bi-board[data-bi="dark"] .bi-k,
+.bi-board[data-bi="dark"] .bi-k.g2,
+.bi-board[data-bi="dark"] .bi-k.g3,
+.bi-board[data-bi="dark"] .bi-k.g4 {
+  background: var(--bi-card);
+  border: 1px solid var(--bi-bd);
+  color: var(--bi-tx);
+}
+.bi-k.clickable { cursor: pointer; }
+.bi-k.clickable:hover { filter: brightness(1.07); }
+.bi-k .lb { font-size: 11.5px; font-weight: 600; opacity: 0.88; }
+.bi-k .vl {
+  font-size: 27px;
+  font-weight: 800;
+  line-height: 1.35;
+  font-family: "Noto Kufi Arabic", sans-serif;
+}
+.bi-board[data-bi="dark"] .bi-k .vl { color: #7fd0bd; }
+.bi-k .sb { font-size: 11px; opacity: 0.78; }
+
+.bi-row {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.bi-row.two { grid-template-columns: 1fr 1fr; }
+.bi-c {
+  background: var(--bi-soft);
+  border: 1px solid var(--bi-bd);
+  border-radius: 15px;
+  padding: 14px;
+  min-width: 0;
+}
+.bi-c h4 {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--bi-h);
+}
+.bi-mid {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  min-height: 118px;
+}
+.bi-donut,
+.bi-gauge { color: var(--bi-tx); flex: none; }
+
+.bi-lg { display: flex; flex-direction: column; gap: 6px; font-size: 11.5px; min-width: 108px; }
+.bi-lg span { display: flex; align-items: center; color: var(--bi-tx); opacity: 0.85; }
+.bi-lg i { width: 9px; height: 9px; border-radius: 2px; flex: none; margin-inline-end: 6px; }
+.bi-lg b { margin-inline-start: auto; padding-inline-start: 10px; font-weight: 800; }
+
+.bi-bars { display: flex; align-items: flex-end; gap: 10px; height: 132px; padding-top: 6px; }
+.bi-bars > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  opacity: 0.75;
+}
+.bi-bars i { width: 100%; border-radius: 6px 6px 0 0; display: block; }
+.bi-bars b { font-size: 11.5px; font-weight: 700; opacity: 1; }
+
+.bi-tw { overflow-x: auto; }
+.bi-tbl { width: 100%; border-collapse: collapse; font-size: 12px; background: transparent; box-shadow: none; border: none; }
+.bi-tbl th {
+  text-align: right;
+  font-weight: 700;
+  padding: 5px 6px;
+  background: transparent;
+  border-bottom: 1px solid var(--bi-bd);
+  opacity: 0.7;
+}
+.bi-tbl td { padding: 6px; border-bottom: 1px solid var(--bi-bd); }
+.bi-pill { border-radius: 999px; padding: 1px 10px; font-size: 11px; font-weight: 700; display: inline-block; }
+.bi-pill.pl-g { background: var(--ok-bg); color: var(--ok-tx); }
+.bi-pill.pl-r { background: var(--dgr-bg); color: var(--dgr-tx); }
+.bi-pill.pl-a { background: #fdf3e0; color: #a5720c; }
+.bi-board[data-bi="dark"] .bi-pill.pl-a { background: #3a2f13; color: #e6c26a; }
+
+@media (max-width: 1100px) {
+  .bi-kpis { grid-template-columns: repeat(2, 1fr); }
+  .bi-row, .bi-row.two { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 820px) {
+  .bi-kpis, .bi-row, .bi-row.two { grid-template-columns: 1fr; }
 }
