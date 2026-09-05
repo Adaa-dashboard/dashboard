@@ -967,12 +967,119 @@ function InstCard({ it, t }: { it: Item; t: T }) {
   );
 }
 
-/* صفحة المتابعة — جدول بأعمدة ملف الإدارة، كل خلية تُحرَّر في مكانها */
+/* ---------------- بطاقة جهة واحدة ----------------
+   أربع محطات، كل محطة باسمها وقيمتها تحتها ونقطة بلون حالتها —
+   بدل خلايا جدول عرضها مئة بكسل يُقتطع فيها النص */
+function instSteps(d: Rec, t: T) {
+  const rep = txt(d.rep);
+  const meet = txt(d.meet);
+  const docs = txt(d.docs);
+  const ds = txt(d.docsState);
+  const live = txt(d.live);
+  return [
+    {
+      k: t("تسمية ممثل", "Rep"),
+      v: rep === "تمت تسمية ممثل" ? t("تمت", "Named") : rep || "—",
+      c: rep === "تمت تسمية ممثل" ? "ok" : rep ? "wt" : "",
+    },
+    {
+      k: t("الاجتماع التعريفي", "Kickoff"),
+      v: meet === "تم" ? txt(d.meetAt) || t("تم", "Held") : meet || "—",
+      c: meet === "تم" ? "ok" : meet ? "wt" : "",
+    },
+    {
+      k: t("الوثائق", "Documents"),
+      v: docs === "✓" ? ds || t("مستلمة", "Received") : docs === "✗" ? t("لم تُستلم", "Not received") : "—",
+      c:
+        docs === "✓"
+          ? ds === "مكتمل" || !ds
+            ? "ok"
+            : ds === "جزئي"
+              ? "wt"
+              : "no"
+          : docs === "✗"
+            ? "no"
+            : "",
+    },
+    { k: t("تفعيل القياس", "Measurement"), v: live || "—", c: live === "مفعل" ? "ok" : live ? "wt" : "" },
+  ];
+}
+
+function InstEntity({ it, t, onEdit }: { it: Item; t: T; onEdit?: () => void }) {
+  const d = it.data;
+  const ph = txt(d.phase);
+  return (
+    <div className="iw">
+      <div className="iw-h">
+        <b>{txt(d.owner) || "—"}</b>
+        <span className={`iw-ph ${ph === "Phase 1" ? "p1" : ""}`}>{ph || "—"}</span>
+      </div>
+      <div className="iw-who">
+        <span>
+          {t("الاستشاري", "Consultant")} <b>{txt(d.consultant) || "—"}</b>
+        </span>
+        {d.phone ? <span>{txt(d.phone)}</span> : null}
+        {d.email ? <span>{txt(d.email)}</span> : null}
+      </div>
+      <div className="iw-steps">
+        {instSteps(d, t).map((st) => (
+          <div className={`iw-st ${st.c}`} key={st.k}>
+            <i />
+            <div className="k">{st.k}</div>
+            <div className="v">{st.v}</div>
+          </div>
+        ))}
+      </div>
+      <div className="iw-f">
+        {d.target ? (
+          <span className="tg">{`${t("مستهدف التفعيل", "Target")} ${txt(d.target)}`}</span>
+        ) : (
+          <span>{t("لم يُحدَّد مستهدف التفعيل", "No activation target")}</span>
+        )}
+        {onEdit && (
+          <button className="ed" onClick={onEdit}>
+            {t("تعديل", "Edit")}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* قسم قطاع واحد — بسهم يطويه، والحالة تبقى بين الجلسات */
+function InstSector({
+  name, rows, t, onEdit,
+}: {
+  name: string; rows: Item[]; t: T; onEdit?: (it: Item) => void;
+}) {
+  const { open, toggle } = useCollapse(`inst:${name}`);
+  if (!rows.length) return null;
+  return (
+    <>
+      <div className="iw-sec">
+        <CollapseBtn open={open} toggle={toggle} t={t} />
+        <h3>{name}</h3>
+        <span className="n">{`${AR(rows.length)} ${t("جهة", "entities")}`}</span>
+        <span className="ln" />
+      </div>
+      {open && (
+        <div className="iw-grid">
+          {rows.map((it) => (
+            <InstEntity key={it.id} it={it} t={t} onEdit={onEdit ? () => onEdit(it) : undefined} />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+/* صفحة المتابعة — بطاقات افتراضاً، والجدول الشامل خيار للمقارنة والتصدير */
 function InstPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
-  const { items, loaded, save, remove } = useItems("inststrat");
+  const { items, loaded, save, remove, reload } = useItems("inststrat");
   const [q, setQ] = useState("");
   const [f, setF] = useState("");
-  /* المسودّة تُبقي ما يكتبه المستخدم ظاهراً قبل أن يعود من الخادم */
+  const [view, setView] = useState<"cards" | "table">("cards");
+  const [edit, setEdit] = useState<Item | null>(null);
   const [draft, setDraft] = useState<Record<string, Rec>>({});
 
   const val = (it: Item, k: string) => txt(draft[it.id]?.[k] ?? it.data[k]);
@@ -1003,93 +1110,195 @@ function InstPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
 
   if (!loaded) return <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>;
 
+  /* قطاعات الملف أولاً بترتيبها، ثم أي قطاع أُضيف لاحقاً */
+  const secs = [...INST_SECTORS, ...Array.from(new Set(rows.map((r) => txt(r.data.sector)))).filter(
+    (x) => x && !INST_SECTORS.includes(x),
+  )];
+
   return (
     <>
       <Toolbar q={q} setQ={setQ} filter={f} setFilter={setF} options={INST_SECTORS} onExport={exportXl} t={t} />
 
-      <div className="sx-count">
-        {`${t("عرض", "Showing")} ${AR(rows.length)} ${t("من", "of")} ${AR(items.length)}`}
+      <div className="iw-bar">
+        <span className="iw-tog">
+          <span className={view === "cards" ? "on" : ""} onClick={() => setView("cards")}>
+            ◫ {t("بطاقات", "Cards")}
+          </span>
+          <span className={view === "table" ? "on" : ""} onClick={() => setView("table")}>
+            ▤ {t("جدول", "Table")}
+          </span>
+        </span>
+        <span className="sx-count">
+          {`${t("عرض", "Showing")} ${AR(rows.length)} ${t("من", "of")} ${AR(items.length)}`}
+        </span>
       </div>
 
-      <div className="tbl-wrap">
-        <table className="sx-tbl inst">
-          <thead>
-            <tr>
-              <th className="c num">#</th>
-              {INST_COLS.map((c) => (
-                <th key={c.k} style={{ minWidth: c.w }}>
-                  {c.label}
-                </th>
-              ))}
-              {canEdit && <th className="c" />}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((it, n) => (
-              <tr key={it.id}>
-                <td className="c num">{AR(n + 1)}</td>
-                {INST_COLS.map((c) => {
-                  const v = val(it, c.k);
-                  const tone = instTone(c.k, v);
-                  if (!canEdit)
+      {view === "cards" ? (
+        <>
+          {secs.map((sc) => (
+            <InstSector
+              key={sc}
+              name={sc}
+              rows={rows.filter((r) => txt(r.data.sector) === sc)}
+              t={t}
+              onEdit={canEdit ? (it) => setEdit(it) : undefined}
+            />
+          ))}
+          {!rows.length && <div className="pf-none">{t("لا توجد نتائج", "No results")}</div>}
+        </>
+      ) : (
+        <div className="tbl-wrap">
+          <table className="sx-tbl inst">
+            <thead>
+              <tr>
+                <th className="c num">#</th>
+                {INST_COLS.map((c) => (
+                  <th key={c.k} style={{ minWidth: c.w }}>
+                    {c.label}
+                  </th>
+                ))}
+                {canEdit && <th className="c" />}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((it, n) => (
+                <tr key={it.id}>
+                  <td className="c num">{AR(n + 1)}</td>
+                  {INST_COLS.map((c) => {
+                    const v = val(it, c.k);
+                    const tone = instTone(c.k, v);
+                    if (!canEdit)
+                      return (
+                        <td key={c.k} className={tone ? `cell ${tone}` : "cell"} style={{ minWidth: c.w }}>
+                          {v || "—"}
+                        </td>
+                      );
                     return (
                       <td key={c.k} className={tone ? `cell ${tone}` : "cell"} style={{ minWidth: c.w }}>
-                        {v || "—"}
+                        {c.opts ? (
+                          <select value={v} onChange={(e) => void put(it, c.k, e.target.value)}>
+                            {c.opts.map((op) => (
+                              <option key={op} value={op}>
+                                {op || "—"}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            value={v}
+                            onChange={(e) =>
+                              setDraft((old) => ({ ...old, [it.id]: { ...(old[it.id] || {}), [c.k]: e.target.value } }))
+                            }
+                            onBlur={(e) => {
+                              if (e.target.value !== txt(it.data[c.k])) void put(it, c.k, e.target.value);
+                            }}
+                          />
+                        )}
                       </td>
                     );
-                  return (
-                    <td key={c.k} className={tone ? `cell ${tone}` : "cell"} style={{ minWidth: c.w }}>
-                      {c.opts ? (
-                        <select value={v} onChange={(e) => void put(it, c.k, e.target.value)}>
-                          {c.opts.map((o) => (
-                            <option key={o} value={o}>
-                              {o || "—"}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input
-                          value={v}
-                          onChange={(e) =>
-                            setDraft((old) => ({ ...old, [it.id]: { ...(old[it.id] || {}), [c.k]: e.target.value } }))
-                          }
-                          onBlur={(e) => {
-                            if (e.target.value !== txt(it.data[c.k])) void put(it, c.k, e.target.value);
-                          }}
-                        />
-                      )}
+                  })}
+                  {canEdit && (
+                    <td className="c">
+                      <button
+                        className="rowx"
+                        title={t("حذف الصف", "Delete row")}
+                        onClick={() => {
+                          if (!confirm(t(`حذف «${txt(it.data.owner)}»؟`, "Delete row?"))) return;
+                          void remove(it.id);
+                        }}
+                      >
+                        ✕
+                      </button>
                     </td>
-                  );
-                })}
-                {canEdit && (
-                  <td className="c">
-                    <button
-                      className="rowx"
-                      title={t("حذف الصف", "Delete row")}
-                      onClick={() => {
-                        if (!confirm(t(`حذف «${txt(it.data.owner)}»؟`, "Delete row?"))) return;
-                        void remove(it.id);
-                      }}
-                    >
-                      ✕
-                    </button>
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {canEdit && (
-        <div className="sx-hint">
-          {t(
-            "التعديل مباشر داخل الجدول — كل تغيير يُحفظ فور اختياره.",
-            "Edit inline — every change saves immediately.",
-          )}
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
+
+      {edit && (
+        <InstForm
+          it={edit}
+          t={t}
+          onClose={() => setEdit(null)}
+          onSaved={() => {
+            setEdit(null);
+            void reload();
+          }}
+          save={save}
+        />
+      )}
     </>
+  );
+}
+
+/* نافذة تعديل جهة — كل حقل بعنوانه الكامل وقائمته */
+function InstForm({
+  it, t, onClose, onSaved, save,
+}: {
+  it: Item;
+  t: T;
+  onClose: () => void;
+  onSaved: () => void;
+  save: (id: string, data: Rec, ord: number) => Promise<string | null>;
+}) {
+  const [d, setD] = useState<Rec>({ ...it.data });
+  const [busy, setBusy] = useState("");
+
+  async function submit() {
+    setBusy(t("جارٍ الحفظ...", "Saving..."));
+    const err = await save(it.id, { ...d, demo: false }, it.ord);
+    if (err) {
+      setBusy(err);
+      return;
+    }
+    onSaved();
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal wide" onClick={(e) => e.stopPropagation()}>
+        <div className="m-h">
+          <h3>{txt(it.data.owner) || t("تعديل جهة", "Edit entity")}</h3>
+          <button className="mx" onClick={onClose} aria-label="close">
+            ✕
+          </button>
+        </div>
+        <div className="iw-form">
+          {INST_COLS.map((c) => (
+            <label key={c.k}>
+              <span>{c.label}</span>
+              {c.opts ? (
+                <select value={txt(d[c.k])} onChange={(e) => setD({ ...d, [c.k]: e.target.value })}>
+                  {c.opts.map((op) => (
+                    <option key={op} value={op}>
+                      {op || "—"}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input value={txt(d[c.k])} onChange={(e) => setD({ ...d, [c.k]: e.target.value })} />
+              )}
+            </label>
+          ))}
+          <label className="full">
+            <span>{t("ملاحظة", "Note")}</span>
+            <textarea rows={2} value={txt(d.note)} onChange={(e) => setD({ ...d, note: e.target.value })} />
+          </label>
+        </div>
+        <div className="m-f">
+          {busy && <span className="iw-busy">{busy}</span>}
+          <button className="btn btn-ghost" onClick={onClose}>
+            {t("إلغاء", "Cancel")}
+          </button>
+          <button className="btn" onClick={submit}>
+            {t("حفظ", "Save")}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
