@@ -603,50 +603,92 @@ const NAT_DOING: Record<number, string> = {
   1: "يعمل المركز مع الملاك على مراجعة الوثائق الاستراتيجية وإبداء الملاحظات",
 };
 const NAT_TONE: Record<number, string> = { 4: "#1a9d5c", 3: "#0f8a8a", 2: "#e0971a", 1: "#8a9a95" };
+/* عناوين مختصرة للتبويبات — النص الكامل يبقى في العنوان تحتها */
+const NAT_TAB: Record<number, string> = {
+  4: "معتمدة من المجلس",
+  3: "معتمدة من اللجنة",
+  2: "قيد المراجعة",
+  1: "قيد الإعداد",
+};
 
-/* مربّع استراتيجية واحدة — الاسم والجهة ونسبة القياس بلونها */
-function NatBox({ it, on, onClick, t }: { it: Item; on: boolean; onClick: () => void; t: T }) {
-  const d = it.data;
-  const m = numOf(d.meas);
-  const tone = measTone(m);
-  return (
-    <button className={`nsq ${on ? "on" : ""}`} onClick={onClick} title={txt(d.owner)}>
-      <span className="n">{txt(d.name)}</span>
-      <span className="o">{txt(d.owner) || "—"}</span>
-      <span className="m">
-        <b className={tone}>{`${AR(m)}٪`}</b>
-        <i>
-          <em className={tone} style={{ width: `${Math.max(m, 2)}%` }} />
-        </i>
-      </span>
-      {!d.tech && <span className="flag" title={t("غير مقبولة فنياً", "Not accepted")} />}
-    </button>
-  );
-}
-
-/* مجموعة حالة اعتماد — بسهم يطويها كما في بقية الصفحات */
-function NatGroup({
-  stage, rows, openId, setOpen, t,
+/* بطاقة استراتيجية وطنية — حلقة القياس وأربعة أرقام ومسار المراجعة */
+function NatCard({
+  it, t, canEdit, save,
 }: {
-  stage: number; rows: Item[]; openId: string | null; setOpen: (v: string | null) => void; t: T;
+  it: Item;
+  t: T;
+  canEdit?: boolean;
+  save?: (id: string, data: Rec, ord: number) => Promise<string | null>;
 }) {
-  const { open, toggle } = useCollapse(`nat:${stage}`);
-  if (!rows.length) return null;
+  const d = it.data;
+  const meas = numOf(d.meas);
+  const track = natTrack(d);
+
+  async function cycle(i: number) {
+    if (!canEdit || !save) return;
+    const cur = [...track];
+    cur[i] = (cur[i] + 1) % 3;
+    await save(it.id, { ...d, track: cur, demo: false }, it.ord);
+  }
+
   return (
-    <div className="nsq-grp">
-      <div className="hd" style={{ ["--c" as string]: NAT_TONE[stage] }}>
-        <CollapseBtn open={open} toggle={toggle} t={t} />
-        <h3>{NAT_STEPS[stage - 1]}</h3>
-        <b>{AR(rows.length)}</b>
-        <span className="doing">{NAT_DOING[stage]}</span>
+    <div className="ncard">
+      <div className="hd">
+        <b>{txt(d.name)}</b>
+        <span className={`tg ${d.tech ? "ok" : "no"}`}>
+          {d.tech ? t("مقبولة فنياً", "Accepted") : t("غير مقبولة فنياً", "Not accepted")}
+        </span>
       </div>
-      {open && (
-        <div className="nsq-grid">
-          {rows.map((it) => (
-            <NatBox key={it.id} it={it} on={openId === it.id} onClick={() => setOpen(openId === it.id ? null : it.id)} t={t} />
-          ))}
+      <div className="own">
+        {txt(d.owner) || "—"} · {NAT_STEPS[natStage(d) - 1]}
+      </div>
+
+      <div className="bd">
+        <Ring pct={meas} size={104} tone={measTone(meas)} />
+        <div className="nums">
+          <div className="n">
+            <div className="k">{t("المؤشرات", "KPIs")}</div>
+            <div className="v">
+              {AR(numOf(d.kpisRep))} <em>{`${t("من", "of")} ${AR(numOf(d.kpisTot))}`}</em>
+            </div>
+          </div>
+          <div className="n">
+            <div className="k">{t("المبادرات", "Initiatives")}</div>
+            <div className="v">
+              {AR(numOf(d.initRep))} <em>{`${t("من", "of")} ${AR(numOf(d.initTot))}`}</em>
+            </div>
+          </div>
+          <div className="n">
+            <div className="k">{t("فترة الاستراتيجية", "Period")}</div>
+            <div className="v">
+              <em>{txt(d.period) || "—"}</em>
+            </div>
+          </div>
+          <div className="n">
+            <div className="k">{t("تاريخ الاعتماد", "Approved on")}</div>
+            <div className="v">
+              <em>{txt(d.approvedAt) || t("لم تُعتمد", "Not approved")}</em>
+            </div>
+          </div>
         </div>
-      )}
+      </div>
+
+      <div className="trk">
+        {NAT_TRACK.map((n, i) => (
+          <button
+            key={n}
+            className={`stg-c s${track[i]} ${canEdit ? "ed" : ""}`}
+            onClick={() => void cycle(i)}
+            title={`${n} — ${TRACK_STATE[track[i]]}`}
+            disabled={!canEdit}
+          >
+            <i />
+            <span>{n}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="note">{txt(d.note) || t("لا توجد ملاحظات مسجّلة", "No notes")}</div>
     </div>
   );
 }
@@ -654,41 +696,25 @@ function NatGroup({
 function NationalPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
   const { items, loaded, save, undo, undoTop, dismissUndo } = useItems("natstrat");
   const [q, setQ] = useState("");
-  const [f, setF] = useState("");
-  const [open, setOpen] = useState<string | null>(null);
+  /* التبويب المختار — حالة الاعتماد */
+  const [tab, setTab] = useState(4);
 
-  const rows = useMemo(
+  const found = useMemo(
     () =>
       items.filter((it) => {
         const d = it.data;
-        const hay = `${txt(d.name)} ${txt(d.owner)} ${txt(d.domain)}`;
-        if (q && !hay.includes(q)) return false;
-        if (f && NAT_STEPS[natStage(d) - 1] !== f) return false;
-        return true;
+        return !q || `${txt(d.name)} ${txt(d.owner)} ${txt(d.domain)}`.includes(q);
       }),
-    [items, q, f],
+    [items, q],
   );
-
-  const cur = useMemo(() => items.find((x) => x.id === open) || null, [items, open]);
-
-  const nums = useMemo(() => {
-    const meas = items.map((x) => numOf(x.data.meas));
-    const avg = meas.length ? Math.round(meas.reduce((a, b) => a + b, 0) / meas.length) : 0;
-    return {
-      tot: items.length,
-      avg,
-      hi: meas.filter((m) => m >= 90).length,
-      zero: meas.filter((m) => !m).length,
-      kpisRep: items.reduce((a, x) => a + numOf(x.data.kpisRep), 0),
-      kpisTot: items.reduce((a, x) => a + numOf(x.data.kpisTot), 0),
-    };
-  }, [items]);
+  /* البحث يتجاوز التبويب: من يكتب اسم استراتيجية يريدها أينما كانت */
+  const rows = q ? found : found.filter((it) => natStage(it.data) === tab);
 
   function exportXl() {
     const head = ["الاستراتيجية", "الجهة", "حالة الاعتماد", "قابلية القياس ٪", "المؤشرات الممثلة",
       "إجمالي المؤشرات", "المبادرات الممثلة", "إجمالي المبادرات", "المراجعة الفنية",
       "فترة الاستراتيجية", "تاريخ الاعتماد", "أبرز الملاحظات"];
-    const body = rows.map((it) => {
+    const body = items.map((it) => {
       const d = it.data;
       return [txt(d.name), txt(d.owner), NAT_STEPS[natStage(d) - 1], numOf(d.meas),
         numOf(d.kpisRep), numOf(d.kpisTot), numOf(d.initRep), numOf(d.initTot),
@@ -701,52 +727,41 @@ function NationalPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
 
   return (
     <>
-      <Toolbar q={q} setQ={setQ} filter={f} setFilter={setF} options={NAT_STEPS} onExport={exportXl} t={t} />
+      <Toolbar q={q} setQ={setQ} filter="" setFilter={() => {}} options={[]} onExport={exportXl} t={t} />
 
-      <div className="nsq-kpis">
-        <div className="k">
-          <div className="t">{t("إجمالي الاستراتيجيات", "Total")}</div>
-          <div className="v">{AR(nums.tot)}</div>
-          <div className="s">{`${AR(NAT_STEPS.length)} ${t("حالات اعتماد", "stages")}`}</div>
-        </div>
-        <div className="k">
-          <div className="t">{t("متوسط قابلية القياس", "Avg measurability")}</div>
-          <div className="v">{`${AR(nums.avg)}٪`}</div>
-          <div className="pb">
-            <i style={{ width: `${nums.avg}%` }} />
-          </div>
-        </div>
-        <div className="k">
-          <div className="t">{t("قابلية قياس مرتفعة", "High")}</div>
-          <div className="v">{AR(nums.hi)}</div>
-          <div className="s">{`${t("و", "and")}${AR(nums.zero)} ${t("لم تبدأ بعد", "not started")}`}</div>
-        </div>
-        <div className="k">
-          <div className="t">{t("المؤشرات الممثَّلة", "Represented KPIs")}</div>
-          <div className="v">{AR(nums.kpisRep)}</div>
-          <div className="s">{`${t("من", "of")} ${AR(nums.kpisTot)}`}</div>
-        </div>
+      <div className="stabs">
+        {[4, 3, 2, 1].map((st) => {
+          const n = items.filter((it) => natStage(it.data) === st).length;
+          return (
+            <button
+              key={st}
+              className={`stab ${!q && tab === st ? "on" : ""}`}
+              style={{ ["--c" as string]: NAT_TONE[st] }}
+              onClick={() => {
+                setQ("");
+                setTab(st);
+              }}
+            >
+              <span className="l">{NAT_TAB[st]}</span>
+              <b>{AR(n)}</b>
+            </button>
+          );
+        })}
       </div>
 
-      <div className="sx-count">
-        {`${t("عرض", "Showing")} ${AR(rows.length)} ${t("من", "of")} ${AR(items.length)}`}
-      </div>
+      <div className="stab-doing">{q ? `${t("نتائج البحث", "Search results")} · ${AR(rows.length)}` : NAT_DOING[tab]}</div>
 
-      {[4, 3, 2, 1].map((st) => (
-        <NatGroup
-          key={st}
-          stage={st}
-          rows={rows.filter((it) => natStage(it.data) === st)}
-          openId={open}
-          setOpen={setOpen}
-          t={t}
-        />
-      ))}
-      {!rows.length && <div className="pf-none">{t("لا توجد نتائج", "No results")}</div>}
+      {rows.length ? (
+        <div className="ncards">
+          {rows.map((it) => (
+            <NatCard key={it.id} it={it} t={t} canEdit={canEdit} save={save} />
+          ))}
+        </div>
+      ) : (
+        <div className="pf-none">{t("لا توجد استراتيجيات في هذه الحالة", "Nothing here")}</div>
+      )}
 
       <UndoBar step={undoTop} onUndo={() => void undo()} onClose={dismissUndo} t={t} />
-
-      {cur && <NationalDetail it={cur} t={t} canEdit={canEdit} save={save} />}
     </>
   );
 }
@@ -1188,39 +1203,13 @@ function InstEntity({ it, t, onEdit }: { it: Item; t: T; onEdit?: () => void }) 
   );
 }
 
-/* قسم قطاع واحد — بسهم يطويه، والحالة تبقى بين الجلسات */
-function InstSector({
-  name, rows, t, onEdit,
-}: {
-  name: string; rows: Item[]; t: T; onEdit?: (it: Item) => void;
-}) {
-  const { open, toggle } = useCollapse(`inst:${name}`);
-  if (!rows.length) return null;
-  return (
-    <>
-      <div className="iw-sec">
-        <CollapseBtn open={open} toggle={toggle} t={t} />
-        <h3>{name}</h3>
-        <span className="n">{`${AR(rows.length)} ${t("جهة", "entities")}`}</span>
-        <span className="ln" />
-      </div>
-      {open && (
-        <div className="iw-grid">
-          {rows.map((it) => (
-            <InstEntity key={it.id} it={it} t={t} onEdit={onEdit ? () => onEdit(it) : undefined} />
-          ))}
-        </div>
-      )}
-    </>
-  );
-}
-
-/* صفحة المتابعة — بطاقات افتراضاً، والجدول الشامل خيار للمقارنة والتصدير */
 function InstPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
   const { items, loaded, save, remove, reload, undo, undoTop, dismissUndo } = useItems("inststrat");
   const [q, setQ] = useState("");
   const [f, setF] = useState("");
   const [view, setView] = useState<"cards" | "table">("cards");
+  /* القطاع المختار — تبويب أعلى الصفحة */
+  const [tab, setTab] = useState(INST_SECTORS[0]);
   const [edit, setEdit] = useState<Item | null>(null);
   const [draft, setDraft] = useState<Record<string, Rec>>({});
 
@@ -1277,16 +1266,38 @@ function InstPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
 
       {view === "cards" ? (
         <>
-          {secs.map((sc) => (
-            <InstSector
-              key={sc}
-              name={sc}
-              rows={rows.filter((r) => txt(r.data.sector) === sc)}
-              t={t}
-              onEdit={canEdit ? (it) => setEdit(it) : undefined}
-            />
-          ))}
-          {!rows.length && <div className="pf-none">{t("لا توجد نتائج", "No results")}</div>}
+          <div className="stabs">
+            {secs.map((sc) => {
+              const n = items.filter((r) => txt(r.data.sector) === sc).length;
+              return (
+                <button
+                  key={sc}
+                  className={`stab ${!q && !f && tab === sc ? "on" : ""}`}
+                  onClick={() => {
+                    setQ("");
+                    setF("");
+                    setTab(sc);
+                  }}
+                >
+                  <span className="l">{sc}</span>
+                  <b>{AR(n)}</b>
+                </button>
+              );
+            })}
+          </div>
+
+          {(() => {
+            /* البحث أو الفلتر يتجاوز التبويب — من يبحث يريد النتيجة أينما كانت */
+            const list = q || f ? rows : rows.filter((r) => txt(r.data.sector) === tab);
+            if (!list.length) return <div className="pf-none">{t("لا توجد نتائج", "No results")}</div>;
+            return (
+              <div className="iw-grid">
+                {list.map((it) => (
+                  <InstEntity key={it.id} it={it} t={t} onEdit={canEdit ? () => setEdit(it) : undefined} />
+                ))}
+              </div>
+            );
+          })()}
         </>
       ) : (
         <div className="tbl-wrap">
@@ -1555,7 +1566,6 @@ export function SectionPage({ section, canEdit, t }: { section: SectionKey; canE
       {section === "inststrat" && <InstPage t={t} canEdit={canEdit} />}
       {section === "projects" && <Projects t={t} />}
 
-      {canEdit && <ItemsEditor section={section} t={t} onChanged={() => setNonce((n) => n + 1)} />}
 
       {editing && (
         <ItemForm
@@ -1573,51 +1583,6 @@ export function SectionPage({ section, canEdit, t }: { section: SectionKey; canE
 }
 
 /* جدول تحرير مبسّط أسفل الصفحة — لمن يملك «تحرير بيانات هذه الأقسام» */
-function ItemsEditor({ section, t, onChanged }: { section: SectionKey; t: T; onChanged: () => void }) {
-  const { items, loaded, remove, reload, undo, undoTop, dismissUndo } = useItems(section);
-  const [edit, setEdit] = useState<Item | null>(null);
-  if (!loaded || !items.length) return null;
-  return (
-    <>
-      <UndoBar step={undoTop} onUndo={() => void undo()} onClose={dismissUndo} t={t} />
-      <h3 className="sx-sub">{t("تحرير البنود", "Edit items")}</h3>
-      <div className="sx-edit">
-        {items.map((it) => (
-          <div className="sx-erow" key={it.id}>
-            <span className="n">{txt(it.data.name || it.data.entity || it.id)}</span>
-            <button className="btn btn-ghost btn-sm" onClick={() => setEdit(it)}>
-              {t("تعديل", "Edit")}
-            </button>
-            <button
-              className="btn btn-danger btn-sm"
-              onClick={async () => {
-                if (!confirm(t("حذف هذا البند نهائياً؟", "Delete permanently?"))) return;
-                await remove(it.id);
-                onChanged();
-              }}
-            >
-              {t("حذف", "Delete")}
-            </button>
-          </div>
-        ))}
-      </div>
-      {edit && (
-        <ItemForm
-          section={section}
-          item={edit}
-          t={t}
-          onClose={(changed) => {
-            setEdit(null);
-            if (changed) {
-              void reload();
-              onChanged();
-            }
-          }}
-        />
-      )}
-    </>
-  );
-}
 
 /* ---------------- نافذة إدخال/تعديل بند ---------------- */
 type Field = { k: string; label: string; kind?: "num" | "text" | "date" | "bool" | "area" };
