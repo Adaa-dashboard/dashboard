@@ -259,7 +259,7 @@ function dueLabel(d: string, t: T) {
 
 function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) => void }) {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [filter, setFilter] = useState<"all" | "boss" | "self" | "done">("all");
+  const [filter, setFilter] = useState<"all" | "late" | "done">("all");
   const [open, setOpen] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [adding, setAdding] = useState(false);
@@ -280,12 +280,24 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
   }, [load]);
 
   const isBoss = (x: Task) => x.createdById !== me.id;
+
+  /* الأعمدة نفسها المستعملة في صفحة المهام: متأخرة · هذا الأسبوع ·
+     البقية · المكتملة — فالموظف يرى مهامه بنفس التقسيم أينما كان.
+     مُعرَّفة قبل shown لأن فلتر «المتأخرة» يعتمد عليها */
+  const colOf = (x: Task): "done" | "late" | "week" | "main" => {
+    if (x.state === "done") return "done";
+    const d = x.dueDate ? Math.round((new Date(x.dueDate).getTime() - new Date(new Date().toISOString().slice(0, 10)).getTime()) / 86400000) : 99;
+    if (d < 0) return "late";
+    if (d <= 7) return "week";
+    return "main";
+  };
+
   const openTasks = tasks.filter((x) => x.state !== "done");
+  const lateTasks = openTasks.filter((x) => colOf(x) === "late");
   const shown = tasks.filter((x) => {
     if (filter === "done") return x.state === "done";
     if (x.state === "done") return false;
-    if (filter === "boss") return isBoss(x);
-    if (filter === "self") return !isBoss(x);
+    if (filter === "late") return colOf(x) === "late";
     return true;
   });
 
@@ -333,15 +345,6 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
     </span>
   );
 
-  /* الأعمدة نفسها المستعملة في صفحة المهام: متأخرة · هذا الأسبوع ·
-     البقية · المكتملة — فالموظف يرى مهامه بنفس التقسيم أينما كان */
-  const colOf = (x: Task): "done" | "late" | "week" | "main" => {
-    if (x.state === "done") return "done";
-    const d = x.dueDate ? Math.round((new Date(x.dueDate).getTime() - new Date(new Date().toISOString().slice(0, 10)).getTime()) / 86400000) : 99;
-    if (d < 0) return "late";
-    if (d <= 7) return "week";
-    return "main";
-  };
   const COLS: { key: "late" | "week" | "main" | "done"; title: string; color: string }[] = [
     { key: "late", title: t("المتأخرة", "Overdue"), color: "#d34a4a" },
     { key: "week", title: t("خلال أسبوع", "This week"), color: "#e0971a" },
@@ -414,17 +417,18 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
   return (
     <>
       <div className="tfil">
-        {chip("all", t("الكل", "All"), openTasks.length)}
-        {chip("boss", t("من مديري", "From my manager"), openTasks.filter(isBoss).length)}
-        {chip("self", t("مهامي الذاتية", "My own"), openTasks.filter((x) => !isBoss(x)).length)}
+        {chip("all", t("المهام", "Tasks"), openTasks.length)}
+        {chip("late", t("المتأخرة", "Overdue"), lateTasks.length)}
         {chip("done", t("المكتملة", "Done"), tasks.filter((x) => x.state === "done").length)}
       </div>
 
       <div className="tkboard">
-        {COLS.map((c) => {
+        {COLS.filter((c) =>
+          filter === "done" ? c.key === "done"
+          : filter === "late" ? c.key === "late"
+          : c.key !== "done",
+        ).map((c) => {
           const list = shown.filter((x) => colOf(x) === c.key);
-          if (filter !== "done" && c.key === "done") return null;
-          if (filter === "done" && c.key !== "done") return null;
           const vis = moreCol[c.key] ? list : list.slice(0, LIMIT);
           return (
             <div className="tkcol" key={c.key}>
