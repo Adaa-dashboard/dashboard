@@ -7955,3 +7955,55 @@ table.matrix thead th {
 .sh-sec .tblwrap {
   overflow-x: auto;
 }
+
+/* ============ مراحل الاستراتيجيات الوطنية ============
+   أربعة أعمدة بأسمائها، ونقطة لكل مرحلة يصلها خط أفقي —
+   كان عمود «المراحل» نقاطاً بلا أسماء فلا يُعرف أيها أيّ */
+.sx-tbl th.stg {
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: normal;
+  min-width: 76px;
+}
+.sx-tbl td.stg {
+  position: relative;
+  min-width: 76px;
+}
+/* الخط الواصل: يمتد عبر الخلية، ويقف عند النقطة في الطرفين */
+.sx-tbl td.stg::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  inset-inline: 0;
+  height: 2px;
+  background: var(--line2);
+  transform: translateY(-50%);
+}
+.sx-tbl td.stg.st-a::before { inset-inline-start: 50%; }
+.sx-tbl td.stg.st-z::before { inset-inline-end: 50%; }
+.stdot {
+  position: relative;
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #c9d4d1;
+  vertical-align: middle;
+}
+.stdot.s1 { background: var(--warn); }
+.stdot.s2 { background: var(--g-700); }
+.stdot.ed { cursor: pointer; }
+.stdot.ed:hover { box-shadow: 0 0 0 4px rgba(1, 107, 95, 0.16); }
+
+.stg-lg {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 12px 4px 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.stg-lg span { display: inline-flex; align-items: center; gap: 7px; }
+.stg-lg em { font-style: normal; opacity: 0.75; }
