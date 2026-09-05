@@ -120,7 +120,136 @@ type Ctx = {
   tasks: Rec[];
   rows: Rec[];
   changes: Rec[];
+  /* بنود الأقسام الخمسة من نظرة عامة — مفتاحها اسم القسم */
+  sections: Record<string, Rec[]>;
 };
+
+/* ---------------- زبدة الأقسام الخمسة ----------------
+   «عطني الزبدة من المخرجات الوطنية» وما شابهها. الملخّص يُبنى
+   من نفس البيانات المعروضة في القسم، فلا يختلف رقمٌ عمّا تراه. */
+type SecKey = "sessions" | "natstrat" | "inststrat" | "outputs" | "projects";
+const SEC_WORDS: [SecKey, string[]][] = [
+  ["sessions", ["جلسات مراجعة", "جلسات المراجعة", "جلسة مراجعة", "الجلسات"]],
+  ["natstrat", ["الاستراتيجيات الوطنية", "استراتيجيات وطنية", "الوطنية"]],
+  ["inststrat", ["الاستراتيجيات المؤسسية", "استراتيجيات مؤسسية", "المؤسسية"]],
+  ["outputs", ["المخرجات الوطنية", "مخرجات وطنية", "المخرجات"]],
+  ["projects", ["المشاريع الاستراتيجية", "مشاريع استراتيجية", "المشاريع"]],
+];
+const SEC_NAME: Record<SecKey, string> = {
+  sessions: "جلسات مراجعة الأداء",
+  natstrat: "الاستراتيجيات الوطنية",
+  inststrat: "الاستراتيجيات المؤسسية",
+  outputs: "المخرجات الوطنية",
+  projects: "المشاريع الاستراتيجية",
+};
+const NAT_STEPS = ["طور الإعداد/التحديث", "قيد المراجعة", "معتمدة من اللجنة", "معتمدة من مجلس الوزراء"];
+const INST_STAGES = ["وصلت المركز", "قيد المراجعة", "معالجة الملاحظات", "اعتُمدت", "فُعِّل القياس"];
+
+function whichSection(q: string): SecKey | null {
+  for (const [k, words] of SEC_WORDS) if (has(q, ...words)) return k;
+  return null;
+}
+
+/** ملخّص قسم واحد — الأرقام أولاً ثم أبرز البنود */
+function sectionBrief(k: SecKey, items: Rec[]): Ans {
+  const title = `زبدة ${SEC_NAME[k]}`;
+  if (k === "outputs")
+    return {
+      title,
+      icon: "archive",
+      lines: [
+        "صفحة المخرجات الوطنية ما زالت قيد الإعداد ولم تُعتمد بياناتها بعد.",
+        "ما إن تُدخل البيانات حتى يظهر ملخّصها هنا تلقائياً.",
+      ],
+      note: "لا أخترع أرقاماً — القسم فارغ فعلاً.",
+    };
+  if (!items.length)
+    return { title, icon: "archive", lines: [`لا توجد بنود مسجّلة في ${SEC_NAME[k]} بعد.`] };
+
+  const d = (x: Rec) => (x.data || {}) as Rec;
+
+  if (k === "sessions") {
+    const st = (x: Rec) => {
+      const raw = Array.isArray(d(x).stages) ? d(x).stages : [];
+      const full = raw.length || 6;
+      return { done: Math.max(0, Math.min(full, num(d(x).done))), full };
+    };
+    const closed = items.filter((x) => st(x).done >= st(x).full);
+    const notStarted = items.filter((x) => st(x).done === 0);
+    return {
+      title,
+      icon: "clipboard",
+      chips: [
+        { k: "الجهات", v: String(items.length) },
+        { k: "مكتملة", v: String(closed.length), tone: "g" },
+        { k: "لم تبدأ", v: String(notStarted.length), tone: notStarted.length ? "a" : "g" },
+      ],
+      lines: items
+        .slice(0, 8)
+        .map((x) => `${txt(d(x).entity) || "بلا جهة"} — ${st(x).done}/${st(x).full} مراحل${txt(d(x).quarter) ? ` · ${txt(d(x).quarter)}` : ""}`),
+    };
+  }
+
+  if (k === "natstrat") {
+    const stage = (x: Rec) => Math.max(1, Math.min(4, num(d(x).stage, 1)));
+    const counts = [1, 2, 3, 4].map((n) => items.filter((x) => stage(x) === n).length);
+    const meas = items.map((x) => num(d(x).meas)).filter((n) => n > 0);
+    const avg = meas.length ? Math.round(meas.reduce((a, b) => a + b, 0) / meas.length) : null;
+    const weak = items.filter((x) => num(d(x).meas) > 0 && num(d(x).meas) < 70);
+    return {
+      title,
+      icon: "flag",
+      chips: [
+        { k: "الاستراتيجيات", v: String(items.length) },
+        ...(avg === null ? [] : [{ k: "متوسط قابلية القياس", v: `${avg}%`, tone: avg >= 80 ? "g" : "a" }]),
+        { k: "معتمدة من المجلس", v: String(counts[3]), tone: "g" },
+      ],
+      lines: [
+        ...NAT_STEPS.map((n, i) => `${n}: ${counts[i]}`),
+        ...(weak.length
+          ? ["—", ...weak.slice(0, 5).map((x) => `تحتاج رفع قابلية القياس: ${txt(d(x).name)} (${num(d(x).meas)}%) — ${txt(d(x).owner)}`)]
+          : []),
+      ],
+    };
+  }
+
+  if (k === "inststrat") {
+    const stage = (x: Rec) => Math.max(1, Math.min(5, num(d(x).stage, 1)));
+    const counts = [1, 2, 3, 4, 5].map((n) => items.filter((x) => stage(x) === n).length);
+    const kpis = items.reduce((a, x) => a + num(d(x).kpis), 0);
+    return {
+      title,
+      icon: "building",
+      chips: [
+        { k: "الجهات", v: String(items.length) },
+        { k: "إجمالي المؤشرات", v: String(kpis) },
+        { k: "فُعِّل القياس", v: String(counts[4]), tone: "g" },
+      ],
+      lines: [
+        ...INST_STAGES.map((n, i) => `${n}: ${counts[i]}`),
+        "—",
+        ...items.slice(0, 6).map((x) => `${txt(d(x).owner) || txt(d(x).name)} — ${txt(d(x).status) || INST_STAGES[stage(x) - 1]}`),
+      ],
+    };
+  }
+
+  /* المشاريع الاستراتيجية */
+  const behind = items.filter((x) => num(d(x).actual) < num(d(x).planned));
+  return {
+    title,
+    icon: "rocket",
+    chips: [
+      { k: "المشاريع", v: String(items.length) },
+      { k: "متأخرة عن الخطة", v: String(behind.length), tone: behind.length ? "a" : "g" },
+    ],
+    lines: items.slice(0, 8).map((x) => {
+      const pl = num(d(x).planned);
+      const ac = num(d(x).actual);
+      const gap = pl - ac;
+      return `${txt(d(x).name)} — المخطط ${pl}% · الفعلي ${ac}%${gap > 0 ? ` (فجوة ${gap}%)` : " ✓"}`;
+    }),
+  };
+}
 
 const DONE = ["مغلقة", "مكتمل", "مكتملة", "منجز", "معتمدة"];
 
@@ -149,9 +278,17 @@ function answer(q0: string, c: Ctx): Ans {
         "«كم نسبة التزامي؟»",
         "«كم جهة ما سويت لها اجتماع ربعي؟»",
         "«ملخص الأسبوع»",
+        "«عطني الزبدة من الاستراتيجيات الوطنية» — وكذلك: جلسات مراجعة الأداء · الاستراتيجيات المؤسسية · المخرجات الوطنية · المشاريع الاستراتيجية",
       ],
       note: "الإجابات تُحسب من بياناتك داخل متصفحك — لا يخرج منها شيء.",
     };
+
+  /* زبدة قسم من نظرة عامة — قبل بقية الفروع لأن كلمة
+     «الاستراتيجيات» يخطفها فرع «جهاتي» وإلا */
+  {
+    const sec = whichSection(q);
+    if (sec) return sectionBrief(sec, c.sections[sec] || []);
+  }
 
   /* ترتيب الصفحة */
   if (has(q, "رتب", "رتّب", "ترتيب") && has(q, "صفحتي", "المحفظة", "محفظتي", "الأهمية", "الاهمية")) {
@@ -299,6 +436,7 @@ function answer(q0: string, c: Ctx): Ans {
 /* ---------------- الواجهة ---------------- */
 const SUGGEST = [
   "أهم شي عندي الآن",
+  "عطني الزبدة من الاستراتيجيات الوطنية",
   "أبرز أعمالي هذا الشهر",
   "رتّب صفحتي حسب الأهمية",
   "كم نسبة التزامي؟",
@@ -313,11 +451,21 @@ export default function Assistant({ me, t, onPin }: { me: Me; t: T; onPin: (p: P
   const box = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
-    const [tk, pf] = await Promise.all([
+    const KEYS = ["sessions", "natstrat", "inststrat", "outputs", "projects"];
+    const [tk, pf, ...secs] = await Promise.all([
       apiFetch("/api/tasks").then((r) => r.json()).catch(() => ({})),
       apiFetch("/api/portfolio").then((r) => r.json()).catch(() => ({})),
+      /* القسم الذي لا يملك صاحب الحساب صلاحيته يرجع فارغاً من RLS،
+         فلا يرى في الزبدة ما لا يراه في الصفحة */
+      ...KEYS.map((k) =>
+        apiFetch(`/api/items?section=${k}`).then((r) => r.json()).catch(() => ({})),
+      ),
     ]);
-    setCtx({ me, tasks: tk.tasks || [], rows: pf.items || [], changes: [] });
+    const sections: Record<string, Rec[]> = {};
+    KEYS.forEach((k, i) => {
+      sections[k] = (secs[i]?.items || []) as Rec[];
+    });
+    setCtx({ me, tasks: tk.tasks || [], rows: pf.items || [], changes: [], sections });
   }, [me]);
 
   useEffect(() => {

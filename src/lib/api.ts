@@ -465,6 +465,57 @@ export async function apiFetch(path: string, init: Init = {}) {
       return ok({ ok: true });
     }
 
+    /* ---------------- صلاحيات محفظتي ----------------
+       المحفظة خاصة بصاحبها، ولا يراها أحد — ولو كان مديره — إلا
+       بمنحٍ صريح منه. الحراسة الحقيقية في RLS؛ ما هنا واجهة فقط. */
+    if (p === "/api/portfolio/grants" && method === "GET") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const [g, sh] = await Promise.all([
+        s.rpc("perf_pf_grants"),
+        s.rpc("perf_pf_shared"),
+      ]);
+      const map = (d: unknown) =>
+        ((d || []) as Record<string, unknown>[]).map((r) => ({
+          userId: String(r.user_id),
+          name: String(r.name || ""),
+          jobTitle: String(r.job_title || ""),
+          scopes: (r.scopes || []) as string[],
+          at: r.created_at,
+        }));
+      return ok({ grants: map(g.data), shared: map(sh.data) });
+    }
+    if (p === "/api/portfolio/grants" && method === "POST") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const to = str(body.userId);
+      const scopes = Array.isArray(body.scopes) ? body.scopes.map(String).filter(Boolean) : [];
+      if (!to) return err("لم يُحدَّد الشخص", 400);
+      if (to === String(me.id)) return err("لا حاجة لمنح نفسك", 400);
+      if (!scopes.length) return err("لم يُحدَّد أي قسم", 400);
+      const { error } = await s
+        .from("perf_portfolio_grants")
+        .upsert(
+          { owner_id: Number(me.id), grantee_id: Number(to), scopes },
+          { onConflict: "owner_id,grantee_id" },
+        );
+      if (error) return err(error.message, 403);
+      return ok({ ok: true });
+    }
+    if (p === "/api/portfolio/grants" && method === "DELETE") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const to = q.get("user") || "";
+      if (!to) return err("لم يُحدَّد الشخص", 400);
+      const { error } = await s
+        .from("perf_portfolio_grants")
+        .delete()
+        .eq("owner_id", me.id)
+        .eq("grantee_id", to);
+      if (error) return err(error.message, 403);
+      return ok({ ok: true });
+    }
+
     /* ---------------- أقسام نظرة عامة الخمسة ----------------
        جدول واحد لكل الأقسام: القراءة والكتابة يحرسهما RLS حسب
        صلاحية القسم نفسه، فلا حاجة لفحص إضافي هنا. */
