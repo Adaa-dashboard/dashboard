@@ -35,6 +35,15 @@ const SESS_STAGES = ["تحديد الجهة", "جمع البيانات", "إعد
 /* حالة اعتماد الاستراتيجية الوطنية — أربع محطات */
 const NAT_STEPS = ["طور الإعداد/التحديث", "قيد المراجعة", "معتمدة من اللجنة", "معتمدة من مجلس الوزراء"];
 const NAT_WHERE = ["لدى الجهة المالكة", "لدى اللجنة الاستراتيجية", "اللجنة الاستراتيجية", "اعتماد نهائي"];
+/* مسار المراجعة الأربع — مسار مستقل عن «حالة الاعتماد»:
+   لكل مرحلة حالتها (لم يبدأ · قيد التنفيذ · مكتمل) كما في عرض الإدارة */
+const NAT_TRACK = ["استلام الوثيقة", "استلام الحصر", "المراجعة الفنية", "معالجة الملاحظات"];
+const TRACK_STATE = ["لم يبدأ", "قيد التنفيذ", "مكتمل"];
+/** حالات المراحل الأربع — الافتراضي «لم يبدأ» ولا يُستنتج من غيره */
+function natTrack(d: Rec): number[] {
+  const raw = Array.isArray(d.track) ? d.track : [];
+  return NAT_TRACK.map((_, i) => Math.max(0, Math.min(2, numOf(raw[i], 0))));
+}
 const INST_STAGES = ["وصلت المركز", "قيد المراجعة", "معالجة الملاحظات", "اعتُمدت", "فُعِّل القياس"];
 
 /* الأرقام كلها لاتينية (1 2 3) بطلب المستخدمة. الدالة تحوّل
@@ -432,11 +441,19 @@ export function NationalStrategies({ limit, t, onMore }: { limit?: number; t: T;
   );
 }
 
-function NationalPage({ t }: { t: T }) {
-  const { items, loaded } = useItems("natstrat");
+function NationalPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
+  const { items, loaded, save } = useItems("natstrat");
   const [q, setQ] = useState("");
   const [f, setF] = useState("");
   const [open, setOpen] = useState<string | null>(null);
+
+  /* الضغط على النقطة يقلّب حالتها: لم يبدأ ← قيد التنفيذ ← مكتمل.
+     أسرع من فتح نافذة التحرير لكل مرحلة، ولا يظهر لمن لا يملك التحرير */
+  async function cycle(it: Item, i: number) {
+    const cur = natTrack(it.data);
+    cur[i] = (cur[i] + 1) % 3;
+    await save(it.id, { ...it.data, track: cur, demo: false }, it.ord);
+  }
 
   const rows = useMemo(
     () =>
@@ -533,7 +550,11 @@ function NationalPage({ t }: { t: T }) {
             <tr>
               <th>{t("الاستراتيجية", "Strategy")}</th>
               <th>{t("حالة الاعتماد", "Approval")}</th>
-              <th className="c">{t("المراحل", "Stages")}</th>
+              {NAT_TRACK.map((n, i) => (
+                <th className={`c stg ${i === 0 ? "st-a" : ""} ${i === NAT_TRACK.length - 1 ? "st-z" : ""}`} key={n}>
+                  {n}
+                </th>
+              ))}
               <th className="c">{t("المراجعة الفنية", "Technical review")}</th>
               <th className="c">{t("قابلية القياس", "Measurability")}</th>
               <th>{t("أبرز الملاحظات", "Notes")}</th>
@@ -549,9 +570,20 @@ function NationalPage({ t }: { t: T }) {
                     <div className="own">{txt(d.owner)}</div>
                   </td>
                   <td>{NAT_STEPS[natStage(d) - 1]}</td>
-                  <td className="c">
-                    <Dots n={NAT_STEPS.length} done={natStage(d)} />
-                  </td>
+                  {natTrack(d).map((st, i) => (
+                    <td
+                      className={`c stg ${i === 0 ? "st-a" : ""} ${i === NAT_TRACK.length - 1 ? "st-z" : ""}`}
+                      key={i}
+                      title={`${NAT_TRACK[i]} — ${TRACK_STATE[st]}`}
+                      onClick={(e) => {
+                        if (!canEdit) return;
+                        e.stopPropagation();
+                        void cycle(it, i);
+                      }}
+                    >
+                      <i className={`stdot s${st} ${canEdit ? "ed" : ""}`} />
+                    </td>
+                  ))}
                   <td className="c">
                     <span className={`sx-tag ${d.tech ? "ok" : "no"}`}>
                       {d.tech ? t("مقبولة فنياً", "Accepted") : t("غير مقبولة فنياً", "Not accepted")}
@@ -566,6 +598,16 @@ function NationalPage({ t }: { t: T }) {
             })}
           </tbody>
         </table>
+      </div>
+
+      <div className="stg-lg">
+        {TRACK_STATE.map((n, i) => (
+          <span key={n}>
+            <i className={`stdot s${i}`} />
+            {t(n, n)}
+          </span>
+        ))}
+        {canEdit && <em>{t("اضغط على أي نقطة لتغيير حالتها", "Click a dot to change its state")}</em>}
       </div>
 
       {cur && <NationalDetail it={cur} t={t} />}
@@ -1018,7 +1060,7 @@ export function SectionPage({ section, canEdit, t }: { section: SectionKey; canE
         </div>
       )}
       {section === "sessions" && <SessionsPage t={t} />}
-      {section === "natstrat" && <NationalPage t={t} />}
+      {section === "natstrat" && <NationalPage t={t} canEdit={canEdit} />}
       {section === "inststrat" && <InstPage t={t} />}
       {section === "projects" && <Projects t={t} />}
 
