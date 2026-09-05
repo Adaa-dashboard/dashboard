@@ -176,6 +176,8 @@ export default function Dashboard({ me }: { me: Me }) {
   const [refData, setRefData] = useState<RefData>(EMPTY_REF);
   const [loaded, setLoaded] = useState(false);
   const [lang, setLang] = useState<Lang>("ar");
+  /* الوضع الداكن — محفوظ لكل شخص على متصفحه */
+  const [dark, setDark] = useState(false);
   const [setOpen, setSetOpen] = useState(false);
   const t = useCallback((ar: string, en: string) => (lang === "en" ? en : ar), [lang]);
   const [pwOpen, setPwOpen] = useState(false);
@@ -205,14 +207,24 @@ export default function Dashboard({ me }: { me: Me }) {
   useEffect(() => {
     const savedLang = typeof window !== "undefined" ? localStorage.getItem("lang") : null;
     if (savedLang === "en" || savedLang === "ar") setLang(savedLang);
-    // الثيمات الداكنة القديمة أُزيلت لصالح هوية أداء — نظّف أي بقية محفوظة
     try {
-      localStorage.removeItem("theme");
+      // «dark» وحدها مقبولة — أي قيمة قديمة أخرى تُعامل كوضع فاتح
+      setDark(localStorage.getItem("theme") === "dark");
     } catch {
       /* ignore */
     }
-    document.documentElement.removeAttribute("data-theme");
   }, []);
+
+  useEffect(() => {
+    const el = document.documentElement;
+    if (dark) el.setAttribute("data-theme", "dark");
+    else el.removeAttribute("data-theme");
+    try {
+      localStorage.setItem("theme", dark ? "dark" : "light");
+    } catch {
+      /* ignore */
+    }
+  }, [dark]);
 
   useEffect(() => {
     document.documentElement.setAttribute("lang", lang);
@@ -402,6 +414,16 @@ export default function Dashboard({ me }: { me: Me }) {
               {t("اللغة", "Language")}
               <span className="lang-chip">{lang === "ar" ? "EN" : "AR"}</span>
             </button>
+            <button
+              className="sub-item"
+              onClick={() => setDark(!dark)}
+              aria-pressed={dark}
+            >
+              {t("الوضع الداكن", "Dark mode")}
+              <span className={`thm-sw ${dark ? "on" : ""}`}>
+                <i />
+              </span>
+            </button>
           </div>
 
           <div className="whoami">
@@ -574,6 +596,12 @@ export default function Dashboard({ me }: { me: Me }) {
             <button className="sheet-item" onClick={() => setLang(lang === "ar" ? "en" : "ar")}>
               {t("اللغة", "Language")}
               <span className="lang-chip">{lang === "ar" ? "EN" : "AR"}</span>
+            </button>
+            <button className="sheet-item" onClick={() => setDark(!dark)} aria-pressed={dark}>
+              {t("الوضع الداكن", "Dark mode")}
+              <span className={`thm-sw ${dark ? "on" : ""}`}>
+                <i />
+              </span>
             </button>
             <button className="sheet-item danger" onClick={logout}>
               {t("تسجيل الخروج", "Sign out")}
