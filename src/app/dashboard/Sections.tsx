@@ -46,6 +46,38 @@ function natTrack(d: Rec): number[] {
 }
 const INST_STAGES = ["وصلت المركز", "قيد المراجعة", "معالجة الملاحظات", "اعتُمدت", "فُعِّل القياس"];
 
+/* أعمدة متابعة الاستراتيجيات المؤسسية — هي أعمدة ملف المتابعة نفسه
+   حتى لا يُنقل بين الإكسل واللوحة. كل خلية تُحرَّر في مكانها. */
+type ICol = { k: string; label: string; opts?: string[]; w: number };
+const INST_SECTORS = ["المالي والاقتصادي", "البنية التحتية", "الخدمات الاجتماعية", "الشؤون الحكومية"];
+/* العرض بالبكسل لأن الجدول يمرّر أفقياً — والقيم مقاسة على أطول
+   نص فعلي في كل عمود، فلا يُقتطع اسم جهة ولا بريد */
+const INST_COLS: ICol[] = [
+  { k: "sector", label: "القطاع", opts: ["", ...INST_SECTORS], w: 140 },
+  { k: "owner", label: "الجهة", w: 250 },
+  { k: "consultant", label: "الاستشاري", w: 150 },
+  { k: "phone", label: "رقم الجوال", w: 110 },
+  { k: "email", label: "البريد الإلكتروني", w: 210 },
+  { k: "rep", label: "تسمية ممثل", opts: ["", "تمت تسمية ممثل", "لم يُرسل بعد"], w: 150 },
+  { k: "meet", label: "الاجتماع التعريفي", opts: ["", "تم", "لم يتم بعد"], w: 125 },
+  { k: "meetAt", label: "تاريخ الاجتماع", w: 150 },
+  { k: "docs", label: "استلام الوثائق", opts: ["", "✓", "✗"], w: 100 },
+  { k: "docsState", label: "حالة الوثائق", opts: ["", "مكتمل", "جزئي", "لايمكن قياسه"], w: 130 },
+  { k: "target", label: "تفعيل القياس (مستهدف)", opts: ["", "Q1", "Q2", "Q3", "Q4"], w: 120 },
+  { k: "live", label: "حالة التفعيل", opts: ["", "مفعل", "غير مفعل"], w: 115 },
+  { k: "phase", label: "Phase", opts: ["", "Phase 1", "Phase 2"], w: 110 },
+];
+/* تلوين الخلايا التي لها معنى حالة */
+function instTone(k: string, v: string): string {
+  if (!v) return "";
+  if (k === "docs") return v === "✓" ? "ok" : "no";
+  if (k === "meet") return v === "تم" ? "ok" : "wt";
+  if (k === "rep") return v === "تمت تسمية ممثل" ? "ok" : "wt";
+  if (k === "live") return v === "مفعل" ? "ok" : "wt";
+  if (k === "docsState") return v === "مكتمل" ? "ok" : v === "جزئي" ? "wt" : "no";
+  return "";
+}
+
 /* الأرقام كلها لاتينية (1 2 3) بطلب المستخدمة. الدالة تحوّل
    الأرقام الهندية إن وردت في نص مُدخَل، فيتوحّد الشكل مهما
    كُتبت البيانات. */
@@ -789,24 +821,25 @@ export function StrategyBox({
     );
   }
 
-  const at = (n: number) => items.filter((x) => instStage(x.data) === n).length;
-  const arrived = items.filter((x) => instStage(x.data) >= 1).length;
-  const live = items.filter((x) => instStage(x.data) >= INST_STAGES.length).length;
+  const cnt = (k: string, v: string) => items.filter((x) => txt(x.data[k]) === v).length;
+  const met = cnt("meet", "تم");
+  const docs = cnt("docs", "✓");
+  const live = cnt("live", "مفعل");
   const pct = Math.round((live / tot) * 100);
-  const goals = items.reduce((a, x) => a + numOf(x.data.goals), 0);
-  const kpis = items.reduce((a, x) => a + numOf(x.data.kpis), 0);
+  const goals = cnt("phase", "Phase 1");
+  const kpis = cnt("phase", "Phase 2");
   return box(
     <>
       <div className="head-row">
         <div className="big">
           <b>{AR(tot)}</b>
-          <span>{t("استراتيجية مؤسسية", "institutional")}</span>
+          <span>{t("جهة", "entities")}</span>
         </div>
         <div className="side">
-          <KV label={t("وصلت المركز", "Received")} n={arrived} tot={tot} />
-          <KV label={INST_STAGES[1]} n={at(2)} tot={tot} />
-          <KV label={INST_STAGES[2]} n={at(3)} tot={tot} />
-          <KV label={t("فُعِّل قياسها", "Measurement live")} n={live} tot={tot} tone="g" />
+          <KV label={t("عُقد الاجتماع التعريفي", "Kickoff held")} n={met} tot={tot} />
+          <KV label={t("الوثائق مستلمة", "Docs received")} n={docs} tot={tot} />
+          <KV label={t("اكتملت الوثائق", "Docs complete")} n={cnt("docsState", "مكتمل")} tot={tot} />
+          <KV label={t("فُعِّل القياس", "Measurement live")} n={live} tot={tot} tone="g" />
         </div>
       </div>
       <div className="gen">
@@ -818,10 +851,10 @@ export function StrategyBox({
             </span>
           </span>
         </GCell>
-        <GCell k={t("لم تصل بعد", "Not received")}>
-          {AR(tot - arrived)} <em>{t("جهة", "entities")}</em>
+        <GCell k={t("لم يُعقد اجتماعها", "Kickoff pending")}>
+          {AR(tot - met)} <em>{t("جهة", "entities")}</em>
         </GCell>
-        <GCell k={t("الأهداف · المؤشرات", "Goals · KPIs")}>
+        <GCell k="Phase 1 · Phase 2">
           {AR(goals)} <em>· {AR(kpis)}</em>
         </GCell>
         <GCell k={t("آخر تحديث", "Last update")}>
@@ -845,33 +878,34 @@ export function InstStrategies({ limit, t, onMore }: { limit?: number; t: T; onM
   if (!items.length)
     return (
       <Empty
-        title={t("لا توجد استراتيجيات مؤسسية بعد", "Nothing yet")}
-        note={t("تُضاف الاستراتيجيات من زر «إضافة».", "Add strategies.")}
+        title={t("لا توجد جهات بعد", "Nothing yet")}
+        note={t("تُضاف الجهات من زر «إضافة».", "Add entities.")}
       />
     );
 
-  const arrived = items.filter((i) => instStage(i.data) >= 1).length;
-  const live = items.filter((i) => instStage(i.data) >= INST_STAGES.length).length;
-  const latest = [...items].sort((a, b) => txt(b.data.updated).localeCompare(txt(a.data.updated)));
-  const shown = limit ? latest.slice(0, limit) : latest;
+  const g = (k: string, v: string) => items.filter((i) => txt(i.data[k]) === v).length;
+  const met = g("meet", "تم");
+  const docs = g("docs", "✓");
+  const live = g("live", "مفعل");
+  const shown = limit ? items.slice(0, limit) : items;
 
   return (
     <>
       <div className="sx-nums three">
         <div className="sx-tot">
           <b>{AR(items.length)}</b>
-          <span>{t("استراتيجية مؤسسية", "Institutional")}</span>
+          <span>{t("جهة", "entities")}</span>
         </div>
         <div className="sx-nc">
-          <div className="t">{t("وصلت المركز", "Received")}</div>
-          <b>{AR(arrived)}</b>
+          <div className="t">{t("عُقد الاجتماع التعريفي", "Kickoff held")}</div>
+          <b>{AR(met)}</b>
           <div className="s">{`${t("من أصل", "of")} ${AR(items.length)}`}</div>
           <div className="sx-prog">
-            <i style={{ width: `${items.length ? (arrived / items.length) * 100 : 0}%` }} />
+            <i style={{ width: `${items.length ? (met / items.length) * 100 : 0}%` }} />
           </div>
         </div>
         <div className="sx-nc g">
-          <div className="t">{t("فُعِّل قياسها", "Measurement live")}</div>
+          <div className="t">{t("فُعِّل القياس", "Measurement live")}</div>
           <b>{AR(live)}</b>
           <div className="s">{`${t("من أصل", "of")} ${AR(items.length)}`}</div>
           <div className="sx-prog">
@@ -880,13 +914,25 @@ export function InstStrategies({ limit, t, onMore }: { limit?: number; t: T; onM
         </div>
       </div>
 
+      <div className="sx-mini-row">
+        <span>
+          {t("الوثائق مستلمة", "Docs received")} <b>{AR(docs)}</b>
+        </span>
+        <span>
+          Phase 1 <b>{AR(g("phase", "Phase 1"))}</b>
+        </span>
+        <span>
+          Phase 2 <b>{AR(g("phase", "Phase 2"))}</b>
+        </span>
+      </div>
+
       <div className="sx-cards">
         {shown.map((it) => (
           <InstCard key={it.id} it={it} t={t} />
         ))}
       </div>
-      {limit && items.length > limit && onMore && (
-        <button className="sx-more" onClick={onMore}>
+      {onMore && limit && items.length > limit && (
+        <button className="sx-link mid" onClick={onMore}>
           {`${t("عرض الكل", "Show all")} (${AR(items.length)})`}
         </button>
       )}
@@ -896,61 +942,153 @@ export function InstStrategies({ limit, t, onMore }: { limit?: number; t: T; onM
 
 function InstCard({ it, t }: { it: Item; t: T }) {
   const d = it.data;
+  const step = (k: string, on: boolean, label: string) => (
+    <span key={k} className={`ist ${on ? "on" : ""}`}>
+      {label}
+    </span>
+  );
   return (
     <div className="sx-card wide">
       <div className="sx-h">
-        <b>{txt(d.name) || "—"}</b>
-        <span className="sx-own">{txt(d.owner)}</span>
-        <span className="sx-mini">
-          {`${AR(numOf(d.goals))} ${t("أهداف", "goals")} · ${AR(numOf(d.kpis))} ${t("مؤشراً", "KPIs")}`}
-        </span>
-        <span className="sx-pill">{txt(d.status) || INST_STAGES[Math.max(0, instStage(d) - 1)]}</span>
-        <span className="sx-up">{txt(d.updated)}</span>
+        <b>{txt(d.owner) || "—"}</b>
+        <span className="sx-own">{txt(d.consultant)}</span>
+        <span className="sx-mini">{txt(d.sector)}</span>
+        <span className="sx-pill">{txt(d.phase) || "—"}</span>
+        <span className="sx-up">{txt(d.target) ? `${t("مستهدف", "target")} ${txt(d.target)}` : ""}</span>
       </div>
-      <Flow stages={INST_STAGES} done={instStage(d)} />
-      {d.note ? <div className="sx-note">{txt(d.note)}</div> : null}
+      <div className="ist-row">
+        {step("rep", txt(d.rep) === "تمت تسمية ممثل", t("تسمية ممثل", "Rep named"))}
+        {step("meet", txt(d.meet) === "تم", t("الاجتماع التعريفي", "Kickoff"))}
+        {step("docs", txt(d.docs) === "✓", t("استلام الوثائق", "Docs"))}
+        {step("ds", txt(d.docsState) === "مكتمل", t("اكتمال الوثائق", "Docs complete"))}
+        {step("live", txt(d.live) === "مفعل", t("تفعيل القياس", "Measurement live"))}
+      </div>
     </div>
   );
 }
 
-function InstPage({ t }: { t: T }) {
-  const { items, loaded } = useItems("inststrat");
+/* صفحة المتابعة — جدول بأعمدة ملف الإدارة، كل خلية تُحرَّر في مكانها */
+function InstPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
+  const { items, loaded, save, remove } = useItems("inststrat");
   const [q, setQ] = useState("");
   const [f, setF] = useState("");
+  /* المسودّة تُبقي ما يكتبه المستخدم ظاهراً قبل أن يعود من الخادم */
+  const [draft, setDraft] = useState<Record<string, Rec>>({});
+
+  const val = (it: Item, k: string) => txt(draft[it.id]?.[k] ?? it.data[k]);
+
+  async function put(it: Item, k: string, v: string) {
+    const data = { ...it.data, ...(draft[it.id] || {}), [k]: v, demo: false };
+    setDraft((old) => ({ ...old, [it.id]: { ...(old[it.id] || {}), [k]: v } }));
+    await save(it.id, data, it.ord);
+  }
+
   const rows = useMemo(
     () =>
       items.filter((it) => {
         const d = it.data;
-        if (q && !`${txt(d.name)} ${txt(d.owner)}`.includes(q)) return false;
-        if (f && INST_STAGES[Math.max(0, instStage(d) - 1)] !== f) return false;
+        const hay = `${txt(d.owner)} ${txt(d.consultant)} ${txt(d.sector)} ${txt(d.email)}`;
+        if (q && !hay.includes(q)) return false;
+        if (f && txt(d.sector) !== f) return false;
         return true;
       }),
     [items, q, f],
   );
 
   function exportXl() {
-    const head = ["الاستراتيجية", "الجهة", "الأهداف", "المؤشرات", "المرحلة", "الحالة", "آخر تحديث"];
-    const body = rows.map((it) => {
-      const d = it.data;
-      return [
-        txt(d.name),
-        txt(d.owner),
-        numOf(d.goals),
-        numOf(d.kpis),
-        INST_STAGES[Math.max(0, instStage(d) - 1)],
-        txt(d.status),
-        txt(d.updated),
-      ];
-    });
-    download("الاستراتيجيات-المؤسسية.xlsx", writeXlsx([{ name: "المؤسسية", rows: [head, ...body] }]));
+    const head = INST_COLS.map((c) => c.label);
+    const body = rows.map((it) => INST_COLS.map((c) => txt(it.data[c.k])));
+    download("متابعة-الاستراتيجيات-المؤسسية.xlsx", writeXlsx([{ name: "المؤسسية", rows: [head, ...body] }]));
   }
 
   if (!loaded) return <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>;
 
   return (
     <>
-      <Toolbar q={q} setQ={setQ} filter={f} setFilter={setF} options={INST_STAGES} onExport={exportXl} t={t} />
-      <InstStrategies t={t} />
+      <Toolbar q={q} setQ={setQ} filter={f} setFilter={setF} options={INST_SECTORS} onExport={exportXl} t={t} />
+
+      <div className="sx-count">
+        {`${t("عرض", "Showing")} ${AR(rows.length)} ${t("من", "of")} ${AR(items.length)}`}
+      </div>
+
+      <div className="tbl-wrap">
+        <table className="sx-tbl inst">
+          <thead>
+            <tr>
+              <th className="c num">#</th>
+              {INST_COLS.map((c) => (
+                <th key={c.k} style={{ minWidth: c.w }}>
+                  {c.label}
+                </th>
+              ))}
+              {canEdit && <th className="c" />}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((it, n) => (
+              <tr key={it.id}>
+                <td className="c num">{AR(n + 1)}</td>
+                {INST_COLS.map((c) => {
+                  const v = val(it, c.k);
+                  const tone = instTone(c.k, v);
+                  if (!canEdit)
+                    return (
+                      <td key={c.k} className={tone ? `cell ${tone}` : "cell"} style={{ minWidth: c.w }}>
+                        {v || "—"}
+                      </td>
+                    );
+                  return (
+                    <td key={c.k} className={tone ? `cell ${tone}` : "cell"} style={{ minWidth: c.w }}>
+                      {c.opts ? (
+                        <select value={v} onChange={(e) => void put(it, c.k, e.target.value)}>
+                          {c.opts.map((o) => (
+                            <option key={o} value={o}>
+                              {o || "—"}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          value={v}
+                          onChange={(e) =>
+                            setDraft((old) => ({ ...old, [it.id]: { ...(old[it.id] || {}), [c.k]: e.target.value } }))
+                          }
+                          onBlur={(e) => {
+                            if (e.target.value !== txt(it.data[c.k])) void put(it, c.k, e.target.value);
+                          }}
+                        />
+                      )}
+                    </td>
+                  );
+                })}
+                {canEdit && (
+                  <td className="c">
+                    <button
+                      className="rowx"
+                      title={t("حذف الصف", "Delete row")}
+                      onClick={() => {
+                        if (!confirm(t(`حذف «${txt(it.data.owner)}»؟`, "Delete row?"))) return;
+                        void remove(it.id);
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {canEdit && (
+        <div className="sx-hint">
+          {t(
+            "التعديل مباشر داخل الجدول — كل تغيير يُحفظ فور اختياره.",
+            "Edit inline — every change saves immediately.",
+          )}
+        </div>
+      )}
     </>
   );
 }
@@ -1061,7 +1199,7 @@ export function SectionPage({ section, canEdit, t }: { section: SectionKey; canE
       )}
       {section === "sessions" && <SessionsPage t={t} />}
       {section === "natstrat" && <NationalPage t={t} canEdit={canEdit} />}
-      {section === "inststrat" && <InstPage t={t} />}
+      {section === "inststrat" && <InstPage t={t} canEdit={canEdit} />}
       {section === "projects" && <Projects t={t} />}
 
       {canEdit && <ItemsEditor section={section} t={t} onChanged={() => setNonce((n) => n + 1)} />}
@@ -1157,14 +1295,20 @@ const FIELDS: Record<Exclude<SectionKey, "outputs">, Field[]> = {
     { k: "updated", label: "آخر تحديث", kind: "date" },
   ],
   inststrat: [
-    { k: "name", label: "الاستراتيجية" },
+    { k: "sector", label: "القطاع" },
     { k: "owner", label: "الجهة" },
-    { k: "goals", label: "عدد الأهداف", kind: "num" },
-    { k: "kpis", label: "عدد المؤشرات", kind: "num" },
-    { k: "stage", label: "المرحلة (1..5)", kind: "num" },
-    { k: "status", label: "الحالة" },
+    { k: "consultant", label: "الاستشاري" },
+    { k: "phone", label: "رقم الجوال" },
+    { k: "email", label: "البريد الإلكتروني" },
+    { k: "rep", label: "تسمية ممثل (تمت تسمية ممثل · لم يُرسل بعد)" },
+    { k: "meet", label: "الاجتماع التعريفي (تم · لم يتم بعد)" },
+    { k: "meetAt", label: "تاريخ الاجتماع" },
+    { k: "docs", label: "استلام الوثائق (✓ · ✗)" },
+    { k: "docsState", label: "حالة الوثائق (مكتمل · جزئي · لايمكن قياسه)" },
+    { k: "target", label: "تفعيل القياس المستهدف (Q1..Q4)" },
+    { k: "live", label: "حالة التفعيل (مفعل · غير مفعل)" },
+    { k: "phase", label: "Phase 1 · Phase 2" },
     { k: "note", label: "ملاحظة", kind: "area" },
-    { k: "updated", label: "آخر تحديث", kind: "date" },
   ],
   projects: [
     { k: "name", label: "اسم المشروع" },
