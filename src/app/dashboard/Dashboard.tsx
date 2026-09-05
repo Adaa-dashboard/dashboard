@@ -480,24 +480,35 @@ export default function Dashboard({ me }: { me: Me }) {
 
         <main className="main-area">
           <div className="page-head">
-            {canBack && (
-              <button
-                className="tl-b back-b"
-                onClick={goBack}
-                title={t("رجوع للصفحة السابقة", "Back")}
-                aria-label={t("رجوع", "Back")}
-              >
-                {/* السهم لا يُقلب تلقائياً، فيُرسم حسب اتجاه اللغة */}
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                  {lang === "en" ? <path d="M15 5l-7 7 7 7" /> : <path d="M9 5l7 7-7 7" />}
-                </svg>
-              </button>
-            )}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img className="hlogo" src={asset("/adaa-logo.png")} alt="أداء — المركز الوطني لقياس أداء الأجهزة العامة" />
             <div className="hsep" />
             <h1>{t(title[0], title[1])}</h1>
             <div className="grow" />
+            {canBack && (
+              <button
+                className="back-b"
+                onClick={goBack}
+                title={t("رجوع للصفحة السابقة", "Back")}
+                aria-label={t("رجوع", "Back")}
+              >
+                {/* سهم منحنٍ بلا خلفية — والاتجاه حسب لغة الصفحة،
+                    فالـSVG لا يُقلب تلقائياً مع RTL */}
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  {lang === "en" ? (
+                    <>
+                      <path d="M3.5 8h11.5a6 6 0 0 1 0 12h-5" />
+                      <path d="M3.5 8l5-5M3.5 8l5 5" />
+                    </>
+                  ) : (
+                    <>
+                      <path d="M20.5 8H9a6 6 0 0 0 0 12h5" />
+                      <path d="M20.5 8l-5-5M20.5 8l-5 5" />
+                    </>
+                  )}
+                </svg>
+              </button>
+            )}
             <Tools t={t} meId={me.id} />
           </div>
 

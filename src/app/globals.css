@@ -17,7 +17,7 @@
   --primary-dark: #003b33;
   --accent: #008b84;
   --text: #132420;
-  --muted: var(--muted);
+  --muted: #8a9a95;
   --ink-2: #4b5a55;
   --border: #e6efec;
   --success: #1a9d5c;
@@ -8281,9 +8281,25 @@ table.matrix thead th {
   .iw-st:nth-child(3)::before { inset-inline-start: 50%; }
 }
 
-/* زر الرجوع داخل الصفحة — مربّع أخضر وسهم أبيض كبقية أزرار الرأس.
-   يظهر فقط بعد أول انتقال، فلا يشغل مكاناً في أول صفحة تُفتح */
+/* زر الرجوع — سهم منحنٍ رصاصي بلا خلفية، بجانب الحاسبة.
+   يظهر بعد أول انتقال فقط، فلا يشغل مكاناً في أول صفحة تُفتح */
 .back-b {
   flex: none;
-  margin-inline-end: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  margin-inline-end: 6px;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.back-b:hover {
+  color: var(--ink-2);
+  background: var(--soft);
 }
