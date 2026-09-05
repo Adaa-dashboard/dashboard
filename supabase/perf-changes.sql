@@ -857,3 +857,25 @@ begin
                 for delete to authenticated using (bucket_id = 'portfolio' and owner = auth.uid()) $q$;
   end if;
 end $$;
+
+-- ------------------------------------------------------------
+--  ١٣) المسمّى الوظيفي في قائمة الأشخاص
+--      صفحة «الهيكل» تقرأ jobTitle، لكن perf_people لم تكن تُرجعه
+--      فكان المسمّى فارغاً دائماً تحت كل اسم.
+-- ------------------------------------------------------------
+drop function if exists public.perf_people();
+create or replace function public.perf_people()
+returns table (id text, name text, role text, sector_ids text[],
+               active boolean, is_lead boolean, job_title text)
+language plpgsql security definer set search_path = public as $$
+begin
+  if not public.perf_signed_in() then raise exception 'forbidden'; end if;
+  return query select u.id::text, u.display_name, u.role, u.sector_ids,
+                      u.active, u.is_lead, u.job_title
+                 from public.perf_users u
+                where u.active
+                order by u.is_lead desc, u.display_name;
+end;
+$$;
+revoke all on function public.perf_people() from public, anon;
+grant execute on function public.perf_people() to authenticated;
