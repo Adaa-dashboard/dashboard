@@ -81,9 +81,11 @@ type WDef = {
 };
 
 export const WIDGETS: WDef[] = [
-  { key: "tasks", label: "مهامي", group: "top", icon: "clipboard", color: "#016b5f" },
+  /* الصف الأول: التقويم يميناً والملاحظات يساراً بارتفاع واحد،
+     وتحتهما «مهامي» بعرض الصفحة كاملاً */
   { key: "calendar", label: "التقويم", group: "top", icon: "calendar", color: "#1a9d5c" },
   { key: "notes", label: "ملاحظاتي", group: "top", icon: "note", color: "#c9a020" },
+  { key: "tasks", label: "مهامي", group: "top", icon: "clipboard", color: "#016b5f" },
   { key: "projects", label: "المشاريع الاستراتيجية", group: "projects", icon: "rocket", color: "#0f8a8a", section: "projects" },
   { key: "strategies", label: "البرامج والاستراتيجيات", group: "ops", icon: "map", color: "#016b5f", section: "entities" },
   { key: "quarterly", label: "التقارير الربعية", group: "ops", icon: "calendar-check", color: "#1a9d5c", section: "entities" },
@@ -325,6 +327,77 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
     </span>
   );
 
+  /* الأعمدة نفسها المستعملة في صفحة المهام: متأخرة · هذا الأسبوع ·
+     البقية · المكتملة — فالموظف يرى مهامه بنفس التقسيم أينما كان */
+  const colOf = (x: Task): "done" | "late" | "week" | "main" => {
+    if (x.state === "done") return "done";
+    const d = x.dueDate ? Math.round((new Date(x.dueDate).getTime() - new Date(new Date().toISOString().slice(0, 10)).getTime()) / 86400000) : 99;
+    if (d < 0) return "late";
+    if (d <= 7) return "week";
+    return "main";
+  };
+  const COLS: { key: "late" | "week" | "main" | "done"; title: string; color: string }[] = [
+    { key: "late", title: t("المتأخرة", "Overdue"), color: "#d34a4a" },
+    { key: "week", title: t("خلال أسبوع", "This week"), color: "#e0971a" },
+    { key: "main", title: t("البقية", "Later"), color: "#016b5f" },
+    { key: "done", title: t("المكتملة", "Completed"), color: "#5aaba2" },
+  ];
+
+  function TaskCard({ x }: { x: Task }) {
+    const boss = isBoss(x);
+    const ups = Array.isArray(x.updates) ? x.updates : [];
+    return (
+      <div className={`tk2c ${boss ? "boss" : ""}`}>
+        <div className="ttl">{x.title}</div>
+        <div className="mt">
+          <span className="from">{boss ? t("من مديري", "From manager") : t("ذاتية", "Self")}</span>
+          <span className="due">{dueLabel(x.dueDate, t)}</span>
+        </div>
+        <div className="acts">
+          <span className="ac2" onClick={() => setOpen(open === x.id ? null : x.id)}>
+            {ups.length ? `${ups.length} ${t("تحديثات", "updates")}` : `+ ${t("تحديث", "Update")}`}
+          </span>
+          {x.state !== "done" && (
+            <span className="ac2" onClick={() => done(x.id)}>
+              ✓ {t("إنهاء", "Done")}
+            </span>
+          )}
+          {boss ? (
+            <span className="lock" title={t("مسندة من مديرك — لا يمكن حذفها", "Assigned by your manager")}>
+              🔒
+            </span>
+          ) : (
+            <span className="ac2 del2" onClick={() => del(x.id)}>
+              ✕
+            </span>
+          )}
+        </div>
+        {open === x.id && (
+          <div className="upd">
+            {ups.map((u, i) => (
+              <div className="u" key={i}>
+                <b>{u.byName || ""}:</b>
+                <span>{u.text}</span>
+                <span className="d">{txt(u.at).slice(0, 10)}</span>
+              </div>
+            ))}
+            <div className="updbox">
+              <input
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder={t("اكتب تحديثاً يظهر لمديرك…", "Write an update…")}
+                onKeyDown={(e) => e.key === "Enter" && addUpdate(x.id)}
+              />
+              <button className="btn btn-sm" onClick={() => addUpdate(x.id)}>
+                {t("إرسال", "Send")}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <>
       <div className="tfil">
@@ -334,74 +407,25 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
         {chip("done", t("المكتملة", "Done"), tasks.filter((x) => x.state === "done").length)}
       </div>
 
-      {!shown.length && <div className="pf-none">{t("لا توجد مهام هنا.", "Nothing here.")}</div>}
-
-      {shown.map((x) => {
-        const boss = isBoss(x);
-        const ups = Array.isArray(x.updates) ? x.updates : [];
-        return (
-          <div className={`tcard ${boss ? "boss" : ""}`} key={x.id}>
-            <div className="r1">
-              <span className="ttl2">{x.title}</span>
-              <span className={`from ${boss ? "" : "self"}`}>
-                {boss ? t("من مديري", "From manager") : t("مهمة ذاتية", "Self")}
-              </span>
-            </div>
-            <div className="r2">
-              <i className={dueTone(x.dueDate, x.state)} />
-              {dueLabel(x.dueDate, t)}
-              <span className="acts2">
-                {ups.length > 0 && (
-                  <span className="ac2" onClick={() => setOpen(open === x.id ? null : x.id)}>
-                    {ups.length} {t("تحديثات", "updates")}
-                  </span>
-                )}
-                <span className="ac2" onClick={() => setOpen(open === x.id ? null : x.id)}>
-                  + {t("تحديث", "Update")}
-                </span>
-                {x.state !== "done" && (
-                  <span className="ac2" onClick={() => done(x.id)}>
-                    ✓ {t("إنهاء", "Done")}
-                  </span>
-                )}
-                {boss ? (
-                  <span className="lock" title={t("مسندة من مديرك — لا يمكن حذفها", "Assigned by your manager")}>
-                    🔒
-                  </span>
-                ) : (
-                  <span className="ac2 del2" onClick={() => del(x.id)}>
-                    ✕
-                  </span>
-                )}
-              </span>
-            </div>
-            {(open === x.id || ups.length > 0) && (
-              <div className="upd">
-                {ups.map((u, i) => (
-                  <div className="u" key={i}>
-                    <b>{u.byName || ""}:</b>
-                    <span>{u.text}</span>
-                    <span className="d">{txt(u.at).slice(0, 10)}</span>
-                  </div>
-                ))}
-                {open === x.id && (
-                  <div className="updbox">
-                    <input
-                      value={draft}
-                      onChange={(e) => setDraft(e.target.value)}
-                      placeholder={t("اكتب تحديثاً يظهر لمديرك…", "Write an update…")}
-                      onKeyDown={(e) => e.key === "Enter" && addUpdate(x.id)}
-                    />
-                    <button className="btn btn-sm" onClick={() => addUpdate(x.id)}>
-                      {t("إرسال", "Send")}
-                    </button>
-                  </div>
-                )}
+      <div className="tkboard">
+        {COLS.map((c) => {
+          const list = shown.filter((x) => colOf(x) === c.key);
+          if (filter !== "done" && c.key === "done") return null;
+          if (filter === "done" && c.key !== "done") return null;
+          return (
+            <div className="tkcol" key={c.key}>
+              <div className="h" style={{ ["--c" as string]: c.color }}>
+                {c.title}
+                <b>{list.length}</b>
               </div>
-            )}
-          </div>
-        );
-      })}
+              {list.map((x) => (
+                <TaskCard key={x.id} x={x} />
+              ))}
+              {!list.length && <div className="pf-none sm">—</div>}
+            </div>
+          );
+        })}
+      </div>
 
       {adding ? (
         <div className="updbox" style={{ marginTop: 8 }}>
@@ -1219,12 +1243,12 @@ export default function Portfolio({
   }
 
   /* بطاقة كاملة */
-  function Card({ k }: { k: WKey }) {
+  function Card({ k, wide }: { k: WKey; wide?: boolean }) {
     const w = WMAP[k];
     const st = stat(k);
     return (
       <div
-        className="card2"
+        className={`card2 ${wide ? "wide" : ""}`}
         draggable={arrange}
         onDragStart={() => setDrag(k)}
         onDragOver={(e) => arrange && e.preventDefault()}
@@ -1424,9 +1448,9 @@ export default function Portfolio({
         </div>
       )}
 
-      <div className={`pf-body lay-${prefs.mode === "table" ? "one" : prefs.layout}`}>
+      <div className={`pf-top ${prefs.mode === "table" || prefs.layout === "one" ? "one" : ""}`}>
         {group("top").map((k) => (
-          <Card key={k} k={k} />
+          <Card key={k} k={k} wide={k === "tasks"} />
         ))}
       </div>
 
