@@ -8280,3 +8280,10 @@ table.matrix thead th {
   .iw-st:nth-child(2)::before { inset-inline-end: 50%; }
   .iw-st:nth-child(3)::before { inset-inline-start: 50%; }
 }
+
+/* زر الرجوع داخل الصفحة — مربّع أخضر وسهم أبيض كبقية أزرار الرأس.
+   يظهر فقط بعد أول انتقال، فلا يشغل مكاناً في أول صفحة تُفتح */
+.back-b {
+  flex: none;
+  margin-inline-end: 4px;
+}
