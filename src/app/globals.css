@@ -8007,3 +8007,94 @@ table.matrix thead th {
 }
 .stg-lg span { display: inline-flex; align-items: center; gap: 7px; }
 .stg-lg em { font-style: normal; opacity: 0.75; }
+
+/* ============ جدول متابعة الاستراتيجيات المؤسسية ============
+   أعمدة ملف الإدارة نفسها، وكل خلية تُحرَّر في مكانها */
+.sx-tbl.inst {
+  font-size: 12px;
+  min-width: 1900px;
+}
+.sx-tbl.inst th {
+  font-size: 11px;
+  white-space: normal;
+  line-height: 1.4;
+}
+.sx-tbl.inst th.num,
+.sx-tbl.inst td.num { min-width: 34px; width: 34px; color: var(--muted); }
+.sx-tbl.inst td.cell { padding: 3px 5px; }
+.sx-tbl.inst td.cell select,
+.sx-tbl.inst td.cell input {
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 8px;
+  padding: 5px 7px;
+  font: inherit;
+  font-size: 12px;
+  color: inherit;
+}
+.sx-tbl.inst td.cell select:hover,
+.sx-tbl.inst td.cell input:hover {
+  border-color: var(--border);
+  background: var(--soft);
+}
+.sx-tbl.inst td.cell select:focus,
+.sx-tbl.inst td.cell input:focus {
+  border-color: var(--g-400);
+  background: var(--panel);
+  box-shadow: 0 0 0 3px rgba(0, 139, 132, 0.12);
+}
+/* تلوين الحالة — على الخلية لا على الحقل، فيبقى واضحاً أثناء التحرير */
+.sx-tbl.inst td.cell.ok { background: var(--ok-bg); color: var(--ok-tx); font-weight: 700; }
+.sx-tbl.inst td.cell.no { background: var(--dgr-bg); color: var(--dgr-tx); font-weight: 700; }
+.sx-tbl.inst td.cell.wt { background: #fdf3e0; color: #a5720c; font-weight: 700; }
+:root[data-theme="dark"] .sx-tbl.inst td.cell.wt { background: #3a2f13; color: #e6c26a; }
+.rowx {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 7px;
+}
+.rowx:hover { background: var(--dgr-bg); color: var(--dgr-tx); }
+.sx-hint {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 10px 2px 0;
+  text-align: center;
+}
+.sx-count {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 2px 2px 8px;
+}
+/* شريط أرقام مختصر تحت بطاقات المؤسسية */
+.sx-mini-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 10px 0 14px;
+}
+.sx-mini-row span {
+  background: var(--soft);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.sx-mini-row b { color: var(--gt-800); margin-inline-start: 6px; }
+/* مسار البطاقة: خطوات ملوّنة بدل شريط المراحل القديم */
+.ist-row { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 2px 2px; }
+.ist {
+  font-size: 11.5px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 3px 11px;
+  background: var(--soft);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.ist.on { background: var(--ok-bg); border-color: var(--ok-bd); color: var(--ok-tx); }
