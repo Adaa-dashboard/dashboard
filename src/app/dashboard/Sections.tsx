@@ -595,19 +595,67 @@ export function NationalStrategies({ limit, t, onMore }: { limit?: number; t: T;
   );
 }
 
+/* ما يعمله المركز عند كل حالة — نصوص عرض الإدارة نفسها */
+const NAT_DOING: Record<number, string> = {
+  4: "يعمل المركز على قياس أداء الاستراتيجيات والرفع بالتقارير",
+  3: "يعمل المركز مع الملاك على تقييم ورفع قابلية القياس",
+  2: "يعمل المركز مع الملاك على مراجعة الوثائق الاستراتيجية وإبداء الملاحظات",
+  1: "يعمل المركز مع الملاك على مراجعة الوثائق الاستراتيجية وإبداء الملاحظات",
+};
+const NAT_TONE: Record<number, string> = { 4: "#1a9d5c", 3: "#0f8a8a", 2: "#e0971a", 1: "#8a9a95" };
+
+/* مربّع استراتيجية واحدة — الاسم والجهة ونسبة القياس بلونها */
+function NatBox({ it, on, onClick, t }: { it: Item; on: boolean; onClick: () => void; t: T }) {
+  const d = it.data;
+  const m = numOf(d.meas);
+  const tone = measTone(m);
+  return (
+    <button className={`nsq ${on ? "on" : ""}`} onClick={onClick} title={txt(d.owner)}>
+      <span className="n">{txt(d.name)}</span>
+      <span className="o">{txt(d.owner) || "—"}</span>
+      <span className="m">
+        <b className={tone}>{`${AR(m)}٪`}</b>
+        <i>
+          <em className={tone} style={{ width: `${Math.max(m, 2)}%` }} />
+        </i>
+      </span>
+      {!d.tech && <span className="flag" title={t("غير مقبولة فنياً", "Not accepted")} />}
+    </button>
+  );
+}
+
+/* مجموعة حالة اعتماد — بسهم يطويها كما في بقية الصفحات */
+function NatGroup({
+  stage, rows, openId, setOpen, t,
+}: {
+  stage: number; rows: Item[]; openId: string | null; setOpen: (v: string | null) => void; t: T;
+}) {
+  const { open, toggle } = useCollapse(`nat:${stage}`);
+  if (!rows.length) return null;
+  return (
+    <div className="nsq-grp">
+      <div className="hd" style={{ ["--c" as string]: NAT_TONE[stage] }}>
+        <CollapseBtn open={open} toggle={toggle} t={t} />
+        <h3>{NAT_STEPS[stage - 1]}</h3>
+        <b>{AR(rows.length)}</b>
+        <span className="doing">{NAT_DOING[stage]}</span>
+      </div>
+      {open && (
+        <div className="nsq-grid">
+          {rows.map((it) => (
+            <NatBox key={it.id} it={it} on={openId === it.id} onClick={() => setOpen(openId === it.id ? null : it.id)} t={t} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NationalPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
   const { items, loaded, save, undo, undoTop, dismissUndo } = useItems("natstrat");
   const [q, setQ] = useState("");
   const [f, setF] = useState("");
   const [open, setOpen] = useState<string | null>(null);
-
-  /* الضغط على النقطة يقلّب حالتها: لم يبدأ ← قيد التنفيذ ← مكتمل.
-     أسرع من فتح نافذة التحرير لكل مرحلة، ولا يظهر لمن لا يملك التحرير */
-  async function cycle(it: Item, i: number) {
-    const cur = natTrack(it.data);
-    cur[i] = (cur[i] + 1) % 3;
-    await save(it.id, { ...it.data, track: cur, demo: false }, it.ord);
-  }
 
   const rows = useMemo(
     () =>
@@ -621,165 +669,135 @@ function NationalPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
     [items, q, f],
   );
 
-  const groups = useMemo(() => {
-    const g: Record<number, Item[]> = { 4: [], 3: [], 12: [] };
-    for (const it of items) {
-      const st = natStage(it.data);
-      if (st === 4) g[4].push(it);
-      else if (st === 3) g[3].push(it);
-      else g[12].push(it);
-    }
-    return g;
+  const cur = useMemo(() => items.find((x) => x.id === open) || null, [items, open]);
+
+  const nums = useMemo(() => {
+    const meas = items.map((x) => numOf(x.data.meas));
+    const avg = meas.length ? Math.round(meas.reduce((a, b) => a + b, 0) / meas.length) : 0;
+    return {
+      tot: items.length,
+      avg,
+      hi: meas.filter((m) => m >= 90).length,
+      zero: meas.filter((m) => !m).length,
+      kpisRep: items.reduce((a, x) => a + numOf(x.data.kpisRep), 0),
+      kpisTot: items.reduce((a, x) => a + numOf(x.data.kpisTot), 0),
+    };
   }, [items]);
 
-  if (!loaded) return <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>;
-  if (!items.length)
-    return (
-      <Empty
-        title={t("لا توجد استراتيجيات بعد", "Nothing yet")}
-        note={t("تُضاف الاستراتيجيات من زر «إضافة».", "Add strategies.")}
-      />
-    );
-
-  const cur = items.find((x) => x.id === open) || null;
-
-  function chips(list: Item[]) {
-    const names = [...new Set(list.map((x) => txt(x.data.domain)).filter(Boolean))];
-    const head = names.slice(0, 6);
-    return (
-      <div className="chips">
-        {head.map((n) => (
-          <span key={n}>{n}</span>
-        ))}
-        {names.length > head.length && <span className="more">+{AR(names.length - head.length)}</span>}
-      </div>
-    );
-  }
-
   function exportXl() {
-    const head = ["الاستراتيجية", "الجهة", "النطاق", "حالة الاعتماد", "المراجعة الفنية", "قابلية القياس", "أبرز الملاحظات"];
+    const head = ["الاستراتيجية", "الجهة", "حالة الاعتماد", "قابلية القياس ٪", "المؤشرات الممثلة",
+      "إجمالي المؤشرات", "المبادرات الممثلة", "إجمالي المبادرات", "المراجعة الفنية",
+      "فترة الاستراتيجية", "تاريخ الاعتماد", "أبرز الملاحظات"];
     const body = rows.map((it) => {
       const d = it.data;
-      return [
-        txt(d.name),
-        txt(d.owner),
-        txt(d.domain),
-        NAT_STEPS[natStage(d) - 1],
-        d.tech ? "مقبولة فنياً" : "غير مقبولة فنياً",
-        numOf(d.meas),
-        txt(d.note),
-      ];
+      return [txt(d.name), txt(d.owner), NAT_STEPS[natStage(d) - 1], numOf(d.meas),
+        numOf(d.kpisRep), numOf(d.kpisTot), numOf(d.initRep), numOf(d.initTot),
+        d.tech ? "مقبولة فنياً" : "غير مقبولة فنياً", txt(d.period), txt(d.approvedAt), txt(d.note)];
     });
-    download("الاستراتيجيات-الوطنية.xlsx", writeXlsx([{ name: "الاستراتيجيات", rows: [head, ...body] }]));
+    download("الاستراتيجيات-الوطنية.xlsx", writeXlsx([{ name: "الوطنية", rows: [head, ...body] }]));
   }
+
+  if (!loaded) return <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>;
 
   return (
     <>
       <Toolbar q={q} setQ={setQ} filter={f} setFilter={setF} options={NAT_STEPS} onExport={exportXl} t={t} />
 
-      <div className="sx-groups">
-        <div className="sx-grp dark">
-          <div className="hd">
-            {t("معتمدة من مجلس الوزراء", "Cabinet approved")} <b>{AR(groups[4].length)}</b>
-          </div>
-          {chips(groups[4])}
+      <div className="nsq-kpis">
+        <div className="k">
+          <div className="t">{t("إجمالي الاستراتيجيات", "Total")}</div>
+          <div className="v">{AR(nums.tot)}</div>
+          <div className="s">{`${AR(NAT_STEPS.length)} ${t("حالات اعتماد", "stages")}`}</div>
         </div>
-        <div className="sx-grp dark">
-          <div className="hd">
-            {t("معتمدة من اللجنة الاستراتيجية", "Committee approved")} <b>{AR(groups[3].length)}</b>
+        <div className="k">
+          <div className="t">{t("متوسط قابلية القياس", "Avg measurability")}</div>
+          <div className="v">{`${AR(nums.avg)}٪`}</div>
+          <div className="pb">
+            <i style={{ width: `${nums.avg}%` }} />
           </div>
-          {chips(groups[3])}
         </div>
-        <div className="sx-grp">
-          <div className="hd">
-            {t("تحت المراجعة والتطوير", "Under review")} <b>{AR(groups[12].length)}</b>
-          </div>
-          {chips(groups[12])}
+        <div className="k">
+          <div className="t">{t("قابلية قياس مرتفعة", "High")}</div>
+          <div className="v">{AR(nums.hi)}</div>
+          <div className="s">{`${t("و", "and")}${AR(nums.zero)} ${t("لم تبدأ بعد", "not started")}`}</div>
+        </div>
+        <div className="k">
+          <div className="t">{t("المؤشرات الممثَّلة", "Represented KPIs")}</div>
+          <div className="v">{AR(nums.kpisRep)}</div>
+          <div className="s">{`${t("من", "of")} ${AR(nums.kpisTot)}`}</div>
         </div>
       </div>
 
-      <div className="tbl-wrap">
-        <table className="sx-tbl">
-          <thead>
-            <tr>
-              <th>{t("الاستراتيجية", "Strategy")}</th>
-              <th>{t("حالة الاعتماد", "Approval")}</th>
-              {NAT_TRACK.map((n, i) => (
-                <th className={`c stg ${i === 0 ? "st-a" : ""} ${i === NAT_TRACK.length - 1 ? "st-z" : ""}`} key={n}>
-                  {n}
-                </th>
-              ))}
-              <th className="c">{t("المراجعة الفنية", "Technical review")}</th>
-              <th className="c">{t("قابلية القياس", "Measurability")}</th>
-              <th>{t("أبرز الملاحظات", "Notes")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((it) => {
-              const d = it.data;
-              return (
-                <tr key={it.id} className={open === it.id ? "on" : ""} onClick={() => setOpen(open === it.id ? null : it.id)}>
-                  <td>
-                    <div className="nm">{txt(d.name)}</div>
-                    <div className="own">{txt(d.owner)}</div>
-                  </td>
-                  <td>{NAT_STEPS[natStage(d) - 1]}</td>
-                  {natTrack(d).map((st, i) => (
-                    <td
-                      className={`c stg ${i === 0 ? "st-a" : ""} ${i === NAT_TRACK.length - 1 ? "st-z" : ""}`}
-                      key={i}
-                      title={`${NAT_TRACK[i]} — ${TRACK_STATE[st]}`}
-                      onClick={(e) => {
-                        if (!canEdit) return;
-                        e.stopPropagation();
-                        void cycle(it, i);
-                      }}
-                    >
-                      <i className={`stdot s${st} ${canEdit ? "ed" : ""}`} />
-                    </td>
-                  ))}
-                  <td className="c">
-                    <span className={`sx-tag ${d.tech ? "ok" : "no"}`}>
-                      {d.tech ? t("مقبولة فنياً", "Accepted") : t("غير مقبولة فنياً", "Not accepted")}
-                    </span>
-                  </td>
-                  <td className="c">
-                    <Bar v={numOf(d.meas)} />
-                  </td>
-                  <td className="note">{txt(d.note)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className="sx-count">
+        {`${t("عرض", "Showing")} ${AR(rows.length)} ${t("من", "of")} ${AR(items.length)}`}
       </div>
 
-      <div className="stg-lg">
-        {TRACK_STATE.map((n, i) => (
-          <span key={n}>
-            <i className={`stdot s${i}`} />
-            {t(n, n)}
-          </span>
-        ))}
-        {canEdit && <em>{t("اضغط على أي نقطة لتغيير حالتها", "Click a dot to change its state")}</em>}
-      </div>
+      {[4, 3, 2, 1].map((st) => (
+        <NatGroup
+          key={st}
+          stage={st}
+          rows={rows.filter((it) => natStage(it.data) === st)}
+          openId={open}
+          setOpen={setOpen}
+          t={t}
+        />
+      ))}
+      {!rows.length && <div className="pf-none">{t("لا توجد نتائج", "No results")}</div>}
 
       <UndoBar step={undoTop} onUndo={() => void undo()} onClose={dismissUndo} t={t} />
 
-      {cur && <NationalDetail it={cur} t={t} />}
+      {cur && <NationalDetail it={cur} t={t} canEdit={canEdit} save={save} />}
     </>
   );
 }
 
-function NationalDetail({ it, t }: { it: Item; t: T }) {
+function NationalDetail({
+  it, t, canEdit, save,
+}: {
+  it: Item;
+  t: T;
+  canEdit?: boolean;
+  save?: (id: string, data: Rec, ord: number) => Promise<string | null>;
+}) {
   const d = it.data;
   const meas = numOf(d.meas);
+  const track = natTrack(d);
+
+  /* مراحل المراجعة: الضغط يقلّب حالة المرحلة — لم يبدأ ← قيد التنفيذ ← مكتمل */
+  async function cycle(i: number) {
+    if (!canEdit || !save) return;
+    const cur = [...track];
+    cur[i] = (cur[i] + 1) % 3;
+    await save(it.id, { ...d, track: cur, demo: false }, it.ord);
+  }
+
   return (
     <div className="sx-det">
       <div className="col">
         <div className="box">
           <div className="k">{t("اسم الاستراتيجية", "Strategy")}</div>
           <div className="v">{txt(d.name)}</div>
+        </div>
+        <div className="box">
+          <div className="k">{t("مراحل المراجعة", "Review stages")}</div>
+          <div className="nat-track">
+            {NAT_TRACK.map((n, i) => (
+              <button
+                key={n}
+                className={`stg-c s${track[i]} ${canEdit ? "ed" : ""}`}
+                onClick={() => void cycle(i)}
+                title={`${n} — ${TRACK_STATE[track[i]]}`}
+                disabled={!canEdit}
+              >
+                <i />
+                <span>{n}</span>
+                <em>{TRACK_STATE[track[i]]}</em>
+              </button>
+            ))}
+          </div>
+          {canEdit && (
+            <div className="hint">{t("اضغط على أي مرحلة لتغيير حالتها", "Click a stage to change it")}</div>
+          )}
         </div>
         <div className="two">
           <div className="box">
