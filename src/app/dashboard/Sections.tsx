@@ -28,7 +28,7 @@ export const SECTION_TITLE: Record<SectionKey, [string, string]> = {
   natstrat: ["الاستراتيجيات الوطنية", "National strategies"],
   inststrat: ["الاستراتيجيات المؤسسية", "Institutional strategies"],
   outputs: ["المخرجات الوطنية", "National outputs"],
-  cx: ["أعمال قياس تجربة المستفيد عن الخدمات الحكومية", "Beneficiary experience measurement"],
+  cx: ["أعمال قياس تجربة المستفيد من الخدمات الحكومية", "Beneficiary experience measurement"],
   projects: ["المشاريع الاستراتيجية", "Strategic projects"],
 };
 
@@ -1675,7 +1675,7 @@ function InstForm({
 }
 
 /* ============================================================
-   أعمال قياس تجربة المستفيد عن الخدمات الحكومية
+   أعمال قياس تجربة المستفيد من الخدمات الحكومية
    ============================================================ */
 
 /** يقسم بنود القسم: بند المستهدف المحجوز، وبقيةُ الأجهزة */
