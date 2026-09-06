@@ -5098,6 +5098,15 @@ table.matrix thead th {
 .sx-pj .br {
   margin-top: 7px;
 }
+/* ملاحظة المشروع — سطر هادئ أسفل الشريطين */
+.sx-pj-note {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--muted);
+  border-top: 1px solid var(--line2);
+  padding-top: 8px;
+}
 .sx-pj .br .lb {
   display: flex;
   font-size: 10.5px;

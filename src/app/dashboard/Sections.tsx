@@ -366,7 +366,7 @@ function UndoBar({
    بديل تشغيل SQL يدوياً: الملف مرفق مع الموقع، والزر يكتبه عبر
    نفس واجهة القسم — فتحكمه صلاحيات الحساب لا امتيازات القاعدة.
    لا يُضاف بند موجود مسبقاً، فالضغط مرتين لا يكرّر شيئاً. */
-const SEEDED: SectionKey[] = ["natstrat", "inststrat"];
+const SEEDED: SectionKey[] = ["natstrat", "inststrat", "projects"];
 
 function SeedBtn({
   section, have, t, onDone,
@@ -1606,6 +1606,7 @@ export function Projects({ t }: { t: T }) {
               <h4>{txt(d.name) || "—"}</h4>
               <div className="meta">
                 {d.status ? <span className="sx-pill">{txt(d.status)}</span> : null}
+                {d.owner ? <span className="m">{`${t("الراعي", "Sponsor")}: ${txt(d.owner)}`}</span> : null}
                 {d.period ? <span className="m">{txt(d.period)}</span> : null}
                 {numOf(d.months) > 0 ? (
                   <span className="m">{`· ${t("الشهر", "Month")} ${AR(numOf(d.elapsed))} ${t("من", "of")} ${AR(numOf(d.months))}`}</span>
@@ -1629,6 +1630,7 @@ export function Projects({ t }: { t: T }) {
                   <i style={{ width: `${Math.max(0, Math.min(100, actual))}%` }} />
                 </div>
               </div>
+              {d.note ? <p className="sx-pj-note">{txt(d.note)}</p> : null}
             </div>
           </div>
         );
@@ -1751,12 +1753,14 @@ const FIELDS: Record<Exclude<SectionKey, "outputs">, Field[]> = {
   ],
   projects: [
     { k: "name", label: "اسم المشروع" },
+    { k: "owner", label: "الراعي" },
     { k: "status", label: "الحالة" },
     { k: "planned", label: "نسبة التقدم المخطط ٪", kind: "num" },
     { k: "actual", label: "نسبة التقدم الفعلي ٪", kind: "num" },
     { k: "period", label: "الفترة" },
     { k: "months", label: "مدة المشروع (شهر)", kind: "num" },
     { k: "elapsed", label: "الشهر الحالي", kind: "num" },
+    { k: "note", label: "ملاحظة", kind: "area" },
   ],
 };
 
