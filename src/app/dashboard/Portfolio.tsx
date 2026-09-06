@@ -22,6 +22,7 @@ import { IconGear } from "./icons";
 type Rec = Record<string, any>;
 type T = (ar: string, en: string) => string;
 type Me = { id: string; name: string; role: string; jobTitle?: string; scopes: string[] };
+type Person = { id: string; name: string; role?: string; isLead?: boolean; sectorIds?: string[] };
 
 export type Row = { section: string; id: string; ord: number; data: Rec; updatedAt?: string };
 
@@ -270,10 +271,14 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
   const [moreUpd, setMoreUpd] = useState<Record<string, boolean>>({});
   const LIMIT = 5;
 
+  const [people, setPeople] = useState<Person[]>([]);
+  const [busy, setBusy] = useState(false);
+
   const load = useCallback(async () => {
     const d = await apiFetch("/api/tasks").then((r) => r.json()).catch(() => ({}));
     const mine: Task[] = (d.tasks || []).filter((x: Task) => x.assigneeId === me.id);
     setTasks(mine);
+    setPeople(d.people || []);
     onCount?.(mine.filter((x) => x.state !== "done").length);
   }, [me.id, onCount]);
   useEffect(() => {
@@ -329,6 +334,67 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
     });
     setNewT({ title: "", dueDate: "" });
     setAdding(false);
+    await load();
+  }
+
+  /* ---- بيانات تجريبية للعرض ----
+     مهام من مديري وأخرى ذاتية، لتوضيح شكل الصفحة قبل تعبئتها.
+     معرّفاتها تبدأ بـ tsk-demo- فتُعرف وتُحذف دفعة واحدة. */
+  const hasDemo = tasks.some((x) => x.id.startsWith("tsk-demo-"));
+  const bossId = useMemo(() => {
+    const mine = people.find((x) => x.id === me.id);
+    const mySec = mine?.sectorIds || [];
+    const lead = people.find(
+      (x) => x.id !== me.id && x.isLead && x.sectorIds?.some((sc) => mySec.includes(sc))
+    );
+    return (lead || people.find((x) => x.id !== me.id && x.isLead))?.id || "";
+  }, [people, me.id]);
+
+  async function seedDemo() {
+    if (!bossId) {
+      alert(t("لم يُعثر على حساب مديرك — شغّلي ملف الهيكل أولاً.", "Manager account not found."));
+      return;
+    }
+    const day = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+    const bossName = people.find((x) => x.id === bossId)?.name || "";
+    const rows = [
+      { id: "tsk-demo-p1", title: "إعداد ملخّص تنفيذي لجاهزية الاستراتيجيات الوطنية قبل جلسة المجلس",
+        createdById: bossId, dueDate: day(4), state: "ok", priority: "high",
+        updates: [{ id: "d1", text: "الملخّص يُرفع بصيغة عرض من ٥ شرائح.", byId: bossId, byName: bossName, at: new Date(Date.now() - 2 * 86400000).toISOString() }] },
+      { id: "tsk-demo-p2", title: "مراجعة الجهات ذات قابلية القياس المنخفضة ورفع التوصيات",
+        createdById: bossId, dueDate: day(-3), state: "ok", priority: "high", updates: [] },
+      { id: "tsk-demo-p3", title: "تحديث بيانات الاستراتيجيات المؤسسية لقطاع الشؤون الاقتصادية",
+        createdById: bossId, dueDate: day(-8), state: "done", priority: "mid", updates: [] },
+      { id: "tsk-demo-p4", title: "تجهيز عرض الإنجاز الأسبوعي للإدارة",
+        createdById: me.id, dueDate: day(2), state: "ok", priority: "mid", updates: [] },
+      { id: "tsk-demo-p5", title: "متابعة استلام وثائق الاستراتيجيات المتبقية من الجهات",
+        createdById: me.id, dueDate: day(9), state: "ok", priority: "mid", updates: [] },
+      { id: "tsk-demo-p6", title: "توحيد أسماء الجهات في ملف الاستراتيجيات المؤسسية",
+        createdById: me.id, dueDate: day(-5), state: "done", priority: "mid", updates: [] },
+    ].map((x) => ({ ...x, assigneeId: me.id, kind: "task" }));
+    setBusy(true);
+    const r = await apiFetch("/api/tasks/demo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tasks: rows }),
+    });
+    setBusy(false);
+    if (!r.ok) {
+      alert(t("تعذّر إضافة البيانات التجريبية.", "Could not add demo data."));
+      return;
+    }
+    await load();
+  }
+
+  async function clearDemo() {
+    if (!confirm(t("حذف كل المهام التجريبية؟", "Delete all demo tasks?"))) return;
+    setBusy(true);
+    const r = await apiFetch("/api/tasks/demo?kind=task", { method: "DELETE" });
+    setBusy(false);
+    if (!r.ok) {
+      alert(t("تعذّر الحذف — يحتاج صلاحية مدير الإدارة.", "Delete needs admin."));
+      return;
+    }
     await load();
   }
 
@@ -466,6 +532,18 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
           + {t("مهمة جديدة لنفسي", "New task for me")}
         </div>
       )}
+
+      <div className="demorow">
+        {hasDemo ? (
+          <button className="btn btn-ghost btn-sm" disabled={busy} onClick={clearDemo}>
+            {t("حذف البيانات التجريبية", "Remove demo data")}
+          </button>
+        ) : (
+          <button className="btn btn-ghost btn-sm" disabled={busy} onClick={seedDemo}>
+            {t("إضافة بيانات تجريبية للعرض", "Add demo data")}
+          </button>
+        )}
+      </div>
     </>
   );
 }

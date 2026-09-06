@@ -73,8 +73,9 @@ export default function Activity({
     }
   }
 
-  const shown = open ? items : items.slice(0, 2);
-  const rest = Math.max(0, items.length - 2);
+  const SHOW = 4;
+  const shown = open ? items : items.slice(0, SHOW);
+  const rest = Math.max(0, items.length - SHOW);
 
   return (
     <div className={`card upcard ${open ? "open" : ""}`}>
@@ -126,7 +127,10 @@ export default function Activity({
           </div>
           {!open && rest > 0 && (
             <div className="up-more" onClick={toggle}>
-              {t(`عرض ${rest} تحديثات أخرى ▾`, `Show ${rest} more ▾`)}
+              {t(
+                rest === 1 ? "عرض تحديث آخر ▾" : rest === 2 ? "عرض تحديثين آخرين ▾" : `عرض ${rest} تحديثات أخرى ▾`,
+                `Show ${rest} more ▾`
+              )}
             </div>
           )}
         </>
