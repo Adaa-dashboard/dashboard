@@ -1111,7 +1111,8 @@ export function StrategyBox({
 }: {
   section: "natstrat" | "inststrat";
   t: T;
-  onOpen: () => void;
+  /** بلا onOpen لا يظهر زرّ «التفاصيل» — لمن لا يملك صلاحية القسم */
+  onOpen?: () => void;
 }) {
   const { items, loaded } = useItems(section);
   const title = SECTION_TITLE[section];
@@ -1122,9 +1123,11 @@ export function StrategyBox({
       <div className="hd">
         <CollapseBtn open={open} toggle={toggle} t={t} />
         <h3>{t(title[0], title[1])}</h3>
-        <button className="lnk" onClick={onOpen}>
-          {t("التفاصيل", "Details")} ‹
-        </button>
+        {onOpen && (
+          <button className="lnk" onClick={onOpen}>
+            {t("التفاصيل", "Details")} ‹
+          </button>
+        )}
       </div>
       {open && <div className="bd">{body}</div>}
     </div>
