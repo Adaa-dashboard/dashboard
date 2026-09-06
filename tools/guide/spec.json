@@ -1,0 +1,111 @@
+{
+ "login": [
+  ".card div:nth-of-type(2) input",
+  ".card div:nth-of-type(3) input",
+  ".card .btn",
+  ".card p:last-of-type"
+ ],
+ "overview": [
+  ".sx-two .sx-box:nth-child(1) .big",
+  ".sx-two .sx-box:nth-child(2) .big",
+  ".sx-two .sx-box:nth-child(1) .gen .gc:nth-child(1)",
+  ".sx-two .sx-box:nth-child(1) .hd .lnk",
+  ".cxc-l .sx-ring",
+  ".cxc-r .cxc-b:nth-child(4)"
+ ],
+ "nat": [
+  ".stabs .stab.on",
+  ".ncards .ncard:nth-child(1) .hd b",
+  ".ncards .ncard:nth-child(1) .tg",
+  ".ncards .ncard:nth-child(1) .sx-ring",
+  ".ncards .ncard:nth-child(1) .nums .n:nth-child(1)",
+  ".ncards .ncard:nth-child(1) .trk"
+ ],
+ "inst": [
+  ".stabs .stab.on",
+  ".iw-grid .iw:nth-child(1) .iw-h b",
+  ".iw-grid .iw:nth-child(1) .iw-ph",
+  ".iw-grid .iw:nth-child(1) .iw-who",
+  ".iw-grid .iw:nth-child(1) .iw-steps",
+  ".iw-grid .iw:nth-child(1) .iw-f .tg"
+ ],
+ "sess": [
+  ".sx-side .sx-ring",
+  ".sx-side .lgd",
+  ".sx-list .sx-card:nth-child(1) .sx-h",
+  ".sx-list .sx-card:nth-child(1) .sx-flow"
+ ],
+ "cx": [
+  ".sx-tools .seedb .btn",
+  ".cx-kpis .cx-k:nth-child(1)",
+  ".cx-stages .cx-st:nth-child(3)",
+  ".cx-two .card:nth-child(1) table",
+  ".cx-two .card:nth-child(2) table",
+  ".tbl-wrap table thead"
+ ],
+ "proj": [
+  ".sx-pjs .sx-pj:nth-child(1) .tile",
+  ".sx-pjs .sx-pj:nth-child(1) .bd h4",
+  ".sx-pjs .sx-pj:nth-child(1) .meta",
+  ".sx-pjs .sx-pj:nth-child(1) .br.pl"
+ ],
+ "details": [
+  ".toolbar .chips",
+  ".toolbar .btn:nth-of-type(1)",
+  ".dt-gh",
+  ".dt-tbl tbody tr:nth-child(1) .dt-name",
+  ".dt-tbl tbody tr:nth-child(1) td:nth-child(2)",
+  ".dt-tbl tbody tr:nth-child(1) td:nth-child(7)"
+ ],
+ "mypage": [
+  ".pf-hero",
+  ".tfil",
+  ".tkboard .tkcol:nth-child(1) .h",
+  ".tkboard .tkcol:nth-child(1) .tk2c.boss",
+  ".tkboard .tkcol:nth-child(1) .tk2c:not(.boss)",
+  ".nts .nt2:nth-child(1)",
+  ".card2:nth-child(2) .addrow",
+  ".tiles .card2:nth-child(3)"
+ ],
+ "asg": [
+  ".tboard .tcol:nth-child(1) .tk:nth-of-type(1)",
+  ".tboard .tcol:nth-child(2) .tcol-h"
+ ],
+ "changes": [
+  ".toolbar .chips",
+  ".toolbar .btn:nth-of-type(1)",
+  ".cr-tbl tbody tr:nth-child(1) .cr-name",
+  ".cr-tbl tbody tr:nth-child(1) .cr-st"
+ ],
+ "weekly": [
+  ".wk-heroS",
+  ".wk-heroT .wk-hd",
+  ".sx-tbl.mini",
+  ".ai-lines"
+ ],
+ "ai": [
+  ".ai-ask input",
+  ".ai-sg",
+  ".ai-t b",
+  ".ai-pin",
+  ".ai-foot"
+ ],
+ "notes": [
+  ".nts .nt2:nth-child(1) .t",
+  ".tl-grid .tl-d.has",
+  ".tl-calh b",
+  ".tl-cal-b .tl-alh"
+ ],
+ "struct": [
+  ".org-head",
+  ".org-grid .org-col:nth-child(1) .org-sec",
+  ".org-grid .org-col:nth-child(1) .org-p:nth-child(3)"
+ ],
+ "users": [
+  ".toolbar .chips",
+  ".toolbar .btn",
+  "table tbody tr:nth-child(1) td:nth-child(1)",
+  "table tbody tr:nth-child(1) td:nth-child(4)",
+  "table tbody tr:nth-child(1) td:nth-child(5)"
+ ]
+}
