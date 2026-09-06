@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { writeXlsx } from "@/lib/sheet";
+import { asset } from "@/lib/base";
 
 /* ============================================================
    الأقسام الخمسة المتفرّعة من المؤشرات التفصيلية:
@@ -358,6 +359,63 @@ function UndoBar({
         ✕
       </button>
     </div>
+  );
+}
+
+/* ---------------- تحميل البيانات الأولية ----------------
+   بديل تشغيل SQL يدوياً: الملف مرفق مع الموقع، والزر يكتبه عبر
+   نفس واجهة القسم — فتحكمه صلاحيات الحساب لا امتيازات القاعدة.
+   لا يُضاف بند موجود مسبقاً، فالضغط مرتين لا يكرّر شيئاً. */
+const SEEDED: SectionKey[] = ["natstrat", "inststrat"];
+
+function SeedBtn({
+  section, have, t, onDone,
+}: {
+  section: SectionKey; have: Set<string>; t: T; onDone: () => void;
+}) {
+  const [busy, setBusy] = useState("");
+
+  async function run() {
+    setBusy(t("جارٍ التحميل...", "Loading..."));
+    try {
+      const r = await fetch(asset(`/seed/${section}.json`));
+      const all = (await r.json()) as { id: string; ord: number; data: Rec }[];
+      const rows = all.filter((x) => !have.has(x.id));
+      if (!rows.length) {
+        setBusy(t("البيانات محمّلة أصلاً — لا جديد", "Already loaded"));
+        return;
+      }
+      if (!confirm(t(
+        `سيُضاف ${rows.length} بنداً إلى هذا القسم. البنود الموجودة لن تُمسّ. متابعة؟`,
+        `Add ${rows.length} items? Existing items are untouched.`,
+      ))) {
+        setBusy("");
+        return;
+      }
+      const res = await apiFetch("/api/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ section, items: rows }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setBusy(d.error || t("تعذّر التحميل", "Failed"));
+        return;
+      }
+      setBusy("");
+      onDone();
+    } catch {
+      setBusy(t("تعذّر قراءة ملف البيانات", "Could not read the data file"));
+    }
+  }
+
+  return (
+    <span className="seedb">
+      <button className="btn btn-sm" onClick={run} disabled={!!busy && busy.includes("جارٍ")}>
+        {t("تحميل البيانات الأولية", "Load starter data")}
+      </button>
+      {busy && <em>{busy}</em>}
+    </span>
   );
 }
 
@@ -1549,6 +1607,9 @@ export function Outputs({ t }: { t: T }) {
 export function SectionPage({ section, canEdit, t }: { section: SectionKey; canEdit: boolean; t: T }) {
   const [editing, setEditing] = useState<Item | "new" | null>(null);
   const [nonce, setNonce] = useState(0);
+  /* معرّفات ما هو محمَّل فعلاً — ليعرف زر التحميل ما ينقص */
+  const { items } = useItems(section, section !== "outputs");
+  const have = useMemo(() => new Set(items.map((x) => x.id)), [items]);
 
   if (section === "outputs") return <Outputs t={t} />;
 
@@ -1559,6 +1620,14 @@ export function SectionPage({ section, canEdit, t }: { section: SectionKey; canE
           <button className="btn btn-sm" onClick={() => setEditing("new")}>
             {t("إضافة", "Add")}
           </button>
+          {SEEDED.includes(section) && (
+            <SeedBtn
+              section={section}
+              have={have}
+              t={t}
+              onDone={() => setNonce((n) => n + 1)}
+            />
+          )}
         </div>
       )}
       {section === "sessions" && <SessionsPage t={t} />}
