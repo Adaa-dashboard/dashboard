@@ -80,6 +80,15 @@ update public.perf_users
          public.perf_norm_name('حمد العويس'));
 
 -- ------------------------------------------------------------
+--  ٣-ب) تنظيف صلاحية ميتة
+--     «entry» بقيت في حسابات قديمة وهي بلا صفحة ولا أثر، فكانت
+--     تظهر في صفحة المستخدمين باسمها الإنجليزي الخام.
+-- ------------------------------------------------------------
+update public.perf_users
+   set scopes = array_remove(scopes, 'entry')
+ where scopes @> array['entry'];
+
+-- ------------------------------------------------------------
 --  ٤) التكاليف — ناصر الشايع ومدير الإدارة
 -- ------------------------------------------------------------
 update public.perf_users
@@ -119,7 +128,7 @@ update public.perf_users
 update public.perf_users
    set scopes = (select array(select distinct unnest(
          coalesce(scopes, '{}') || array[
-           'overview','details','details:all','entry','targets','tasks','tasks:all',
+           'overview','details','details:all','targets','tasks','tasks:all',
            'assignments','changes','changes:upload','weekly','sessions','natstrat',
            'inststrat','outputs','cx','projects','sections:edit','structure','users'])))
  where active
