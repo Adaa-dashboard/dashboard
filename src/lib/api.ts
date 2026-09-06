@@ -365,6 +365,43 @@ export async function apiFetch(path: string, init: Init = {}) {
       if (error) return err(error.message, 403);
       return ok({ ok: true });
     }
+    /* بيانات تجريبية للعرض — معرّفاتها تبدأ بـ tsk-demo- فتُميَّز وتُحذف دفعة واحدة.
+       تُدرج بمُسنِد صريح (created_by_id) حتى تظهر «من مديري» كما تظهر في الواقع. */
+    if (p === "/api/tasks/demo") {
+      if (method === "POST") {
+        const rows = (Array.isArray(body.tasks) ? body.tasks : []).map(
+          (x: Record<string, unknown>) => ({
+            id: String(x.id),
+            title: String(x.title || ""),
+            description: String(x.description || ""),
+            assignee_id: String(x.assigneeId || ""),
+            priority: x.priority === "high" ? "high" : "mid",
+            due_date: x.dueDate,
+            indicator_id: null,
+            kind: x.kind === "assignment" ? "assignment" : "task",
+            state: x.state === "done" ? "done" : x.state === "risk" ? "risk" : "ok",
+            updates: Array.isArray(x.updates) ? x.updates : [],
+            created_by_id: String(x.createdById || ""),
+            completed_at: x.state === "done" ? new Date().toISOString() : null,
+          })
+        );
+        if (!rows.length) return err("لا توجد بيانات", 400);
+        if (rows.some((r: { id: string }) => !r.id.startsWith("tsk-demo-")))
+          return err("معرّف غير تجريبي", 400);
+        const { error } = await s.from("perf_tasks").upsert(rows, { onConflict: "id" });
+        if (error) return err(error.message, 403);
+        return ok({ ok: true, count: rows.length });
+      }
+      if (method === "DELETE") {
+        const kind = q.get("kind");
+        let del = s.from("perf_tasks").delete().like("id", "tsk-demo-%");
+        if (kind) del = del.eq("kind", kind);
+        const { error } = await del;
+        if (error) return err("حذف البيانات التجريبية لمدير الإدارة وحده", 403);
+        return ok({ ok: true });
+      }
+    }
+
     if (p.startsWith("/api/tasks/")) {
       const id = p.split("/")[3];
       if (method === "DELETE") {

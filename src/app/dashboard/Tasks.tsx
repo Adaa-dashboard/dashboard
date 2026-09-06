@@ -137,6 +137,63 @@ export default function Tasks({
     onFocusDone?.();
   }, [focusId, loaded, tasks, onFocusDone]);
 
+  /* ---- مثال تجريبي للتكاليف ----
+     تكليف واحد بمُسنَد إليه ومُسنِد حقيقيين من الهيكل، لتوضيح شكل الصفحة.
+     معرّفه يبدأ بـ tsk-demo- فيُعرف ويُحذف وحده. */
+  const nrm = (v: string) =>
+    v.replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/\s+/g, " ").trim();
+  const findPerson = (n: string) => people.find((x) => nrm(x.name) === nrm(n));
+  const hasDemo = tasks.some((x) => x.id.startsWith("tsk-demo-"));
+  const [demoBusy, setDemoBusy] = useState(false);
+
+  async function seedDemo() {
+    const to = findPerson("عبدالله البكر");
+    const by = findPerson("عبدالله الحزامي");
+    if (!to || !by) {
+      setErr(t("الحسابان غير موجودين — شغّلي ملف الهيكل أولاً.", "Accounts not found — run the roster file first."));
+      return;
+    }
+    setDemoBusy(true);
+    const r = await apiFetch("/api/tasks/demo", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        tasks: [
+          {
+            id: "tsk-demo-a1",
+            title:
+              "التنسيق مع وزارة الداخلية لاتخاذ ما يلزم لتضمين آلية قياس كفاية أداء الخدمات العامة في المناطق",
+            assigneeId: to.id,
+            createdById: by.id,
+            kind: "assignment",
+            priority: "high",
+            state: "ok",
+            dueDate: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
+            updates: [],
+          },
+        ],
+      }),
+    }).then((x) => x.json());
+    setDemoBusy(false);
+    if (r.error) {
+      setErr(r.error);
+      return;
+    }
+    load();
+  }
+
+  async function clearDemo() {
+    if (!confirm(t("حذف التكاليف التجريبية؟", "Delete demo assignments?"))) return;
+    setDemoBusy(true);
+    const r = await apiFetch("/api/tasks/demo?kind=assignment", { method: "DELETE" }).then((x) => x.json());
+    setDemoBusy(false);
+    if (r.error) {
+      setErr(r.error);
+      return;
+    }
+    load();
+  }
+
   const nameOf = useCallback(
     (id: string) => people.find((p) => p.id === id)?.name || "—",
     [people]
@@ -213,6 +270,17 @@ export default function Tasks({
           </button>
         </div>
         <div style={{ flex: 1 }} />
+        {asg && (
+          <button
+            className="btn btn-ghost btn-sm"
+            disabled={demoBusy}
+            onClick={hasDemo ? clearDemo : seedDemo}
+          >
+            {hasDemo
+              ? t("حذف البيانات التجريبية", "Remove demo data")
+              : t("إضافة مثال تجريبي", "Add demo example")}
+          </button>
+        )}
         <button className="btn btn-sm" onClick={() => setCreating(true)}>
           ＋ {L.add}
         </button>

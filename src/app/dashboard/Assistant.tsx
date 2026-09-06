@@ -193,15 +193,23 @@ function sectionBrief(k: SecKey, items: Rec[]): Ans {
   if (k === "natstrat") {
     const stage = (x: Rec) => Math.max(1, Math.min(4, num(d(x).stage, 1)));
     const counts = [1, 2, 3, 4].map((n) => items.filter((x) => stage(x) === n).length);
-    const meas = items.map((x) => num(d(x).meas)).filter((n) => n > 0);
-    const avg = meas.length ? Math.round(meas.reduce((a, b) => a + b, 0) / meas.length) : null;
+    /* نطاقات لا متوسط: المتوسط يخلط ما لم يصل المركز بعد بما قِيس فضعُف */
+    const band = { hi: 0, mid: 0, low: 0 };
+    for (const x of items) {
+      const m = num(d(x).meas);
+      if (m >= 90) band.hi++;
+      else if (m >= 70) band.mid++;
+      else band.low++;
+    }
     const weak = items.filter((x) => num(d(x).meas) > 0 && num(d(x).meas) < 70);
     return {
       title,
       icon: "flag",
       chips: [
         { k: "الاستراتيجيات", v: String(items.length) },
-        ...(avg === null ? [] : [{ k: "متوسط قابلية القياس", v: `${avg}%`, tone: avg >= 80 ? "g" : "a" }]),
+        { k: "قابلية قياس مرتفعة", v: String(band.hi), tone: "g" },
+        { k: "متوسطة", v: String(band.mid), tone: "a" },
+        { k: "منخفضة", v: String(band.low), tone: band.low ? "r" : "g" },
         { k: "معتمدة من المجلس", v: String(counts[3]), tone: "g" },
       ],
       lines: [

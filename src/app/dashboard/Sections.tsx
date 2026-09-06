@@ -669,14 +669,40 @@ const NAT_TAB: Record<number, string> = {
   1: "قيد الإعداد",
 };
 
+/* شعارات الجهات المستخرَجة من عرض الإدارة.
+   المطابقة بالاسم لا بحقل محفوظ، فتعمل على البنود المحمَّلة سابقاً. */
+const logoKey = (s: string) =>
+  s.replace(/\s+/g, "").replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي");
+
+function useLogos() {
+  const [map, setMap] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let live = true;
+    void fetch(asset("/logos/index.json"))
+      .then((r) => r.json())
+      .then((d: Record<string, string>) => {
+        if (!live) return;
+        const m: Record<string, string> = {};
+        for (const [k, v] of Object.entries(d)) m[logoKey(k)] = v;
+        setMap(m);
+      })
+      .catch(() => setMap({}));
+    return () => {
+      live = false;
+    };
+  }, []);
+  return map;
+}
+
 /* بطاقة استراتيجية وطنية — حلقة القياس وأربعة أرقام ومسار المراجعة */
 function NatCard({
-  it, t, canEdit, save,
+  it, t, canEdit, save, logo,
 }: {
   it: Item;
   t: T;
   canEdit?: boolean;
   save?: (id: string, data: Rec, ord: number) => Promise<string | null>;
+  logo?: string;
 }) {
   const d = it.data;
   const meas = numOf(d.meas);
@@ -692,6 +718,10 @@ function NatCard({
   return (
     <div className="ncard">
       <div className="hd">
+        {logo && (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img className="lg" src={asset(`/logos/${logo}`)} alt="" loading="lazy" />
+        )}
         <b>{txt(d.name)}</b>
         <span className={`tg ${d.tech ? "ok" : "no"}`}>
           {d.tech ? t("مقبولة فنياً", "Accepted") : t("غير مقبولة فنياً", "Not accepted")}
@@ -756,6 +786,7 @@ function NationalPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
   const [q, setQ] = useState("");
   /* التبويب المختار — حالة الاعتماد */
   const [tab, setTab] = useState(4);
+  const logos = useLogos();
 
   const found = useMemo(
     () =>
@@ -812,7 +843,14 @@ function NationalPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
       {rows.length ? (
         <div className="ncards">
           {rows.map((it) => (
-            <NatCard key={it.id} it={it} t={t} canEdit={canEdit} save={save} />
+            <NatCard
+              key={it.id}
+              it={it}
+              t={t}
+              canEdit={canEdit}
+              save={save}
+              logo={logos[logoKey(txt(it.data.name))]}
+            />
           ))}
         </div>
       ) : (
@@ -996,7 +1034,15 @@ export function StrategyBox({
   if (section === "natstrat") {
     const c = [0, 0, 0, 0];
     for (const it of items) c[natStage(it.data) - 1]++;
-    const meas = Math.round(items.reduce((a, x) => a + numOf(x.data.meas), 0) / tot);
+    /* توزيع النطاقات بدل متوسط واحد: المتوسط يخلط ما لم يصل المركز
+       بعد (قابليته صفر) بما قِيس وطلع ضعيفاً، فيعطي رقماً مضلِّلاً */
+    const band = { hi: 0, mid: 0, low: 0 };
+    for (const it of items) {
+      const m = numOf(it.data.meas);
+      if (m >= 90) band.hi++;
+      else if (m >= 70) band.mid++;
+      else band.low++;
+    }
     const tech = items.filter((x) => x.data.tech).length;
     const rep = items.reduce((a, x) => a + numOf(x.data.kpisRep), 0);
     const all = items.reduce((a, x) => a + numOf(x.data.kpisTot), 0);
@@ -1014,11 +1060,16 @@ export function StrategyBox({
           </div>
         </div>
         <div className="gen">
-          <GCell k={t("متوسط قابلية القياس", "Avg. measurability")}>
-            <span className="meas">
-              <span className={`n ${measTone(meas)}`}>{AR(meas)}٪</span>
-              <span className="bar">
-                <i className={measTone(meas)} style={{ width: `${meas}%` }} />
+          <GCell k={t("قابلية القياس", "Measurability")}>
+            <span className="bands">
+              <span className="hi">
+                {AR(band.hi)} <em>{t("مرتفعة", "high")}</em>
+              </span>
+              <span className="mid">
+                {AR(band.mid)} <em>{t("متوسطة", "medium")}</em>
+              </span>
+              <span className="low">
+                {AR(band.low)} <em>{t("منخفضة", "low")}</em>
               </span>
             </span>
           </GCell>
