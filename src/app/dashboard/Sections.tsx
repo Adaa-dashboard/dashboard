@@ -21,14 +21,20 @@ type Rec = Record<string, any>;
 export type Item = { id: string; ord: number; data: Rec; updatedAt?: string; updatedBy?: string };
 type T = (ar: string, en: string) => string;
 
-export type SectionKey = "sessions" | "natstrat" | "inststrat" | "outputs" | "projects";
+export type SectionKey = "sessions" | "natstrat" | "inststrat" | "outputs" | "cx" | "projects";
 
 export const SECTION_TITLE: Record<SectionKey, [string, string]> = {
   sessions: ["جلسات مراجعة الأداء", "Performance review sessions"],
   natstrat: ["الاستراتيجيات الوطنية", "National strategies"],
   inststrat: ["الاستراتيجيات المؤسسية", "Institutional strategies"],
   outputs: ["المخرجات الوطنية", "National outputs"],
+  cx: ["أعمال قياس تجربة المستفيد عن الخدمات الحكومية", "Beneficiary experience measurement"],
   projects: ["المشاريع الاستراتيجية", "Strategic projects"],
+};
+
+/* اسم مختصر لعنصر القائمة الجانبية — الاسم الكامل يطول عليه */
+export const SECTION_NAV_TITLE: Partial<Record<SectionKey, [string, string]>> = {
+  cx: ["قياس تجربة المستفيد", "Beneficiary experience"],
 };
 
 /* مراحل المسار — مبدئية حتى تعتمدها الإدارة المعنية */
@@ -68,6 +74,31 @@ const INST_COLS: ICol[] = [
   { k: "live", label: "حالة التفعيل", opts: ["", "مفعل", "غير مفعل"], w: 115 },
   { k: "phase", label: "Phase", opts: ["", "Phase 1", "Phase 2"], w: 110 },
 ];
+
+/* ============ أعمال قياس تجربة المستفيد ============
+   الوحدة المحسوبة هي «الجهاز» لا الخدمة: كم جهازاً تُقاس خدماته،
+   وكم منها اكتمل، مقابل المستهدف.
+   المستهدف رقم واحد للقسم كله — يُحفظ في بند محجوز معرّفه CX_META
+   داخل نفس الجدول، فلا يحتاج جدولاً ولا صلاحيةً جديدة في القاعدة.
+   هذا البند يُستبعَد من كل قوائم الأجهزة وعدّاداتها. */
+const CX_META = "cx-meta";
+const CX_STATES = ["لم يبدأ", "جارٍ القياس", "مكتمل"];
+const CX_COLS: ICol[] = [
+  { k: "owner", label: "الجهة", w: 240 },
+  { k: "sector", label: "القطاع", opts: ["", ...INST_SECTORS], w: 150 },
+  { k: "state", label: "الحالة", opts: CX_STATES, w: 120 },
+  { k: "services", label: "عدد الخدمات", w: 100 },
+  { k: "measured", label: "المقيس منها", w: 100 },
+  { k: "updated", label: "آخر تحديث", w: 110 },
+  { k: "note", label: "ملاحظة", w: 260 },
+];
+/** لون خلية الحالة — أخضر للمكتمل، ذهبي للجاري، رمادي لما لم يبدأ */
+function cxTone(k: string, v: string): string {
+  if (k !== "state") return "";
+  if (v === "مكتمل") return "ok";
+  if (v === "جارٍ القياس") return "wt";
+  return "";
+}
 /* تلوين الخلايا التي لها معنى حالة */
 function instTone(k: string, v: string): string {
   if (!v) return "";
@@ -1567,6 +1598,278 @@ function InstForm({
 }
 
 /* ============================================================
+   أعمال قياس تجربة المستفيد عن الخدمات الحكومية
+   ============================================================ */
+
+/** يقسم بنود القسم: بند المستهدف المحجوز، وبقيةُ الأجهزة */
+function cxSplit(items: Item[]) {
+  const meta = items.find((x) => x.id === CX_META) || null;
+  const rows = items.filter((x) => x.id !== CX_META);
+  return { meta, rows, target: numOf(meta?.data.target) };
+}
+
+/** أرقام القسم — كلها مشتقّة من البنود، فلا رقم مخزَّن يتقادم */
+function cxStats(items: Item[]) {
+  const { rows, target } = cxSplit(items);
+  const done = rows.filter((x) => txt(x.data.state) === "مكتمل").length;
+  const going = rows.filter((x) => txt(x.data.state) === "جارٍ القياس").length;
+  const notYet = rows.length - done - going;
+  const services = rows.reduce((a, x) => a + numOf(x.data.services), 0);
+  const measured = rows.reduce((a, x) => a + numOf(x.data.measured), 0);
+  const last = rows.map((x) => txt(x.data.updated)).sort().slice(-1)[0] || "—";
+  // النسبة من المستهدف — وبلا مستهدف لا نسبة، فلا نقسم على عدد الصفوف
+  const pct = target > 0 ? Math.round((done / target) * 100) : null;
+  return { rows, target, done, going, notYet, services, measured, last, pct };
+}
+
+export function CxBox({ t, onOpen }: { t: T; onOpen: () => void }) {
+  const { items, loaded } = useItems("cx");
+  const title = SECTION_TITLE.cx;
+  const { open, toggle } = useCollapse("cx");
+
+  const box = (body: ReactNode) => (
+    <div className={`sx-box ${open ? "" : "closed"}`} style={{ marginTop: 28 }}>
+      <div className="hd">
+        <CollapseBtn open={open} toggle={toggle} t={t} />
+        <h3>{t(title[0], title[1])}</h3>
+        <button className="lnk" onClick={onOpen}>
+          {t("التفاصيل", "Details")} ‹
+        </button>
+      </div>
+      {open && <div className="bd">{body}</div>}
+    </div>
+  );
+
+  if (!loaded) return box(<div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>);
+
+  const st = cxStats(items);
+  if (!st.rows.length)
+    return box(
+      <div className="sx-none">{t("لا توجد بيانات بعد — تُضاف من صفحة القسم.", "No data yet.")}</div>,
+    );
+
+  return box(
+    <>
+      <div className="head-row">
+        <div className="big">
+          <b>{AR(st.rows.length)}</b>
+          <span>{t("جهاز تُقاس خدماته", "agencies measured")}</span>
+        </div>
+        <div className="side">
+          <KV label={t("المحقق (اكتمل قياسها)", "Completed")} n={st.done} tot={st.rows.length} tone="g" />
+          <KV label={t("جارٍ القياس", "In progress")} n={st.going} tot={st.rows.length} />
+          <KV label={t("لم يبدأ", "Not started")} n={st.notYet} tot={st.rows.length} />
+        </div>
+      </div>
+      <div className="gen">
+        <GCell k={t("المستهدف", "Target")}>
+          {st.target > 0 ? (
+            <>
+              {AR(st.target)} <em>{t("جهاز", "agencies")}</em>
+            </>
+          ) : (
+            <em>{t("لم يُحدَّد بعد", "Not set")}</em>
+          )}
+        </GCell>
+        <GCell k={t("المحقق من المستهدف", "Achieved of target")}>
+          {st.pct === null ? (
+            <em>{t("يحتاج تحديد المستهدف", "Set the target first")}</em>
+          ) : (
+            <span className="meas">
+              <span className="n hi">{AR(st.pct)}٪</span>
+              <span className="bar">
+                <i className="hi" style={{ width: `${Math.min(100, st.pct)}%` }} />
+              </span>
+            </span>
+          )}
+        </GCell>
+        <GCell k={t("الخدمات المقيسة", "Services measured")}>
+          {AR(st.measured)} <em>{`${t("من", "of")} ${AR(st.services)}`}</em>
+        </GCell>
+        <GCell k={t("آخر تحديث", "Last update")}>
+          <span className="dt">{st.last}</span>
+        </GCell>
+      </div>
+    </>,
+  );
+}
+
+export function CxPage({ t, canEdit }: { t: T; canEdit: boolean }) {
+  const { items, loaded, save, remove, undo, undoTop, dismissUndo } = useItems("cx");
+  const [q, setQ] = useState("");
+  const [f, setF] = useState("");
+  const [draft, setDraft] = useState<Record<string, Rec>>({});
+  const [tgtDraft, setTgtDraft] = useState<string | null>(null);
+
+  const val = (it: Item, k: string) => txt(draft[it.id]?.[k] ?? it.data[k]);
+
+  async function put(it: Item, k: string, v: string) {
+    const data = { ...it.data, ...(draft[it.id] || {}), [k]: v };
+    setDraft((old) => ({ ...old, [it.id]: { ...(old[it.id] || {}), [k]: v } }));
+    await save(it.id, data, it.ord);
+  }
+
+  const st = cxStats(items);
+  const { meta } = cxSplit(items);
+
+  async function saveTarget(v: string) {
+    const n = numOf(v);
+    if (n === st.target) return;
+    await save(CX_META, { ...(meta?.data || {}), target: n }, 0);
+  }
+
+  const shown = useMemo(
+    () =>
+      st.rows.filter((it) => {
+        const d = it.data;
+        if (q && !`${txt(d.owner)} ${txt(d.sector)} ${txt(d.note)}`.includes(q)) return false;
+        if (f && txt(d.sector) !== f) return false;
+        return true;
+      }),
+    [st.rows, q, f],
+  );
+
+  function exportXl() {
+    const head = CX_COLS.map((c) => c.label);
+    const body = shown.map((it) => CX_COLS.map((c) => txt(it.data[c.k])));
+    download("قياس-تجربة-المستفيد.xlsx", writeXlsx([{ name: "تجربة المستفيد", rows: [head, ...body] }]));
+  }
+
+  if (!loaded) return <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>;
+
+  return (
+    <>
+      <div className="cx-kpis">
+        <div className="cx-k">
+          <b>{AR(st.rows.length)}</b>
+          <span>{t("جهاز تُقاس خدماته", "Agencies measured")}</span>
+        </div>
+        <div className="cx-k ok">
+          <b>{AR(st.done)}</b>
+          <span>{t("المحقق", "Achieved")}</span>
+        </div>
+        <div className="cx-k tgt">
+          {canEdit ? (
+            <input
+              className="cx-tin"
+              inputMode="numeric"
+              value={tgtDraft ?? (st.target || "")}
+              placeholder="—"
+              onChange={(e) => setTgtDraft(e.target.value)}
+              onBlur={(e) => {
+                setTgtDraft(null);
+                void saveTarget(e.target.value);
+              }}
+            />
+          ) : (
+            <b>{st.target > 0 ? AR(st.target) : "—"}</b>
+          )}
+          <span>{t("المستهدف", "Target")}</span>
+        </div>
+        <div className="cx-k pct">
+          <b>{st.pct === null ? "—" : `${AR(st.pct)}٪`}</b>
+          <span>{t("المحقق من المستهدف", "Of target")}</span>
+        </div>
+      </div>
+
+      <Toolbar q={q} setQ={setQ} filter={f} setFilter={setF} options={INST_SECTORS} onExport={exportXl} t={t} />
+
+      {!st.rows.length ? (
+        <Empty
+          title={t("لا توجد أجهزة بعد", "No agencies yet")}
+          note={t(
+            "يُضاف الجهاز وعدد خدماته وحالة القياس من زر «إضافة».",
+            "Add an agency, its services and measurement state.",
+          )}
+        />
+      ) : (
+        <>
+          <div className="iw-bar">
+            <span className="sx-count">
+              {`${t("عرض", "Showing")} ${AR(shown.length)} ${t("من", "of")} ${AR(st.rows.length)}`}
+            </span>
+          </div>
+          <div className="tbl-wrap">
+            <table className="sx-tbl inst">
+              <thead>
+                <tr>
+                  <th className="c num">#</th>
+                  {CX_COLS.map((c) => (
+                    <th key={c.k} style={{ minWidth: c.w }}>
+                      {c.label}
+                    </th>
+                  ))}
+                  {canEdit && <th className="c" />}
+                </tr>
+              </thead>
+              <tbody>
+                {shown.map((it, n) => (
+                  <tr key={it.id}>
+                    <td className="c num">{AR(n + 1)}</td>
+                    {CX_COLS.map((c) => {
+                      const v = val(it, c.k);
+                      const cls = `cell${cxTone(c.k, v) ? ` ${cxTone(c.k, v)}` : ""}`;
+                      if (!canEdit)
+                        return (
+                          <td key={c.k} className={cls} style={{ minWidth: c.w }}>
+                            {v || "—"}
+                          </td>
+                        );
+                      return (
+                        <td key={c.k} className={cls} style={{ minWidth: c.w }}>
+                          {c.opts ? (
+                            <select value={v} onChange={(e) => void put(it, c.k, e.target.value)}>
+                              {c.opts.map((op) => (
+                                <option key={op} value={op}>
+                                  {op || "—"}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              value={v}
+                              onChange={(e) =>
+                                setDraft((old) => ({
+                                  ...old,
+                                  [it.id]: { ...(old[it.id] || {}), [c.k]: e.target.value },
+                                }))
+                              }
+                              onBlur={(e) => {
+                                if (e.target.value !== txt(it.data[c.k])) void put(it, c.k, e.target.value);
+                              }}
+                            />
+                          )}
+                        </td>
+                      );
+                    })}
+                    {canEdit && (
+                      <td className="c">
+                        <button
+                          className="rowx"
+                          title={t("حذف الصف", "Delete row")}
+                          onClick={() => {
+                            if (!confirm(t(`حذف «${txt(it.data.owner)}»؟`, "Delete row?"))) return;
+                            void remove(it.id);
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      <UndoBar step={undoTop} onUndo={() => void undo()} onClose={dismissUndo} t={t} />
+    </>
+  );
+}
+
+/* ============================================================
    ٥) المشاريع الاستراتيجية
    ============================================================ */
 export function Projects({ t, canEdit }: { t: T; canEdit: boolean }) {
@@ -1724,6 +2027,7 @@ export function SectionPage({ section, canEdit, t }: { section: SectionKey; canE
       {section === "sessions" && <SessionsPage t={t} />}
       {section === "natstrat" && <NationalPage t={t} canEdit={canEdit} />}
       {section === "inststrat" && <InstPage t={t} canEdit={canEdit} />}
+      {section === "cx" && <CxPage t={t} canEdit={canEdit} />}
       {section === "projects" && <Projects t={t} canEdit={canEdit} />}
 
 
@@ -1787,6 +2091,15 @@ const FIELDS: Record<Exclude<SectionKey, "outputs">, Field[]> = {
     { k: "target", label: "تفعيل القياس المستهدف (Q1..Q4)" },
     { k: "live", label: "حالة التفعيل (مفعل · غير مفعل)" },
     { k: "phase", label: "Phase 1 · Phase 2" },
+    { k: "note", label: "ملاحظة", kind: "area" },
+  ],
+  cx: [
+    { k: "owner", label: "الجهة" },
+    { k: "sector", label: "القطاع" },
+    { k: "state", label: "الحالة (لم يبدأ · جارٍ القياس · مكتمل)" },
+    { k: "services", label: "عدد الخدمات", kind: "num" },
+    { k: "measured", label: "الخدمات المقيسة", kind: "num" },
+    { k: "updated", label: "آخر تحديث" },
     { k: "note", label: "ملاحظة", kind: "area" },
   ],
   projects: [
