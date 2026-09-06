@@ -20,7 +20,6 @@ export type Scope =
   | "projects"
   | "cx"
   | "sections:edit"
-  | "entry"
   | "structure"
   | "tasks"
   | "tasks:all"

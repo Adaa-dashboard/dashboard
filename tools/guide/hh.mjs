@@ -1,0 +1,11 @@
+import { chromium } from "playwright-core";
+const b = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium-1194/chrome-linux/chrome" });
+const p = await b.newPage({ viewport: { width: 794, height: 1123 } });
+await p.goto("file:///tmp/guide/guide2.html", { waitUntil: "load" });
+await p.emulateMedia({ media: "print" });
+await p.waitForTimeout(600);
+const hs = await p.$$eval(".pg", els => els.map(e => Math.round(e.getBoundingClientRect().height)));
+const LIMIT = Math.round(273 * 3.7795);
+hs.forEach((h,i) => { if (h > LIMIT) console.log("صفحة", i, ":", h, "px — تتجاوز", LIMIT); });
+console.log("الحد:", LIMIT, "| الأطوال:", hs.join(" "));
+await b.close();
