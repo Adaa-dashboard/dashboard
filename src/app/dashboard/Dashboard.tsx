@@ -29,9 +29,11 @@ import {
   StrategyBox,
   Projects,
   Outputs,
+  CxBox,
   useCollapse,
   CollapseBtn,
   SECTION_TITLE,
+  SECTION_NAV_TITLE,
   type SectionKey,
 } from "./Sections";
 import {
@@ -44,6 +46,7 @@ import {
   IconInst,
   IconOut,
   IconProj,
+  IconCx,
   IconSettings,
   IconFolder,
 } from "./icons";
@@ -159,6 +162,7 @@ const SECTION_NAV: [SectionKey, (p: { size?: number }) => ReactElement][] = [
   ["natstrat", IconNat],
   ["inststrat", IconInst],
   ["outputs", IconOut],
+  ["cx", IconCx],
   ["projects", IconProj],
 ];
 
@@ -333,6 +337,7 @@ export default function Dashboard({ me }: { me: Me }) {
     natstrat: SECTION_TITLE.natstrat,
     inststrat: SECTION_TITLE.inststrat,
     outputs: SECTION_TITLE.outputs,
+    cx: SECTION_TITLE.cx,
     projects: SECTION_TITLE.projects,
   };
   const title = TITLES[tab] ?? TITLES.overview;
@@ -416,7 +421,7 @@ export default function Dashboard({ me }: { me: Me }) {
           {/* الأقسام الخمسة — متفرّعة من المؤشرات التفصيلية */}
           {SECTION_NAV.map(([key, Ic]) =>
             can(key) ? (
-              <NavItem key={key} id={key} icon={<Ic size={16} />} label={SECTION_TITLE[key]} small />
+              <NavItem key={key} id={key} icon={<Ic size={16} />} label={SECTION_NAV_TITLE[key] ?? SECTION_TITLE[key]} small />
             ) : null,
           )}
 
@@ -631,7 +636,7 @@ export default function Dashboard({ me }: { me: Me }) {
               </div>
             </div>
             {SECTION_NAV.map(([key]) =>
-              can(key) ? <SheetItem key={key} id={key} label={SECTION_TITLE[key]} /> : null,
+              can(key) ? <SheetItem key={key} id={key} label={SECTION_NAV_TITLE[key] ?? SECTION_TITLE[key]} /> : null,
             )}
             <SheetItem id="mypage" label={["محفظتي", "My portfolio"]} />
             {can("users") && <SheetItem id="users" label={["المستخدمون والصلاحيات", "Users & Roles"]} />}
@@ -1194,6 +1199,9 @@ function Overview({
           )}
         </div>
       )}
+
+      {/* قياس تجربة المستفيد — فوق المشاريع بطلب المستخدمة */}
+      {hasScope(me.scopes, "cx") && <CxBox t={t} onOpen={() => onOpenTab("cx")} />}
 
       {(["outputs", "projects"] as const).map((key) =>
         hasScope(me.scopes, key) ? (

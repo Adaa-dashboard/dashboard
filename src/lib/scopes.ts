@@ -18,6 +18,7 @@ export type Scope =
   | "inststrat"
   | "outputs"
   | "projects"
+  | "cx"
   | "sections:edit"
   | "entry"
   | "structure"
@@ -45,6 +46,7 @@ export const SCOPE_GROUPS: { title: string; items: { key: Scope; label: string; 
       { key: "inststrat", label: "الاستراتيجيات المؤسسية" },
       { key: "outputs", label: "المخرجات الوطنية" },
       { key: "projects", label: "المشاريع الاستراتيجية" },
+      { key: "cx", label: "أعمال قياس تجربة المستفيد", note: "عن الخدمات الحكومية" },
       { key: "sections:edit", label: "تحرير بيانات هذه الأقسام", note: "الإضافة والتعديل والحذف" },
     ],
   },
