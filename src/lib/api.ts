@@ -535,6 +535,25 @@ export async function apiFetch(path: string, init: Init = {}) {
     if (p === "/api/items" && (method === "POST" || method === "PUT")) {
       const me = await whoAmI();
       if (!me) return err("غير مصرّح", 401);
+      /* دفعة واحدة: تحميل بيانات قسم كامل بطلب واحد بدل عشرات الطلبات.
+         RLS هي التي تسمح أو تمنع — لا فحص إضافي هنا. */
+      if (Array.isArray(body.items)) {
+        const sec = str(body.section);
+        const rows = (body.items as Record<string, unknown>[])
+          .filter((r) => str(r.id))
+          .map((r) => ({
+            section: sec,
+            id: str(r.id),
+            ord: num(r.ord) ?? 100,
+            data: r.data ?? {},
+            updated_at: new Date().toISOString(),
+            updated_by: me.name || me.username || "",
+          }));
+        if (!sec || !rows.length) return err("لا توجد بنود", 400);
+        const { error } = await s.from("perf_items").upsert(rows, { onConflict: "section,id" });
+        if (error) return err(error.message, 403);
+        return ok({ ok: true, n: rows.length });
+      }
       const section = str(body.section);
       if (!section) return err("لا يوجد قسم", 400);
       const id = str(body.id) || "it-" + newId();
