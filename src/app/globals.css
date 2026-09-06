@@ -6723,6 +6723,28 @@ table.matrix thead th {
   opacity: 1;
 }
 
+/* شرح التقاط التاريخ من نص الملاحظة — يظهر حتى يُكتشف ثم يختفي */
+.pf .nt-tip {
+  background: #fffdf3;
+  border: 1px solid #f0e6c8;
+  border-inline-start: 3px solid #e0a200;
+  border-radius: 11px;
+  padding: 9px 12px;
+  margin-bottom: 9px;
+}
+.pf .nt-tip b {
+  display: block;
+  font-size: 11.5px;
+  color: #8a6d0b;
+  margin-bottom: 3px;
+}
+.pf .nt-tip span {
+  display: block;
+  font-size: 10.5px;
+  line-height: 1.85;
+  color: #6d6249;
+}
+
 /* ملاحظاتي */
 .pf .nts {
   display: flex;

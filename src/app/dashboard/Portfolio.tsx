@@ -557,8 +557,21 @@ function NotesWidget({ t, onOpen }: { t: T; onOpen: () => void }) {
   }, []);
   const sorted = [...(data.notes || [])].sort((a, b) => txt(b.updatedAt).localeCompare(txt(a.updatedAt)));
   const list = all ? sorted : sorted.slice(0, 5);
+  /* الميزة الأقل وضوحاً في المنصة: التاريخ يُقرأ من نص الملاحظة.
+     فيُشرح هنا حتى يُكتشف، ويختفي الشرح متى ظهر أثره — أي متى صار
+     لملاحظة موعد — فلا يبقى تنبيهاً دائماً لمن عرفه. */
+  const gotIt = sorted.some((n) => !!n.due);
   return (
     <>
+      {!gotIt && (
+        <div className="nt-tip">
+          <b>اكتب التاريخ داخل الملاحظة</b>
+          <span>
+            «بكرة الساعة ٩ اجتماع الديوان» — يُقرأ الموعد من النص ويظهر في تقويمك وتنبيهاتك وحده.
+            وتُفهم: اليوم · بكرة · بعد بكرة · الأحد · الأربعاء ٢:٣٠ · بعد أسبوع · ١٥ سبتمبر.
+          </span>
+        </div>
+      )}
       <div className="nts">
         {list.map((n) => (
           <div className="nt2" key={n.id}>
