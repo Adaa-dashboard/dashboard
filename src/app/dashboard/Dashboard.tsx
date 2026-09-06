@@ -1207,7 +1207,7 @@ function Overview({
               </button>
             }
           >
-            {key === "projects" ? <Projects t={t} /> : <Outputs t={t} />}
+            {key === "projects" ? <Projects t={t} canEdit={false} /> : <Outputs t={t} />}
           </Sec>
         ) : null,
       )}

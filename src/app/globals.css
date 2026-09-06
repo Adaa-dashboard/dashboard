@@ -5078,6 +5078,7 @@ table.matrix thead th {
 }
 .sx-pj .bd h4 {
   margin: 0 0 5px;
+  padding-inline-end: 46px;   /* مكان زرَّي التعديل والحذف فلا يمرّ العنوان تحتهما */
   font-family: "Noto Kufi Arabic", sans-serif;
   font-weight: 700;
   font-size: 13px;
@@ -5098,6 +5099,24 @@ table.matrix thead th {
 .sx-pj .br {
   margin-top: 7px;
 }
+/* أزرار البطاقة — تظهر عند المرور، فلا تزاحم المحتوى */
+.sx-pj {
+  position: relative;
+}
+.sx-pj-x {
+  position: absolute;
+  inset-block-start: 8px;
+  inset-inline-end: 8px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.sx-pj:hover .sx-pj-x,
+.sx-pj:focus-within .sx-pj-x {
+  opacity: 1;
+}
+
 /* ملاحظة المشروع — سطر هادئ أسفل الشريطين */
 .sx-pj-note {
   margin: 10px 0 0;
