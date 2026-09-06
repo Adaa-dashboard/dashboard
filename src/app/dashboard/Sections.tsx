@@ -1569,8 +1569,13 @@ function InstForm({
 /* ============================================================
    ٥) المشاريع الاستراتيجية
    ============================================================ */
-export function Projects({ t }: { t: T }) {
-  const { items, loaded } = useItems("projects");
+export function Projects({ t, canEdit }: { t: T; canEdit: boolean }) {
+  const { items, loaded, remove, undo, undoTop, dismissUndo, reload } = useItems("projects");
+  const [edit, setEdit] = useState<Item | null>(null);
+  /* النسب تُدخَل بكسور عشرية (٤١٫٣) فطرحها المباشر يعطي ٦٫٥٩٩٩٩٩٩٩٩٩٩٩٩٩٤ —
+     التقريب لخانة واحدة عند العرض وحده، والقيمة المحفوظة تبقى كما أُدخلت. */
+  const p1 = (n: number) => Math.round(n * 10) / 10;
+
   if (!loaded) return <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>;
   if (!items.length)
     return (
@@ -1580,62 +1585,95 @@ export function Projects({ t }: { t: T }) {
       />
     );
   return (
-    <div className="sx-pjs">
-      {items.map((it) => {
-        const d = it.data;
-        const planned = numOf(d.planned);
-        const actual = numOf(d.actual);
-        const g = actual - planned;
-        // مشروع لم تصل بياناته بعد: لا نعرض «متقدم ٠٪» بل نقول ذلك صراحةً
-        const blank = planned === 0 && actual === 0;
-        return (
-          <div className="sx-pj" key={it.id}>
-            <div className="tile">
-              <b>{AR(actual)}٪</b>
-              <span>{t("الإنجاز الفعلي", "Actual")}</span>
-              <em>{`${t("المخطط", "Planned")} ${AR(planned)}٪`}</em>
-              {blank ? (
-                <span className="sx-gap wait">{t("بانتظار البيانات", "Awaiting data")}</span>
-              ) : (
-                <span className={`sx-gap ${g < 0 ? "neg" : "pos"}`}>
-                  {g < 0 ? `متأخر ${AR(Math.abs(g))}٪` : `متقدم ${AR(g)}٪`}
-                </span>
+    <>
+      <div className="sx-pjs">
+        {items.map((it) => {
+          const d = it.data;
+          const planned = numOf(d.planned);
+          const actual = numOf(d.actual);
+          const g = p1(actual - planned);
+          // مشروع لم تصل بياناته بعد: لا نعرض «متقدم ٠٪» بل نقول ذلك صراحةً
+          const blank = planned === 0 && actual === 0;
+          return (
+            <div className="sx-pj" key={it.id}>
+              <div className="tile">
+                <b>{AR(p1(actual))}٪</b>
+                <span>{t("الإنجاز الفعلي", "Actual")}</span>
+                <em>{`${t("المخطط", "Planned")} ${AR(p1(planned))}٪`}</em>
+                {blank ? (
+                  <span className="sx-gap wait">{t("بانتظار البيانات", "Awaiting data")}</span>
+                ) : (
+                  <span className={`sx-gap ${g < 0 ? "neg" : "pos"}`}>
+                    {g < 0 ? `متأخر ${AR(Math.abs(g))}٪` : `متقدم ${AR(g)}٪`}
+                  </span>
+                )}
+              </div>
+              <div className="bd">
+                <h4>{txt(d.name) || "—"}</h4>
+                <div className="meta">
+                  {d.status ? <span className="sx-pill">{txt(d.status)}</span> : null}
+                  {d.owner ? <span className="m">{`${t("الراعي", "Sponsor")}: ${txt(d.owner)}`}</span> : null}
+                  {d.period ? <span className="m">{txt(d.period)}</span> : null}
+                  {numOf(d.months) > 0 ? (
+                    <span className="m">{`· ${t("الشهر", "Month")} ${AR(numOf(d.elapsed))} ${t("من", "of")} ${AR(numOf(d.months))}`}</span>
+                  ) : null}
+                </div>
+                <div className="br pl">
+                  <div className="lb">
+                    <span>{t("المخطط", "Planned")}</span>
+                    <b>{AR(p1(planned))}٪</b>
+                  </div>
+                  <div className="bar">
+                    <i style={{ width: `${Math.max(0, Math.min(100, planned))}%` }} />
+                  </div>
+                </div>
+                <div className="br ac">
+                  <div className="lb">
+                    <span>{t("الفعلي", "Actual")}</span>
+                    <b>{AR(p1(actual))}٪</b>
+                  </div>
+                  <div className="bar">
+                    <i style={{ width: `${Math.max(0, Math.min(100, actual))}%` }} />
+                  </div>
+                </div>
+                {d.note ? <p className="sx-pj-note">{txt(d.note)}</p> : null}
+              </div>
+              {canEdit && (
+                <div className="sx-pj-x">
+                  <button className="rowx" title={t("تعديل", "Edit")} onClick={() => setEdit(it)}>
+                    ✎
+                  </button>
+                  <button
+                    className="rowx"
+                    title={t("حذف المشروع", "Delete project")}
+                    onClick={() => {
+                      if (!confirm(t(`حذف «${txt(d.name)}»؟`, "Delete project?"))) return;
+                      void remove(it.id);
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
               )}
             </div>
-            <div className="bd">
-              <h4>{txt(d.name) || "—"}</h4>
-              <div className="meta">
-                {d.status ? <span className="sx-pill">{txt(d.status)}</span> : null}
-                {d.owner ? <span className="m">{`${t("الراعي", "Sponsor")}: ${txt(d.owner)}`}</span> : null}
-                {d.period ? <span className="m">{txt(d.period)}</span> : null}
-                {numOf(d.months) > 0 ? (
-                  <span className="m">{`· ${t("الشهر", "Month")} ${AR(numOf(d.elapsed))} ${t("من", "of")} ${AR(numOf(d.months))}`}</span>
-                ) : null}
-              </div>
-              <div className="br pl">
-                <div className="lb">
-                  <span>{t("المخطط", "Planned")}</span>
-                  <b>{AR(planned)}٪</b>
-                </div>
-                <div className="bar">
-                  <i style={{ width: `${Math.max(0, Math.min(100, planned))}%` }} />
-                </div>
-              </div>
-              <div className="br ac">
-                <div className="lb">
-                  <span>{t("الفعلي", "Actual")}</span>
-                  <b>{AR(actual)}٪</b>
-                </div>
-                <div className="bar">
-                  <i style={{ width: `${Math.max(0, Math.min(100, actual))}%` }} />
-                </div>
-              </div>
-              {d.note ? <p className="sx-pj-note">{txt(d.note)}</p> : null}
-            </div>
-          </div>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
+
+      <UndoBar step={undoTop} onUndo={() => void undo()} onClose={dismissUndo} t={t} />
+
+      {edit && (
+        <ItemForm
+          section="projects"
+          item={edit}
+          t={t}
+          onClose={(changed) => {
+            setEdit(null);
+            if (changed) void reload();
+          }}
+        />
+      )}
+    </>
   );
 }
 
@@ -1686,7 +1724,7 @@ export function SectionPage({ section, canEdit, t }: { section: SectionKey; canE
       {section === "sessions" && <SessionsPage t={t} />}
       {section === "natstrat" && <NationalPage t={t} canEdit={canEdit} />}
       {section === "inststrat" && <InstPage t={t} canEdit={canEdit} />}
-      {section === "projects" && <Projects t={t} />}
+      {section === "projects" && <Projects t={t} canEdit={canEdit} />}
 
 
       {editing && (
