@@ -990,6 +990,16 @@ function Overview({
 
   /* عنوان قسم قابل للطيّ — السهم يخفي محتواه ويبقى العنوان.
      الحالة في متصفح المستخدم وحده. */
+  /** زرّ «المزيد من التفاصيل» — لمن يملك صلاحية القسم وحده */
+  function MoreLink({ k }: { k: Scope }) {
+    if (!hasScope(me.scopes, k)) return null;
+    return (
+      <button className="sx-link" onClick={() => onOpenTab(k)}>
+        {t("المزيد من التفاصيل", "More details")} ‹
+      </button>
+    );
+  }
+
   function Sec({
     id,
     title,
@@ -1173,65 +1183,48 @@ function Overview({
         </div>
       )}
 
-      {hasScope(me.scopes, "sessions") && (
-        <Sec
-          id="sessions"
-          title={t(SECTION_TITLE.sessions[0], SECTION_TITLE.sessions[1])}
-          extra={
-            <button className="sx-link" onClick={() => onOpenTab("sessions")}>
-              {t("المزيد من التفاصيل", "More details")} ‹
-            </button>
-          }
-        >
-          <Sessions t={t} limit={4} />
-        </Sec>
-      )}
+      {/* ملخّصات الأقسام يراها كل من يفتح «نظرة عامة» — بطلب المستخدمة.
+          وزرّ «المزيد من التفاصيل» وحده يُحجب عمّن لا يملك صلاحية القسم،
+          فالصفحة التفصيلية تبقى لأصحابها. */}
+      <Sec
+        id="sessions"
+        title={t(SECTION_TITLE.sessions[0], SECTION_TITLE.sessions[1])}
+        extra={<MoreLink k="sessions" />}
+      >
+        <Sessions t={t} limit={4} />
+      </Sec>
 
       {/* الاستراتيجيتان جنب بعض: معلومات عامة فقط، والأسماء
           والتفاصيل كلها في صفحة كل قسم */}
-      {(hasScope(me.scopes, "natstrat") || hasScope(me.scopes, "inststrat")) && (
-        <div className="sx-two" style={{ marginTop: 28 }}>
-          {hasScope(me.scopes, "natstrat") && (
-            <StrategyBox section="natstrat" t={t} onOpen={() => onOpenTab("natstrat")} />
-          )}
-          {hasScope(me.scopes, "inststrat") && (
-            <StrategyBox section="inststrat" t={t} onOpen={() => onOpenTab("inststrat")} />
-          )}
-        </div>
-      )}
+      <div className="sx-two" style={{ marginTop: 28 }}>
+        <StrategyBox
+          section="natstrat"
+          t={t}
+          onOpen={hasScope(me.scopes, "natstrat") ? () => onOpenTab("natstrat") : undefined}
+        />
+        <StrategyBox
+          section="inststrat"
+          t={t}
+          onOpen={hasScope(me.scopes, "inststrat") ? () => onOpenTab("inststrat") : undefined}
+        />
+      </div>
 
       {/* قياس تجربة المستفيد — فوق المشاريع بطلب المستخدمة.
           داخل <Sec> نفسه ليتوحّد عنوانه مع بقية عناوين نظرة عامة */}
-      {hasScope(me.scopes, "cx") && (
-        <Sec
-          id="cx"
-          title={t(SECTION_TITLE.cx[0], SECTION_TITLE.cx[1])}
-          extra={
-            <button className="sx-link" onClick={() => onOpenTab("cx")}>
-              {t("المزيد من التفاصيل", "More details")} ‹
-            </button>
-          }
-        >
-          <CxBox t={t} />
-        </Sec>
-      )}
+      <Sec id="cx" title={t(SECTION_TITLE.cx[0], SECTION_TITLE.cx[1])} extra={<MoreLink k="cx" />}>
+        <CxBox t={t} />
+      </Sec>
 
-      {(["outputs", "projects"] as const).map((key) =>
-        hasScope(me.scopes, key) ? (
-          <Sec
-            key={key}
-            id={key}
-            title={t(SECTION_TITLE[key][0], SECTION_TITLE[key][1])}
-            extra={
-              <button className="sx-link" onClick={() => onOpenTab(key)}>
-                {t("المزيد من التفاصيل", "More details")} ‹
-              </button>
-            }
-          >
-            {key === "projects" ? <Projects t={t} canEdit={false} /> : <Outputs t={t} />}
-          </Sec>
-        ) : null,
-      )}
+      {(["outputs", "projects"] as const).map((key) => (
+        <Sec
+          key={key}
+          id={key}
+          title={t(SECTION_TITLE[key][0], SECTION_TITLE[key][1])}
+          extra={<MoreLink k={key} />}
+        >
+          {key === "projects" ? <Projects t={t} canEdit={false} /> : <Outputs t={t} />}
+        </Sec>
+      ))}
 
       {hasScope(me.scopes, "changes") && (
         <Sec id="changes" title={t("طلبات التغيير", "Change requests")}>
