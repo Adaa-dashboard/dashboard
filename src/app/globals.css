@@ -8151,6 +8151,71 @@ table.matrix thead th {
   .cx-kpis { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* بطاقة نظرة عامة — صفّ أرقام ثم شريط المحقق من المستهدف */
+.cxa-row {
+  display: grid;
+  grid-template-columns: 1.3fr repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.cxa-n {
+  text-align: center;
+  padding: 12px 8px;
+  border-radius: 12px;
+  background: var(--soft);
+  border: 1px solid var(--line2);
+  border-top: 3px solid var(--c, #dfe7e5);
+}
+.cxa-n.tot { background: var(--g-900); border-color: var(--g-900); }
+.cxa-n.tot b { color: #fff; }
+.cxa-n.tot span { color: #cfe3dd; }
+.cxa-n b {
+  display: block;
+  font-family: "Noto Kufi Arabic", sans-serif;
+  font-weight: 800;
+  font-size: 26px;
+  line-height: 1.1;
+  color: var(--c, var(--gt-700));
+}
+.cxa-n span { display: block; margin-top: 5px; font-size: 11px; color: var(--ink-2); }
+.cxa-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--tint);
+  border: 1px solid var(--tint-bd);
+  border-radius: 12px;
+}
+.cxa-bar .lb { display: flex; flex-direction: column; gap: 2px; min-width: 150px; }
+.cxa-bar .lb span { font-size: 11px; color: var(--muted); }
+.cxa-bar .lb b { font-size: 13px; color: var(--gt-900); }
+.cxa-bar .bar { flex: 1; height: 12px; border-radius: 99px; background: #dceae6; overflow: hidden; }
+.cxa-bar .bar i { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #29a361, #1a9d5c); }
+.cxa-bar em {
+  font-style: normal;
+  font-family: "Noto Kufi Arabic", sans-serif;
+  font-weight: 800;
+  font-size: 20px;
+  color: #1a9d5c;
+}
+.cxa-bar em.none { font-size: 12px; font-weight: 600; color: var(--muted); }
+.cxa-foot {
+  display: flex;
+  gap: 22px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line2);
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.cxa-foot b { color: var(--gt-800); font-size: 13px; }
+@media (max-width: 820px) {
+  .cxa-row { grid-template-columns: repeat(2, 1fr); }
+  .cxa-bar { flex-wrap: wrap; }
+}
+
 /* شرائح المراحل — كل شريحة فلتر على مرحلتها */
 .cx-stages {
   display: grid;
@@ -8206,7 +8271,10 @@ table.matrix thead th {
   font-size: 12.5px;
   color: var(--gt-900);
 }
-.sx-tbl.mini { width: 100%; font-size: 11.5px; }
+/* الجدولان المصغّران داخل بطاقتين ضيّقتين — ‏min-width الموروث
+   من ‎.sx-tbl (760px) كان يمدّهما خارج البطاقة فيُقصّان */
+.sx-tbl.mini { width: 100%; min-width: 0; font-size: 11.5px; table-layout: fixed; }
+.sx-tbl.mini th, .sx-tbl.mini td { overflow-wrap: anywhere; white-space: normal; }
 .sx-tbl.mini th {
   background: transparent;
   color: var(--muted);

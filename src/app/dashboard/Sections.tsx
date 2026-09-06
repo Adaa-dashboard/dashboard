@@ -1733,74 +1733,72 @@ function cxStats(items: Item[]) {
   };
 }
 
-export function CxBox({ t, onOpen }: { t: T; onOpen: () => void }) {
+/* البطاقة داخل «نظرة عامة» — بلا إطار خاص بها: يلفّها <Sec> في
+   لوحة نظرة عامة كما يلفّ «المخرجات الوطنية» و«المشاريع»، فيتوحّد
+   حجم العنوان وزرّ الطيّ مع بقية الأقسام (كان ١٤px بدل ١٨px). */
+export function CxBox({ t }: { t: T }) {
   const { items, loaded } = useItems("cx");
-  const title = SECTION_TITLE.cx;
-  const { open, toggle } = useCollapse("cx");
-
-  const box = (body: ReactNode) => (
-    <div className={`sx-box ${open ? "" : "closed"}`} style={{ marginTop: 28 }}>
-      <div className="hd">
-        <CollapseBtn open={open} toggle={toggle} t={t} />
-        <h3>{t(title[0], title[1])}</h3>
-        <button className="lnk" onClick={onOpen}>
-          {t("التفاصيل", "Details")} ‹
-        </button>
-      </div>
-      {open && <div className="bd">{body}</div>}
-    </div>
-  );
-
-  if (!loaded) return box(<div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>);
+  if (!loaded) return <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>;
 
   const st = cxStats(items);
   if (!st.rows.length)
-    return box(
+    return (
       <div className="sx-none">
         {t("لا توجد بيانات بعد — تُرفع من صفحة القسم بملف المتابعة.", "No data yet.")}
-      </div>,
+      </div>
     );
 
   const n = st.rows.length;
-  return box(
-    <>
-      <div className="head-row">
-        <div className="big">
+  const steps = CX_STAGES.filter((g) => g.k !== "none");
+  return (
+    <div className="card cxa">
+      <div className="cxa-row">
+        <div className="cxa-n tot">
           <b>{AR(n)}</b>
-          <span>{t("جهاز حكومي", "agencies")}</span>
+          <span>{t("إجمالي الأجهزة", "Agencies")}</span>
         </div>
-        <div className="side">
-          {CX_STAGES.filter((g) => g.k !== "none").map((g) => (
-            <KV key={g.k} label={t(g.ar, g.en)} n={st.stage[g.k] || 0} tot={n} tone={g.k === "reports" ? "g" : ""} />
-          ))}
+        {steps.map((g) => (
+          <div className="cxa-n" key={g.k} style={{ ["--c" as string]: g.c }}>
+            <b>{AR(st.stage[g.k] || 0)}</b>
+            <span>{t(g.ar, g.en)}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="cxa-bar">
+        <div className="lb">
+          <span>{t("المحقق من المستهدف", "Achieved of target")}</span>
+          <b>
+            {st.target > 0
+              ? `${AR(st.doneAgencies)} ${t("من", "of")} ${AR(st.target)}`
+              : `${AR(st.doneAgencies)} ${t("جهاز", "agencies")}`}
+          </b>
         </div>
+        {st.pct === null ? (
+          <em className="none">{t("المستهدف لم يُحدَّد بعد", "No target set")}</em>
+        ) : (
+          <>
+            <div className="bar">
+              <i style={{ width: `${Math.min(100, st.pct)}%` }} />
+            </div>
+            <em>{AR(st.pct)}٪</em>
+          </>
+        )}
       </div>
-      <div className="gen">
-        <GCell k={t("المحقق من المستهدف", "Achieved of target")}>
-          {st.pct === null ? (
-            <>
-              {AR(st.doneAgencies)} <em>{t("جهاز — المستهدف لم يُحدَّد", "no target set")}</em>
-            </>
-          ) : (
-            <span className="meas">
-              <span className="n hi">{`${AR(st.doneAgencies)}/${AR(st.target)}`}</span>
-              <span className="bar">
-                <i className="hi" style={{ width: `${Math.min(100, st.pct)}%` }} />
-              </span>
-            </span>
-          )}
-        </GCell>
-        <GCell k={t("مجموع التقارير المعتمدة", "Approved reports")}>
-          {AR(st.reportsTot)} <em>{t("تقرير", "reports")}</em>
-        </GCell>
-        <GCell k={t("احتُسبت في المؤشر", "Counted in KPI")}>
-          {AR(st.counted)} <em>{`${t("من", "of")} ${AR(n)}`}</em>
-        </GCell>
-        <GCell k={t("الخدمات المخطط قياسها", "Services planned")}>
-          {AR(st.servPlan)} <em>{`${t("من", "of")} ${AR(st.servTot)}`}</em>
-        </GCell>
+
+      <div className="cxa-foot">
+        <span>
+          {t("مجموع التقارير المعتمدة", "Approved reports")} <b>{AR(st.reportsTot)}</b>
+        </span>
+        <span>
+          {t("احتُسبت في المؤشر", "Counted in KPI")} <b>{AR(st.counted)}</b>
+        </span>
+        <span>
+          {t("الخدمات المخطط قياسها", "Services planned")} <b>{AR(st.servPlan)}</b> {t("من", "of")}{" "}
+          <b>{AR(st.servTot)}</b>
+        </span>
       </div>
-    </>,
+    </div>
   );
 }
 
