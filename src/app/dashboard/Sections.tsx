@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { writeXlsx } from "@/lib/sheet";
+import { writeXlsx, readXlsxSheets } from "@/lib/sheet";
 import { asset } from "@/lib/base";
 
 /* ============================================================
@@ -75,30 +75,107 @@ const INST_COLS: ICol[] = [
   { k: "phase", label: "Phase", opts: ["", "Phase 1", "Phase 2"], w: 110 },
 ];
 
-/* ============ أعمال قياس تجربة المستفيد ============
-   الوحدة المحسوبة هي «الجهاز» لا الخدمة: كم جهازاً تُقاس خدماته،
-   وكم منها اكتمل، مقابل المستهدف.
-   المستهدف رقم واحد للقسم كله — يُحفظ في بند محجوز معرّفه CX_META
-   داخل نفس الجدول، فلا يحتاج جدولاً ولا صلاحيةً جديدة في القاعدة.
-   هذا البند يُستبعَد من كل قوائم الأجهزة وعدّاداتها. */
+/* ============ أعمال قياس تجربة المستفيد (BEX) ============
+   النموذج مأخوذ حرفياً من ملف المتابعة «Master Tracker»: كل عمود
+   في الملف عمود هنا، فالرفع يستبدل الحقل بالحقل بلا إعادة صياغة.
+   وكل أرقام اللوحة محسوبة من الصفوف بنفس معادلات ورقة Dashboard
+   في الملف — لا رقم ملخَّص مخزَّن يتقادم. */
 const CX_META = "cx-meta";
-const CX_STATES = ["لم يبدأ", "جارٍ القياس", "مكتمل"];
-const CX_COLS: ICol[] = [
-  { k: "owner", label: "الجهة", w: 240 },
-  { k: "sector", label: "القطاع", opts: ["", ...INST_SECTORS], w: 150 },
-  { k: "state", label: "الحالة", opts: CX_STATES, w: 120 },
-  { k: "services", label: "عدد الخدمات", w: 100 },
-  { k: "measured", label: "المقيس منها", w: 100 },
-  { k: "updated", label: "آخر تحديث", w: 110 },
-  { k: "note", label: "ملاحظة", w: 260 },
+/** حالة مرحلة في الملف — نفس القيم المستخدمة في قوائمه المنسدلة */
+const CX_ST = [
+  "",
+  "تم الاعتماد",
+  "قيد المراجعة",
+  "لدى الجهاز لمعالجة الملاحظات",
+  "تم الاستلام (استشاري الجهة)",
+  "لم يتم الاستلام",
 ];
-/** لون خلية الحالة — أخضر للمكتمل، ذهبي للجاري، رمادي لما لم يبدأ */
-function cxTone(k: string, v: string): string {
-  if (k !== "state") return "";
-  if (v === "مكتمل") return "ok";
-  if (v === "جارٍ القياس") return "wt";
-  return "";
+const CX_OK = "تم الاعتماد";
+const CX_NONE = "لم يتم الاستلام";
+/** «قيد العمل»: بدأت ولم تُعتمد — تعريف ورقة Dashboard نفسه */
+const cxProg = (v: string) => v !== "" && v !== CX_OK && v !== CX_NONE;
+
+/** الأرباع الخمسة كما في الملف: الأخير من ٢٠٢٥ ثم أرباع ٢٠٢٦ */
+const CX_QS = [
+  { k: "q0", label: "Q4 — 2025م" },
+  { k: "q1", label: "Q1 — 2026م" },
+  { k: "q2", label: "Q2 — 2026م" },
+  { k: "q3", label: "Q3 — 2026م" },
+  { k: "q4", label: "Q4 — 2026م" },
+];
+
+type CxCol = { k: string; label: string; w: number; opts?: string[]; core?: boolean };
+/** ترتيب الأعمدة هو ترتيب الملف نفسه، فالفهرس هو أداة المطابقة عند الرفع */
+const CX_COLS: CxCol[] = [
+  { k: "name", label: "اسم الجهاز", w: 240, core: true },
+  { k: "sector", label: "القطاع", w: 150, opts: ["", ...INST_SECTORS], core: true },
+  { k: "kind", label: "تصنيف الجهة", w: 110, core: true },
+  { k: "reply", label: "رد الجهاز وسبب عدم قياس الخدمات", w: 260 },
+  { k: "m2023", label: "قياسات 2023", w: 90 },
+  { k: "m2024", label: "قياسات 2024", w: 90 },
+  { k: "m2025", label: "قياسات 2025", w: 90 },
+  { k: "m2026", label: "قياس 2026", w: 90 },
+  { k: "counted", label: "احتُسب في المؤشر", w: 100, core: true },
+  { k: "countedQ2", label: "احتُسب Q2", w: 90 },
+  { k: "consultant", label: "الاستشاري", w: 130, core: true },
+  { k: "letters", label: "الخطابات الصادرة 2026م", w: 130 },
+  { k: "meet", label: "عقد الاجتماع التعريفي", w: 120, opts: ["", "تم", "لم يبدأ"], core: true },
+  { k: "survey", label: "حصر الخدمات من الجهاز", w: 150, opts: CX_ST, core: true },
+  { k: "servTot", label: "إجمالي الخدمات", w: 100, core: true },
+  { k: "card", label: "بطاقة القياس", w: 150, opts: CX_ST, core: true },
+  { k: "scope", label: "الخدمات المستهدفة بالقياس", w: 230 },
+  { k: "servPlan", label: "الخدمات المخطط قياسها", w: 110, core: true },
+  { k: "freq", label: "دورية القياس", w: 100, opts: ["", "سنوية", "نصف سنوية", "ربعية"], core: true },
+  { k: "firstData", label: "موعد توفر البيانات", w: 110 },
+  { k: "l1", label: "استبيان لفل 1", w: 150, opts: CX_ST, core: true },
+  { k: "rep2025", label: "تقارير 2025م", w: 90 },
+  { k: "rep2026", label: "تقارير 2026م", w: 90 },
+  ...CX_QS.flatMap((q) => [
+    { k: `${q.k}Share`, label: `مشاركة النتائج ${q.label}`, w: 170, opts: CX_ST },
+    { k: `${q.k}Issue`, label: `إصدار التقرير ${q.label}`, w: 170, opts: CX_ST },
+    { k: `${q.k}Svc`, label: `خدمات بمؤشر رضا ${q.label}`, w: 130 },
+    { k: `${q.k}Sat`, label: `مؤشر الرضا ${q.label}`, w: 110 },
+  ]),
+];
+const CX_CORE = CX_COLS.filter((c) => c.core);
+
+/** لون خلية الحالة — أخضر للمعتمد، ذهبي لما هو قيد العمل، أحمر لما لم يُستلم */
+function cxTone(c: CxCol, v: string): string {
+  if (!v || !c.opts) return "";
+  if (c.k === "meet") return v === "تم" ? "ok" : "wt";
+  if (v === CX_OK) return "ok";
+  if (v === CX_NONE) return "no";
+  return "wt";
 }
+
+/* مراحل الملف — بنفس معادلات ورقة Dashboard حرفياً.
+   وهي **متداخلة لا متتابعة**: جهاز صدر له تقرير في ربع قد يكون
+   ما زال «في القياس» في ربع آخر، فيُعدّ في الاثنين — كما في ملفك.
+   لذلك لا تُجمع الأرقام على أنها تقسيم للـ١٥٤. */
+const CX_STAGES: { k: string; ar: string; en: string; c: string; test: (d: Rec) => boolean }[] = [
+  {
+    k: "prep", ar: "في التهيئة", en: "Onboarding", c: "#2b7fd4",
+    test: (d) => txt(d.meet) === "تم" && txt(d.survey) !== CX_OK,
+  },
+  {
+    k: "planning", ar: "في التخطيط", en: "Planning", c: "#7a5cd6",
+    test: (d) => txt(d.survey) === CX_OK && (cxProg(txt(d.card)) || cxProg(txt(d.l1))),
+  },
+  {
+    k: "measuring", ar: "في القياس", en: "Measuring", c: "#e0971a",
+    test: (d) =>
+      txt(d.survey) === CX_OK && txt(d.card) === CX_OK && txt(d.l1) === CX_OK &&
+      CX_QS.some((q) => cxProg(txt(d[`${q.k}Share`]))),
+  },
+  {
+    k: "reports", ar: "صدر لها تقرير", en: "Report issued", c: "#1a9d5c",
+    test: (d) => CX_QS.some((q) => txt(d[`${q.k}Issue`]) === CX_OK),
+  },
+  {
+    k: "none", ar: "لم تبدأ", en: "Not started", c: "#9aa8a4",
+    test: (d) => txt(d.meet) === "لم يبدأ",
+  },
+];
 /* تلوين الخلايا التي لها معنى حالة */
 function instTone(k: string, v: string): string {
   if (!v) return "";
@@ -1608,18 +1685,52 @@ function cxSplit(items: Item[]) {
   return { meta, rows, target: numOf(meta?.data.target) };
 }
 
-/** أرقام القسم — كلها مشتقّة من البنود، فلا رقم مخزَّن يتقادم */
+/** كل أرقام القسم — بمعادلات ورقة Dashboard في ملف المتابعة حرفياً */
 function cxStats(items: Item[]) {
-  const { rows, target } = cxSplit(items);
-  const done = rows.filter((x) => txt(x.data.state) === "مكتمل").length;
-  const going = rows.filter((x) => txt(x.data.state) === "جارٍ القياس").length;
-  const notYet = rows.length - done - going;
-  const services = rows.reduce((a, x) => a + numOf(x.data.services), 0);
-  const measured = rows.reduce((a, x) => a + numOf(x.data.measured), 0);
-  const last = rows.map((x) => txt(x.data.updated)).sort().slice(-1)[0] || "—";
-  // النسبة من المستهدف — وبلا مستهدف لا نسبة، فلا نقسم على عدد الصفوف
-  const pct = target > 0 ? Math.round((done / target) * 100) : null;
-  return { rows, target, done, going, notYet, services, measured, last, pct };
+  const { rows, target, meta } = cxSplit(items);
+  const stage: Record<string, number> = {};
+  for (const g of CX_STAGES) stage[g.k] = rows.filter((it) => g.test(it.data)).length;
+
+  /* «تقارير معتمدة» في الملف مجموعُ التقارير لا عدد الأجهزة: جهاز واحد
+     قد يصدر له تقرير في أكثر من ربع. فنحسب الاثنين ونسمّي كلاً باسمه. */
+  let reportsTot = 0;
+  const byQ = CX_QS.map((q) => {
+    const share = rows.filter((x) => txt(x.data[`${q.k}Share`]) === CX_OK).length;
+    const issued = rows.filter((x) => txt(x.data[`${q.k}Issue`]) === CX_OK).length;
+    const review = rows.filter((x) => cxProg(txt(x.data[`${q.k}Issue`]))).length;
+    const none = rows.filter((x) => txt(x.data[`${q.k}Issue`]) === CX_NONE).length;
+    reportsTot += issued;
+    return { ...q, share, issued, review, none };
+  });
+  /* المستهدف في ملفك «٦٩ جهازاً» — فالمقارنة تكون بعدد الأجهزة التي
+     صدر لها تقرير، لا بمجموع التقارير: تقرير مقابل جهاز لا يستقيم. */
+  const doneAgencies = rows.filter((x) => CX_QS.some((q) => txt(x.data[`${q.k}Issue`]) === CX_OK)).length;
+  const counted = rows.filter((x) => numOf(x.data.counted) === 1).length;
+  const servTot = rows.reduce((a, x) => a + numOf(x.data.servTot), 0);
+  const servPlan = rows.reduce((a, x) => a + numOf(x.data.servPlan), 0);
+  const pct = target > 0 ? Math.round((doneAgencies / target) * 100) : null;
+
+  const secs = [...INST_SECTORS, ...Array.from(new Set(rows.map((r) => txt(r.data.sector)))).filter(
+    (x) => x && !INST_SECTORS.includes(x),
+  )];
+  const bySector = secs
+    .map((sc) => {
+      const list = rows.filter((r) => txt(r.data.sector) === sc);
+      return {
+        sector: sc,
+        tot: list.length,
+        started: list.filter((r) => txt(r.data.meet) === "تم").length,
+        notStarted: list.filter((r) => txt(r.data.meet) === "لم يبدأ").length,
+        noSurvey: list.filter((r) => txt(r.data.survey) === CX_NONE).length,
+      };
+    })
+    .filter((x) => x.tot);
+
+  return {
+    rows, target, meta, stage, byQ, bySector,
+    reportsTot, doneAgencies, counted, servTot, servPlan, pct,
+    updated: txt(meta?.data.updated),
+  };
 }
 
 export function CxBox({ t, onOpen }: { t: T; onOpen: () => void }) {
@@ -1645,62 +1756,198 @@ export function CxBox({ t, onOpen }: { t: T; onOpen: () => void }) {
   const st = cxStats(items);
   if (!st.rows.length)
     return box(
-      <div className="sx-none">{t("لا توجد بيانات بعد — تُضاف من صفحة القسم.", "No data yet.")}</div>,
+      <div className="sx-none">
+        {t("لا توجد بيانات بعد — تُرفع من صفحة القسم بملف المتابعة.", "No data yet.")}
+      </div>,
     );
 
+  const n = st.rows.length;
   return box(
     <>
       <div className="head-row">
         <div className="big">
-          <b>{AR(st.rows.length)}</b>
-          <span>{t("جهاز تُقاس خدماته", "agencies measured")}</span>
+          <b>{AR(n)}</b>
+          <span>{t("جهاز حكومي", "agencies")}</span>
         </div>
         <div className="side">
-          <KV label={t("المحقق (اكتمل قياسها)", "Completed")} n={st.done} tot={st.rows.length} tone="g" />
-          <KV label={t("جارٍ القياس", "In progress")} n={st.going} tot={st.rows.length} />
-          <KV label={t("لم يبدأ", "Not started")} n={st.notYet} tot={st.rows.length} />
+          {CX_STAGES.filter((g) => g.k !== "none").map((g) => (
+            <KV key={g.k} label={t(g.ar, g.en)} n={st.stage[g.k] || 0} tot={n} tone={g.k === "reports" ? "g" : ""} />
+          ))}
         </div>
       </div>
       <div className="gen">
-        <GCell k={t("المستهدف", "Target")}>
-          {st.target > 0 ? (
-            <>
-              {AR(st.target)} <em>{t("جهاز", "agencies")}</em>
-            </>
-          ) : (
-            <em>{t("لم يُحدَّد بعد", "Not set")}</em>
-          )}
-        </GCell>
         <GCell k={t("المحقق من المستهدف", "Achieved of target")}>
           {st.pct === null ? (
-            <em>{t("يحتاج تحديد المستهدف", "Set the target first")}</em>
+            <>
+              {AR(st.doneAgencies)} <em>{t("جهاز — المستهدف لم يُحدَّد", "no target set")}</em>
+            </>
           ) : (
             <span className="meas">
-              <span className="n hi">{AR(st.pct)}٪</span>
+              <span className="n hi">{`${AR(st.doneAgencies)}/${AR(st.target)}`}</span>
               <span className="bar">
                 <i className="hi" style={{ width: `${Math.min(100, st.pct)}%` }} />
               </span>
             </span>
           )}
         </GCell>
-        <GCell k={t("الخدمات المقيسة", "Services measured")}>
-          {AR(st.measured)} <em>{`${t("من", "of")} ${AR(st.services)}`}</em>
+        <GCell k={t("مجموع التقارير المعتمدة", "Approved reports")}>
+          {AR(st.reportsTot)} <em>{t("تقرير", "reports")}</em>
         </GCell>
-        <GCell k={t("آخر تحديث", "Last update")}>
-          <span className="dt">{st.last}</span>
+        <GCell k={t("احتُسبت في المؤشر", "Counted in KPI")}>
+          {AR(st.counted)} <em>{`${t("من", "of")} ${AR(n)}`}</em>
+        </GCell>
+        <GCell k={t("الخدمات المخطط قياسها", "Services planned")}>
+          {AR(st.servPlan)} <em>{`${t("من", "of")} ${AR(st.servTot)}`}</em>
         </GCell>
       </div>
     </>,
   );
 }
 
+/* ---------- رفع ملف المتابعة ----------
+   المطابقة بموضع العمود لا باسمه: عنوانا «مشاركة نتائج القياس Q4»
+   يتكرران حرفياً (ربع ٢٠٢٥ وربع ٢٠٢٦)، فالاسم وحده لا يميّزهما.
+   ولئلا يمرّ ملف تغيّر ترتيبه، نتحقق من ثلاثة عناوين مرساة أولاً. */
+const CX_ANCHORS: [number, string][] = [
+  [1, "اسم الجهاز"],
+  [2, "القطاع"],
+  [13, "عقد الاجتماع"],
+];
+const cxNorm = (v: string) =>
+  v.replace(/[▼\n\r]/g, " ").replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/\s+/g, " ").trim();
+
+/** معرّف ثابت من اسم الجهاز، فإعادة الرفع تُحدِّث الصف نفسه ولا تكرّره */
+function cxId(name: string): string {
+  const k = cxNorm(name).replace(/\s/g, "");
+  let h = 5381;
+  for (let i = 0; i < k.length; i++) h = ((h * 33) ^ k.charCodeAt(i)) >>> 0;
+  return "cx-" + h.toString(36);
+}
+
+/** الرقم التسلسلي لإكسل ⇒ YYYY-MM-DD · وما ليس تاريخاً يبقى كما هو */
+function cxDate(v: string): string {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 20000 || n > 80000) return v;
+  const ms = (n - 25569) * 86400000;
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+function CxImport({ t, onDone }: { t: T; onDone: () => void }) {
+  const [msg, setMsg] = useState("");
+  const ref = useRef<HTMLInputElement>(null);
+
+  async function pick(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    setMsg(t("جارٍ القراءة...", "Reading..."));
+    try {
+      const sheets = await readXlsxSheets(await f.arrayBuffer());
+      const master =
+        sheets.find((x) => cxNorm(x.name).includes("Master") || cxNorm(x.name).includes("Tracker")) ||
+        sheets[0];
+      const rows = master?.rows || [];
+      const head = rows[2] || [];
+      const bad = CX_ANCHORS.find(([i, lbl]) => !cxNorm(head[i] || "").startsWith(cxNorm(lbl)));
+      if (bad) {
+        setMsg(
+          t(
+            `تغيّر ترتيب أعمدة الملف — العمود ${bad[0] + 1} ليس «${bad[1]}». أرسلي الملف كما هو أو أبلغيني بالترتيب الجديد.`,
+            "Column layout changed.",
+          ),
+        );
+        return;
+      }
+      const items = rows
+        .slice(3)
+        .filter((r) => txt(r[1]).trim())
+        .map((r, i) => {
+          const data: Rec = {};
+          CX_COLS.forEach((c, ci) => {
+            const raw = txt(r[ci + 1]).trim();
+            data[c.k] = c.k === "firstData" ? cxDate(raw) : raw;
+          });
+          return { id: cxId(data.name), ord: i + 1, data };
+        });
+      if (!items.length) {
+        setMsg(t("لم يُقرأ أي صف من الملف", "No rows read"));
+        return;
+      }
+      if (
+        !confirm(
+          t(
+            `سيُحدَّث ${items.length} جهازاً من الملف. الموجود يُحدَّث بمعرّفه ولا يتكرّر، ولا يُحذف شيء. متابعة؟`,
+            `Update ${items.length} agencies?`,
+          ),
+        )
+      ) {
+        setMsg("");
+        return;
+      }
+      /* دفعات صغيرة: ١٥٠ صفاً في طلب واحد قد يتجاوز حدّ الطلب */
+      for (let i = 0; i < items.length; i += 60) {
+        const res = await apiFetch("/api/items", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ section: "cx", items: items.slice(i, i + 60) }),
+        });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          setMsg(d.error || t("تعذّر الحفظ", "Save failed"));
+          return;
+        }
+      }
+      /* المستهدف من ورقة «KPI L1» إن وُجد — «٦٩ جهاز» في خانة المستهدف */
+      const kpi = sheets.find((x) => cxNorm(x.name).toUpperCase().includes("KPI"));
+      const tgtCell = kpi?.rows?.[1]?.find((c) => /\d/.test(c) && cxNorm(c).includes("جهاز"));
+      const tgt = tgtCell ? Number((tgtCell.match(/\d+/) || [])[0]) : 0;
+      await apiFetch("/api/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          section: "cx",
+          items: [
+            {
+              id: CX_META,
+              ord: 0,
+              data: { target: tgt || undefined, updated: new Date().toISOString().slice(0, 10) },
+            },
+          ],
+        }),
+      });
+      setMsg(
+        t(
+          `تم تحديث ${items.length} جهازاً${tgt ? ` · المستهدف ${tgt}` : ""}`,
+          `Updated ${items.length}`,
+        ),
+      );
+      onDone();
+    } catch {
+      setMsg(t("تعذّرت قراءة الملف — تأكدي أنه xlsx", "Could not read the file"));
+    }
+  }
+
+  return (
+    <span className="seedb">
+      <button className="btn btn-sm" onClick={() => ref.current?.click()}>
+        {t("رفع ملف المتابعة", "Upload tracker")}
+      </button>
+      <input ref={ref} type="file" accept=".xlsx" hidden onChange={pick} />
+      {msg && <em>{msg}</em>}
+    </span>
+  );
+}
+
 export function CxPage({ t, canEdit }: { t: T; canEdit: boolean }) {
-  const { items, loaded, save, remove, undo, undoTop, dismissUndo } = useItems("cx");
+  const { items, loaded, save, remove, reload, undo, undoTop, dismissUndo } = useItems("cx");
   const [q, setQ] = useState("");
   const [f, setF] = useState("");
+  const [wide, setWide] = useState(false);
+  const [stg, setStg] = useState("");
   const [draft, setDraft] = useState<Record<string, Rec>>({});
   const [tgtDraft, setTgtDraft] = useState<string | null>(null);
 
+  const st = cxStats(items);
   const val = (it: Item, k: string) => txt(draft[it.id]?.[k] ?? it.data[k]);
 
   async function put(it: Item, k: string, v: string) {
@@ -1708,93 +1955,192 @@ export function CxPage({ t, canEdit }: { t: T; canEdit: boolean }) {
     setDraft((old) => ({ ...old, [it.id]: { ...(old[it.id] || {}), [k]: v } }));
     await save(it.id, data, it.ord);
   }
-
-  const st = cxStats(items);
-  const { meta } = cxSplit(items);
-
   async function saveTarget(v: string) {
     const n = numOf(v);
     if (n === st.target) return;
-    await save(CX_META, { ...(meta?.data || {}), target: n }, 0);
+    await save(CX_META, { ...(st.meta?.data || {}), target: n }, 0);
   }
 
+  const cols = wide ? CX_COLS : CX_CORE;
   const shown = useMemo(
     () =>
       st.rows.filter((it) => {
         const d = it.data;
-        if (q && !`${txt(d.owner)} ${txt(d.sector)} ${txt(d.note)}`.includes(q)) return false;
+        if (q && !`${txt(d.name)} ${txt(d.consultant)} ${txt(d.sector)}`.includes(q)) return false;
         if (f && txt(d.sector) !== f) return false;
+        if (stg && !CX_STAGES.find((g) => g.k === stg)?.test(d)) return false;
         return true;
       }),
-    [st.rows, q, f],
+    [st.rows, q, f, stg],
   );
 
   function exportXl() {
     const head = CX_COLS.map((c) => c.label);
     const body = shown.map((it) => CX_COLS.map((c) => txt(it.data[c.k])));
-    download("قياس-تجربة-المستفيد.xlsx", writeXlsx([{ name: "تجربة المستفيد", rows: [head, ...body] }]));
+    download("متابعة-تجربة-المستفيد.xlsx", writeXlsx([{ name: "BEX", rows: [head, ...body] }]));
   }
 
   if (!loaded) return <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>;
 
   return (
     <>
-      <div className="cx-kpis">
-        <div className="cx-k">
-          <b>{AR(st.rows.length)}</b>
-          <span>{t("جهاز تُقاس خدماته", "Agencies measured")}</span>
-        </div>
-        <div className="cx-k ok">
-          <b>{AR(st.done)}</b>
-          <span>{t("المحقق", "Achieved")}</span>
-        </div>
-        <div className="cx-k tgt">
-          {canEdit ? (
-            <input
-              className="cx-tin"
-              inputMode="numeric"
-              value={tgtDraft ?? (st.target || "")}
-              placeholder="—"
-              onChange={(e) => setTgtDraft(e.target.value)}
-              onBlur={(e) => {
-                setTgtDraft(null);
-                void saveTarget(e.target.value);
-              }}
-            />
-          ) : (
-            <b>{st.target > 0 ? AR(st.target) : "—"}</b>
+      {canEdit && (
+        <div className="sx-tools">
+          <CxImport t={t} onDone={() => void reload()} />
+          {st.updated && (
+            <span className="sx-count">{`${t("آخر رفع", "Last upload")}: ${st.updated}`}</span>
           )}
-          <span>{t("المستهدف", "Target")}</span>
         </div>
-        <div className="cx-k pct">
-          <b>{st.pct === null ? "—" : `${AR(st.pct)}٪`}</b>
-          <span>{t("المحقق من المستهدف", "Of target")}</span>
-        </div>
-      </div>
-
-      <Toolbar q={q} setQ={setQ} filter={f} setFilter={setF} options={INST_SECTORS} onExport={exportXl} t={t} />
+      )}
 
       {!st.rows.length ? (
         <Empty
-          title={t("لا توجد أجهزة بعد", "No agencies yet")}
+          title={t("لا توجد بيانات بعد", "No data yet")}
           note={t(
-            "يُضاف الجهاز وعدد خدماته وحالة القياس من زر «إضافة».",
-            "Add an agency, its services and measurement state.",
+            "ارفعي ملف المتابعة (Master Tracker) من زر «رفع ملف المتابعة» — تُقرأ كل الأعمدة كما هي.",
+            "Upload the Master Tracker file.",
           )}
         />
       ) : (
         <>
+          <div className="cx-kpis">
+            <div className="cx-k">
+              <b>{AR(st.rows.length)}</b>
+              <span>{t("إجمالي الأجهزة", "Agencies")}</span>
+            </div>
+            <div className="cx-k ok">
+              <b>{AR(st.doneAgencies)}</b>
+              <span>{t("صدر لها تقرير", "With a report")}</span>
+            </div>
+            <div className="cx-k tgt">
+              {canEdit ? (
+                <input
+                  className="cx-tin"
+                  inputMode="numeric"
+                  value={tgtDraft ?? (st.target || "")}
+                  placeholder="—"
+                  onChange={(e) => setTgtDraft(e.target.value)}
+                  onBlur={(e) => {
+                    setTgtDraft(null);
+                    void saveTarget(e.target.value);
+                  }}
+                />
+              ) : (
+                <b>{st.target > 0 ? AR(st.target) : "—"}</b>
+              )}
+              <span>{t("المستهدف (جهاز)", "Target")}</span>
+            </div>
+            <div className="cx-k pct">
+              <b>{st.pct === null ? "—" : `${AR(st.pct)}٪`}</b>
+              <span>{t("المحقق من المستهدف", "Of target")}</span>
+            </div>
+          </div>
+
+          {/* المراحل — كل شريحة تفلتر الجدول على مرحلتها */}
+          <div className="cx-stages">
+            {CX_STAGES.map((g) => (
+              <button
+                key={g.k}
+                className={`cx-st ${stg === g.k ? "on" : ""}`}
+                style={{ ["--c" as string]: g.c }}
+                onClick={() => setStg(stg === g.k ? "" : g.k)}
+              >
+                <b>{AR(st.stage[g.k] || 0)}</b>
+                <span>{t(g.ar, g.en)}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="cx-two">
+            <div className="card">
+              <h3>{t("التقارير حسب الربع", "Reports by quarter")}</h3>
+              <table className="sx-tbl mini">
+                <thead>
+                  <tr>
+                    <th>{t("الربع", "Quarter")}</th>
+                    <th className="c">{t("مشاركة النتائج", "Results shared")}</th>
+                    <th className="c">{t("تقرير معتمد", "Report issued")}</th>
+                    <th className="c">{t("قيد المراجعة", "In review")}</th>
+                    <th className="c">{t("لم يُستلم", "Not received")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {st.byQ.map((r) => (
+                    <tr key={r.k}>
+                      <td>{r.label}</td>
+                      <td className="c">{AR(r.share)}</td>
+                      <td className="c b">{AR(r.issued)}</td>
+                      <td className="c">{AR(r.review)}</td>
+                      <td className="c dim">{AR(r.none)}</td>
+                    </tr>
+                  ))}
+                  <tr className="sum">
+                    <td>{t("الإجمالي", "Total")}</td>
+                    <td className="c">{AR(st.byQ.reduce((a, x) => a + x.share, 0))}</td>
+                    <td className="c b">{AR(st.reportsTot)}</td>
+                    <td className="c">{AR(st.byQ.reduce((a, x) => a + x.review, 0))}</td>
+                    <td className="c dim">—</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div className="card">
+              <h3>{t("توزيع الأجهزة حسب القطاع", "By sector")}</h3>
+              <table className="sx-tbl mini">
+                <thead>
+                  <tr>
+                    <th>{t("القطاع", "Sector")}</th>
+                    <th className="c">{t("الأجهزة", "Agencies")}</th>
+                    <th className="c">{t("بدأت", "Started")}</th>
+                    <th className="c">{t("لم تبدأ", "Not started")}</th>
+                    <th className="c">{t("لم يُستلم الحصر", "No survey")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {st.bySector.map((r) => (
+                    <tr key={r.sector}>
+                      <td>{r.sector}</td>
+                      <td className="c b">{AR(r.tot)}</td>
+                      <td className="c">{AR(r.started)}</td>
+                      <td className="c dim">{AR(r.notStarted)}</td>
+                      <td className="c dim">{AR(r.noSurvey)}</td>
+                    </tr>
+                  ))}
+                  <tr className="sum">
+                    <td>{t("الإجمالي", "Total")}</td>
+                    <td className="c b">{AR(st.bySector.reduce((a, x) => a + x.tot, 0))}</td>
+                    <td className="c">{AR(st.bySector.reduce((a, x) => a + x.started, 0))}</td>
+                    <td className="c dim">{AR(st.bySector.reduce((a, x) => a + x.notStarted, 0))}</td>
+                    <td className="c dim">{AR(st.bySector.reduce((a, x) => a + x.noSurvey, 0))}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <Toolbar q={q} setQ={setQ} filter={f} setFilter={setF} options={INST_SECTORS} onExport={exportXl} t={t} />
+
           <div className="iw-bar">
+            <span className="iw-tog">
+              <span className={!wide ? "on" : ""} onClick={() => setWide(false)}>
+                {t("أعمدة أساسية", "Core columns")}
+              </span>
+              <span className={wide ? "on" : ""} onClick={() => setWide(true)}>
+                {t("كل الأعمدة", "All columns")}
+              </span>
+            </span>
             <span className="sx-count">
               {`${t("عرض", "Showing")} ${AR(shown.length)} ${t("من", "of")} ${AR(st.rows.length)}`}
             </span>
           </div>
+
           <div className="tbl-wrap">
             <table className="sx-tbl inst">
               <thead>
                 <tr>
                   <th className="c num">#</th>
-                  {CX_COLS.map((c) => (
+                  {cols.map((c) => (
                     <th key={c.k} style={{ minWidth: c.w }}>
                       {c.label}
                     </th>
@@ -1806,9 +2152,10 @@ export function CxPage({ t, canEdit }: { t: T; canEdit: boolean }) {
                 {shown.map((it, n) => (
                   <tr key={it.id}>
                     <td className="c num">{AR(n + 1)}</td>
-                    {CX_COLS.map((c) => {
+                    {cols.map((c) => {
                       const v = val(it, c.k);
-                      const cls = `cell${cxTone(c.k, v) ? ` ${cxTone(c.k, v)}` : ""}`;
+                      const tn = cxTone(c, v);
+                      const cls = tn ? `cell ${tn}` : "cell";
                       if (!canEdit)
                         return (
                           <td key={c.k} className={cls} style={{ minWidth: c.w }}>
@@ -1818,8 +2165,8 @@ export function CxPage({ t, canEdit }: { t: T; canEdit: boolean }) {
                       return (
                         <td key={c.k} className={cls} style={{ minWidth: c.w }}>
                           {c.opts ? (
-                            <select value={v} onChange={(e) => void put(it, c.k, e.target.value)}>
-                              {c.opts.map((op) => (
+                            <select value={c.opts.includes(v) ? v : ""} onChange={(e) => void put(it, c.k, e.target.value)}>
+                              {[...c.opts, ...(c.opts.includes(v) ? [] : [v])].map((op) => (
                                 <option key={op} value={op}>
                                   {op || "—"}
                                 </option>
@@ -1848,7 +2195,7 @@ export function CxPage({ t, canEdit }: { t: T; canEdit: boolean }) {
                           className="rowx"
                           title={t("حذف الصف", "Delete row")}
                           onClick={() => {
-                            if (!confirm(t(`حذف «${txt(it.data.owner)}»؟`, "Delete row?"))) return;
+                            if (!confirm(t(`حذف «${txt(it.data.name)}»؟`, "Delete row?"))) return;
                             void remove(it.id);
                           }}
                         >

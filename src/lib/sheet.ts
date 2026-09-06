@@ -145,8 +145,21 @@ function orderedSheets(files: Map<string, Uint8Array>, dec: TextDecoder): string
   return paths;
 }
 
-/** يقرأ ملف xlsx ويُرجع صفوف الورقة الأولى التي فيها بيانات */
-export async function readXlsx(buf: ArrayBuffer): Promise<string[][]> {
+/** أسماء الأوراق بترتيب المصنّف — بموازاة مسارات orderedSheets */
+function sheetNames(files: Map<string, Uint8Array>, dec: TextDecoder): string[] {
+  const wb = files.get("xl/workbook.xml");
+  if (!wb) return [];
+  const out: string[] = [];
+  const re = /<sheet\b[^>]*>/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(dec.decode(wb)))) {
+    out.push(unesc(/name="([^"]*)"/.exec(m[0])?.[1] || ""));
+  }
+  return out;
+}
+
+/** كل أوراق المصنّف بأسمائها — لملف فيه أكثر من ورقة تُقرأ معاً */
+export async function readXlsxSheets(buf: ArrayBuffer): Promise<{ name: string; rows: string[][] }[]> {
   const files = await unzip(buf);
   const dec = new TextDecoder("utf-8");
 
@@ -159,11 +172,18 @@ export async function readXlsx(buf: ArrayBuffer): Promise<string[][]> {
     while ((m = re.exec(xml))) shared.push(texts(m[1]));
   }
 
-  for (const path of orderedSheets(files, dec)) {
+  const paths = orderedSheets(files, dec);
+  const names = sheetNames(files, dec);
+  return paths.map((path, i) => {
     const f = files.get(path);
-    if (!f) continue;
-    const rows = sheetRows(dec.decode(f), shared);
-    if (rows.some((r) => r.some((c) => c !== ""))) return rows;
+    return { name: names[i] || `Sheet${i + 1}`, rows: f ? sheetRows(dec.decode(f), shared) : [] };
+  });
+}
+
+/** يقرأ ملف xlsx ويُرجع صفوف الورقة الأولى التي فيها بيانات */
+export async function readXlsx(buf: ArrayBuffer): Promise<string[][]> {
+  for (const sh of await readXlsxSheets(buf)) {
+    if (sh.rows.some((r) => r.some((c) => c !== ""))) return sh.rows;
   }
   return [];
 }
