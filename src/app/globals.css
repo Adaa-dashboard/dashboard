@@ -8151,6 +8151,92 @@ table.matrix thead th {
   .cx-kpis { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* شرائح المراحل — كل شريحة فلتر على مرحلتها */
+.cx-stages {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.cx-st {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-inline-start: 4px solid var(--c);
+  border-radius: 12px;
+  padding: 12px 10px;
+  text-align: center;
+  cursor: pointer;
+  font: inherit;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.cx-st:hover { background: var(--soft); }
+.cx-st.on {
+  background: var(--tint);
+  border-color: var(--tint-bd);
+  border-inline-start-color: var(--c);
+  box-shadow: 0 0 0 2px var(--tint-bd);
+}
+.cx-st b {
+  display: block;
+  font-family: "Noto Kufi Arabic", sans-serif;
+  font-weight: 800;
+  font-size: 22px;
+  color: var(--c);
+  line-height: 1.1;
+}
+.cx-st span {
+  display: block;
+  margin-top: 5px;
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
+/* جدولا التقارير والقطاعات جنباً إلى جنب */
+.cx-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.cx-two .card { padding: 14px 16px 8px; }
+.cx-two .card h3 {
+  margin: 0 0 10px;
+  font-family: "Noto Kufi Arabic", sans-serif;
+  font-weight: 700;
+  font-size: 12.5px;
+  color: var(--gt-900);
+}
+.sx-tbl.mini { width: 100%; font-size: 11.5px; }
+.sx-tbl.mini th {
+  background: transparent;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 10.5px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line2);
+}
+.sx-tbl.mini td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--line2);
+  color: var(--ink);
+}
+.sx-tbl.mini td.c { text-align: center; }
+.sx-tbl.mini td.b { font-weight: 800; color: var(--gt-700); }
+.sx-tbl.mini td.dim { color: var(--muted); }
+.sx-tbl.mini tr.sum td {
+  border-top: 1px solid var(--border);
+  border-bottom: none;
+  font-weight: 700;
+  background: var(--soft);
+}
+@media (max-width: 1100px) {
+  .cx-stages { grid-template-columns: repeat(3, 1fr); }
+  .cx-two { grid-template-columns: 1fr; }
+}
+@media (max-width: 620px) {
+  .cx-stages { grid-template-columns: repeat(2, 1fr); }
+}
+
 .rowx {
   background: transparent;
   border: none;
