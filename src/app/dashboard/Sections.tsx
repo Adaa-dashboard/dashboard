@@ -1751,52 +1751,51 @@ export function CxBox({ t }: { t: T }) {
   const n = st.rows.length;
   const steps = CX_STAGES.filter((g) => g.k !== "none");
   return (
-    <div className="card cxa">
-      <div className="cxa-row">
-        <div className="cxa-n tot">
-          <b>{AR(n)}</b>
-          <span>{t("إجمالي الأجهزة", "Agencies")}</span>
-        </div>
-        {steps.map((g) => (
-          <div className="cxa-n" key={g.k} style={{ ["--c" as string]: g.c }}>
-            <b>{AR(st.stage[g.k] || 0)}</b>
-            <span>{t(g.ar, g.en)}</span>
-          </div>
-        ))}
-      </div>
-
-      <div className="cxa-bar">
-        <div className="lb">
-          <span>{t("المحقق من المستهدف", "Achieved of target")}</span>
-          <b>
-            {st.target > 0
-              ? `${AR(st.doneAgencies)} ${t("من", "of")} ${AR(st.target)}`
-              : `${AR(st.doneAgencies)} ${t("جهاز", "agencies")}`}
-          </b>
-        </div>
+    <div className="card cxc">
+      <div className="cxc-l">
         {st.pct === null ? (
-          <em className="none">{t("المستهدف لم يُحدَّد بعد", "No target set")}</em>
+          <>
+            <b className="big">{AR(st.doneAgencies)}</b>
+            <b>{t("جهازاً صدر لها تقرير", "with a report")}</b>
+            <span>{t("المستهدف لم يُحدَّد بعد", "No target set")}</span>
+          </>
         ) : (
           <>
-            <div className="bar">
-              <i style={{ width: `${Math.min(100, st.pct)}%` }} />
-            </div>
-            <em>{AR(st.pct)}٪</em>
+            <Ring pct={st.pct} size={140} tone="hi" />
+            <b>{`${AR(st.doneAgencies)} ${t("من", "of")} ${AR(st.target)} ${t("جهازاً", "agencies")}`}</b>
+            <span>{t("المحقق من المستهدف", "Achieved of target")}</span>
           </>
         )}
       </div>
 
-      <div className="cxa-foot">
-        <span>
-          {t("مجموع التقارير المعتمدة", "Approved reports")} <b>{AR(st.reportsTot)}</b>
-        </span>
-        <span>
-          {t("احتُسبت في المؤشر", "Counted in KPI")} <b>{AR(st.counted)}</b>
-        </span>
-        <span>
-          {t("الخدمات المخطط قياسها", "Services planned")} <b>{AR(st.servPlan)}</b> {t("من", "of")}{" "}
-          <b>{AR(st.servTot)}</b>
-        </span>
+      <div className="cxc-r">
+        <div className="cxc-h">
+          {t(`توزيع الأجهزة الـ${AR(n)} على المراحل`, `The ${n} agencies by stage`)}
+        </div>
+        {steps.map((g) => {
+          const v = st.stage[g.k] || 0;
+          return (
+            <div className="cxc-b" key={g.k}>
+              <span className="l">{t(g.ar, g.en)}</span>
+              <span className="m">
+                <i style={{ width: `${n ? (v / n) * 100 : 0}%`, background: g.c }} />
+              </span>
+              <b style={{ color: g.c }}>{AR(v)}</b>
+            </div>
+          );
+        })}
+        <div className="cxc-f">
+          <span>
+            {t("مجموع التقارير المعتمدة", "Approved reports")} <b>{AR(st.reportsTot)}</b>
+          </span>
+          <span>
+            {t("احتُسبت في المؤشر", "Counted in KPI")} <b>{AR(st.counted)}</b>
+          </span>
+          <span>
+            {t("الخدمات المخطط قياسها", "Services planned")} <b>{AR(st.servPlan)}</b> {t("من", "of")}{" "}
+            <b>{AR(st.servTot)}</b>
+          </span>
+        </div>
       </div>
     </div>
   );
