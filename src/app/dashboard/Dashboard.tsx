@@ -1200,8 +1200,21 @@ function Overview({
         </div>
       )}
 
-      {/* قياس تجربة المستفيد — فوق المشاريع بطلب المستخدمة */}
-      {hasScope(me.scopes, "cx") && <CxBox t={t} onOpen={() => onOpenTab("cx")} />}
+      {/* قياس تجربة المستفيد — فوق المشاريع بطلب المستخدمة.
+          داخل <Sec> نفسه ليتوحّد عنوانه مع بقية عناوين نظرة عامة */}
+      {hasScope(me.scopes, "cx") && (
+        <Sec
+          id="cx"
+          title={t(SECTION_TITLE.cx[0], SECTION_TITLE.cx[1])}
+          extra={
+            <button className="sx-link" onClick={() => onOpenTab("cx")}>
+              {t("المزيد من التفاصيل", "More details")} ‹
+            </button>
+          }
+        >
+          <CxBox t={t} />
+        </Sec>
+      )}
 
       {(["outputs", "projects"] as const).map((key) =>
         hasScope(me.scopes, key) ? (
