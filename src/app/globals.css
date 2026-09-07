@@ -9261,15 +9261,26 @@ table.matrix thead th {
 
 @media (max-width: 760px) { .pm { grid-template-columns: 1fr; } }
 
-/* رأس مجموعة القطاع في جدول المستخدمين */
+/* رأس مجموعة القطاع في جدول المستخدمين — يُطوى بالسهم */
 .users-tbl tr.u-grp td {
   background: #f4f8f6; border-top: 1px solid var(--line, #e6edea);
-  border-bottom: 1px solid var(--line, #e6edea);
-  font-family: var(--kufi, "Noto Kufi Arabic", sans-serif);
-  font-size: 12px; color: #0d3d22; padding: 9px 14px;
+  border-bottom: 1px solid var(--line, #e6edea); padding: 0;
 }
-.users-tbl tr.u-grp td span {
-  display: inline-block; margin-inline-start: 8px; font-family: inherit;
+.users-tbl tr.u-grp button {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  background: none; border: 0; cursor: pointer; text-align: start;
+  font-family: var(--kufi, "Noto Kufi Arabic", sans-serif);
+  font-size: 12px; color: #0d3d22; padding: 10px 14px;
+}
+.users-tbl tr.u-grp button:hover { background: #edf4f1; }
+.users-tbl tr.u-grp i {
+  font-style: normal; font-size: 10px; color: #7b8a86;
+  display: inline-block; transition: transform .15s;
+  transform: rotate(-90deg);
+}
+.users-tbl tr.u-grp i.open { transform: none; }
+.users-tbl tr.u-grp span {
+  font-family: "IBM Plex Sans Arabic", sans-serif;
   font-size: 10px; color: #6b7c77; background: #fff;
   border: 1px solid var(--line, #e6edea); border-radius: 20px; padding: 1px 8px;
 }

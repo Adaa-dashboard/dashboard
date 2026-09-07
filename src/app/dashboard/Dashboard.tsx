@@ -2250,18 +2250,28 @@ function UsersManager({ refData }: { refData: RefData }) {
   /* الترتيب: مجموعة لكل قطاع، مديره أولاً ثم موظفوه بالأبجدية.
      ومن يتبع أكثر من قطاع يظهر تحت كلٍّ منها — فالقائمة تُقرأ
      كما يُقرأ الهيكل التنظيمي. */
+  /* الترتيب: إدارة عمليات الأداء أولاً، ثم مجموعة لكل قطاع بمديره
+     أولاً ثم موظفيه بالأبجدية — فتُقرأ كما يُقرأ الهيكل التنظيمي. */
   const groups = useMemo(() => {
     const byName = (a: UserRow, b: UserRow) =>
       Number(!!b.isLead) - Number(!!a.isLead) || a.name.localeCompare(b.name, "ar");
-    const out = refData.sectors.map((sec) => ({
-      id: sec.id,
-      name: sec.name,
-      rows: shown.filter((u) => (u.sectorIds || []).includes(sec.id)).sort(byName),
-    }));
-    const none = shown.filter((u) => !(u.sectorIds || []).some((id) => refData.sectors.some((s) => s.id === id)));
-    if (none.length) out.push({ id: "__none", name: t("بلا قطاع", "No sector"), rows: none.sort(byName) });
-    return out.filter((g) => g.rows.length);
+    const head = shown
+      .filter((u) => !(u.sectorIds || []).some((id) => refData.sectors.some((s) => s.id === id)))
+      .sort(byName);
+    const out: { id: string; name: string; rows: UserRow[] }[] = [];
+    if (head.length)
+      out.push({ id: "__dept", name: t("إدارة عمليات الأداء", "Performance Operations"), rows: head });
+    for (const sec of refData.sectors) {
+      const rows = shown.filter((u) => (u.sectorIds || []).includes(sec.id)).sort(byName);
+      if (rows.length) out.push({ id: sec.id, name: sec.name, rows });
+    }
+    return out;
   }, [shown, refData.sectors, t]);
+
+  /* الطيّ في متصفح المستخدم وحده — القائمة تطول فيريح إغلاق ما لا يعنيه */
+  const [shut, setShut] = useState<string[]>([]);
+  const toggleGrp = (id: string) =>
+    setShut((v) => (v.includes(id) ? v.filter((x) => x !== id) : [...v, id]));
 
   return (
     <div>
@@ -2373,11 +2383,15 @@ function UsersManager({ refData }: { refData: RefData }) {
           <tbody key={g.id}>
             <tr className="u-grp">
               <td colSpan={8}>
-                {g.name}
-                <span>{g.rows.length}</span>
+                <button type="button" onClick={() => toggleGrp(g.id)}>
+                  <i className={shut.includes(g.id) ? "" : "open"}>▾</i>
+                  {g.name}
+                  <span>{g.rows.length}</span>
+                </button>
               </td>
             </tr>
-            {g.rows.map((u) => (
+            {!shut.includes(g.id) &&
+              g.rows.map((u) => (
               <tr key={u.id}>
                 <td className="u-name">
                   {u.name}
@@ -2429,7 +2443,7 @@ function UsersManager({ refData }: { refData: RefData }) {
                   </div>
                 </td>
               </tr>
-            ))}
+              ))}
           </tbody>
         ))}
       </table>
