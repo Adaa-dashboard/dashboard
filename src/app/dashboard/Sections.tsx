@@ -2585,3 +2585,116 @@ function ItemForm({
     </div>
   );
 }
+
+/* ============================================================
+   ملخّص أسبوعي لقسم واحد — يستعمله «التقرير الأسبوعي».
+   يُبنى من نفس الدوال والثوابت التي ترسم القسم في نظرة عامة،
+   فلا يختلف رقمٌ بين الصفحة والتقرير.
+   ============================================================ */
+export type WeekSum = {
+  total: number;
+  totalLabel: string;
+  breakdown: { k: string; n: number }[];
+  /** تقدّم القسم نحو غايته — منه يُحسب «الأداء العام» في التقرير
+      الأسبوعي. null حيث لا غاية معتمدة، فلا يدخل المتوسط أصلاً. */
+  prog: { done: number; of: number } | null;
+};
+
+export function weekSummary(section: SectionKey, items: Item[]): WeekSum {
+  const d = (x: Item) => x.data;
+
+  if (section === "sessions") {
+    let done = 0;
+    let live = 0;
+    let none = 0;
+    for (const it of items) {
+      const s = sessOf(d(it));
+      if (s.done >= s.full) done++;
+      else if (s.done === 0) none++;
+      else live++;
+    }
+    return {
+      total: items.length,
+      totalLabel: "جلسة",
+      breakdown: [
+        { k: "مكتملة", n: done },
+        { k: "قيد التنفيذ", n: live },
+        { k: "لم تبدأ", n: none },
+      ],
+      prog: items.length ? { done, of: items.length } : null,
+    };
+  }
+
+  if (section === "natstrat") {
+    const c = [0, 0, 0, 0];
+    for (const it of items) c[natStage(d(it)) - 1]++;
+    return {
+      total: items.length,
+      totalLabel: "استراتيجية",
+      breakdown: NAT_STEPS.map((s, i) => ({ k: s, n: c[i] })),
+      /* «معتمدة» = من اللجنة أو من مجلس الوزراء */
+      prog: items.length ? { done: c[2] + c[3], of: items.length } : null,
+    };
+  }
+
+  if (section === "inststrat") {
+    const g = (k: string, v: string) => items.filter((i) => txt(i.data[k]) === v).length;
+    return {
+      total: items.length,
+      totalLabel: "جهة",
+      breakdown: [
+        { k: "عُقد الاجتماع التعريفي", n: g("meet", "تم") },
+        { k: "الوثائق مستلمة", n: g("docs", "✓") },
+        { k: "فُعِّل القياس", n: g("live", "مفعل") },
+      ],
+      prog: items.length ? { done: g("live", "مفعل"), of: items.length } : null,
+    };
+  }
+
+  if (section === "cx") {
+    const st = cxStats(items);
+    return {
+      total: st.rows.length,
+      totalLabel: "جهاز",
+      breakdown: [
+        { k: "صدر لها تقرير", n: st.stage.reports || 0 },
+        { k: "في القياس", n: st.stage.measuring || 0 },
+        { k: "في التهيئة", n: st.stage.prep || 0 },
+        { k: "لم تبدأ", n: st.stage.none || 0 },
+      ],
+      /* المستهدف في ملف المتابعة نفسه — لا رقم مفترض */
+      prog: st.target > 0 ? { done: st.doneAgencies, of: st.target } : null,
+    };
+  }
+
+  if (section === "projects") {
+    const behind = items.filter((x) => numOf(d(x).actual) < numOf(d(x).planned)).length;
+    const done = items.filter((x) => numOf(d(x).actual) >= 100).length;
+    return {
+      total: items.length,
+      totalLabel: "مشروع",
+      breakdown: [
+        { k: "مكتملة", n: done },
+        { k: "متأخرة عن الخطة", n: behind },
+        { k: "وفق الخطة", n: items.length - behind - done },
+      ],
+      /* متوسط الإنجاز الفعلي للمشاريع — مئوية أصلاً */
+      prog: items.length
+        ? { done: Math.round(items.reduce((a, x) => a + numOf(d(x).actual), 0) / items.length), of: 100 }
+        : null,
+    };
+  }
+
+  /* المخرجات الوطنية — الحقول لم تُعتمد بعد، فالحالة نصٌّ حر */
+  const byStatus = new Map<string, number>();
+  for (const it of items) {
+    const s = txt(d(it).status) || "بلا حالة";
+    byStatus.set(s, (byStatus.get(s) || 0) + 1);
+  }
+  return {
+    total: items.length,
+    totalLabel: "مخرج",
+    breakdown: [...byStatus.entries()].map(([k, n]) => ({ k, n })).slice(0, 4),
+    prog: null,
+  };
+}

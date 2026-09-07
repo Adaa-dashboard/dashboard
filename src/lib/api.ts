@@ -1,7 +1,7 @@
 "use client";
 
 import { ensureAnon, sb, whoAmI } from "./supa";
-import { buildWeekly, weekStartOf, type WeeklyInput } from "./weekly";
+import { weekStartOf } from "./weeklyReport";
 
 /* ============================================================
    طبقة ترجمة: الواجهة تنادي نفس مسارات /api/... التي كانت تنادي
@@ -804,47 +804,36 @@ export async function apiFetch(path: string, init: Init = {}) {
     }
 
     /* ---------------- الإنجاز الأسبوعي ---------------- */
-    if (p === "/api/report" && method === "GET") {
+    /* ---------------- تخصيص التقرير الأسبوعي ----------------
+       مفتاحان في perf_settings: الافتراضي واستثناء أسبوع بعينه.
+       الكتابة يحرسها RLS (صلاحية weekly:edit) لا فحصٌ هنا. */
+    if (p === "/api/weekly" && method === "GET") {
       const me = await whoAmI();
       if (!me) return err("غير مصرّح", 401);
-      const asked = q.get("week") || "";
-      const week = /^\d{4}-\d{2}-\d{2}$/.test(asked)
-        ? weekStartOf(asked)
-        : weekStartOf(new Date().toISOString().slice(0, 10));
-
-      const [ms, sec, ind, tk, tg, st, ppl] = await Promise.all([
-        s.from("perf_measurements").select("*"),
-        s.from("perf_sectors").select("*").order("ord"),
-        s.from("perf_indicators").select("*").eq("active", true).order("ord"),
-        s.from("perf_tasks").select("*"),
-        s.from("perf_targets").select("*"),
-        s.from("perf_settings").select("*").eq("key", "statuses").maybeSingle(),
-        people(),
-      ]);
-      const targets: Record<string, number | number[]> = {};
-      for (const r of tg.data || []) targets[`${r.sector_id}|${r.indicator_id}`] = r.value;
-
-      const input: WeeklyInput = {
-        measurements: (ms.data || []).map((r) => ({
-          sectorId: r.sector_id, indicatorId: r.indicator_id,
-          actual: r.actual === null ? null : Number(r.actual), updatedAt: r.updated_at,
-        })),
-        sectors: (sec.data || []).map((r) => ({ id: r.id, name: r.name })),
-        indicators: (ind.data || []).map((r) => ({ id: r.id, name: r.name, unit: r.unit })),
-        tasks: (tk.data || []).map((r) => ({
-          id: r.id, title: r.title, assigneeId: r.assignee_id, createdById: r.created_by_id,
-          dueDate: r.due_date, state: r.state,
-          updates: Array.isArray(r.updates) ? r.updates : [],
-          completedAt: r.completed_at ?? undefined,
-        })),
-        users: ppl.map((x: { id: string; name: string }) => ({ id: x.id, name: x.name })),
-        targets,
-        statuses: (st.data?.value as WeeklyInput["statuses"]) || [],
-      };
-      const report = buildWeekly(week, input, {
-        id: me.id, role: me.role, sectorIds: me.sectorIds,
+      const week = q.get("week") || "";
+      const keys = ["weekly_prefs", ...(week ? [`weekly_wk_${week}`] : [])];
+      const { data, error } = await s.from("perf_settings").select("*").in("key", keys);
+      if (error) return err(error.message, 403);
+      const map: Record<string, unknown> = {};
+      for (const r of data || []) map[r.key] = r.value;
+      return ok({
+        base: map["weekly_prefs"] ?? null,
+        week: week ? (map[`weekly_wk_${week}`] ?? null) : null,
       });
-      return ok({ report, canShare: me.role === "admin" });
+    }
+    if (p === "/api/weekly" && (method === "PUT" || method === "POST")) {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const scope = str(body.scope) === "week" ? "week" : "default";
+      const week = str(body.week);
+      if (scope === "week" && !/^\d{4}-\d{2}-\d{2}$/.test(week))
+        return err("أسبوع غير صالح", 400);
+      const key = scope === "week" ? `weekly_wk_${week}` : "weekly_prefs";
+      const { error } = await s
+        .from("perf_settings")
+        .upsert({ key, value: body.prefs ?? {} }, { onConflict: "key" });
+      if (error) return err(error.message, 403);
+      return ok({ ok: true, key });
     }
 
     if (p === "/api/report/share") {

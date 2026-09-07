@@ -582,7 +582,7 @@ export default function Dashboard({ me }: { me: Me }) {
                 />
               )}
               {tab === "mypage" && <Portfolio me={me} t={t} onOpenNotes={() => setNotesOpen(true)} />}
-              {tab === "report" && can("weekly") && <WeeklyPanel t={t} />}
+              {tab === "report" && can("weekly") && <WeeklyPanel t={t} canEdit={can("weekly:edit")} />}
               {tab === "structure" && can("structure") && (
                 <Structure
                   sectors={refData.sectors}

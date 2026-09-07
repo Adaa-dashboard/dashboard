@@ -8976,3 +8976,226 @@ table.matrix thead th {
   border-radius: 8px;
   background: var(--panel);
 }
+
+/* ============================================================
+   التقرير الأسبوعي — الشكل المعتمد
+   لون واحد للأرقام والعناوين، رمادي للتوضيح، وأخضر للفروقات.
+   البرتقالي والأحمر نقطةٌ صغيرة في حالة التكليف وحدها.
+   ============================================================ */
+.wr {
+  --wg9: #0d3d22;
+  --wg8: #155c35;
+  --wg7: #1e7a48;
+  --wok: #1a9d5c;
+  --wbad: #d34a4a;
+  --wmut: #7b8a86;
+  background: #fff;
+  border: 1px solid var(--line, #e6edea);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+/* ── الترويسة ── */
+.wr-hd {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(115deg, var(--wg9) 0%, var(--wg8) 55%, var(--wg7) 100%);
+  color: #fff;
+  padding: 22px 26px;
+  display: flex;
+  align-items: center;
+  min-height: 108px;
+  gap: 8px;
+}
+.wr-art { position: absolute; inset-block: 0; inset-inline-end: 0; width: 36%; overflow: hidden; }
+.wr-bld { width: 100%; height: 100%; opacity: .5; display: block; }
+.wr-cut {
+  position: absolute; inset-block: 0; inset-inline-start: -2px; width: 90px;
+  background: linear-gradient(90deg, rgba(13, 61, 34, 0) 0%, var(--wg8) 78%);
+}
+.wr-lg {
+  z-index: 1; min-width: 150px; text-align: start;
+  padding-inline-end: 18px; border-inline-end: 1px solid rgba(255, 255, 255, .22);
+}
+.wr-lg b { font-family: var(--kufi, "Noto Kufi Arabic", sans-serif); font-size: 27px; letter-spacing: .5px; }
+.wr-lg span { display: block; font-size: 9px; color: rgba(255, 255, 255, .7); line-height: 1.6; margin-top: 2px; }
+.wr-mid { z-index: 1; flex: 1; text-align: center; padding: 0 18px; }
+.wr-mid > b { font-family: var(--kufi, "Noto Kufi Arabic", sans-serif); font-size: 22px; display: block; }
+.wr-mid > span { display: block; font-size: 12.5px; color: rgba(255, 255, 255, .78); margin-top: 3px; }
+.wr-pdw { display: block; margin-top: 10px; }
+.wr-pd {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: rgba(255, 255, 255, .13); border: 1px solid rgba(255, 255, 255, .22);
+  padding: 5px 13px; border-radius: 8px; font-size: 11px; color: #fff;
+}
+.wr-ci { width: 14px; height: 14px; display: inline-flex; }
+.wr-ci svg { width: 14px; height: 14px; }
+.wr-mot {
+  z-index: 1; font-size: 11px; line-height: 1.9;
+  color: rgba(255, 255, 255, .9); text-align: center; min-width: 100px;
+}
+.wr-mot em { font-style: normal; font-weight: 700; color: #fff; }
+
+/* ── الجسم ── */
+.wr-bd { padding: 26px 30px 30px; }
+.wr-top {
+  display: flex; align-items: center; gap: 26px;
+  padding-bottom: 22px; margin-bottom: 6px; border-bottom: 1px solid #eef3f1;
+}
+.wr-donut { width: 104px; height: 104px; flex: none; }
+.wr-donut-t {
+  font: 800 25px var(--kufi, "Noto Kufi Arabic"), sans-serif;
+  direction: ltr; fill: var(--wg9);
+}
+.wr-tx { flex: 1; min-width: 180px; }
+.wr-tx > b { display: block; font-family: var(--kufi, "Noto Kufi Arabic", sans-serif); font-size: 17px; color: var(--wg9); }
+.wr-note { display: block; font-size: 11.5px; color: var(--wmut); line-height: 1.8; margin-top: 6px; }
+.wr-facts { display: flex; gap: 34px; text-align: start; }
+.wr-facts b {
+  display: block; font-family: var(--kufi, "Noto Kufi Arabic", sans-serif);
+  font-size: 26px; color: var(--wg8); line-height: 1.1;
+}
+.wr-facts span { font-size: 10.5px; color: var(--wmut); }
+
+.wr-h {
+  font-family: var(--kufi, "Noto Kufi Arabic", sans-serif); font-size: 14px; color: var(--wg9);
+  margin: 26px 0 14px; display: flex; align-items: baseline; gap: 8px;
+}
+.wr-h em { font-style: normal; font-size: 10.5px; color: var(--wmut); font-weight: 400; }
+
+/* ── ماذا وصلنا هذا الأسبوع: خانات بلا إطارات ── */
+.wr-cells { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px 30px; }
+.wr-cl { padding: 2px 0 14px; border-bottom: 1px solid #f2f6f5; }
+.wr-ttl { display: block; font-size: 12px; color: var(--wg8); font-weight: 700; }
+.wr-num { display: flex; align-items: baseline; gap: 9px; margin: 6px 0 3px; }
+.wr-num b {
+  font-family: var(--kufi, "Noto Kufi Arabic", sans-serif);
+  font-size: 34px; color: var(--wg9); line-height: 1;
+}
+.wr-dl { font-size: 12px; font-weight: 700; }
+.wr-dl.up { color: var(--wok); }
+.wr-dl.down { color: var(--wbad); }
+.wr-dl.flat { color: var(--wmut); }
+.wr-unit { display: block; font-size: 10.5px; color: #6b7c77; }
+.wr-brk { display: block; font-size: 10px; color: #9aa8a4; margin-top: 6px; line-height: 1.7; }
+
+/* ── التكاليف: بطاقات هادئة، الحالة نقطة وكلمة ── */
+.wr-asgs { display: flex; flex-direction: column; }
+.wr-ac { padding: 16px 0; border-bottom: 1px solid #f0f4f3; }
+.wr-ac:last-child { border-bottom: none; }
+.wr-ah { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.wr-ah i { flex: none; font-style: normal; font-size: 11px; font-weight: 800; color: #c3cecb; }
+.wr-ah > b {
+  font-size: 13px; font-weight: 700; color: var(--wg9);
+  line-height: 1.7; flex: 1; min-width: 220px;
+}
+.wr-st { white-space: nowrap; font-size: 11px; color: #3a4a46; }
+.wr-st em { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-inline-end: 6px; }
+.wr-at { white-space: nowrap; font-size: 10.5px; color: #9aa8a4; }
+.wr-abs {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 10px 26px; margin-top: 10px; padding-inline-start: 21px;
+}
+.wr-ab > span { display: block; font-size: 9.5px; color: #9aa8a4; margin-bottom: 3px; }
+.wr-ab > b { display: block; font-size: 11.5px; font-weight: 400; color: #3a4a46; line-height: 1.8; }
+.wr-ab > b.s { color: var(--wg7); font-weight: 600; }
+.wr-empty { font-size: 11.5px; color: var(--wmut); padding: 6px 0 2px; }
+
+.wr-p { font-size: 12px; color: #3a4a46; line-height: 2; margin: 0; }
+.wr-two { display: grid; grid-template-columns: 1fr 1fr; gap: 34px; }
+.wr-li > div { display: flex; gap: 10px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid #f4f7f6; }
+.wr-li > div:last-child { border-bottom: none; }
+.wr-li i { flex: none; font-style: normal; font-size: 11px; font-weight: 800; color: #c3cecb; }
+.wr-li b { font-size: 12px; font-weight: 400; color: #3a4a46; line-height: 1.8; }
+
+/* ── التذييل ── */
+.wr-ft {
+  position: relative; overflow: hidden; background: #f4f8f6; padding: 18px 30px;
+  display: flex; align-items: center; justify-content: space-between; min-height: 66px;
+}
+.wr-mtn { position: absolute; inset-block-end: 0; inset-inline: 0; width: 100%; height: 44px; }
+.wr-sl {
+  z-index: 1; font-family: var(--kufi, "Noto Kufi Arabic", sans-serif);
+  font-size: 13px; color: var(--wg9); line-height: 1.6; text-align: start;
+}
+.wr-sl em { display: block; font-style: normal; font-size: 12px; color: var(--wg7); margin-top: 2px; }
+.wr-r { z-index: 1; font-size: 10.5px; color: var(--wmut); order: -1; }
+
+/* المربع الصغير الذي يفتح صفحة التخصيص */
+.wk-tune {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 3px;
+  width: 34px; height: 34px; padding: 8px; cursor: pointer;
+  background: #fff; border: 1px solid var(--line, #e6edea); border-radius: 9px;
+}
+.wk-tune span { background: #9aa8a4; border-radius: 1.5px; }
+.wk-tune:hover { border-color: var(--wg7, #1e7a48); }
+.wk-tune:hover span { background: var(--wg7, #1e7a48); }
+
+/* ── صفحة التخصيص ── */
+.wc-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.wc-week { font-size: 13px; color: var(--wg9, #0d3d22); }
+.wc-hd {
+  display: flex; align-items: center; gap: 12px;
+  padding-bottom: 12px; border-bottom: 1px solid #e8efed;
+}
+.wc-hd h3 { font-family: var(--kufi, "Noto Kufi Arabic", sans-serif); font-size: 15px; color: var(--wg9, #0d3d22); margin: 0; }
+.wc-hd > div > span { font-size: 11px; color: #7b8a86; }
+.wc-acts { margin-inline-start: auto; display: flex; gap: 8px; }
+.wc-ops { display: grid; grid-template-columns: 1fr 1fr; gap: 0 30px; }
+.wc-op {
+  display: flex; align-items: flex-start; gap: 10px; padding: 12px 0;
+  border-bottom: 1px solid #f4f7f6; background: none; border-inline: 0; border-top: 0;
+  text-align: start; cursor: pointer; font: inherit; width: 100%;
+}
+.wc-op:disabled { cursor: default; }
+.wc-bx {
+  flex: none; width: 17px; height: 17px; border-radius: 5px; border: 1.5px solid #cfdbd7;
+  margin-top: 2px; display: flex; align-items: center; justify-content: center;
+  font-size: 11px; line-height: 1; color: #fff;
+}
+.wc-bx.on { background: var(--wg7, #1e7a48); border-color: var(--wg7, #1e7a48); }
+.wc-tt { flex: 1; }
+.wc-tt b { display: block; font-size: 12px; color: #8f9c98; font-weight: 600; line-height: 1.7; }
+.wc-op.on .wc-tt b { color: var(--wg9, #0d3d22); font-weight: 700; }
+.wc-tt > span { display: block; font-size: 10.5px; color: #a7b3b0; margin-top: 2px; line-height: 1.7; }
+.wc-lk {
+  flex: none; font-size: 9.5px; color: #b6c2bf;
+  border: 1px solid #e8efed; border-radius: 5px; padding: 2px 7px; margin-top: 2px;
+}
+.wc-h {
+  font-family: var(--kufi, "Noto Kufi Arabic", sans-serif); font-size: 14px; color: var(--wg9, #0d3d22);
+  margin: 26px 0 12px; display: flex; align-items: baseline; gap: 8px;
+}
+.wc-h em { font-style: normal; font-size: 10.5px; color: #7b8a86; font-weight: 400; }
+.wc-wr { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.wc-wb label { display: block; font-size: 11px; color: #7b8a86; margin-bottom: 6px; }
+.wc-wb label em { font-style: normal; color: #b6a05a; margin-inline-start: 8px; }
+.wc-wb textarea, .wc-af textarea {
+  width: 100%; border: 1px solid #e2ebe8; border-radius: 9px; padding: 11px 12px;
+  font: inherit; font-size: 12px; color: #3a4a46; line-height: 1.9;
+  background: #fbfdfc; resize: vertical;
+}
+.wc-wb.off textarea { opacity: .55; }
+.wc-asg { display: flex; flex-direction: column; gap: 14px; }
+.wc-a { border: 1px solid #eef3f1; border-radius: 12px; padding: 14px 16px; }
+.wc-at { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.wc-at b { font-size: 12.5px; color: var(--wg9, #0d3d22); flex: 1; line-height: 1.7; }
+.wc-at span { font-size: 10.5px; color: #7b8a86; white-space: nowrap; }
+.wc-af { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.wc-af label { display: block; font-size: 10.5px; color: #7b8a86; }
+.wc-af textarea { margin-top: 5px; }
+.wc-note { margin-top: 22px; font-size: 11px; color: #7b8a86; line-height: 1.9; border-top: 1px solid #eef3f1; padding-top: 14px; }
+.wc-save { display: flex; gap: 10px; margin-top: 18px; }
+
+@media (max-width: 900px) {
+  .wr-cells, .wr-abs, .wc-af { grid-template-columns: 1fr 1fr; }
+  .wr-two, .wc-ops, .wc-wr { grid-template-columns: 1fr; }
+  .wr-hd { flex-wrap: wrap; }
+  .wr-art { display: none; }
+}
+@media (max-width: 620px) {
+  .wr-cells, .wr-abs, .wc-af { grid-template-columns: 1fr; }
+  .wr-top { flex-wrap: wrap; gap: 16px; }
+  .wr-facts { gap: 22px; }
+  .wr-bd { padding: 20px 16px 22px; }
+}

@@ -3,9 +3,18 @@
 import { apiFetch } from "@/lib/api";
 import { BASE } from "@/lib/base";
 
-import { useCallback, useEffect, useState } from "react";
-import WeeklyView, { arDate } from "./WeeklyView";
-import type { WeeklyReport } from "@/lib/weekly";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import WeeklyReportView, { arDate2 } from "./WeeklyReportView";
+import WeeklyCustomize from "./WeeklyCustomize";
+import { weekSummary, type Item, type SectionKey, type WeekSum } from "./Sections";
+import {
+  buildWeekly2,
+  weekStartOf,
+  shiftDays,
+  type AsgRow,
+  type WeeklyReport2,
+} from "@/lib/weeklyReport";
+import { AUTO_SECTIONS, mergePrefs, type WeeklyPrefs } from "@/lib/weeklyPrefs";
 
 type ShareRow = {
   token: string;
@@ -16,49 +25,132 @@ type ShareRow = {
   lastView: string | null;
 };
 
-/** بداية الأسبوع (الأحد) لتاريخ — نسخة الواجهة من weekStartOf. */
-function weekStartOf(iso: string): string {
-  const d = new Date(iso + "T00:00:00Z");
-  d.setUTCDate(d.getUTCDate() - d.getUTCDay());
-  return d.toISOString().slice(0, 10);
-}
-function shift(iso: string, days: number): string {
-  const d = new Date(iso + "T00:00:00Z");
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-export default function WeeklyPanel({ t }: { t: (ar: string, en: string) => string }) {
+export default function WeeklyPanel({
+  t,
+  canEdit = false,
+}: {
+  t: (ar: string, en: string) => string;
+  canEdit?: boolean;
+}) {
   const thisWeek = weekStartOf(new Date().toISOString().slice(0, 10));
   const [week, setWeek] = useState(thisWeek);
-  const [report, setReport] = useState<WeeklyReport | null>(null);
+  const [sections, setSections] = useState<Partial<Record<SectionKey, Item[]>>>({});
+  const [asgRows, setAsgRows] = useState<AsgRow[]>([]);
+  const [base, setBase] = useState<unknown>(null);
+  const [over, setOver] = useState<unknown>(null);
   const [canShare, setCanShare] = useState(false);
   const [loading, setLoading] = useState(true);
   const [shareOpen, setShareOpen] = useState(false);
+  const [tune, setTune] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
 
-  const load = useCallback(async () => {
+  /* الأقسام والتكاليف تُقرأ مرة واحدة — لا تتغيّر بتغيّر الأسبوع،
+     فالتنقّل بين الأسابيع لا يعيد تحميلها. */
+  const loadData = useCallback(async () => {
     setLoading(true);
-    const r = await apiFetch(`/api/report?week=${week}`).then((x) => x.json());
-    setReport(r.report || null);
-    setCanShare(!!r.canShare);
+    const [secs, tk, me] = await Promise.all([
+      Promise.all(
+        AUTO_SECTIONS.map((k) =>
+          apiFetch(`/api/items?section=${k}`).then((r) => r.json()).catch(() => ({})),
+        ),
+      ),
+      apiFetch("/api/tasks").then((r) => r.json()).catch(() => ({})),
+      apiFetch("/api/me").then((r) => r.json()).catch(() => ({})),
+    ]);
+    const map: Partial<Record<SectionKey, Item[]>> = {};
+    AUTO_SECTIONS.forEach((k, i) => {
+      map[k] = (secs[i]?.items || []) as Item[];
+    });
+    setSections(map);
+    setAsgRows((tk.tasks || []) as AsgRow[]);
+    setCanShare(me?.user?.role === "admin");
     setLoading(false);
+  }, []);
+
+  const loadPrefs = useCallback(async () => {
+    const r = await apiFetch(`/api/weekly?week=${week}`).then((x) => x.json()).catch(() => ({}));
+    setBase(r.base ?? null);
+    setOver(r.week ?? null);
   }, [week]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    void loadData();
+  }, [loadData]);
+  useEffect(() => {
+    void loadPrefs();
+  }, [loadPrefs]);
+
+  const prefs: WeeklyPrefs = useMemo(() => mergePrefs(base, over), [base, over]);
+
+  const summaries = useMemo(() => {
+    const out: Partial<Record<SectionKey, WeekSum>> = {};
+    for (const k of AUTO_SECTIONS) out[k] = weekSummary(k, sections[k] || []);
+    return out;
+  }, [sections]);
+
+  const report: WeeklyReport2 = useMemo(
+    () =>
+      buildWeekly2(
+        week,
+        sections,
+        summaries,
+        asgRows,
+        prefs,
+        new Date().toISOString().slice(0, 10),
+      ),
+    [week, sections, summaries, asgRows, prefs],
+  );
+
+  async function save(next: WeeklyPrefs, scope: "default" | "week") {
+    setBusy(true);
+    setMsg("");
+    const r = await apiFetch("/api/weekly", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ scope, week, prefs: next }),
+    }).then((x) => x.json()).catch(() => ({ error: "تعذّر الحفظ" }));
+    setBusy(false);
+    if (r.error) return setMsg(r.error);
+    if (scope === "week") setOver(next);
+    else setBase(next);
+    setMsg(
+      scope === "week"
+        ? t("حُفظ لهذا الأسبوع وحده ✓", "Saved for this week ✓")
+        : t("حُفظ كافتراضي لكل أسبوع ✓", "Saved as the default ✓"),
+    );
+    setTune(false);
+  }
+
+  if (tune)
+    return (
+      <div className="wk-panel">
+        {msg && <div className="alert">{msg}</div>}
+        <WeeklyCustomize
+          prefs={prefs}
+          weekStart={report.weekStart}
+          weekEnd={report.weekEnd}
+          asg={report.asg}
+          canEdit={canEdit}
+          busy={busy}
+          onSave={save}
+          onClose={() => setTune(false)}
+          t={t}
+        />
+      </div>
+    );
 
   return (
     <div className="wk-panel">
       <div className="wk-bar no-print">
         <div className="wk-nav">
-          <button className="btn btn-ghost" onClick={() => setWeek(shift(week, -7))}>
+          <button className="btn btn-ghost" onClick={() => setWeek(shiftDays(week, -7))}>
             {t("الأسبوع السابق", "Previous")}
           </button>
-          <b>{arDate(week)}</b>
+          <b>{arDate2(week)}</b>
           <button
             className="btn btn-ghost"
-            onClick={() => setWeek(shift(week, 7))}
+            onClick={() => setWeek(shiftDays(week, 7))}
             disabled={week >= thisWeek}
           >
             {t("الأسبوع التالي", "Next")}
@@ -70,6 +162,18 @@ export default function WeeklyPanel({ t }: { t: (ar: string, en: string) => stri
           )}
         </div>
         <div className="wk-acts">
+          {/* المربع الصغير: يفتح صفحة اختيار ما يظهر في التقرير */}
+          <button
+            className="wk-tune"
+            onClick={() => setTune(true)}
+            title={t("تخصيص التقرير", "Customise the report")}
+            aria-label={t("تخصيص التقرير", "Customise the report")}
+          >
+            <span />
+            <span />
+            <span />
+            <span />
+          </button>
           <button className="btn" onClick={() => window.print()}>
             {t("تصدير PDF", "Export PDF")}
           </button>
@@ -81,12 +185,12 @@ export default function WeeklyPanel({ t }: { t: (ar: string, en: string) => stri
         </div>
       </div>
 
+      {msg && <div className="alert no-print">{msg}</div>}
+
       {loading ? (
         <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>
-      ) : !report ? (
-        <div className="empty">{t("تعذّر بناء التقرير.", "Could not build the report.")}</div>
       ) : (
-        <WeeklyView report={report} />
+        <WeeklyReportView report={report} prefs={prefs} />
       )}
 
       {shareOpen && <ShareModal week={week} onClose={() => setShareOpen(false)} t={t} />}
