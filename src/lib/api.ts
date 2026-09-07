@@ -734,7 +734,7 @@ export async function apiFetch(path: string, init: Init = {}) {
         );
         return ok({ ok: true });
       }
-      const [ms, nt, tk, sec, ind, seen, tlog, its, card] = await Promise.all([
+      const [ms, nt, tk, sec, ind, seen, tlog, its, sti, card] = await Promise.all([
         s.from("perf_measurements").select("*").order("updated_at", { ascending: false }).limit(30),
         s.from("perf_notes").select("*").order("at", { ascending: false }).limit(20),
         s.from("perf_tasks").select("*").order("created_at", { ascending: false }).limit(20),
@@ -743,6 +743,7 @@ export async function apiFetch(path: string, init: Init = {}) {
         s.from("perf_last_seen").select("at").eq("app_user_id", Number(me.id)).maybeSingle(),
         s.from("perf_target_log").select("*").order("at", { ascending: false }).limit(20),
         s.from("perf_items").select("*").order("updated_at", { ascending: false }).limit(40),
+        s.from("perf_stickies").select("*").eq("done", false).order("at", { ascending: false }).limit(20),
         s.rpc("perf_me"),
       ]);
       const myScopes: string[] = (() => {
@@ -833,6 +834,28 @@ export async function apiFetch(path: string, init: Init = {}) {
           taskId: t.id,
         });
       }
+      /* الملاحظات اللاصقة — تصل من يفتح تلك الصفحة، ولا تصل كاتبها */
+      const PAGE_AR: Record<string, string> = {
+        overview: "نظرة عامة",
+        details: "المؤشرات التفصيلية",
+        weekly: "الإنجاز الأسبوعي",
+        ...SEC_AR,
+      };
+      for (const k of sti.data || []) {
+        if (!myScopes.includes(k.page)) continue;
+        if (String(k.by_id || "") === String(me.id)) continue;
+        items.push({
+          id: "s" + k.id,
+          kind: "sticky",
+          tone: "warn",
+          title: `${k.by_name || "أحدهم"} علّق على ${PAGE_AR[k.page] || k.page}`,
+          sub: String(k.body || "").slice(0, 90),
+          at: k.at,
+          unread: !since || k.at > since,
+          section: k.page,
+        });
+      }
+
       /* ردٌّ على مهمة أو تكليف — يصل مَن أسندها ومَن أُسندت له.
          وصفوف perf_tasks محدودة أصلاً بمن يراها، فلا يتسرّب ردٌّ لغيرهم. */
       type Rep = { id?: string; text?: string; byId?: string; byName?: string; at?: string };
@@ -874,6 +897,75 @@ export async function apiFetch(path: string, init: Init = {}) {
     }
 
     /* ---------------- الإنجاز الأسبوعي ---------------- */
+    /* ---------------- الملاحظات اللاصقة على الصفحات ----------------
+       الموضع بالنسبة المئوية، والرؤية والكتابة يحرسهما RLS. */
+    if (p === "/api/stickies" && method === "GET") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const page = q.get("page") || "";
+      if (!page) return err("لا توجد صفحة", 400);
+      const { data, error } = await s
+        .from("perf_stickies")
+        .select("*")
+        .eq("page", page)
+        .eq("done", false)
+        .order("at");
+      if (error) return err(error.message, 403);
+      const today = new Date().toISOString().slice(0, 10);
+      return ok({
+        stickies: (data || [])
+          /* ما انقضت مدّته لا يُعرض — ويبقى في القاعدة للسجل */
+          .filter((r) => !r.pinned_until || String(r.pinned_until) >= today)
+          .map((r) => ({
+            id: r.id, page: r.page, x: Number(r.x), y: Number(r.y),
+            body: r.body ?? "", byId: String(r.by_id ?? ""), byName: r.by_name ?? "",
+            at: r.at, pinnedUntil: r.pinned_until ?? null,
+          })),
+        meId: me.id,
+      });
+    }
+    if (p === "/api/stickies" && (method === "POST" || method === "PUT")) {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const id = str(body.id) || "st-" + newId();
+      const patch: Record<string, unknown> = {};
+      if (body.x !== undefined) patch.x = num(body.x) ?? 50;
+      if (body.y !== undefined) patch.y = num(body.y) ?? 30;
+      if (body.body !== undefined) patch.body = str(body.body);
+      if (body.pinnedUntil !== undefined)
+        patch.pinned_until = /^\d{4}-\d{2}-\d{2}$/.test(str(body.pinnedUntil)) ? str(body.pinnedUntil) : null;
+      if (body.done === true) {
+        patch.done = true;
+        patch.done_by = me.name || me.username || "";
+        patch.done_at = new Date().toISOString();
+      }
+      if (str(body.id)) {
+        const { error } = await s.from("perf_stickies").update(patch).eq("id", id);
+        if (error) return err(error.message, 403);
+        return ok({ ok: true, id });
+      }
+      const page = str(body.page);
+      if (!page) return err("لا توجد صفحة", 400);
+      const { error } = await s.from("perf_stickies").insert({
+        id, page,
+        x: num(body.x) ?? 50, y: num(body.y) ?? 30,
+        body: str(body.body),
+        by_id: me.id, by_name: me.name || me.username || "",
+        pinned_until: patch.pinned_until ?? null,
+      });
+      if (error) return err(error.message, 403);
+      return ok({ ok: true, id });
+    }
+    if (p === "/api/stickies" && method === "DELETE") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const id = q.get("id") || "";
+      if (!id) return err("لا توجد ملاحظة", 400);
+      const { error } = await s.from("perf_stickies").delete().eq("id", id);
+      if (error) return err(error.message, 403);
+      return ok({ ok: true });
+    }
+
     /* ---------------- تفويض قسم أثناء الإجازة ----------------
        المنح لصاحب القسم وحده — والحارس RLS ودوال القاعدة. */
     if (p === "/api/grants" && method === "GET") {

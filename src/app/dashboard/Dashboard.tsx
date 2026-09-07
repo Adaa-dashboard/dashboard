@@ -12,6 +12,7 @@ import Backup from "./Backup";
 import Tools from "./Tools";
 import Portfolio from "./Portfolio";
 import Audit from "./Audit";
+import StickyLayer from "./Sticky";
 import Assistant, { PinnedBar, usePins } from "./Assistant";
 import Notes from "./Notes";
 import Structure from "./Structure";
@@ -156,6 +157,21 @@ function tgtQuarter(refData: RefData, key: string, q: number): number | null {
 function tgtEff(refData: RefData, key: string, q: number): number | null {
   return refData.targetMode === "quarterly" ? tgtQuarter(refData, key, q) : tgtAnnual(refData, key);
 }
+/* الصفحات التي تقبل ملاحظةً لاصقة — تُخزَّن بمفتاح صلاحيتها لا
+   بمفتاح التبويب، فسياسة القاعدة تقارنه بالصلاحية مباشرة.
+   («الإنجاز الأسبوعي» تبويبه report وصلاحيته weekly) */
+const STICKY_PAGES: Record<string, Scope> = {
+  overview: "overview",
+  details: "details",
+  sessions: "sessions",
+  natstrat: "natstrat",
+  inststrat: "inststrat",
+  outputs: "outputs",
+  cx: "cx",
+  projects: "projects",
+  report: "weekly",
+};
+
 const GAUGE_TRACK = "#e9f1ef";
 
 /* الأقسام الخمسة في القائمة الجانبية — الترتيب هو ترتيب ظهورها */
@@ -604,6 +620,16 @@ export default function Dashboard({ me }: { me: Me }) {
                 ) : null,
               )}
             </>
+          )}
+
+          {/* الملاحظات اللاصقة — على الصفحات التي لها صلاحية باسمها،
+              فالورقة تُرى وتُكتب بقدر ما تُرى الصفحة نفسها */}
+          {STICKY_PAGES[tab] && can(STICKY_PAGES[tab]) && (
+            <StickyLayer
+              page={STICKY_PAGES[tab]}
+              canClose={can(`${STICKY_PAGES[tab]}:edit` as Scope)}
+              t={t}
+            />
           )}
         </main>
 
@@ -1090,7 +1116,7 @@ function Overview({
           t={t}
           onOpen={(it) => {
             // تحديث قسم: تُفتح صفحته مباشرة
-            if (it.section) return onOpenTab(it.section as Scope);
+            if (it.section) return onOpenTab(it.section === "weekly" ? "report" : it.section);
             // التكاليف معروضة في هذه الصفحة نفسها، فلا داعي للانتقال
             if (it.kind === "assignment" && it.taskId) {
               setAsgFocus(it.taskId);
