@@ -962,6 +962,7 @@ export async function apiFetch(path: string, init: Init = {}) {
             id: r.id, page: r.page, x: Number(r.x), y: Number(r.y),
             body: r.body ?? "", byId: String(r.by_id ?? ""), byName: r.by_name ?? "",
             at: r.at, pinnedUntil: r.pinned_until ?? null,
+            anchor: r.anchor ?? "",
           })),
         meId: me.id,
       });
@@ -974,6 +975,7 @@ export async function apiFetch(path: string, init: Init = {}) {
       if (body.x !== undefined) patch.x = num(body.x) ?? 50;
       if (body.y !== undefined) patch.y = num(body.y) ?? 30;
       if (body.body !== undefined) patch.body = str(body.body);
+      if (body.anchor !== undefined) patch.anchor = str(body.anchor).slice(0, 120);
       if (body.pinnedUntil !== undefined)
         patch.pinned_until = /^\d{4}-\d{2}-\d{2}$/.test(str(body.pinnedUntil)) ? str(body.pinnedUntil) : null;
       if (body.done === true) {
@@ -994,6 +996,8 @@ export async function apiFetch(path: string, init: Init = {}) {
         body: str(body.body),
         by_id: me.id, by_name: me.name || me.username || "",
         pinned_until: patch.pinned_until ?? null,
+        /* البند الذي وُضعت عنده — فتعود إليه مهما تغيّر التخطيط */
+        anchor: str(body.anchor).slice(0, 120),
       });
       if (error) return err(error.message, 403);
       return ok({ ok: true, id });

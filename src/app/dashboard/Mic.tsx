@@ -19,6 +19,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 type Field = HTMLInputElement | HTMLTextAreaElement;
 
+const TOUCH = typeof window !== "undefined" && "ontouchstart" in window;
+
 /* أنواع Web Speech API — غير معرَّفة في lib.dom */
 type SRResult = { 0: { transcript: string }; isFinal: boolean };
 type SREvent = { resultIndex: number; results: { length: number } & Record<number, SRResult> };
@@ -72,6 +74,8 @@ export default function Mic({ t }: { t: (ar: string, en: string) => string }) {
   const [err, setErr] = useState("");
   const fieldRef = useRef<Field | null>(null);
   const recRef = useRef<SR | null>(null);
+  /* هل ما زال المستخدم يريد الاستماع؟ يميّز انتهاء الجملة عن الإيقاف */
+  const wantRef = useRef(false);
   const supported = useRef<boolean>(false);
 
   useEffect(() => {
@@ -92,6 +96,7 @@ export default function Mic({ t }: { t: (ar: string, en: string) => string }) {
   }, []);
 
   const stop = useCallback(() => {
+    wantRef.current = false;
     try { recRef.current?.stop(); } catch { /* ignore */ }
     recRef.current = null;
     setOn(false);
@@ -143,7 +148,9 @@ export default function Mic({ t }: { t: (ar: string, en: string) => string }) {
     if (!C || !el) return;
     const r = new C();
     r.lang = "ar-SA";
-    r.continuous = true;
+    /* continuous لا يعمل على Safari/iOS: تُرفض الجلسة فوراً.
+       فنأخذ جملةً جملة ونستأنف تلقائياً ما دام المستخدم لم يوقف. */
+    r.continuous = false;
     r.interimResults = false;
     r.onresult = (e) => {
       let said = "";
@@ -155,15 +162,28 @@ export default function Mic({ t }: { t: (ar: string, en: string) => string }) {
       if (txt && fieldRef.current) writeInto(fieldRef.current, txt);
     };
     r.onerror = (ev) => {
+      const code = ev.error || "";
+      // انقطاع صمت أو إلغاء: ليس خطأً — الاستئناف في onend
+      if (code === "no-speech" || code === "aborted") return;
       setErr(
-        ev.error === "not-allowed"
-          ? t("أذن المتصفح بالميكروفون أولاً", "Allow microphone access")
-          : t("تعذّر الاستماع", "Could not listen")
+        code === "not-allowed" || code === "service-not-allowed"
+          ? t("امنح الإذن للميكروفون: إعدادات ← Safari ← الميكروفون، وفعّل «الإملاء» في إعدادات لوحة المفاتيح", "Allow the microphone in Safari settings")
+          : code === "network"
+            ? t("الإملاء يحتاج اتصالاً بالإنترنت", "Dictation needs a connection")
+            : code === "language-not-supported"
+              ? t("جهازك لا يدعم الإملاء بالعربية — استخدم زرّ المايك في لوحة المفاتيح", "Arabic dictation unsupported — use the keyboard mic")
+              : t(`تعذّر الاستماع (${code || "غير معروف"})`, `Could not listen (${code || "unknown"})`)
       );
+      wantRef.current = false;
       stop();
     };
-    r.onend = () => setOn(false);
+    /* الجلسة تنتهي بعد كل جملة — تُستأنف ما دام المستخدم لم يوقف */
+    r.onend = () => {
+      if (!wantRef.current) { setOn(false); return; }
+      try { r.start(); } catch { setOn(false); wantRef.current = false; }
+    };
     try {
+      wantRef.current = true;
       r.start();
       recRef.current = r;
       setOn(true);
@@ -180,9 +200,10 @@ export default function Mic({ t }: { t: (ar: string, en: string) => string }) {
         type="button"
         className={`mic-b ${on ? "on" : ""}`}
         style={{ left: box.x, top: box.y }}
-        // الضغط لا يسحب التركيز من الحقل، وإلا اختفى الزرّ قبل أن يعمل
-        onMouseDown={(e) => e.preventDefault()}
-        onTouchStart={(e) => e.preventDefault()}
+        /* على سطح المكتب نمنع سحب التركيز من الحقل.
+           وعلى iOS لا نمنع اللمس: منعُه قد يُلغي الضغطة نفسها،
+           والحقل محفوظ في مرجع فلا يضرّنا ذهاب التركيز. */
+        onMouseDown={(e) => { if (!TOUCH) e.preventDefault(); }}
         onClick={toggle}
         title={on ? t("إيقاف الإملاء", "Stop dictation") : t("أملِ بصوتك", "Dictate")}
         aria-label={t("إملاء صوتي", "Dictate")}
