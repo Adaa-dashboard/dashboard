@@ -295,26 +295,30 @@ export default function StickyLayer({
         ))}
       </div>
 
-      {(canWrite || rows.length > 0) && (
-        <button
-          className={`stk-pen ${placing ? "on" : ""} ${canWrite ? "" : "ro"}`}
-          onClick={() => canWrite && setPlacing((v) => !v)}
-          title={
-            canWrite
-              ? t("ملاحظة على هذه الصفحة", "Note on this page")
-              : t("ملاحظات على هذه الصفحة", "Notes on this page")
-          }
-        >
-          {canWrite ? "✎" : "📌"}
-          {rows.length > 0 && <span>{rows.length}</span>}
-        </button>
-      )}
+      {/* الرصيف: يلتصق بأسفل الشاشة ويبقى داخل عرض الصفحة البيضاء،
+          فلا يعلو الشريط الجانبي ولا يغيب مع التمرير */}
+      <div className="stk-dock">
+        {(canWrite || rows.length > 0) && (
+          <button
+            className={`stk-pen ${placing ? "on" : ""} ${canWrite ? "" : "ro"}`}
+            onClick={() => canWrite && setPlacing((v) => !v)}
+            title={
+              canWrite
+                ? t("ملاحظة على هذه الصفحة", "Note on this page")
+                : t("ملاحظات على هذه الصفحة", "Notes on this page")
+            }
+          >
+            {canWrite ? "✎" : "📌"}
+            {rows.length > 0 && <span>{rows.length}</span>}
+          </button>
+        )}
+        {placing && (
+          <div className="stk-hint no-print">
+            {t("اضغط المكان الذي تريد الملاحظة عنده · Esc للإلغاء", "Click where the note belongs · Esc to cancel")}
+          </div>
+        )}
+      </div>
 
-      {placing && (
-        <div className="stk-hint no-print">
-          {t("اضغط المكان الذي تريد الملاحظة عنده · Esc للإلغاء", "Click where the note belongs · Esc to cancel")}
-        </div>
-      )}
     </>
   );
 }
