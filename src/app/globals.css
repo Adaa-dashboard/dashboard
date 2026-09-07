@@ -9273,3 +9273,12 @@ table.matrix thead th {
   .en-kinds { margin-inline-start: 0; width: 100%; }
   .en-m { margin-inline-start: 0; width: 100%; }
 }
+
+/* زر «افتح الصفحة» أسفل إجابة المساعد — ينقل إلى القسم الذي بُنيت منه */
+.ai-open {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 10px;
+  background: none; border: 1px solid #cfe0d8; border-radius: 8px;
+  padding: 7px 13px; font: inherit; font-size: 11.5px; font-weight: 600;
+  color: #1e7a48; cursor: pointer;
+}
+.ai-open:hover { background: #f1f8f4; border-color: #1e7a48; }
