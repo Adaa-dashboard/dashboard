@@ -443,7 +443,8 @@ export default function Dashboard({ me }: { me: Me }) {
             <span className="lb">{t("الإعدادات", "Settings")}</span> <span className="cv">▾</span>
           </button>
           <div className={`subnav ${setOpen ? "show" : ""}`}>
-            <SubItem id="mypage" label={["محفظتي", "My portfolio"]} />
+            {/* «محفظتي» لها بندها في القائمة أعلاه — تكرارها هنا
+                كان يجعل الصفحة الواحدة تظهر مرتين */}
             {can("users") && <SubItem id="users" label={["المستخدمون والصلاحيات", "Users & Roles"]} />}
             {can("structure") && <SubItem id="structure" label={["الهيكل التنظيمي", "Org chart"]} />}
             <button className="sub-item" onClick={() => setBackupOpen(true)}>
