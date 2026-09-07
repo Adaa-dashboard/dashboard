@@ -2269,8 +2269,8 @@ function UsersManager({ refData }: { refData: RefData }) {
         <h2 className="section-title">{t("إضافة مستخدم", "Add User")}</h2>
         <p className="muted" style={{ marginTop: -8, marginBottom: 16 }}>
           {t(
-            "يكفي الاسم والجوال واسم المستخدم والقطاع — وكلمة المرور والمسمّى الوظيفي يضعهما هو عند أول دخول.",
-            "Name, phone, username and sector are enough — the password is set at first sign-in."
+            "يكفي الاسم واسم المستخدم والقطاع — والجوال وكلمة المرور والمسمّى الوظيفي يضعها هو عند أول دخول.",
+            "Name, username and sector are enough — the rest is set at first sign-in."
           )}
         </p>
         {err && <div className="alert alert-error">{err}</div>}
@@ -2278,16 +2278,18 @@ function UsersManager({ refData }: { refData: RefData }) {
         <form onSubmit={add}>
           <div className="row">
             <div>
-              <label>{t("رقم الجوال", "Phone number")}</label>
+              <label>
+                {t("رقم الجوال", "Phone number")}{" "}
+                <span className="opt">{t("اختياري", "optional")}</span>
+              </label>
               <input
                 type="tel"
                 inputMode="tel"
-                placeholder="05XXXXXXXX"
+                placeholder={t("يكتبه هو عند التفعيل", "He types it at activation")}
                 value={phone}
                 dir="ltr"
                 style={{ textAlign: "left" }}
                 onChange={(e) => setPhone(e.target.value)}
-                required
               />
             </div>
             <div>
