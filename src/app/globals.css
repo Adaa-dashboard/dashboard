@@ -9260,3 +9260,17 @@ table.matrix thead th {
 }
 
 @media (max-width: 760px) { .pm { grid-template-columns: 1fr; } }
+
+/* رأس مجموعة القطاع في جدول المستخدمين */
+.users-tbl tr.u-grp td {
+  background: #f4f8f6; border-top: 1px solid var(--line, #e6edea);
+  border-bottom: 1px solid var(--line, #e6edea);
+  font-family: var(--kufi, "Noto Kufi Arabic", sans-serif);
+  font-size: 12px; color: #0d3d22; padding: 9px 14px;
+}
+.users-tbl tr.u-grp td span {
+  display: inline-block; margin-inline-start: 8px; font-family: inherit;
+  font-size: 10px; color: #6b7c77; background: #fff;
+  border: 1px solid var(--line, #e6edea); border-radius: 20px; padding: 1px 8px;
+}
+.users-tbl tbody:first-of-type tr.u-grp td { border-top: 0; }
