@@ -595,7 +595,7 @@ export default function Dashboard({ me }: { me: Me }) {
               {tab === "users" && can("users") && <UsersManager refData={refData} />}
               {SECTION_NAV.map(([key]) =>
                 tab === key && can(key) ? (
-                  <SectionPage key={key} section={key} canEdit={can(`${key}:edit` as Scope)} t={t} />
+                  <SectionPage key={key} section={key} canEdit={can(`${key}:edit` as Scope)} meId={me.id} t={t} />
                 ) : null,
               )}
             </>
