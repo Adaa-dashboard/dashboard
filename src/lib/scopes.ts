@@ -113,7 +113,7 @@ export type PageRow = {
 
 export const PAGE_ROWS: { title: string; rows: PageRow[] }[] = [
   {
-    title: "الصفحات الأساسية",
+    title: "الصفحات العامة",
     rows: [
       { view: "overview", label: "نظرة عامة", note: "ملخّص كل الأقسام" },
       {
@@ -122,14 +122,17 @@ export const PAGE_ROWS: { title: string; rows: PageRow[] }[] = [
         extra: { key: "details:all", label: "كل القطاعات" },
       },
       {
-        view: "tasks", label: "المهام", note: "المهام المسندة له",
+        view: "tasks", label: "المهام", note: "مهامه في محفظتي · والصفحة المستقلة لمن يُسند",
         extra: { key: "tasks:all", label: "كل المهام" },
       },
-      { view: "weekly", label: "الإنجاز الأسبوعي", edit: "weekly:edit", editLabel: "اختيار أقسامه وكتابة خاناته" },
+      {
+        view: "weekly", label: "الإنجاز الأسبوعي", note: "للمدراء ومدير الإدارة",
+        edit: "weekly:edit", editLabel: "اختيار أقسامه وكتابة خاناته",
+      },
     ],
   },
   {
-    title: "أقسام الإدارة",
+    title: "العناوين الأساسية",
     rows: [
       { view: "sessions", label: "جلسات مراجعة الأداء", edit: "sessions:edit" },
       { view: "natstrat", label: "الاستراتيجيات الوطنية", edit: "natstrat:edit" },
@@ -150,8 +153,9 @@ export const PAGE_ROWS: { title: string; rows: PageRow[] }[] = [
   },
 ];
 
-/** ما يُقترح لموظف جديد: يشوف قطاعه ومهامه ولا شيء غيرهما */
-export const DEFAULT_SCOPES: Scope[] = ["overview", "details", "tasks"];
+/* الموظف الجديد: نظرة عامة ومهامه في محفظتي ولا شيء غيرهما —
+   والإنجاز الأسبوعي وصفحات الأقسام تُمنح لمن يخصّه */
+export const DEFAULT_SCOPES: Scope[] = ["overview", "tasks"];
 
 export const scopeLabel = (k: string): string =>
   SCOPE_GROUPS.flatMap((g) => g.items).find((i) => i.key === k)?.label || k;
