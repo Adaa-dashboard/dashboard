@@ -18,7 +18,15 @@ type T = (ar: string, en: string) => string;
 type Me = { id: string; name: string; scopes: string[] };
 
 export type Pin = { id: string; title: string; icon: string; lines: string[]; at: string };
-export type Ans = { title: string; icon: string; lines: string[]; chips?: { k: string; v: string; tone?: string }[]; note?: string };
+export type Ans = {
+  title: string;
+  icon: string;
+  lines: string[];
+  chips?: { k: string; v: string; tone?: string }[];
+  note?: string;
+  /** صفحة القسم التي بُنيت منها الإجابة — زرٌّ يفتحها من داخل المساعد */
+  open?: { tab: string; label: string };
+};
 
 const txt = (v: unknown) => (v === null || v === undefined ? "" : String(v));
 const num = (v: unknown, d = 0) => {
@@ -167,6 +175,15 @@ function whichSection(q: string): SecKey | null {
   return null;
 }
 
+const SEC_OPEN: Record<SecKey, Ans["open"]> = {
+  sessions: { tab: "sessions", label: "افتح صفحة جلسات مراجعة الأداء" },
+  natstrat: { tab: "natstrat", label: "افتح صفحة الاستراتيجيات الوطنية" },
+  inststrat: { tab: "inststrat", label: "افتح صفحة الاستراتيجيات المؤسسية" },
+  outputs: { tab: "outputs", label: "افتح صفحة المخرجات الوطنية" },
+  cx: { tab: "cx", label: "افتح صفحة أعمال قياس تجربة المستفيد" },
+  projects: { tab: "projects", label: "افتح صفحة المشاريع الاستراتيجية" },
+};
+
 /** ملخّص قسم واحد — الأرقام أولاً ثم أبرز البنود */
 function sectionBrief(k: SecKey, items: Rec[]): Ans {
   const title = `زبدة ${SEC_NAME[k]}`;
@@ -186,6 +203,13 @@ function sectionBrief(k: SecKey, items: Rec[]): Ans {
   const d = (x: Rec) => (x.data || {}) as Rec;
 
   if (k === "sessions") {
+    const SESS_OPEN = { tab: "sessions", label: "افتح صفحة جلسات مراجعة الأداء" };
+    const sline = (x: Rec) => {
+      const raw = Array.isArray(d(x).stages) ? d(x).stages : [];
+      const full = raw.length || 6;
+      const done = Math.max(0, Math.min(full, num(d(x).done)));
+      return `${txt(d(x).entity) || "بلا جهة"} — ${done}/${full} مراحل${txt(d(x).quarter) ? ` · ${txt(d(x).quarter)}` : ""}`;
+    };
     const st = (x: Rec) => {
       const raw = Array.isArray(d(x).stages) ? d(x).stages : [];
       const full = raw.length || 6;
@@ -345,6 +369,7 @@ function countAns(
   ofLabel: string,
   names: string[],
   note?: string,
+  open?: Ans["open"],
 ): Ans {
   return {
     title,
@@ -357,7 +382,22 @@ function countAns(
       ? names.slice(0, 12).concat(names.length > 12 ? [`… و${names.length - 12} غيرها`] : [])
       : ["لا يوجد صفٌّ مطابق في بيانات القسم."],
     note: note || "محسوب من صفحة القسم الآن — لا رقم مخزَّن.",
+    open,
   };
+}
+
+/** سطر الجهة في الاستراتيجيات المؤسسية — ما يظهر تحت بطاقتها في صفحتها */
+function instLine(d: Rec): string {
+  const bits = [
+    txt(d.live) ? `التفعيل: ${txt(d.live)}` : "التفعيل: لم يُحدَّد",
+    txt(d.target) ? `مستهدف ${txt(d.target)}` : "",
+    txt(d.meet) === "تم" && txt(d.meetAt) ? `الاجتماع التعريفي ${txt(d.meetAt)}` : txt(d.meet) ? `الاجتماع: ${txt(d.meet)}` : "",
+    txt(d.docs) === "✓" ? `الوثائق ${txt(d.docsState) || "مستلمة"}` : txt(d.docs) ? "الوثائق لم تُستلم" : "",
+    txt(d.consultant) ? `الاستشاري ${txt(d.consultant)}` : "",
+    txt(d.phase) || "",
+    txt(d.sector) || "",
+  ].filter(Boolean);
+  return `${txt(d.owner) || txt(d.name) || "بلا جهة"} — ${bits.join(" · ")}`;
 }
 
 function secQuery(k: SecKey, items: Rec[], q0: string): Ans | null {
@@ -371,6 +411,7 @@ function secQuery(k: SecKey, items: Rec[], q0: string): Ans | null {
   const pick = (f: (x: Rec) => boolean) => items.filter(f);
 
   if (k === "inststrat") {
+    const INST_OPEN = { tab: "inststrat", label: "افتح صفحة الاستراتيجيات المؤسسية" };
     /* «مخطط تفعيلها الربع الثالث» = عمود «تفعيل القياس (مستهدف)» */
     if (qn && has(q, "مخطط", "المخطط", "مستهدف", "المستهدف", "تفعيل", "التفعيل", "خطة")) {
       const rows = pick((x) => txt(d(x).target) === `Q${qn}`);
@@ -380,39 +421,41 @@ function secQuery(k: SecKey, items: Rec[], q0: string): Ans | null {
         rows.length,
         items.length,
         "جهة",
-        rows.map((x) => `${nm(x)}${txt(d(x).live) === "مفعل" ? " — مفعّل بالفعل" : ""}`),
+        rows.map((x) => instLine(d(x))),
         "من عمود «تفعيل القياس (مستهدف)» في صفحة الاستراتيجيات المؤسسية.",
+        { tab: "inststrat", label: "افتح صفحة الاستراتيجيات المؤسسية" },
       );
     }
     if (has(q, "غير مفعل", "غير مفعّل", "ما فُعّل", "ما فعل")) {
       const rows = pick((x) => txt(d(x).live) === "غير مفعل");
-      return countAns("جهات لم يُفعَّل قياسها بعد", "building", rows.length, items.length, "جهة", rows.map(nm));
+      return countAns("جهات لم يُفعَّل قياسها بعد", "building", rows.length, items.length, "جهة", rows.map((x) => instLine(d(x))), undefined, INST_OPEN);
     }
     if (has(q, "مفعل", "مفعّل", "فُعّل", "فعل القياس", "تفعيل القياس")) {
       const rows = pick((x) => txt(d(x).live) === "مفعل");
-      return countAns("جهات فُعِّل قياسها", "building", rows.length, items.length, "جهة", rows.map(nm));
+      return countAns("جهات فُعِّل قياسها", "building", rows.length, items.length, "جهة", rows.map((x) => instLine(d(x))), undefined, INST_OPEN);
     }
     if (has(q, "الاجتماع التعريفي", "اجتماع تعريفي", "الاجتماعات")) {
       const rows = pick((x) => txt(d(x).meet) === "تم");
-      return countAns("جهات عُقد معها الاجتماع التعريفي", "building", rows.length, items.length, "جهة", rows.map(nm));
+      return countAns("جهات عُقد معها الاجتماع التعريفي", "building", rows.length, items.length, "جهة", rows.map((x) => instLine(d(x))), undefined, INST_OPEN);
     }
     if (has(q, "الوثائق", "وثائق", "المستندات")) {
       const rows = pick((x) => txt(d(x).docs) === "✓");
-      return countAns("جهات استُلمت وثائقها", "building", rows.length, items.length, "جهة", rows.map(nm));
+      return countAns("جهات استُلمت وثائقها", "building", rows.length, items.length, "جهة", rows.map((x) => instLine(d(x))), undefined, INST_OPEN);
     }
     if (has(q, "ممثل", "تسمية ممثل")) {
       const rows = pick((x) => txt(d(x).rep) === "تمت تسمية ممثل");
-      return countAns("جهات سمّت ممثلها", "building", rows.length, items.length, "جهة", rows.map(nm));
+      return countAns("جهات سمّت ممثلها", "building", rows.length, items.length, "جهة", rows.map((x) => instLine(d(x))), undefined, INST_OPEN);
     }
     const ph = q0.match(/phase\s*([12])/i);
     if (ph) {
       const rows = pick((x) => txt(d(x).phase) === `Phase ${ph[1]}`);
-      return countAns(`جهات Phase ${ph[1]}`, "building", rows.length, items.length, "جهة", rows.map(nm));
+      return countAns(`جهات Phase ${ph[1]}`, "building", rows.length, items.length, "جهة", rows.map((x) => instLine(d(x))), undefined, INST_OPEN);
     }
     return null;
   }
 
   if (k === "natstrat") {
+    const NAT_OPEN = { tab: "natstrat", label: "افتح صفحة الاستراتيجيات الوطنية" };
     const steps: [string[], number][] = [
       [["مجلس الوزراء", "معتمدة من مجلس"], 4],
       [["اللجنة", "معتمدة من اللجنة"], 3],
@@ -428,7 +471,18 @@ function secQuery(k: SecKey, items: Rec[], q0: string): Ans | null {
           rows.length,
           items.length,
           "استراتيجية",
-          rows.map((x) => `${txt(d(x).name)}${txt(d(x).owner) ? ` — ${txt(d(x).owner)}` : ""}`),
+          rows.map(
+            (x) =>
+              `${txt(d(x).name)} — ${[
+                txt(d(x).owner) ? `الجهة ${txt(d(x).owner)}` : "",
+                num(d(x).meas) ? `قابلية القياس ${num(d(x).meas)}%` : "",
+                txt(d(x).updated) ? `آخر تحديث ${txt(d(x).updated)}` : "",
+              ]
+                .filter(Boolean)
+                .join(" · ")}`,
+          ),
+          undefined,
+          NAT_OPEN,
         );
       }
     }
@@ -437,30 +491,38 @@ function secQuery(k: SecKey, items: Rec[], q0: string): Ans | null {
       return countAns(
         "استراتيجيات وطنية قابلية قياسها منخفضة (أقل من ٧٠٪)",
         "flag", rows.length, items.length, "استراتيجية",
-        rows.map((x) => `${txt(d(x).name)} — ${num(d(x).meas)}%`),
+        rows.map((x) => `${txt(d(x).name)} — ${num(d(x).meas)}%${txt(d(x).owner) ? ` · ${txt(d(x).owner)}` : ""}`),
+        undefined,
+        NAT_OPEN,
       );
     }
     return null;
   }
 
   if (k === "sessions") {
+    const SESS_OPEN = { tab: "sessions", label: "افتح صفحة جلسات مراجعة الأداء" };
     const st = (x: Rec) => {
       const raw = Array.isArray(d(x).stages) ? d(x).stages : [];
       const full = raw.length || 6;
       return { done: Math.max(0, Math.min(full, num(d(x).done))), full };
     };
+    /* السطر يذكر أين وقفت الجلسة وربعها — لا الاسم وحده */
+    const sline = (x: Rec) =>
+      `${txt(d(x).entity) || "بلا جهة"} — ${st(x).done}/${st(x).full} مراحل${
+        txt(d(x).quarter) ? ` · ${txt(d(x).quarter)}` : ""
+      }${txt(d(x).owner) ? ` · ${txt(d(x).owner)}` : ""}`;
     if (qn) {
       const rows = pick((x) => txt(d(x).quarter).includes(String(qn)));
       return countAns(`جلسات الربع ${["", "الأول", "الثاني", "الثالث", "الرابع"][qn]}`, "clipboard",
-        rows.length, items.length, "جلسة", rows.map(nm));
+        rows.length, items.length, "جلسة", rows.map(sline), undefined, SESS_OPEN);
     }
     if (has(q, "لم تبدأ", "ما بدأت", "مابدأت")) {
       const rows = pick((x) => st(x).done === 0);
-      return countAns("جلسات لم تبدأ", "clipboard", rows.length, items.length, "جلسة", rows.map(nm));
+      return countAns("جلسات لم تبدأ", "clipboard", rows.length, items.length, "جلسة", rows.map(sline), undefined, SESS_OPEN);
     }
     if (has(q, "مكتمل", "مكتملة", "مغلقة", "انتهت")) {
       const rows = pick((x) => st(x).done >= st(x).full);
-      return countAns("جلسات مكتملة", "clipboard", rows.length, items.length, "جلسة", rows.map(nm));
+      return countAns("جلسات مكتملة", "clipboard", rows.length, items.length, "جلسة", rows.map(sline), undefined, SESS_OPEN);
     }
     return null;
   }
@@ -471,22 +533,32 @@ function secQuery(k: SecKey, items: Rec[], q0: string): Ans | null {
     const NONE = "لم يتم الاستلام";
     const prog = (v: string) => v !== "" && v !== OK && v !== NONE;
     const QK = ["q0", "q1", "q2", "q3", "q4"];
-    const nmx = (x: Rec) => txt(d(x).name) || "بلا اسم";
+    const CX_OPEN = { tab: "cx", label: "افتح صفحة أعمال قياس تجربة المستفيد" };
+    const nmx = (x: Rec) =>
+      `${txt(d(x).name) || "بلا اسم"}${
+        [txt(d(x).sector), txt(d(x).consultant) ? `الاستشاري ${txt(d(x).consultant)}` : "", num(d(x).servPlan) ? `${num(d(x).servPlan)} خدمة مخططة` : ""]
+          .filter(Boolean).length
+          ? " — " +
+            [txt(d(x).sector), txt(d(x).consultant) ? `الاستشاري ${txt(d(x).consultant)}` : "", num(d(x).servPlan) ? `${num(d(x).servPlan)} خدمة مخططة` : ""]
+              .filter(Boolean)
+              .join(" · ")
+          : ""
+      }`;
     if (qn) {
       const key = `q${qn}`;
       const rows = rows0.filter((x) => txt(d(x)[`${key}Issue`]) === OK);
       return countAns(
         `أجهزة صدر لها تقرير في الربع ${["", "الأول", "الثاني", "الثالث", "الرابع"][qn]} من ٢٠٢٦م`,
-        "users", rows.length, rows0.length, "جهاز", rows.map(nmx),
+        "users", rows.length, rows0.length, "جهاز", rows.map(nmx), undefined, CX_OPEN,
       );
     }
     if (has(q, "صدر", "تقرير", "تقارير")) {
       const rows = rows0.filter((x) => QK.some((z) => txt(d(x)[`${z}Issue`]) === OK));
-      return countAns("أجهزة صدر لها تقرير", "users", rows.length, rows0.length, "جهاز", rows.map(nmx));
+      return countAns("أجهزة صدر لها تقرير", "users", rows.length, rows0.length, "جهاز", rows.map(nmx), undefined, CX_OPEN);
     }
     if (has(q, "لم تبدأ", "ما بدأت", "لم يبدأ")) {
       const rows = rows0.filter((x) => txt(d(x).meet) === "لم يبدأ");
-      return countAns("أجهزة لم تبدأ", "users", rows.length, rows0.length, "جهاز", rows.map(nmx));
+      return countAns("أجهزة لم تبدأ", "users", rows.length, rows0.length, "جهاز", rows.map(nmx), undefined, CX_OPEN);
     }
     if (has(q, "في القياس", "قيد القياس", "تُقاس")) {
       const rows = rows0.filter(
@@ -494,7 +566,7 @@ function secQuery(k: SecKey, items: Rec[], q0: string): Ans | null {
           txt(d(x).survey) === OK && txt(d(x).card) === OK && txt(d(x).l1) === OK &&
           QK.some((z) => prog(txt(d(x)[`${z}Share`]))),
       );
-      return countAns("أجهزة في مرحلة القياس", "users", rows.length, rows0.length, "جهاز", rows.map(nmx));
+      return countAns("أجهزة في مرحلة القياس", "users", rows.length, rows0.length, "جهاز", rows.map(nmx), undefined, CX_OPEN);
     }
     return null;
   }
@@ -503,11 +575,14 @@ function secQuery(k: SecKey, items: Rec[], q0: string): Ans | null {
     if (has(q, "متأخر", "متأخرة", "متعثر", "متعثرة", "خلف الخطة")) {
       const rows = pick((x) => num(d(x).actual) < num(d(x).planned));
       return countAns("مشاريع متأخرة عن الخطة", "rocket", rows.length, items.length, "مشروع",
-        rows.map((x) => `${txt(d(x).name)} — المخطط ${num(d(x).planned)}% · الفعلي ${num(d(x).actual)}%`));
+        rows.map((x) => `${txt(d(x).name)} — المخطط ${num(d(x).planned)}% · الفعلي ${num(d(x).actual)}%${txt(d(x).sponsor) ? ` · الراعي ${txt(d(x).sponsor)}` : ""}`),
+        undefined, { tab: "projects", label: "افتح صفحة المشاريع الاستراتيجية" });
     }
     if (has(q, "مكتمل", "مكتملة", "منتهية")) {
       const rows = pick((x) => num(d(x).actual) >= 100);
-      return countAns("مشاريع مكتملة", "rocket", rows.length, items.length, "مشروع", rows.map((x) => txt(d(x).name)));
+      return countAns("مشاريع مكتملة", "rocket", rows.length, items.length, "مشروع",
+        rows.map((x) => `${txt(d(x).name)}${txt(d(x).sponsor) ? ` — الراعي ${txt(d(x).sponsor)}` : ""}`),
+        undefined, { tab: "projects", label: "افتح صفحة المشاريع الاستراتيجية" });
     }
     return null;
   }
@@ -746,9 +821,13 @@ function answer(q0: string, c: Ctx): Ans {
     if (sec) {
       /* السؤال المحدَّد أولاً: «كم … الربع الثالث؟» يريد عدداً
          لا زبدة. وإن لم يُفهم القيد رجعنا إلى الزبدة الكاملة. */
+      /* زرّ «افتح الصفحة» لا يظهر إلا لمن يملك صلاحية ذلك القسم —
+         وإلا فتح على فراغ. والملخّص يبقى ظاهراً للجميع. */
+      const may = c.me.scopes.includes(sec);
+      const withOpen = (a: Ans): Ans => ({ ...a, open: may ? a.open || SEC_OPEN[sec] : undefined });
       const direct = secQuery(sec, c.sections[sec] || [], q);
-      if (direct) return direct;
-      return sectionBrief(sec, c.sections[sec] || []);
+      if (direct) return withOpen(direct);
+      return withOpen(sectionBrief(sec, c.sections[sec] || []));
     }
   }
 
@@ -909,7 +988,18 @@ const SUGGEST = [
   "كم جهة ما سويت لها اجتماع ربعي؟",
 ];
 
-export default function Assistant({ me, t, onPin }: { me: Me; t: T; onPin: (p: Pin) => void }) {
+export default function Assistant({
+  me,
+  t,
+  onPin,
+  onOpenTab,
+}: {
+  me: Me;
+  t: T;
+  onPin: (p: Pin) => void;
+  /** فتح صفحة القسم الذي بُنيت منه الإجابة */
+  onOpenTab?: (tab: string) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [ans, setAns] = useState<Ans | null>(null);
@@ -1027,6 +1117,17 @@ export default function Assistant({ me, t, onPin }: { me: Me; t: T; onPin: (p: P
                       <li key={i}>{l}</li>
                     ))}
                   </ul>
+                  {show.open && onOpenTab && (
+                    <button
+                      className="ai-open"
+                      onClick={() => {
+                        onOpenTab(show.open!.tab);
+                        setOpen(false);
+                      }}
+                    >
+                      {show.open.label} ‹
+                    </button>
+                  )}
                   {show.note && <div className="ai-note">{show.note}</div>}
                 </div>
               )

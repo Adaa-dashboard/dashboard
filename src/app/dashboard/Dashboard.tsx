@@ -618,7 +618,7 @@ export default function Dashboard({ me }: { me: Me }) {
         </nav>
       </div>
 
-      <Assistant me={me} t={t} onPin={pins.add} />
+      <Assistant me={me} t={t} onPin={pins.add} onOpenTab={setTab} />
 
       {notesOpen && <Notes t={t} onClose={() => setNotesOpen(false)} />}
 
