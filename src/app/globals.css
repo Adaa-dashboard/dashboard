@@ -9042,15 +9042,8 @@ table.matrix thead th {
   display: flex; align-items: center; gap: 26px;
   padding-bottom: 22px; margin-bottom: 6px; border-bottom: 1px solid #eef3f1;
 }
-.wr-donut { width: 104px; height: 104px; flex: none; }
-.wr-donut-t {
-  font: 800 25px var(--kufi, "Noto Kufi Arabic"), sans-serif;
-  direction: ltr; fill: var(--wg9);
-}
-.wr-tx { flex: 1; min-width: 180px; }
-.wr-tx > b { display: block; font-family: var(--kufi, "Noto Kufi Arabic", sans-serif); font-size: 17px; color: var(--wg9); }
-.wr-note { display: block; font-size: 11.5px; color: var(--wmut); line-height: 1.8; margin-top: 6px; }
-.wr-facts { display: flex; gap: 34px; text-align: start; }
+/* الدائرة أُزيلت — يبقى صفُّ الحقائق الثلاث وحده */
+.wr-facts { display: flex; gap: 48px; text-align: start; }
 .wr-facts b {
   display: block; font-family: var(--kufi, "Noto Kufi Arabic", sans-serif);
   font-size: 26px; color: var(--wg8); line-height: 1.1;
