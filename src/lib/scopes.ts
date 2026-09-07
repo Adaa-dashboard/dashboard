@@ -19,7 +19,12 @@ export type Scope =
   | "outputs"
   | "projects"
   | "cx"
-  | "sections:edit"
+  | "sessions:edit"
+  | "natstrat:edit"
+  | "inststrat:edit"
+  | "outputs:edit"
+  | "cx:edit"
+  | "projects:edit"
   | "structure"
   | "tasks"
   | "tasks:all"
@@ -48,7 +53,19 @@ export const SCOPE_GROUPS: { title: string; items: { key: Scope; label: string; 
       { key: "outputs", label: "المخرجات الوطنية" },
       { key: "projects", label: "المشاريع الاستراتيجية" },
       { key: "cx", label: "أعمال قياس تجربة المستفيد", note: "من الخدمات الحكومية" },
-      { key: "sections:edit", label: "تحرير بيانات هذه الأقسام", note: "الإضافة والتعديل والحذف" },
+    ],
+  },
+  {
+    /* التحرير صلاحية مستقلة لكل قسم: الاطّلاع على قسمٍ لا يعني
+       تحريره. فمدير القطاع يرى الأقسام كلها ولا يحدّث إلا قسمه. */
+    title: "تحرير بيانات الأقسام",
+    items: [
+      { key: "sessions:edit", label: "تحرير جلسات مراجعة الأداء" },
+      { key: "natstrat:edit", label: "تحرير الاستراتيجيات الوطنية" },
+      { key: "inststrat:edit", label: "تحرير الاستراتيجيات المؤسسية" },
+      { key: "outputs:edit", label: "تحرير المخرجات الوطنية" },
+      { key: "cx:edit", label: "تحرير أعمال قياس تجربة المستفيد" },
+      { key: "projects:edit", label: "تحرير المشاريع الاستراتيجية" },
     ],
   },
   {
