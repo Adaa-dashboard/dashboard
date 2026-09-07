@@ -1,13 +1,4 @@
--- ============================================================
---  تحديثات إضافية من المطوّر — إعلانٌ داخل «آخر التحديثات»
---  يُشغَّل بعد perf-sticky.sql. idempotent وليس فيه حذف بيانات.
--- ============================================================
-
--- ------------------------------------------------------------
---  ١) الجدول
---     audience فارغاً = للجميع، وإلا فأسماء دخول بعينها.
---     until فارغاً = يبقى، وإلا يختفي بانقضاء تاريخه.
--- ------------------------------------------------------------
+-- إعلان القلم: إنشاء + إصلاح + تشخيص في استعلام واحد
 create table if not exists public.perf_notices (
   id       text primary key,
   title    text        not null,
@@ -19,8 +10,8 @@ create table if not exists public.perf_notices (
 );
 alter table public.perf_notices enable row level security;
 grant select on public.perf_notices to authenticated;
+revoke insert, update, delete on public.perf_notices from authenticated;
 
--- القراءة: للجميع إن كان الإعلان عاماً، وإلا لمن سُمّي فيه
 drop policy if exists "perf_notices_read" on public.perf_notices;
 create policy "perf_notices_read" on public.perf_notices
   for select to authenticated
@@ -35,63 +26,48 @@ create policy "perf_notices_read" on public.perf_notices
         where s.user_id = auth.uid() and u.username = any(audience))
     ));
 
--- الكتابة من SQL Editor وحده — لا يكتبها أحد من الواجهة
-revoke insert, update, delete on public.perf_notices from authenticated;
+-- الإدراج لا يتوقف بخطأ: الجمهور يُبنى مما وُجد، والتشخيص أدناه يقول ما نقص
+insert into public.perf_notices (id, title, body, audience)
+select 'n-sticky',
+  'جديد: القلم — ملاحظة لاصقة على أي مكان في الصفحة',
+  'في أسفل يمين كل صفحة زرّ ✎. اضغطه ثم اضغط المكان الذي تريد الملاحظة عنده، '
+  || 'فتُفتح ورقة صفراء هناك تكتب فيها ملاحظتك أو سؤالك.'
+  || E'\n' ||
+  'تختار مدّة بقائها: ٣ أيام · أسبوع · شهر · بلا مدة — وتختفي بانتهائها من نفسها.'
+  || E'\n' ||
+  'الورقة تُطوى إلى دبّوس صغير بزرّ (−) حتى لا تحجب ما تحتها، وتُسحب من رأسها إلى مكان آخر.'
+  || E'\n' ||
+  'وتصل من يفتح تلك الصفحة في «آخر التحديثات»، ومن يحرّرها يغلقها بـ«تمّت المعالجة» بعد الردّ.',
+  coalesce((select array_agg(u.username) from public.perf_users u
+             where u.active and public.perf_norm_name(u.display_name) in (
+                   public.perf_norm_name('عبدالله الحزامي'),
+                   public.perf_norm_name('عمر العتيق'),
+                   public.perf_norm_name('سلطانه العرجاني'))), '{}')
+on conflict (id) do update
+  set title = excluded.title, body = excluded.body, audience = excluded.audience;
 
--- ------------------------------------------------------------
---  ٢) أول إعلان: القلم والملاحظات اللاصقة
--- ------------------------------------------------------------
-/* الجمهور يُشتقّ من الأسماء لا من أسماء الدخول: أسماء الدخول
-   تتغيّر، والخطأ فيها لا يُرى — الإعلان ببساطة لا يصل أحداً.
-   وإن لم يُعثر على أحدهم توقّف بخطأ بدل أن يُنشر ناقصاً. */
-do $$
-declare v_aud text[]; v_want text[] := array[
-  'عبدالله الحزامي', 'عمر العتيق', 'سلطانه العرجاني'];
-declare v_missing text;
-begin
-  select array_agg(u.username) into v_aud
-    from public.perf_users u
-   where u.active
-     and public.perf_norm_name(u.display_name) = any(
-           select public.perf_norm_name(n) from unnest(v_want) n);
-
-  select string_agg(n, ' · ') into v_missing
-    from unnest(v_want) n
-   where not exists (select 1 from public.perf_users u
-                      where u.active
-                        and public.perf_norm_name(u.display_name) = public.perf_norm_name(n));
-  if v_missing is not null then
-    raise exception 'لم يُعثر على حساب نشط لـ: %  — صحّح الاسم في القائمة أعلاه ثم أعد التشغيل', v_missing;
-  end if;
-
-  insert into public.perf_notices (id, title, body, audience) values (
-    'n-sticky',
-    'جديد: القلم — ملاحظة لاصقة على أي مكان في الصفحة',
-    'في أسفل يمين كل صفحة زرّ ✎. اضغطه ثم اضغط المكان الذي تريد الملاحظة عنده، '
-    || 'فتُفتح ورقة صفراء هناك تكتب فيها ملاحظتك أو سؤالك.'
-    || E'\n' ||
-    'تختار مدّة بقائها: ٣ أيام · أسبوع · شهر · بلا مدة — وتختفي بانتهائها من نفسها.'
-    || E'\n' ||
-    'الورقة تُطوى إلى دبّوس صغير بزرّ (−) حتى لا تحجب ما تحتها، وتُسحب من رأسها إلى مكان آخر.'
-    || E'\n' ||
-    'وتصل من يفتح تلك الصفحة في «آخر التحديثات»، ومن يحرّرها يغلقها بـ«تمّت المعالجة» بعد الردّ.',
-    v_aud
-  ) on conflict (id) do update
-    set title = excluded.title, body = excluded.body, audience = excluded.audience;
-end $$;
-
--- ------------------------------------------------------------
---  ٣) المراجعة
--- ------------------------------------------------------------
-select title as "العنوان",
-       case when cardinality(audience) = 0 then 'الجميع'
-            else array_to_string(audience, ' · ') end as "لمن",
-       coalesce(until::text, 'بلا انتهاء') as "حتى"
-  from public.perf_notices order by at desc;
-
--- ============================================================
---  لإضافة إعلان جديد لاحقاً:
---    insert into public.perf_notices (id, title, body, audience)
---    values ('n-xxx', 'العنوان', 'الشرح', array['aalhizami','sultana']);
---  (audience فارغاً ⇒ للجميع)
--- ============================================================
+-- التشخيص
+select 'وصل إلى' as "الفحص",
+       case when cardinality(audience)=0 then '⚠️ فارغ ⇒ يظهر للجميع'
+            else array_to_string(audience,' · ') end as "النتيجة"
+  from public.perf_notices where id='n-sticky'
+union all
+select 'من لم يُعثر عليه',
+       coalesce((select string_agg(n,' · ') from unnest(array[
+                  'عبدالله الحزامي','عمر العتيق','سلطانه العرجاني']) n
+                  where not exists (select 1 from public.perf_users u
+                                     where u.active and public.perf_norm_name(u.display_name)
+                                         = public.perf_norm_name(n))), '✅ الثلاثة موجودون')
+union all
+select 'اسم دخولي',
+       coalesce((select username from public.perf_users where active
+                  and public.perf_norm_name(display_name)
+                    = public.perf_norm_name('سلطانه العرجاني')), '❌ لا حساب بهذا الاسم')
+union all
+select 'هل يظهر لي؟',
+       case when exists (select 1 from public.perf_notices n, public.perf_users u
+                          where n.id='n-sticky' and u.active
+                            and public.perf_norm_name(u.display_name)
+                              = public.perf_norm_name('سلطانه العرجاني')
+                            and (cardinality(n.audience)=0 or u.username = any(n.audience)))
+            then '✅ نعم' else '❌ لا' end;
