@@ -1,15 +1,17 @@
 "use client";
 
 /* ============================================================
-   التقرير الأسبوعي — الشكل المعتمد.
+   التقرير الأسبوعي — بشكل «الإنجاز الأسبوعي» الأول:
+   ترويسة · حلقة الأداء العام ومسارها · أقسام تُطوى.
 
-   القاعدة: لون واحد للأرقام والعناوين، رمادي للتوضيح، وأخضر
-   للفروقات. البرتقالي والأحمر نقطةٌ صغيرة في حالة التكليف وحدها.
-   كل كتلة هنا تُظهر أو تُخفى من «تخصيص التقرير» — الشرط عند
-   موضع الاستدعاء لا داخل المكوّن، فالمخفيّ لا يُبنى أصلاً.
+   والفرق عن ذاك: الأرقام تُقرأ من أقسام المنصة (perf_items) لا من
+   نموذج المؤشرات القديم — فما يظهر هنا هو ما في الصفحات نفسها.
+   وكل كتلة تُظهر أو تُخفى من «تخصيص التقرير».
    ============================================================ */
 
-import type { WeeklyReport2 } from "@/lib/weeklyReport";
+import { useState } from "react";
+import { asset } from "@/lib/base";
+import type { WeeklyCell, WeeklyReport2 } from "@/lib/weeklyReport";
 import type { WeeklyPrefs } from "@/lib/weeklyPrefs";
 
 const AR_MONTHS = [
@@ -23,13 +25,30 @@ export function arDate2(iso: string): string {
   return `${d} ${AR_MONTHS[m - 1]} ${y}`;
 }
 
-/** المدى: 26 – 30 يوليو 2026 — الشهر مرة واحدة إن اتّحد الطرفان */
 export function rangeText2(a: string, b: string): string {
   if (!a || !b) return "—";
   return a.slice(0, 7) === b.slice(0, 7)
     ? `${Number(a.slice(8))} – ${arDate2(b)}`
     : `${arDate2(a)} – ${arDate2(b)}`;
 }
+
+/* الأقسام غايات سنوية تُنجَز على مدار السنة، فمقارنة تقدّمها بـ١٠٠٪
+   في يوليو تجعل كل شيء أحمر بلا معنى. المقارنة هنا بـ«المتوقّع حتى
+   اليوم» = ما انقضى من السنة: بلغه فأخضر، قاربه فذهبي، تخلّف عنه
+   كثيراً فأحمر. القاعدة مكتوبة تحت الجدول حتى لا تكون لوناً مبهماً. */
+export function expectedPct(now = new Date()): number {
+  const y = now.getUTCFullYear();
+  const start = Date.UTC(y, 0, 1);
+  const end = Date.UTC(y + 1, 0, 1);
+  return Math.round(((now.getTime() - start) / (end - start)) * 100);
+}
+function toneOf(p: number | null, expected: number): string {
+  if (p == null) return "#8a9a95";
+  if (p >= expected) return "#22c55e";
+  if (p >= expected * 0.8) return "#f59e0b";
+  return "#ef4444";
+}
+const pct = (v: number | null) => (v == null ? "—" : `${Math.round(v)}%`);
 
 const DOT: Record<string, string> = {
   done: "#1a9d5c",
@@ -38,73 +57,120 @@ const DOT: Record<string, string> = {
   late: "#d34a4a",
 };
 
-function Delta({ n }: { n: number }) {
-  if (n === 0) return <span className="wr-dl flat">—</span>;
+/** خط صغير لتاريخ ستة أسابيع — يتجاهل الفجوات الفارغة */
+function Spark({ points, color }: { points: number[]; color: string }) {
+  const vals = points.filter((v) => Number.isFinite(v));
+  if (vals.length < 2 || Math.max(...vals) === 0) return <span className="wk-nospark">—</span>;
+  const min = Math.min(...vals);
+  const max = Math.max(...vals);
+  const span = Math.max(1, max - min);
+  const W = 86;
+  const H = 26;
+  const step = W / Math.max(1, points.length - 1);
+  const d = points
+    .map((v, i) => `${(i * step).toFixed(1)},${(H - ((v - min) / span) * (H - 6) - 3).toFixed(1)}`)
+    .join(" ");
   return (
-    <span className={`wr-dl ${n > 0 ? "up" : "down"}`}>
-      {n > 0 ? "▲" : "▼"} {Math.abs(n)}
-    </span>
+    <svg className="wk-spark" width={W} height={H} viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
+      <polyline points={d} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
   );
 }
 
-function Donut({ v }: { v: number | null }) {
-  const R = 46;
+function Ring({ value, color }: { value: number | null; color: string }) {
+  const R = 52;
   const C = 2 * Math.PI * R;
-  const p = v == null ? 0 : Math.max(0, Math.min(100, v));
+  const v = value == null ? 0 : Math.max(0, Math.min(100, value));
   return (
-    <svg className="wr-donut" viewBox="0 0 116 116" role="img" aria-label={`الأداء العام ${p}%`}>
-      <circle cx="58" cy="58" r={R} fill="none" stroke="#e9f1ef" strokeWidth="11" />
+    <svg className="wk-ring" viewBox="0 0 130 130" width="118" height="118" role="img" aria-label={`الإنجاز ${pct(value)}`}>
+      <circle cx="65" cy="65" r={R} fill="none" stroke="#e9f1ef" strokeWidth="12" />
       <circle
-        cx="58" cy="58" r={R} fill="none" stroke="#1a9d5c" strokeWidth="11" strokeLinecap="round"
-        strokeDasharray={`${(C * p) / 100} ${C}`} transform="rotate(-90 58 58)"
+        cx="65" cy="65" r={R} fill="none" stroke={color} strokeWidth="12" strokeLinecap="round"
+        strokeDasharray={`${(C * v) / 100} ${C}`} transform="rotate(-90 65 65)"
       />
-      <text x="58" y="66" textAnchor="middle" className="wr-donut-t">
-        {v == null ? "—" : `${p}%`}
+      <text
+        x="65" y="72" textAnchor="middle"
+        style={{ font: "800 24px 'Noto Kufi Arabic', sans-serif", direction: "ltr" }}
+        fill="#0f2e28"
+      >
+        {pct(value)}
       </text>
     </svg>
   );
 }
 
-const Buildings = () => (
-  <svg className="wr-bld" viewBox="0 0 320 120" preserveAspectRatio="none" aria-hidden="true">
-    <g fill="rgba(255,255,255,.10)">
-      <rect x="6" y="46" width="26" height="74" /><rect x="38" y="28" width="20" height="92" />
-      <rect x="64" y="58" width="30" height="62" /><rect x="100" y="14" width="24" height="106" />
-      <rect x="130" y="40" width="18" height="80" /><rect x="154" y="66" width="34" height="54" />
-      <rect x="194" y="22" width="22" height="98" /><rect x="222" y="52" width="28" height="68" />
-      <rect x="256" y="34" width="20" height="86" /><rect x="282" y="60" width="32" height="60" />
-    </g>
-    <g fill="rgba(255,255,255,.16)">
-      <rect x="44" y="40" width="3" height="3" /><rect x="50" y="40" width="3" height="3" />
-      <rect x="44" y="52" width="3" height="3" /><rect x="50" y="52" width="3" height="3" />
-      <rect x="106" y="26" width="3" height="3" /><rect x="112" y="26" width="3" height="3" />
-      <rect x="106" y="38" width="3" height="3" /><rect x="112" y="38" width="3" height="3" />
-      <rect x="200" y="34" width="3" height="3" /><rect x="206" y="34" width="3" height="3" />
-      <rect x="200" y="46" width="3" height="3" /><rect x="206" y="46" width="3" height="3" />
-    </g>
-  </svg>
-);
+function deltaText(n: number): { txt: string; cls: string } {
+  if (n === 0) return { txt: "بلا تغيّر", cls: "flat" };
+  return n > 0 ? { txt: `▲ ${n}`, cls: "up" } : { txt: `▼ ${Math.abs(n)}`, cls: "down" };
+}
 
-const Mountains = () => (
-  <svg className="wr-mtn" viewBox="0 0 1000 90" preserveAspectRatio="none" aria-hidden="true">
-    <path d="M0 90 L120 40 L190 66 L300 18 L400 62 L470 44 L580 78 L680 34 L760 60 L860 26 L1000 72 L1000 90 Z" fill="rgba(13,61,34,.07)" />
-    <path d="M0 90 L90 58 L170 76 L280 42 L380 74 L500 54 L620 82 L720 56 L820 74 L1000 48 L1000 90 Z" fill="rgba(13,61,34,.05)" />
-  </svg>
-);
-
-const CalIcon = () => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
-    <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
-    <path d="M3.5 10h17M8 3v4M16 3v4" />
-  </svg>
-);
-
-function Head({ title, sub }: { title: string; sub: string }) {
+/** صفّ قسم — يُفتح فيعرض توزيع حالاته */
+function SecRow({ c, expected }: { c: WeeklyCell; expected: number }) {
+  const [open, setOpen] = useState(false);
+  const p = c.sum.prog && c.sum.prog.of > 0
+    ? Math.min(100, Math.round((c.sum.prog.done / c.sum.prog.of) * 100))
+    : null;
+  const color = toneOf(p, expected);
+  const d = deltaText(c.moved - c.prev);
   return (
-    <h3 className="wr-h">
-      {title}
-      <em>{sub}</em>
-    </h3>
+    <>
+      <tr className={`wk-krow ${open ? "open" : ""}`} onClick={() => setOpen(!open)}>
+        <td className="wk-kname">
+          <span className="wk-caret">▾</span>
+          {c.name}
+        </td>
+        <td className="ltr" data-l="المستهدف">{c.sum.prog ? c.sum.prog.of : "—"}</td>
+        <td className="ltr" data-l="المحقق">{c.sum.prog ? c.sum.prog.done : "—"}</td>
+        <td data-l="الإنجاز">
+          <span className="wk-badge" style={{ background: color }}>{pct(p)}</span>
+        </td>
+        <td className="ltr" data-l="تحرّك هذا الأسبوع">{c.moved}</td>
+        <td className={`wk-delta ${d.cls}`} data-l="عن الأسبوع الماضي">{d.txt}</td>
+        <td className="wk-sparkcell" data-l="المسار">
+          <Spark points={c.history} color={color} />
+        </td>
+      </tr>
+      {open && (
+        <tr className="wk-sub">
+          <td colSpan={7}>
+            <div className="wk-secgrid">
+              {c.sum.breakdown.map((b) => (
+                <div className="wk-sec" key={b.k}>
+                  <b>{b.k}</b>
+                  <span className="wk-secv">{b.n}</span>
+                  <span className="wk-secd ltr">
+                    {c.sum.total} {c.sum.totalLabel}
+                  </span>
+                </div>
+              ))}
+              {c.sum.breakdown.length === 0 && <div className="empty">لا بيانات في هذا القسم بعد.</div>}
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+function Section({
+  title,
+  count,
+  children,
+}: {
+  title: string;
+  count?: number;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(true);
+  return (
+    <section className={`wk-sect ${open ? "open" : ""}`}>
+      <button className="wk-sh" onClick={() => setOpen(!open)}>
+        <h3>{title}</h3>
+        {count != null && <span className="wk-count">{count}</span>}
+        <span className="wk-caret">▾</span>
+      </button>
+      {open && <div className="wk-sb">{children}</div>}
+    </section>
   );
 }
 
@@ -119,181 +185,137 @@ export default function WeeklyReportView({
 }) {
   const on = (k: string) => !!prefs.on[k];
   const r = report;
-  const hasTwo = (on("challenges") && !!r.texts.challenges) || (on("priorities") && r.texts.priorities.length > 0);
+  const expected = expectedPct();
+  const color = toneOf(r.overall, expected);
+  const movedNow = r.overallHistory[r.overallHistory.length - 1] ?? 0;
+  const movedPrev = r.overallHistory[r.overallHistory.length - 2] ?? 0;
+  const d = deltaText(movedNow - movedPrev);
 
   return (
-    <div className="wr">
-      <header className="wr-hd">
-        <div className="wr-art">
-          <Buildings />
-          <span className="wr-cut" />
-        </div>
-        <div className="wr-lg">
-          <b>أداء</b>
-          <span>
-            المركز الوطني لقياس
-            <br />
-            أداء الأجهزة العامة
-          </span>
-        </div>
-        <div className="wr-mid">
-          <b>التحديث الأسبوعي</b>
+    <div className="wk">
+      <header className="wk-head">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={asset("/adaa-logo.png")} alt="أداء" className="wk-logo" />
+        <div className="wk-ht">
+          <h2>الإنجاز الأسبوعي</h2>
           <span>{dept}</span>
-          <span className="wr-pdw">
-            <span className="wr-pd">
-              <span className="wr-ci">
-                <CalIcon />
-              </span>
-              الفترة: {rangeText2(r.weekStart, r.weekEnd)}
-            </span>
-          </span>
         </div>
-        <div className="wr-mot">
-          من البيانات
-          <br />
-          <em>إلى أثر في الأداء</em>
+        <div className="wk-hr">
+          <b>{rangeText2(r.weekStart, r.weekEnd)}</b>
+          <span>صدر في {arDate2(new Date().toISOString().slice(0, 10))}</span>
         </div>
       </header>
 
-      <div className="wr-bd">
-        {on("perf") && (
-          <div className="wr-top">
-            <Donut v={r.overall} />
-            <div className="wr-tx">
-              <b>الأداء العام</b>
-              <span className="wr-note">متوسط تقدّم الأقسام المعروضة نحو غاياتها المعتمدة</span>
-            </div>
-            <div className="wr-facts">
-              {r.facts.map((f) => (
-                <div key={f.label}>
-                  <b>{f.n}</b>
-                  <span>{f.label}</span>
-                </div>
-              ))}
-            </div>
+      {on("perf") && (
+        <div className="wk-hero">
+          <Ring value={r.overall} color={color} />
+          <div className="wk-heroT">
+            <span className="wk-lbl">الأداء العام</span>
+            <b className={`wk-hd ${d.cls}`}>
+              {movedNow} بندًا تحرّك هذا الأسبوع · {d.txt} عن الأسبوع الماضي
+            </b>
+            <span className="wk-sub2">متوسط تقدّم الأقسام المعروضة نحو غاياتها المعتمدة</span>
           </div>
-        )}
+          <div className="wk-heroS">
+            <span className="wk-lbl">حركة ستة أسابيع</span>
+            <Spark points={r.overallHistory} color={color} />
+          </div>
+        </div>
+      )}
 
-        {r.cells.length > 0 && (
-          <>
-            <Head title="ماذا وصلنا هذا الأسبوع" sub="مقارنةً بالأسبوع الماضي" />
-            <div className="wr-cells">
+      {r.cells.length > 0 && (
+        <Section title="أقسام الإدارة" count={r.cells.length}>
+          <table className="wk-tbl">
+            <thead>
+              <tr>
+                <th>القسم</th>
+                <th>المستهدف</th>
+                <th>المحقق</th>
+                <th>الإنجاز</th>
+                <th>تحرّك هذا الأسبوع</th>
+                <th>عن الأسبوع الماضي</th>
+                <th>المسار</th>
+              </tr>
+            </thead>
+            <tbody>
               {r.cells.map((c) => (
-                <div className="wr-cl" key={c.k}>
-                  <span className="wr-ttl">{c.name}</span>
-                  <span className="wr-num">
-                    <b>{c.moved}</b>
-                    <Delta n={c.moved - c.prev} />
-                  </span>
-                  <span className="wr-unit">
-                    بندًا تحرّك — من {c.sum.total} {c.sum.totalLabel}
-                  </span>
-                  <span className="wr-brk">
-                    {c.sum.breakdown.map((b) => `${b.k} ${b.n}`).join(" · ")}
-                  </span>
-                </div>
+                <SecRow c={c} expected={expected} key={c.k} />
               ))}
-            </div>
-          </>
-        )}
+            </tbody>
+          </table>
+          <p className="wk-rule">
+            اللون بالمقارنة مع المتوقّع حتى اليوم ({expected}٪ من السنة): بلغه أخضر · قاربه ذهبي · تخلّف عنه أحمر.
+          </p>
+        </Section>
+      )}
 
-        {on("asg") && (
-          <>
-            <Head title="التكاليف الواردة للمركز" sub="وما آلت إليه" />
-            {r.asg.length === 0 ? (
-              <div className="wr-empty">لا توجد تكاليف مفتوحة هذا الأسبوع.</div>
-            ) : (
-              <div className="wr-tblw">
-                <table className="wr-tbl">
-                  <colgroup>
-                    <col style={{ width: "26px" }} />
-                    <col style={{ width: "26%" }} />
-                    <col style={{ width: "11%" }} />
-                    <col style={{ width: "11%" }} />
-                    <col style={{ width: "18%" }} />
-                    <col style={{ width: "17%" }} />
-                    <col style={{ width: "17%" }} />
-                  </colgroup>
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>موضوع التكليف</th>
-                      <th>الورود</th>
-                      <th>الحالة</th>
-                      <th>الخطوات القادمة</th>
-                      <th>التحدي</th>
-                      <th>الدعم المطلوب</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {r.asg.map((a, i) => (
-                      <tr key={a.id}>
-                        <td className="n">{i + 1}</td>
-                        <td className="sb">{a.title}</td>
-                        <td className="dt">{a.at ? arDate2(a.at) : "—"}</td>
-                        <td className="st">
-                          <em style={{ background: DOT[a.state] }} />
-                          {a.stateAr}
-                        </td>
-                        <td className={a.next ? "s" : "m"}>{a.next || "لا يوجد"}</td>
-                        <td className={a.challenge ? "" : "m"}>{a.challenge || "لا يوجد"}</td>
-                        <td className={a.support ? "s" : "m"}>{a.support || "لا يوجد"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </>
-        )}
+      {on("asg") && (
+        <Section title="التكاليف الواردة للمركز" count={r.asg.length}>
+          {r.asg.length === 0 ? (
+            <div className="empty">لا توجد تكاليف مفتوحة هذا الأسبوع.</div>
+          ) : (
+            <table className="wk-tbl wk-tasks">
+              <thead>
+                <tr>
+                  <th>موضوع التكليف</th>
+                  <th>الورود</th>
+                  <th>الحالة</th>
+                  <th>الخطوات القادمة</th>
+                  <th>التحدي</th>
+                  <th>الدعم المطلوب</th>
+                </tr>
+              </thead>
+              <tbody>
+                {r.asg.map((a) => (
+                  <tr key={a.id}>
+                    <td className="wk-tname">{a.title}</td>
+                    <td className="ltr" data-l="الورود">{a.at ? arDate2(a.at) : "—"}</td>
+                    <td data-l="الحالة">
+                      <span className="wk-st2">
+                        <em style={{ background: DOT[a.state] }} />
+                        {a.stateAr}
+                      </span>
+                    </td>
+                    <td className="wk-upd" data-l="الخطوات القادمة">{a.next || "—"}</td>
+                    <td className="wk-upd" data-l="التحدي">{a.challenge || "—"}</td>
+                    <td className="wk-upd" data-l="الدعم المطلوب">{a.support || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Section>
+      )}
 
-        {on("next") && !!r.texts.next && (
-          <>
-            <Head title="الخطوات القادمة" sub="" />
-            <p className="wr-p">{r.texts.next}</p>
-          </>
-        )}
+      {on("next") && !!r.texts.next && (
+        <Section title="الخطوات القادمة">
+          <p className="wk-p">{r.texts.next}</p>
+        </Section>
+      )}
 
-        {on("support") && !!r.texts.support && (
-          <>
-            <Head title="الدعم المطلوب" sub="" />
-            <p className="wr-p">{r.texts.support}</p>
-          </>
-        )}
+      {on("support") && !!r.texts.support && (
+        <Section title="الدعم المطلوب">
+          <p className="wk-p">{r.texts.support}</p>
+        </Section>
+      )}
 
-        {hasTwo && (
-          <div className="wr-two">
-            {on("challenges") && !!r.texts.challenges && (
-              <div>
-                <Head title="التحديات" sub="" />
-                <p className="wr-p">{r.texts.challenges}</p>
-              </div>
-            )}
-            {on("priorities") && r.texts.priorities.length > 0 && (
-              <div>
-                <Head title="أولويات الأسبوع القادم" sub="" />
-                <div className="wr-li">
-                  {r.texts.priorities.map((x, i) => (
-                    <div key={i}>
-                      <i>{i + 1}</i>
-                      <b>{x}</b>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      {on("challenges") && !!r.texts.challenges && (
+        <Section title="التحديات">
+          <p className="wk-p">{r.texts.challenges}</p>
+        </Section>
+      )}
 
-      <footer className="wr-ft">
-        <Mountains />
-        <span className="wr-sl">
-          معاً ..
-          <em>لأداء أكثر أثراً</em>
-        </span>
-        <span className="wr-r">مركز أداء &nbsp;|&nbsp; {dept}</span>
-      </footer>
+      {on("priorities") && r.texts.priorities.length > 0 && (
+        <Section title="خطة الأسبوع القادم" count={r.texts.priorities.length}>
+          <ul className="wk-list">
+            {r.texts.priorities.map((x, i) => (
+              <li key={i}>{x}</li>
+            ))}
+          </ul>
+        </Section>
+      )}
+
+      <footer className="wk-foot">مركز أداء · {dept}</footer>
     </div>
   );
 }

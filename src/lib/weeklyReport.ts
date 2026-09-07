@@ -30,6 +30,8 @@ export type WeeklyCell = {
   name: string;
   moved: number;
   prev: number;
+  /** ما تحرّك في كل أسبوع من الستة الأخيرة — لرسم المسار */
+  history: number[];
   sum: WeekSum;
 };
 
@@ -39,6 +41,8 @@ export type WeeklyReport2 = {
   overall: number | null;
   overallPrev: number | null;
   cells: WeeklyCell[];
+  /** مجموع ما تحرّك أسبوعاً بأسبوع — مسار الستة أسابيع في الرأس */
+  overallHistory: number[];
   asg: WeeklyAsg[];
   facts: { n: number; label: string }[];
   texts: { next: string; support: string; challenges: string; priorities: string[] };
@@ -99,6 +103,14 @@ export function buildWeekly2(
   const pStart = shiftDays(weekStart, -7);
   const pEnd = shiftDays(weekStart, -1);
 
+  /* مسار ستة أسابيع: عدد ما تحرّك في كل أسبوع منتهياً بهذا الأسبوع.
+     يُحسب من updatedAt، فلا يحتاج لقطةً محفوظة. */
+  const HIST = 6;
+  const windows = Array.from({ length: HIST }, (_, i) => {
+    const a = shiftDays(weekStart, -7 * (HIST - 1 - i));
+    return [a, shiftDays(a, 6)] as const;
+  });
+
   const cells: WeeklyCell[] = [];
   for (const k of AUTO_SECTIONS) {
     if (!prefs.on[k]) continue;
@@ -110,6 +122,7 @@ export function buildWeekly2(
       name: SEC_NAME[k],
       moved: items.filter((x) => inRange(x.updatedAt, weekStart, weekEnd)).length,
       prev: items.filter((x) => inRange(x.updatedAt, pStart, pEnd)).length,
+      history: windows.map(([a, b]) => items.filter((x) => inRange(x.updatedAt, a, b)).length),
       sum,
     });
   }
@@ -166,6 +179,7 @@ export function buildWeekly2(
     overall,
     overallPrev,
     cells,
+    overallHistory: windows.map((_, i) => cells.reduce((a, c) => a + (c.history[i] || 0), 0)),
     asg,
     facts,
     texts: {
