@@ -275,7 +275,7 @@ export default function Backup({
           {err && <div className="alert alert-error">{err}</div>}
           <p className="bk-note">
             {t(
-              "نسخة بكل ما يخصّك في اللوحة: قياسات قطاعاتك وملاحظاتك ومهامك وتكاليفك — تحفظينها عندك فتبقى بين يديك لو انقطع الاتصال باللوحة.",
+              "القياسات والمهام والتكاليف والملاحظات — للحفظ على الجهاز.",
               "Everything that concerns you in the dashboard, saved on your device."
             )}
           </p>
@@ -314,7 +314,7 @@ export default function Backup({
                   <span className="ic">🖨</span>
                   <b>{t("تحميل PDF", "Download PDF")}</b>
                   <span className="s">
-                    {t("تُفتح نافذة الطباعة — اختاري «حفظ بصيغة PDF»", "Print dialog → Save as PDF")}
+                    {t("من نافذة الطباعة ← حفظ بصيغة PDF", "Print dialog → Save as PDF")}
                   </span>
                 </button>
               </div>

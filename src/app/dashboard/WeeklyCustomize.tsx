@@ -71,10 +71,7 @@ export default function WeeklyCustomize({
 
       {!canEdit && (
         <div className="alert">
-          {t(
-            "العرض فقط — تخصيص التقرير لمن يحرّره.",
-            "View only — customising the report is for its editors.",
-          )}
+{t("العرض فقط.", "View only.")}
         </div>
       )}
 
@@ -179,7 +176,7 @@ export default function WeeklyCustomize({
 
       <p className="wc-note">
         {t(
-          "ما لا يُؤشَّر عليه لا يظهر في التقرير ولا في ملف الـPDF ولا في الرابط المشترَك. الأقسام المقروءة آليًا تُحدَّث من صفحات المنصة نفسها.",
+          "ما لا يُؤشَّر عليه لا يظهر في التقرير ولا في الـPDF ولا في الرابط المشترَك.",
           "Unchecked sections never appear — not in the report, the PDF, or the shared link.",
         )}
       </p>

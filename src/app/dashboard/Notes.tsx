@@ -292,7 +292,7 @@ export default function Notes({
             <section className="nb-editor">
               {!open ? (
                 <div className="empty" style={{ padding: 30 }}>
-                  {t("اختاري ملاحظة أو أنشئي واحدة جديدة.", "Pick a note or create one.")}
+                  {t("لا ملاحظة مفتوحة — اختيار واحدة من القائمة أو إنشاء جديدة.", "Pick a note or create one.")}
                 </div>
               ) : (
                 <>
@@ -321,7 +321,7 @@ export default function Notes({
                   <textarea
                     className="nb-body"
                     value={open.body}
-                    placeholder={t("اكتبي هنا…", "Write here…")}
+                    placeholder={t("نص الملاحظة…", "Write here…")}
                     onChange={(e) => editNote(open.id, { body: e.target.value })}
                   />
 
@@ -365,7 +365,7 @@ export default function Notes({
                     )}
                     {!open.due && (
                       <span className="hint">
-                        {t("اكتبي «بكرة» أو «الأحد الساعة ٩» ويلتقطه بنفسه", "Write a date and it is picked up")}
+                        {t("«بكرة» أو «الأحد الساعة ٩» — يُلتقط الموعد تلقائياً", "Write a date and it is picked up")}
                       </span>
                     )}
                   </div>
