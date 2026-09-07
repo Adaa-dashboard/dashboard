@@ -9391,6 +9391,9 @@ table.matrix thead th {
 }
 .stk-pen:hover { color: #c9a020; border-color: #ecd898; }
 .stk-pen.on { background: #c9a020; border-color: #c9a020; color: #fff; }
+/* للقارئ: يرى الملاحظات ولا يكتب — فالزرّ عدّادٌ لا أداة */
+.stk-pen.ro { cursor: default; }
+.stk-pen.ro:hover { color: #6b7c77; border-color: var(--line, #e6edea); }
 .stk-pen span {
   position: absolute; inset-block-start: -4px; inset-inline-start: -4px;
   min-width: 18px; height: 18px; border-radius: 9px; background: #c9a020;

@@ -32,6 +32,7 @@ export type Scope =
   | "weekly"
   | "weekly:edit"
   | "users"
+  | "sticky"
   | "audit";
 
 export const SCOPE_GROUPS: { title: string; items: { key: Scope; label: string; note?: string }[] }[] = [
@@ -90,6 +91,7 @@ export const SCOPE_GROUPS: { title: string; items: { key: Scope; label: string; 
     items: [
       { key: "structure", label: "الهيكل التنظيمي", note: "القطاعات وموظفوها" },
       { key: "users", label: "المستخدمون والصلاحيات" },
+      { key: "sticky", label: "كتابة الملاحظات اللاصقة", note: "القلم في زاوية كل صفحة" },
       { key: "audit", label: "سجل النشاط", note: "من عدّل ماذا ومتى" },
     ],
   },
@@ -151,6 +153,7 @@ export const PAGE_ROWS: { title: string; rows: PageRow[] }[] = [
       { view: "changes", label: "طلبات التغيير", edit: "changes:upload", editLabel: "رفع الملف اليومي" },
       { view: "structure", label: "الهيكل التنظيمي" },
       { view: "users", label: "المستخدمون والصلاحيات" },
+      { view: "sticky", label: "كتابة الملاحظات اللاصقة", note: "القلم في زاوية كل صفحة" },
       { view: "audit", label: "سجل النشاط", note: "من عدّل ماذا ومتى" },
     ],
   },

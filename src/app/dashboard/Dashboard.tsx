@@ -627,6 +627,7 @@ export default function Dashboard({ me }: { me: Me }) {
           {STICKY_PAGES[tab] && can(STICKY_PAGES[tab]) && (
             <StickyLayer
               page={STICKY_PAGES[tab]}
+              canWrite={can("sticky")}
               canClose={can(`${STICKY_PAGES[tab]}:edit` as Scope)}
               t={t}
             />

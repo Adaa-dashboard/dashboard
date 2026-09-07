@@ -192,11 +192,14 @@ function Note({
 
 export default function StickyLayer({
   page,
+  canWrite,
   canClose,
   t,
 }: {
   /** مفتاح الصفحة — هو نفسه مفتاح صلاحيتها */
   page: string;
+  /** الكتابة لمدير الإدارة ومدراء القطاعات — والقراءة لمن يفتح الصفحة */
+  canWrite: boolean;
   /** من يحرّر الصفحة يقدر يغلق ملاحظات غيره بعد معالجتها */
   canClose: boolean;
   t: T;
@@ -225,7 +228,7 @@ export default function StickyLayer({
   }, [placing]);
 
   async function place(e: React.MouseEvent) {
-    if (!placing || !host.current) return;
+    if (!placing || !canWrite || !host.current) return;
     const r = host.current.getBoundingClientRect();
     /* الإحداثي من الحافة اليسرى الفيزيائية — لا من «بداية السطر»،
        فلا ينقلب المعنى بين العربية والإنجليزية */
@@ -292,14 +295,20 @@ export default function StickyLayer({
         ))}
       </div>
 
-      <button
-        className={`stk-pen ${placing ? "on" : ""}`}
-        onClick={() => setPlacing((v) => !v)}
-        title={t("ملاحظة على هذه الصفحة", "Note on this page")}
-      >
-        ✎
-        {rows.length > 0 && <span>{rows.length}</span>}
-      </button>
+      {(canWrite || rows.length > 0) && (
+        <button
+          className={`stk-pen ${placing ? "on" : ""} ${canWrite ? "" : "ro"}`}
+          onClick={() => canWrite && setPlacing((v) => !v)}
+          title={
+            canWrite
+              ? t("ملاحظة على هذه الصفحة", "Note on this page")
+              : t("ملاحظات على هذه الصفحة", "Notes on this page")
+          }
+        >
+          {canWrite ? "✎" : "📌"}
+          {rows.length > 0 && <span>{rows.length}</span>}
+        </button>
+      )}
 
       {placing && (
         <div className="stk-hint no-print">
