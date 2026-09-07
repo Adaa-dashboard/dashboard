@@ -230,6 +230,23 @@ export default function Tasks({
     setOpen(all.find((x) => x.id === task.id) || null);
   }
 
+  /* الحذف نهائي ولا تراجع فيه، فيسبقه تأكيد باسم البند.
+     الصلاحية الحقيقية في RLS: من سجّل البند أو مدير الإدارة. */
+  async function removeTask(task: Task) {
+    const q = asg
+      ? t(`حذف التكليف «${task.title}» نهائياً؟`, `Delete assignment "${task.title}"?`)
+      : t(`حذف المهمة «${task.title}» نهائياً؟`, `Delete task "${task.title}"?`);
+    if (!confirm(q)) return;
+    setErr("");
+    const r = await apiFetch(`/api/tasks/${task.id}`, { method: "DELETE" }).then((x) => x.json());
+    if (r.error) {
+      setErr(r.error);
+      return;
+    }
+    setOpen(null);
+    load();
+  }
+
   async function saveState(task: Task, state: State, text: string) {
     const r = await apiFetch(`/api/tasks/${task.id}`, {
       method: "PATCH",
@@ -367,9 +384,11 @@ export default function Tasks({
           who={nameOf(open.assigneeId)}
           indicatorName={indicators.find((i) => i.id === open.indicatorId)?.name}
           canEdit={isAdmin || open.assigneeId === meId || open.createdById === meId}
+          canDelete={isAdmin || open.createdById === meId}
           onClose={() => setOpen(null)}
           onSave={saveState}
           onReply={saveReply}
+          onDelete={removeTask}
           t={t}
         />
       )}
@@ -397,18 +416,22 @@ function TaskDetail({
   who,
   indicatorName,
   canEdit,
+  canDelete,
   onClose,
   onSave,
   onReply,
+  onDelete,
   t,
 }: {
   task: Task;
   who: string;
   indicatorName?: string;
   canEdit: boolean;
+  canDelete: boolean;
   onClose: () => void;
   onSave: (task: Task, state: State, text: string) => void;
   onReply: (task: Task, updateId: string, text: string) => void;
+  onDelete: (task: Task) => void;
   t: (ar: string, en: string) => string;
 }) {
   const [state, setState] = useState<State>(task.state);
@@ -538,6 +561,12 @@ function TaskDetail({
           )}
         </div>
         <div className="m-f">
+          {canDelete && (
+            <button className="btn btn-del btn-sm" onClick={() => onDelete(task)}>
+              {t("حذف", "Delete")}
+            </button>
+          )}
+          <div style={{ flex: 1 }} />
           <button className="btn btn-ghost btn-sm" onClick={onClose}>
             {t("إغلاق", "Close")}
           </button>

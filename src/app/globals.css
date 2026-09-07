@@ -147,6 +147,17 @@ a {
   background: linear-gradient(140deg, #e06b6b, var(--danger));
   color: #ffffff;
 }
+/* حذف هادئ: لا يزاحم زر الحفظ بلونه، ويصير أحمر صريحاً عند القصد */
+.btn-del {
+  background: transparent;
+  color: #b13636;
+  border: 1px solid #e7c3c3;
+}
+.btn-del:hover {
+  background: #b13636;
+  border-color: #b13636;
+  color: #ffffff;
+}
 .btn-sm {
   padding: 6px 12px;
   font-size: 13px;

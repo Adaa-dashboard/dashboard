@@ -405,8 +405,11 @@ export async function apiFetch(path: string, init: Init = {}) {
     if (p.startsWith("/api/tasks/")) {
       const id = p.split("/")[3];
       if (method === "DELETE") {
-        const { error } = await s.from("perf_tasks").delete().eq("id", id);
-        if (error) return err("الحذف لمدير الإدارة وحده", 403);
+        // RLS ترفض بلا خطأ: تُرجع صفراً من الصفوف. لذلك نطلب المحذوف
+        // بـ select ونتحقق منه، وإلا بدا الحذف ناجحاً والبند باقٍ.
+        const { data, error } = await s.from("perf_tasks").delete().eq("id", id).select("id");
+        if (error) return err("تعذّر الحذف — الصلاحية لمن سجّل البند أو لمدير الإدارة", 403);
+        if (!data || data.length === 0) return err("الحذف لمن سجّل البند أو لمدير الإدارة", 403);
         return ok({ ok: true });
       }
       if (method === "PATCH") {
