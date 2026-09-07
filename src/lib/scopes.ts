@@ -95,6 +95,61 @@ export const SCOPE_GROUPS: { title: string; items: { key: Scope; label: string; 
 
 export const ALL_SCOPES: Scope[] = SCOPE_GROUPS.flatMap((g) => g.items.map((i) => i.key));
 
+/* ============================================================
+   شاشة الصلاحيات: صفٌّ لكل صفحة بدل خانةٍ لكل صلاحية.
+   الاطّلاع والتعديل صلاحيتان في القاعدة، لكن المستخدم لا يفكّر
+   بهما إلا سؤالاً واحداً: «يفتحها؟ ويعدّل فيها؟» — فيُعرضان معاً.
+   ============================================================ */
+export type PageRow = {
+  view: Scope;
+  label: string;
+  note?: string;
+  /** صلاحية التعديل إن كان للصفحة تعديل */
+  edit?: Scope;
+  editLabel?: string;
+  /** خيار إضافي يوسّع نطاق الصفحة */
+  extra?: { key: Scope; label: string };
+};
+
+export const PAGE_ROWS: { title: string; rows: PageRow[] }[] = [
+  {
+    title: "الصفحات الأساسية",
+    rows: [
+      { view: "overview", label: "نظرة عامة", note: "ملخّص كل الأقسام" },
+      {
+        view: "details", label: "المؤشرات التفصيلية", note: "قطاعاته المسندة له",
+        edit: "targets", editLabel: "تعديل المستهدفات",
+        extra: { key: "details:all", label: "كل القطاعات" },
+      },
+      {
+        view: "tasks", label: "المهام", note: "المهام المسندة له",
+        extra: { key: "tasks:all", label: "كل المهام" },
+      },
+      { view: "weekly", label: "الإنجاز الأسبوعي", edit: "weekly:edit", editLabel: "اختيار أقسامه وكتابة خاناته" },
+    ],
+  },
+  {
+    title: "أقسام الإدارة",
+    rows: [
+      { view: "sessions", label: "جلسات مراجعة الأداء", edit: "sessions:edit" },
+      { view: "natstrat", label: "الاستراتيجيات الوطنية", edit: "natstrat:edit" },
+      { view: "inststrat", label: "الاستراتيجيات المؤسسية", edit: "inststrat:edit" },
+      { view: "outputs", label: "المخرجات الوطنية", edit: "outputs:edit" },
+      { view: "cx", label: "أعمال قياس تجربة المستفيد", edit: "cx:edit" },
+      { view: "projects", label: "المشاريع الاستراتيجية", edit: "projects:edit" },
+    ],
+  },
+  {
+    title: "بنود نظرة عامة والإعدادات",
+    rows: [
+      { view: "assignments", label: "التكاليف", note: "الواردة من جهة أعلى" },
+      { view: "changes", label: "طلبات التغيير", edit: "changes:upload", editLabel: "رفع الملف اليومي" },
+      { view: "structure", label: "الهيكل التنظيمي" },
+      { view: "users", label: "المستخدمون والصلاحيات" },
+    ],
+  },
+];
+
 /** ما يُقترح لموظف جديد: يشوف قطاعه ومهامه ولا شيء غيرهما */
 export const DEFAULT_SCOPES: Scope[] = ["overview", "details", "tasks"];
 

@@ -17,7 +17,8 @@ import Structure from "./Structure";
 import {
   ALL_SCOPES,
   DEFAULT_SCOPES,
-  SCOPE_GROUPS,
+  PAGE_ROWS,
+  type PageRow,
   can as hasScope,
   scopeLabel,
   type Scope,
@@ -2041,12 +2042,41 @@ function ScopePicker({
   onChange: (v: string[]) => void;
   t: (ar: string, en: string) => string;
 }) {
-  const toggle = (k: string) =>
-    onChange(value.includes(k) ? value.filter((x) => x !== k) : [...value, k]);
+  const on = (k: string) => value.includes(k);
+  const add = (v: string[], k: string) => (v.includes(k) ? v : [...v, k]);
+  const rm = (v: string[], k: string) => v.filter((x) => x !== k);
+
+  /* إطفاء الصفحة يُسقط تعديلها وتوسعتها معها — فلا تبقى صلاحية
+     معلّقة على صفحة لا تُفتح */
+  function toggleView(r: PageRow) {
+    let v = [...value];
+    if (on(r.view)) {
+      v = rm(v, r.view);
+      if (r.edit) v = rm(v, r.edit);
+      if (r.extra) v = rm(v, r.extra.key);
+    } else v = add(v, r.view);
+    onChange(v);
+  }
+  function setLevel(r: PageRow, edit: boolean) {
+    let v = add([...value], r.view);
+    v = edit && r.edit ? add(v, r.edit) : r.edit ? rm(v, r.edit) : v;
+    onChange(v);
+  }
+  function toggleExtra(r: PageRow) {
+    if (!r.extra) return;
+    onChange(on(r.extra.key) ? rm([...value], r.extra.key) : add(add([...value], r.view), r.extra.key));
+  }
+
+  const nPages = PAGE_ROWS.flatMap((g) => g.rows).filter((r) => on(r.view)).length;
 
   return (
     <div className="field" style={{ marginTop: 14 }}>
-      <label>{t("الصلاحيات", "Permissions")}</label>
+      <label>
+        {t("الصلاحيات", "Permissions")}
+        <span className="pm-n">
+          {nPages} {t("صفحة", "pages")}
+        </span>
+      </label>
       <div className="sc-tools">
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => onChange([...DEFAULT_SCOPES])}>
           {t("الافتراضي", "Default")}
@@ -2058,19 +2088,44 @@ function ScopePicker({
           {t("مسح", "None")}
         </button>
       </div>
-      <div className="sc-grid">
-        {SCOPE_GROUPS.map((g) => (
-          <div className="sc-col" key={g.title}>
-            <div className="sc-h">{g.title}</div>
-            {g.items.map((it) => (
-              <label key={it.key} className={`sc-item ${value.includes(it.key) ? "on" : ""}`}>
-                <input type="checkbox" checked={value.includes(it.key)} onChange={() => toggle(it.key)} />
-                <span>
-                  <b>{it.label}</b>
-                  {it.note && <i>{it.note}</i>}
-                </span>
-              </label>
-            ))}
+
+      <div className="pm">
+        {PAGE_ROWS.map((g) => (
+          <div className="pm-g" key={g.title}>
+            <div className="pm-gh">{g.title}</div>
+            {g.rows.map((r) => {
+              const open = on(r.view);
+              const edits = !!r.edit && on(r.edit);
+              return (
+                <div className={`pm-r ${open ? "on" : ""}`} key={r.view}>
+                  <label className="pm-c">
+                    <input type="checkbox" checked={open} onChange={() => toggleView(r)} />
+                    <span>
+                      <b>{r.label}</b>
+                      {r.note && <i>{r.note}</i>}
+                    </span>
+                  </label>
+
+                  {open && r.edit && (
+                    <div className="pm-seg" role="group" title={r.editLabel}>
+                      <button type="button" className={edits ? "" : "on"} onClick={() => setLevel(r, false)}>
+                        {t("مطّلع", "View")}
+                      </button>
+                      <button type="button" className={edits ? "on" : ""} onClick={() => setLevel(r, true)}>
+                        {t("يعدّل", "Edit")}
+                      </button>
+                    </div>
+                  )}
+
+                  {open && r.extra && (
+                    <label className="pm-x">
+                      <input type="checkbox" checked={on(r.extra.key)} onChange={() => toggleExtra(r)} />
+                      {r.extra.label}
+                    </label>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ))}
       </div>
@@ -2198,8 +2253,8 @@ function UsersManager({ refData }: { refData: RefData }) {
         <h2 className="section-title">{t("إضافة مستخدم", "Add User")}</h2>
         <p className="muted" style={{ marginTop: -8, marginBottom: 16 }}>
           {t(
-            "الدور يحدّد الكتابة في قاعدة البيانات، والصلاحيات أدناه تحدّد ما يراه ويستخدمه. اتركي كلمة المرور فارغة وأعطيه اسم المستخدم فقط — يختار كلمته بنفسه عند أول دخول.",
-            "The role governs database writes; the permissions below govern what the person sees and uses. Leave the password blank — the owner picks it at first sign-in."
+            "يكفي الاسم والجوال واسم المستخدم والقطاع — وكلمة المرور والمسمّى الوظيفي يضعهما هو عند أول دخول.",
+            "Name, phone, username and sector are enough — the password is set at first sign-in."
           )}
         </p>
         {err && <div className="alert alert-error">{err}</div>}
@@ -2224,16 +2279,6 @@ function UsersManager({ refData }: { refData: RefData }) {
               <input value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div>
-              <label>
-                {t("المسمّى الوظيفي", "Job title")} <span className="opt">{t("اختياري", "optional")}</span>
-              </label>
-              <input
-                value={jobTitle}
-                onChange={(e) => setJobTitle(e.target.value)}
-                placeholder={t("مثال: أخصائي قياس أداء", "e.g. Performance Analyst")}
-              />
-            </div>
-            <div>
               <label>{t("اسم المستخدم", "Username")}</label>
               <input
                 value={username}
@@ -2241,22 +2286,6 @@ function UsersManager({ refData }: { refData: RefData }) {
                 dir="ltr"
                 style={{ textAlign: "left" }}
                 autoComplete="off"
-              />
-            </div>
-            <div>
-              <label>
-                {t("كلمة المرور", "Password")}{" "}
-                <span className="opt">{t("(اختيارية)", "(optional)")}</span>
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                dir="ltr"
-                style={{ textAlign: "left" }}
-                autoComplete="new-password"
-                minLength={6}
-                placeholder={t("اتركها فارغة ليختارها هو", "Leave blank — the owner sets it")}
               />
             </div>
             <div style={{ flex: "0 0 170px" }}>
@@ -2276,16 +2305,9 @@ function UsersManager({ refData }: { refData: RefData }) {
                 <option value="lead">{t("مدير القطاع", "Sector lead")}</option>
               </select>
             </div>
-            <div style={{ flex: "0 0 170px" }}>
-              <label>{t("مستوى الكتابة", "Write level")}</label>
-              <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
-                <option value="manager">{t("يكتب في قطاعاته", "Writes to own sectors")}</option>
-                <option value="admin">{t("يكتب في كل القطاعات", "Writes to all sectors")}</option>
-              </select>
-            </div>
           </div>
           <div className="field" style={{ marginTop: 12 }}>
-            <label>{t("القطاعات المسؤول عنها", "Assigned sectors")}</label>
+            <label>{t("القطاع", "Sector")}</label>
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
               {refData.sectors.map((s) => (
                 <label key={s.id} className="checkbox-inline">
@@ -2534,13 +2556,16 @@ function EditUserModal({
             <option value="lead">{t("مدير القطاع", "Sector lead")}</option>
           </select>
 
-          <label>{t("مستوى الكتابة", "Write level")}</label>
+          <label>
+            {t("الكتابة في قاعدة البيانات", "Database writes")}{" "}
+            <span className="opt">{t("نادراً ما تُغيَّر", "rarely changed")}</span>
+          </label>
           <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
             <option value="manager">{t("يكتب في قطاعاته", "Writes to own sectors")}</option>
             <option value="admin">{t("يكتب في كل القطاعات", "Writes to all sectors")}</option>
           </select>
 
-          <label>{t("القطاعات المسؤول عنها", "Assigned sectors")}</label>
+          <label>{t("القطاع", "Sector")}</label>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 4 }}>
             {sectors.map((sc) => (
               <label key={sc.id} className="checkbox-inline">
