@@ -2247,6 +2247,22 @@ function UsersManager({ refData }: { refData: RefData }) {
   const sectorNames = (ids: string[]) =>
     ids.map((id) => refData.sectors.find((s) => s.id === id)?.name).filter(Boolean).join("، ") || "—";
 
+  /* الترتيب: مجموعة لكل قطاع، مديره أولاً ثم موظفوه بالأبجدية.
+     ومن يتبع أكثر من قطاع يظهر تحت كلٍّ منها — فالقائمة تُقرأ
+     كما يُقرأ الهيكل التنظيمي. */
+  const groups = useMemo(() => {
+    const byName = (a: UserRow, b: UserRow) =>
+      Number(!!b.isLead) - Number(!!a.isLead) || a.name.localeCompare(b.name, "ar");
+    const out = refData.sectors.map((sec) => ({
+      id: sec.id,
+      name: sec.name,
+      rows: shown.filter((u) => (u.sectorIds || []).includes(sec.id)).sort(byName),
+    }));
+    const none = shown.filter((u) => !(u.sectorIds || []).some((id) => refData.sectors.some((s) => s.id === id)));
+    if (none.length) out.push({ id: "__none", name: t("بلا قطاع", "No sector"), rows: none.sort(byName) });
+    return out.filter((g) => g.rows.length);
+  }, [shown, refData.sectors, t]);
+
   return (
     <div>
       <div className="card" style={{ marginBottom: 24 }}>
@@ -2351,61 +2367,69 @@ function UsersManager({ refData }: { refData: RefData }) {
             <th></th>
           </tr>
         </thead>
-        <tbody>
-          {shown.map((u) => (
-            <tr key={u.id}>
-              <td className="u-name">
-                {u.name}
-                {u.isLead && <span className="u-lead">{t("مدير قطاع", "Lead")}</span>}
-                {u.jobTitle && <span className="u-job">{u.jobTitle}</span>}
-              </td>
-              <td dir="ltr" style={{ textAlign: "right" }} data-l={t("اسم المستخدم", "Username")}>
-                {u.username || <span className="muted">—</span>}
-              </td>
-              <td data-l={t("الحساب", "Account")}>
-                {u.hasPassword ? (
-                  <span className="badge badge-manager">{t("مفعّل", "Active")}</span>
-                ) : (
-                  <span className="badge badge-off">{t("بانتظار التفعيل", "Awaiting setup")}</span>
-                )}
-              </td>
-              <td dir="ltr" style={{ textAlign: "right" }} data-l={t("رقم الجوال", "Phone")}>
-                {u.phone}
-              </td>
-              <td data-l={t("القطاعات", "Sectors")}>{sectorNames(u.sectorIds)}</td>
-              <td data-l={t("الصلاحيات", "Permissions")}>
-                {(u.scopes || []).length === 0 ? (
-                  <span className="muted">—</span>
-                ) : (
-                  <span className="sc-chips">
-                    {(u.scopes || []).map((k) => (
-                      <span className="sc-chip" key={k}>
-                        {scopeLabel(k)}
-                      </span>
-                    ))}
-                  </span>
-                )}
-              </td>
-              <td data-l={t("الحالة", "Status")}>
-                {u.active ? (
-                  <span className="badge badge-manager">{t("نشط", "Active")}</span>
-                ) : (
-                  <span className="badge badge-off">{t("موقوف", "Disabled")}</span>
-                )}
-              </td>
-              <td>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  <button className="btn btn-sm" onClick={() => setEditing(u)}>
-                    {t("تعديل الصلاحيات", "Edit access")}
-                  </button>
-                  <button className="btn btn-danger btn-sm" onClick={() => remove(u)}>
-                    {t("حذف", "Delete")}
-                  </button>
-                </div>
+        {groups.map((g) => (
+          <tbody key={g.id}>
+            <tr className="u-grp">
+              <td colSpan={8}>
+                {g.name}
+                <span>{g.rows.length}</span>
               </td>
             </tr>
-          ))}
-        </tbody>
+            {g.rows.map((u) => (
+              <tr key={u.id}>
+                <td className="u-name">
+                  {u.name}
+                  {u.isLead && <span className="u-lead">{t("مدير قطاع", "Lead")}</span>}
+                  {u.jobTitle && <span className="u-job">{u.jobTitle}</span>}
+                </td>
+                <td dir="ltr" style={{ textAlign: "right" }} data-l={t("اسم المستخدم", "Username")}>
+                  {u.username || <span className="muted">—</span>}
+                </td>
+                <td data-l={t("الحساب", "Account")}>
+                  {u.hasPassword ? (
+                    <span className="badge badge-manager">{t("مفعّل", "Active")}</span>
+                  ) : (
+                    <span className="badge badge-off">{t("بانتظار التفعيل", "Awaiting setup")}</span>
+                  )}
+                </td>
+                <td dir="ltr" style={{ textAlign: "right" }} data-l={t("رقم الجوال", "Phone")}>
+                  {u.phone}
+                </td>
+                <td data-l={t("القطاعات", "Sectors")}>{sectorNames(u.sectorIds)}</td>
+                <td data-l={t("الصلاحيات", "Permissions")}>
+                  {(u.scopes || []).length === 0 ? (
+                    <span className="muted">—</span>
+                  ) : (
+                    <span className="sc-chips">
+                      {(u.scopes || []).map((k) => (
+                        <span className="sc-chip" key={k}>
+                          {scopeLabel(k)}
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                </td>
+                <td data-l={t("الحالة", "Status")}>
+                  {u.active ? (
+                    <span className="badge badge-manager">{t("نشط", "Active")}</span>
+                  ) : (
+                    <span className="badge badge-off">{t("موقوف", "Disabled")}</span>
+                  )}
+                </td>
+                <td>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    <button className="btn btn-sm" onClick={() => setEditing(u)}>
+                      {t("تعديل الصلاحيات", "Edit access")}
+                    </button>
+                    <button className="btn btn-danger btn-sm" onClick={() => remove(u)}>
+                      {t("حذف", "Delete")}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        ))}
       </table>
 
       {editing && (
