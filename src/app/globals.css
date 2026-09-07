@@ -6791,7 +6791,8 @@ table.matrix thead th {
 }
 .pf .nt2 .m {
   font-size: 10px;
-  color: #a99a72;
+  /* كان #a99a72 — تباينه 2.7 على الورق الكريمي، أقلّ من الحدّ المقروء */
+  color: #7d7049;
   margin-top: 5px;
 }
 
@@ -9372,7 +9373,7 @@ table.matrix thead th {
   padding: 8px 10px 10px; font-size: 12px; color: #4a3f1c;
 }
 .stk-h { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
-.stk-h.grab { cursor: grab; }
+.stk-h.grab { cursor: grab; touch-action: none; }
 .stk-h.grab:active { cursor: grabbing; }
 .stk-h b { font-size: 11.5px; color: #6b5a1e; }
 .stk-h span { font-size: 10px; color: #9c8b52; }
@@ -9608,3 +9609,75 @@ table.matrix thead th {
 @media (prefers-reduced-motion: reduce) {
   .mic-b.on { animation: none; }
 }
+
+/* ============================================================
+   الوضع الداكن — الجزر الفاتحة
+   ------------------------------------------------------------
+   بعض المكوّنات وُلدت بخلفية فاتحة مكتوبة بالرقم (ورقة كريمية ·
+   حقل أبيض · تلوين أخضر خفيف)، ونصُّها يتبع متغيّر الثيم. فحين
+   يقلب الوضع الداكن المتغيّر إلى نصٍّ فاتح يصير الفاتح على فاتح
+   ولا يُقرأ.
+
+   العلاج نوعان:
+   · ما صُمِّم ورقةً كريمية يبقى ورقةً ويُثبَّت حبره داكناً.
+   · ما كان حقلاً أو سطحاً محايداً يأخذ سطح الثيم، فيعمل نصُّه
+     المتغيّر كما يعمل في بقية المنصة.
+   ============================================================ */
+
+/* ---- الحقول: سطح الثيم بدل الأبيض ---- */
+:root[data-theme="dark"] .en-name input,
+:root[data-theme="dark"] .en-name select,
+:root[data-theme="dark"] .en-tbl input,
+:root[data-theme="dark"] .en-tbl select,
+:root[data-theme="dark"] .en-tbl input:focus,
+:root[data-theme="dark"] .en-tbl select:focus,
+:root[data-theme="dark"] .sg-form input,
+:root[data-theme="dark"] .sg-form select,
+:root[data-theme="dark"] .au-bar select,
+:root[data-theme="dark"] .wc-wb textarea,
+:root[data-theme="dark"] .wc-af textarea {
+  background: var(--bg2);
+  border-color: var(--border);
+  color: var(--text);
+}
+:root[data-theme="dark"] .dt-tgt.ok input { background: #12352a; color: var(--text); }
+:root[data-theme="dark"] .dt-tgt.err input { background: #3a1d1d; color: var(--text); }
+
+/* ---- الأسطح الخضراء الخفيفة ---- */
+:root[data-theme="dark"] .sx-grp,
+:root[data-theme="dark"] .sx-sess .sx-side,
+:root[data-theme="dark"] .sx-card.wide,
+:root[data-theme="dark"] .sg-q,
+:root[data-theme="dark"] .en-t,
+:root[data-theme="dark"] .au-sum button,
+:root[data-theme="dark"] .pm-seg button,
+:root[data-theme="dark"] .users-tbl tr.u-grp,
+:root[data-theme="dark"] .users-tbl tr.u-grp span,
+:root[data-theme="dark"] .wk-tune,
+:root[data-theme="dark"] .undo-bar .u,
+:root[data-theme="dark"] .stk-pen,
+:root[data-theme="dark"] .thm-sw i {
+  background: var(--panel-2);
+  color: var(--text);
+}
+:root[data-theme="dark"] .sx-gap.wait { background: var(--soft2); color: var(--ink-2); }
+:root[data-theme="dark"] .en-h:hover,
+:root[data-theme="dark"] .ai-open:hover,
+:root[data-theme="dark"] .users-tbl tr.u-grp button:hover { background: var(--panel-2); }
+:root[data-theme="dark"] .sx-dots i,
+:root[data-theme="dark"] .sx-dots i + i::before { background: var(--border); }
+:root[data-theme="dark"] .undo-b:hover { background: var(--panel-2); color: #e6c26a; }
+
+/* ---- الورق الكريمي: يبقى ورقاً، ويثبت حبره ---- */
+:root[data-theme="dark"] .pf .nt2 .t,
+:root[data-theme="dark"] .pf .nt-hint,
+:root[data-theme="dark"] .pf .nt-hint b { color: #33291a; }
+:root[data-theme="dark"] .stk-card,
+:root[data-theme="dark"] .stk-card p,
+:root[data-theme="dark"] .stk-card textarea { color: #4a3f1c; }
+
+/* ---- شارات ملوّنة على خلفية فاتحة ثابتة ---- */
+:root[data-theme="dark"] .cr-tbl tr.cr-near td { color: #5a4413; }
+:root[data-theme="dark"] .nb-due .tag,
+:root[data-theme="dark"] .nb-item .s .due { color: #3b2f73; }
+:root[data-theme="dark"] .sg.on { color: #14663f; }
