@@ -41,20 +41,44 @@ revoke insert, update, delete on public.perf_notices from authenticated;
 -- ------------------------------------------------------------
 --  ٢) أول إعلان: القلم والملاحظات اللاصقة
 -- ------------------------------------------------------------
-insert into public.perf_notices (id, title, body, audience) values (
-  'n-sticky',
-  'جديد: القلم — ملاحظة لاصقة على أي مكان في الصفحة',
-  'في أسفل يمين كل صفحة زرّ ✎. اضغطه ثم اضغط المكان الذي تريد الملاحظة عنده، '
-  || 'فتُفتح ورقة صفراء هناك تكتب فيها ملاحظتك أو سؤالك.'
-  || E'\n' ||
-  'تختار مدّة بقائها: ٣ أيام · أسبوع · شهر · بلا مدة — وتختفي بانتهائها من نفسها.'
-  || E'\n' ||
-  'الورقة تُطوى إلى دبّوس صغير بزرّ (−) حتى لا تحجب ما تحتها، وتُسحب من رأسها إلى مكان آخر.'
-  || E'\n' ||
-  'وتصل من يفتح تلك الصفحة في «آخر التحديثات»، ومن يحرّرها يغلقها بـ«تمّت المعالجة» بعد الردّ.',
-  array['aalhizami','oalateeq','sultana']
-) on conflict (id) do update
-  set title = excluded.title, body = excluded.body, audience = excluded.audience;
+/* الجمهور يُشتقّ من الأسماء لا من أسماء الدخول: أسماء الدخول
+   تتغيّر، والخطأ فيها لا يُرى — الإعلان ببساطة لا يصل أحداً.
+   وإن لم يُعثر على أحدهم توقّف بخطأ بدل أن يُنشر ناقصاً. */
+do $$
+declare v_aud text[]; v_want text[] := array[
+  'عبدالله الحزامي', 'عمر العتيق', 'سلطانه العرجاني'];
+declare v_missing text;
+begin
+  select array_agg(u.username) into v_aud
+    from public.perf_users u
+   where u.active
+     and public.perf_norm_name(u.display_name) = any(
+           select public.perf_norm_name(n) from unnest(v_want) n);
+
+  select string_agg(n, ' · ') into v_missing
+    from unnest(v_want) n
+   where not exists (select 1 from public.perf_users u
+                      where u.active
+                        and public.perf_norm_name(u.display_name) = public.perf_norm_name(n));
+  if v_missing is not null then
+    raise exception 'لم يُعثر على حساب نشط لـ: %  — صحّح الاسم في القائمة أعلاه ثم أعد التشغيل', v_missing;
+  end if;
+
+  insert into public.perf_notices (id, title, body, audience) values (
+    'n-sticky',
+    'جديد: القلم — ملاحظة لاصقة على أي مكان في الصفحة',
+    'في أسفل يمين كل صفحة زرّ ✎. اضغطه ثم اضغط المكان الذي تريد الملاحظة عنده، '
+    || 'فتُفتح ورقة صفراء هناك تكتب فيها ملاحظتك أو سؤالك.'
+    || E'\n' ||
+    'تختار مدّة بقائها: ٣ أيام · أسبوع · شهر · بلا مدة — وتختفي بانتهائها من نفسها.'
+    || E'\n' ||
+    'الورقة تُطوى إلى دبّوس صغير بزرّ (−) حتى لا تحجب ما تحتها، وتُسحب من رأسها إلى مكان آخر.'
+    || E'\n' ||
+    'وتصل من يفتح تلك الصفحة في «آخر التحديثات»، ومن يحرّرها يغلقها بـ«تمّت المعالجة» بعد الردّ.',
+    v_aud
+  ) on conflict (id) do update
+    set title = excluded.title, body = excluded.body, audience = excluded.audience;
+end $$;
 
 -- ------------------------------------------------------------
 --  ٣) المراجعة
