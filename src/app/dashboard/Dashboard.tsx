@@ -11,6 +11,7 @@ import Changes from "./Changes";
 import Backup from "./Backup";
 import Tools from "./Tools";
 import Portfolio from "./Portfolio";
+import Audit from "./Audit";
 import Assistant, { PinnedBar, usePins } from "./Assistant";
 import Notes from "./Notes";
 import Structure from "./Structure";
@@ -332,6 +333,7 @@ export default function Dashboard({ me }: { me: Me }) {
     tasks: ["المهام", "Tasks"],
     mypage: ["محفظتي", "My portfolio"],
     report: ["الإنجاز الأسبوعي", "Weekly Achievement"],
+    audit: ["سجل النشاط", "Activity log"],
     structure: ["الهيكل التنظيمي", "Org chart"],
     users: ["المستخدمون والصلاحيات", "Users & Roles"],
     sessions: SECTION_TITLE.sessions,
@@ -447,6 +449,7 @@ export default function Dashboard({ me }: { me: Me }) {
             {/* «محفظتي» لها بندها في القائمة أعلاه — تكرارها هنا
                 كان يجعل الصفحة الواحدة تظهر مرتين */}
             {can("users") && <SubItem id="users" label={["المستخدمون والصلاحيات", "Users & Roles"]} />}
+            {can("audit") && <SubItem id="audit" label={["سجل النشاط", "Activity log"]} />}
             {can("structure") && <SubItem id="structure" label={["الهيكل التنظيمي", "Org chart"]} />}
             <button className="sub-item" onClick={() => setBackupOpen(true)}>
               {t("نسخة احتياطية من البيانات", "Download backup")}
@@ -594,6 +597,7 @@ export default function Dashboard({ me }: { me: Me }) {
                 />
               )}
               {tab === "users" && can("users") && <UsersManager refData={refData} />}
+              {tab === "audit" && can("audit") && <Audit t={t} />}
               {SECTION_NAV.map(([key]) =>
                 tab === key && can(key) ? (
                   <SectionPage key={key} section={key} canEdit={can(`${key}:edit` as Scope)} meId={me.id} t={t} />
