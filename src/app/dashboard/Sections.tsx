@@ -5,6 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { writeXlsx, readXlsxSheets } from "@/lib/sheet";
 import { asset } from "@/lib/base";
+import { IconGear } from "./icons";
+import SectionSettings from "./SectionSettings";
 
 /* ============================================================
    الأقسام الخمسة المتفرّعة من المؤشرات التفصيلية:
@@ -2345,14 +2347,56 @@ export function Outputs({ t }: { t: T }) {
 /* ============================================================
    الصفحات الكاملة
    ============================================================ */
-export function SectionPage({ section, canEdit, t }: { section: SectionKey; canEdit: boolean; t: T }) {
+export function SectionPage({
+  section,
+  canEdit,
+  meId,
+  t,
+}: {
+  section: SectionKey;
+  canEdit: boolean;
+  /** لاستثناء صاحب الصفحة من قائمة من يُفوَّض */
+  meId?: string;
+  t: T;
+}) {
   const [editing, setEditing] = useState<Item | "new" | null>(null);
+  /* ⚙️ التفويض أثناء الإجازة — يظهر لمن يحرّر القسم، والقاعدة
+     تمنع مَن فُوِّض من التفويض بدوره */
+  const [gear, setGear] = useState(false);
   const [nonce, setNonce] = useState(0);
   /* معرّفات ما هو محمَّل فعلاً — ليعرف زر التحميل ما ينقص */
   const { items } = useItems(section, section !== "outputs");
   const have = useMemo(() => new Set(items.map((x) => x.id)), [items]);
 
-  if (section === "outputs") return <Outputs t={t} />;
+  const gearBtn = canEdit ? (
+    <button
+      className="sx-gear"
+      onClick={() => setGear(true)}
+      title={t("إعدادات القسم — تفويض أثناء الإجازة", "Section settings")}
+      aria-label={t("إعدادات القسم", "Section settings")}
+    >
+      <IconGear />
+    </button>
+  ) : null;
+
+  const gearModal = gear ? (
+    <SectionSettings
+      section={section}
+      title={t(SECTION_TITLE[section][0], SECTION_TITLE[section][1])}
+      meId={meId || ""}
+      onClose={() => setGear(false)}
+      t={t}
+    />
+  ) : null;
+
+  if (section === "outputs")
+    return (
+      <div>
+        {gearBtn && <div className="sx-tools">{gearBtn}</div>}
+        <Outputs t={t} />
+        {gearModal}
+      </div>
+    );
 
   return (
     <div key={nonce}>
@@ -2369,6 +2413,7 @@ export function SectionPage({ section, canEdit, t }: { section: SectionKey; canE
               onDone={() => setNonce((n) => n + 1)}
             />
           )}
+          {gearBtn}
         </div>
       )}
       {section === "sessions" && <SessionsPage t={t} />}
@@ -2377,6 +2422,8 @@ export function SectionPage({ section, canEdit, t }: { section: SectionKey; canE
       {section === "cx" && <CxPage t={t} canEdit={canEdit} />}
       {section === "projects" && <Projects t={t} canEdit={canEdit} />}
 
+
+      {gearModal}
 
       {editing && (
         <ItemForm

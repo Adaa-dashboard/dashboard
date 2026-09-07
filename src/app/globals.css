@@ -9154,3 +9154,60 @@ table.matrix thead th {
   color: #1e7a48; cursor: pointer;
 }
 .ai-open:hover { background: #f1f8f4; border-color: #1e7a48; }
+
+/* ============================================================
+   إعدادات القسم — التفويض أثناء الإجازة
+   ============================================================ */
+.sx-gear {
+  margin-inline-start: auto; display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border: 1px solid var(--line, #e6edea); border-radius: 9px;
+  background: #fff; color: #6b7c77; cursor: pointer;
+}
+.sx-gear:hover { color: #1e7a48; border-color: #1e7a48; }
+.sx-gear svg { width: 16px; height: 16px; }
+
+.modal.sg { max-width: 760px; }
+.sg-note { font-size: 12px; color: #7b8a86; line-height: 1.9; margin: 0 0 14px; }
+.sg-form { display: flex; flex-wrap: wrap; gap: 12px; }
+.sg-form label { display: block; font-size: 10.5px; color: #7b8a86; }
+.sg-form label.grow { flex: 1; min-width: 180px; }
+.sg-form select, .sg-form input {
+  display: block; margin-top: 5px; width: 100%; min-width: 150px;
+  border: 1px solid #e2ebe8; border-radius: 8px; padding: 8px 10px;
+  font: inherit; font-size: 12px; background: #fff; color: #3a4a46;
+}
+.sg-quick { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.sg-q {
+  font-size: 10.5px; color: #6b7c77; background: #f4f8f6; border: 1px solid #e6edea;
+  border-radius: 20px; padding: 5px 12px; cursor: pointer;
+}
+.sg-q:hover { color: #1e7a48; border-color: #cfe0d8; }
+.sg-add { margin-inline-start: auto; }
+
+.sg-h {
+  font-family: var(--kufi, "Noto Kufi Arabic", sans-serif); font-size: 13px;
+  color: #0d3d22; margin: 22px 0 10px;
+}
+.sg-tbl { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+.sg-tbl th {
+  text-align: start; font-size: 10px; font-weight: 600; color: #7b8a86;
+  padding: 0 8px 8px; border-bottom: 1px solid #eef3f1; white-space: nowrap;
+}
+.sg-tbl td { padding: 10px 8px; border-bottom: 1px solid #f5f8f7; color: #3a4a46; }
+.sg-tbl tr.off td { opacity: .55; }
+.sg-tbl td b { color: #0d3d22; }
+.sg-x {
+  font-size: 9.5px; color: #b06a3a; background: #fdf3e8;
+  border-radius: 5px; padding: 2px 7px; margin-inline-start: 7px;
+}
+.sg-m { color: #7b8a86; }
+.sg-del {
+  background: none; border: 1px solid #e6edea; border-radius: 7px;
+  padding: 4px 11px; font: inherit; font-size: 10.5px; color: #7b8a86; cursor: pointer;
+}
+.sg-del:hover { color: #d34a4a; border-color: #ecc9c9; }
+
+@media (max-width: 640px) {
+  .sg-form label { flex: 1 1 100%; }
+  .sg-tbl { display: block; overflow-x: auto; }
+}

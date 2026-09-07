@@ -804,6 +804,68 @@ export async function apiFetch(path: string, init: Init = {}) {
     }
 
     /* ---------------- الإنجاز الأسبوعي ---------------- */
+    /* ---------------- تفويض قسم أثناء الإجازة ----------------
+       المنح لصاحب القسم وحده — والحارس RLS ودوال القاعدة. */
+    if (p === "/api/grants" && method === "GET") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const section = q.get("section") || "";
+      if (!section) return err("لا يوجد قسم", 400);
+      const [rows, mine] = await Promise.all([
+        s.rpc("perf_grants_of", { p_section: section }),
+        s.rpc("perf_can_delegate", { p_section: section }),
+      ]);
+      if (rows.error) return err(rows.error.message, 403);
+      return ok({
+        grants: (rows.data || []).map((r: Record<string, unknown>) => ({
+          granteeId: String(r.grantee_id),
+          name: r.name,
+          canEdit: !!r.can_edit,
+          grantedBy: r.granted_by ?? "",
+          grantedAt: r.granted_at,
+          expiresAt: r.expires_at ?? null,
+          note: r.note ?? "",
+          active: !!r.active,
+        })),
+        canDelegate: mine.data === true,
+      });
+    }
+    if (p === "/api/grants" && (method === "POST" || method === "PUT")) {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const section = str(body.section);
+      const granteeId = str(body.granteeId);
+      if (!section || !granteeId) return err("بيانات ناقصة", 400);
+      const exp = str(body.expiresAt);
+      const { error } = await s.from("perf_section_grants").upsert(
+        {
+          section,
+          grantee_id: Number(granteeId),
+          can_edit: body.canEdit === true,
+          granted_by: me.name || me.username || "",
+          expires_at: /^\d{4}-\d{2}-\d{2}$/.test(exp) ? exp : null,
+          note: str(body.note),
+        },
+        { onConflict: "section,grantee_id" },
+      );
+      if (error) return err(error.message, 403);
+      return ok({ ok: true });
+    }
+    if (p === "/api/grants" && method === "DELETE") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const section = q.get("section") || "";
+      const granteeId = q.get("granteeId") || "";
+      if (!section || !granteeId) return err("بيانات ناقصة", 400);
+      const { error } = await s
+        .from("perf_section_grants")
+        .delete()
+        .eq("section", section)
+        .eq("grantee_id", Number(granteeId));
+      if (error) return err(error.message, 403);
+      return ok({ ok: true });
+    }
+
     /* ---------------- تخصيص التقرير الأسبوعي ----------------
        مفتاحان في perf_settings: الافتراضي واستثناء أسبوع بعينه.
        الكتابة يحرسها RLS (صلاحية weekly:edit) لا فحصٌ هنا. */
