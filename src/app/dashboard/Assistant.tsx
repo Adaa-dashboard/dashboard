@@ -128,13 +128,27 @@ type Ctx = {
    «عطني الزبدة من المخرجات الوطنية» وما شابهها. الملخّص يُبنى
    من نفس البيانات المعروضة في القسم، فلا يختلف رقمٌ عمّا تراه. */
 type SecKey = "sessions" | "natstrat" | "inststrat" | "outputs" | "cx" | "projects";
+/* المطابقة على **جذر الكلمة** لا على العبارة كاملة: السائل يكتب
+   «استراتيجية مؤسسية» و«الاستراتيجيات المؤسسية» و«المؤسسية» —
+   والمطابقة الحرفية كانت تخطئ الأولى فيقع السؤال في فرع آخر.
+   nrm توحّد الهمزات والتاء المربوطة وتُسقط «ال» التعريف. */
+const nrm = (s: string) =>
+  s
+    .replace(/[أإآٱ]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/[\u064B-\u0652\u0640]/g, "")
+    .replace(/(^|\s)ال/g, "$1");
+
+/* الترتيب مقصود: «المخرجات الوطنية» تحوي «وطني»، فتُفحص المخرجات
+   قبلها وإلا خطفها فرع الاستراتيجيات الوطنية */
 const SEC_WORDS: [SecKey, string[]][] = [
-  ["sessions", ["جلسات مراجعة", "جلسات المراجعة", "جلسة مراجعة", "الجلسات"]],
-  ["natstrat", ["الاستراتيجيات الوطنية", "استراتيجيات وطنية", "الوطنية"]],
-  ["inststrat", ["الاستراتيجيات المؤسسية", "استراتيجيات مؤسسية", "المؤسسية"]],
-  ["outputs", ["المخرجات الوطنية", "مخرجات وطنية", "المخرجات"]],
-  ["cx", ["تجربة المستفيد", "تجربه المستفيد", "قياس تجربة", "المستفيدين", "الخدمات الحكومية", "BEX", "bex"]],
-  ["projects", ["المشاريع الاستراتيجية", "مشاريع استراتيجية", "المشاريع"]],
+  ["cx", ["تجربه المستفيد", "قياس تجربه", "المستفيدين", "مستفيد", "bex"]],
+  ["sessions", ["جلسات مراجعه", "جلسه مراجعه", "مراجعه الاداء", "مراجعه اداء"]],
+  ["outputs", ["مخرجات", "مخرج وطني"]],
+  ["inststrat", ["مؤسسي", "تفعيل قياس", "مستهدف تفعيل", "قياسها", "تفعيلها"]],
+  ["natstrat", ["وطني"]],
+  ["projects", ["مشاريع استراتيجيه", "مشروع استراتيجي", "مشاريع", "مشروع"]],
 ];
 const SEC_NAME: Record<SecKey, string> = {
   sessions: "جلسات مراجعة الأداء",
@@ -148,7 +162,8 @@ const NAT_STEPS = ["طور الإعداد/التحديث", "قيد المراج�
 const INST_STAGES = ["وصلت المركز", "قيد المراجعة", "معالجة الملاحظات", "اعتُمدت", "فُعِّل القياس"];
 
 function whichSection(q: string): SecKey | null {
-  for (const [k, words] of SEC_WORDS) if (has(q, ...words)) return k;
+  const n = nrm(q);
+  for (const [k, words] of SEC_WORDS) if (words.some((w) => n.includes(nrm(w)))) return k;
   return null;
 }
 
@@ -310,13 +325,14 @@ function sectionBrief(k: SecKey, items: Rec[]): Ans {
    ---------------------------------------------------- */
 
 /** الربع المذكور في السؤال — رقماً من 1 إلى 4، أو 0 */
-function askedQuarter(q: string): number {
-  const m = q.match(/\bQ\s*([1-4])\b/i);
+function askedQuarter(q0: string): number {
+  const m = q0.match(/\bQ\s*([1-4])\b/i);
   if (m) return Number(m[1]);
-  if (has(q, "الربع الأول", "الربع الاول", "ربع أول", "ربع اول")) return 1;
-  if (has(q, "الربع الثاني", "ربع ثاني")) return 2;
-  if (has(q, "الربع الثالث", "ربع ثالث")) return 3;
-  if (has(q, "الربع الرابع", "ربع رابع")) return 4;
+  const q = nrm(q0);
+  if (has(q, "ربع اول")) return 1;
+  if (has(q, "ربع ثاني")) return 2;
+  if (has(q, "ربع ثالث")) return 3;
+  if (has(q, "ربع رابع")) return 4;
   return 0;
 }
 
@@ -344,8 +360,11 @@ function countAns(
   };
 }
 
-function secQuery(k: SecKey, items: Rec[], q: string): Ans | null {
+function secQuery(k: SecKey, items: Rec[], q0: string): Ans | null {
   if (!items.length) return null;
+  /* الموحَّد يُطابق «مفعّل» و«مفعل» و«الوثائق» و«وثائق» سواء */
+  const q = nrm(q0);
+  const has = (s: string, ...w: string[]) => w.some((x) => s.includes(nrm(x)));
   const d = (x: Rec) => (x.data || {}) as Rec;
   const nm = (x: Rec) => txt(d(x).owner) || txt(d(x).name) || txt(d(x).entity) || "بلا اسم";
   const qn = askedQuarter(q);
@@ -385,7 +404,7 @@ function secQuery(k: SecKey, items: Rec[], q: string): Ans | null {
       const rows = pick((x) => txt(d(x).rep) === "تمت تسمية ممثل");
       return countAns("جهات سمّت ممثلها", "building", rows.length, items.length, "جهة", rows.map(nm));
     }
-    const ph = q.match(/phase\s*([12])/i);
+    const ph = q0.match(/phase\s*([12])/i);
     if (ph) {
       const rows = pick((x) => txt(d(x).phase) === `Phase ${ph[1]}`);
       return countAns(`جهات Phase ${ph[1]}`, "building", rows.length, items.length, "جهة", rows.map(nm));
