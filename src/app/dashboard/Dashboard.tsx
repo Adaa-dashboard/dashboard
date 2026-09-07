@@ -10,6 +10,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import Activity, { type Item as ActivityItem } from "./Activity";
 import Changes from "./Changes";
 import Backup from "./Backup";
+import Mic from "./Mic";
 import Tools from "./Tools";
 import Portfolio from "./Portfolio";
 import Audit from "./Audit";
@@ -663,6 +664,9 @@ export default function Dashboard({ me }: { me: Me }) {
       </div>
 
       <Assistant me={me} t={t} onPin={pins.add} onOpenTab={setTab} />
+
+      {/* الإملاء الصوتي: زرّ واحد يتبع الحقل المركَّز عليه في كل الصفحات */}
+      <Mic t={t} />
 
       {notesOpen && <Notes t={t} onClose={() => setNotesOpen(false)} />}
 

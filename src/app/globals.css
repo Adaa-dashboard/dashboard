@@ -957,11 +957,14 @@ table.matrix thead th {
   .card { padding: 14px; border-radius: 14px; }
   .section-title { font-size: 15px; }
 
-  /* المدخلات: منع تكبير iOS + مساحة لمس مريحة */
-  input, select, button, textarea { font-size: 16px !important; }
+  /* المدخلات: منع تكبير iOS + مساحة لمس مريحة
+     الحقول وحدها تُكبَّر: iOS يقرّب الصفحة عند التركيز في حقل أصغر
+     من 16px. الأزرار لا تُقرِّب شيئاً، وتكبيرها بـ !important كان
+     يفرض 16px على الشريط السفلي والشرائح فتتزاحم وتُقتطع. */
+  input, select, textarea { font-size: 16px !important; }
   input, select { min-height: 44px; }
   .btn { min-height: 44px; }
-  .btn-sm { min-height: 38px; }
+  .btn-sm { min-height: 40px; }
 
   /* بطاقات KPI */
   .kpis { grid-template-columns: repeat(2, 1fr); gap: 10px; }
@@ -2734,15 +2737,16 @@ table.matrix thead th {
     background: transparent;
     border: none;
     border-radius: 16px;
-    padding: 9px 1px;
+    padding: 7px 2px;
+    min-height: 54px;
     color: rgba(255, 255, 255, 0.82);
     font: inherit;
-    font-size: 9px;
+    font-size: 10.5px;
     font-weight: 600;
     cursor: pointer;
   }
   .tab-btn .ic {
-    font-size: 17px;
+    font-size: 19px;
     line-height: 1;
   }
   .tab-btn .lb {
@@ -9472,4 +9476,135 @@ table.matrix thead th {
 .dev-i p {
   margin: 0 0 10px; padding-inline-start: 14px;
   font-size: 11.5px; color: #4a5a56; line-height: 2; white-space: pre-line;
+}
+
+/* ============================================================
+   الجوال — طبقة موحّدة للواجهة الحالية
+   ------------------------------------------------------------
+   الكتلة القديمة (max-width:768px) كُتبت لواجهة سابقة: topbar ·
+   tabs · matrix · entry-cards — وأكثرها لم يعد له وجود. هذه
+   الكتلة تخاطب المكوّنات القائمة: الشريط السفلي · البطاقات ·
+   الجداول · النوافذ · الحقول.
+   الهدف: يُقرأ بلا تقريب، ويُلمس بلا تصويب، ويُعدَّل بيدٍ واحدة.
+   ============================================================ */
+@media (max-width: 768px) {
+  /* الصفحة لا تتحرك أفقياً مهما اتّسع جدول بداخلها.
+     clip لا hidden: الأخير يكسر position:sticky في الأبناء */
+  body { overflow-x: clip; }
+
+  /* ---- الرأس ---- */
+  .main-area { padding: 12px 12px calc(84px + env(safe-area-inset-bottom)); }
+  .page-head { gap: 9px; padding-bottom: 10px; margin-bottom: 14px; }
+  .page-head h1 { font-size: 16.5px; line-height: 1.35; }
+  .page-head .hlogo { height: 28px; }
+  .page-head .hsep { height: 26px; }
+
+  .tab-btn { gap: 4px; }
+
+  /* ---- البطاقات ---- */
+  .card { padding: 14px; border-radius: 14px; }
+  .card h3 { font-size: 15px; }
+  .widget { padding: 14px; }
+
+  /* ---- شريط الأدوات: صفٌّ يلتفّ، لا عمودٌ كلُّ زرٍّ فيه بعرض الشاشة ---- */
+  .toolbar { flex-direction: row; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .toolbar > .chips { flex: 1 1 100%; }
+  .toolbar select { width: auto; min-width: 0; flex: 1 1 auto; }
+  .chip { font-size: 13px; padding: 9px 14px; min-height: 40px; border-radius: 11px; }
+
+  /* ---- الجداول: تمرير أفقي بدل سحق الأعمدة ----
+     بلا هذا يقع كل عمود في سطر فتصير الصفوف كتلة نصٍّ لا تُقرأ.
+     display:block يجعل الجدول صندوقاً يمرَّر، وmin-width يمنع
+     الأعمدة من الانضغاط. */
+  /* الجداول التي لها معالجة بطاقات خاصة (المستخدمون · الأسبوعي ·
+     التفاصيل · طلبات التغيير) مستثناة — لها قواعدها أعلاه */
+  .main-area table:not(.users-tbl):not(.wk-tbl):not(.dt-tbl):not(.cr-tbl) {
+    display: block; overflow-x: auto; -webkit-overflow-scrolling: touch;
+  }
+  .main-area table:not(.users-tbl):not(.wk-tbl):not(.dt-tbl):not(.cr-tbl) > thead,
+  .main-area table:not(.users-tbl):not(.wk-tbl):not(.dt-tbl):not(.cr-tbl) > tbody {
+    display: table; width: 100%; min-width: 560px;
+  }
+  .main-area table th,
+  .main-area table td { padding: 9px 10px; font-size: 12.5px; }
+  .main-area table:not(.users-tbl):not(.wk-tbl):not(.dt-tbl):not(.cr-tbl) th { white-space: nowrap; }
+
+  /* ---- النوافذ: ورقة من الأسفل، وزرّ الحفظ ثابت لا يهرب بالتمرير ---- */
+  .modal-overlay { padding: 0; align-items: flex-end; }
+  .modal {
+    width: 100%; max-width: 100%;
+    max-height: 92vh; max-height: 92dvh;
+    border-radius: 20px 20px 0 0;
+    padding: 14px 14px calc(10px + env(safe-area-inset-bottom));
+  }
+  /* التخطيط العمودي وتثبيت الذيل للنوافذ ذات الجسم المستقل وحدها.
+     غيرها يبقى صندوقاً يمرَّر كما هو، فلا يتغيّر ترتيب محتواه. */
+  .modal:has(> .m-b) { display: flex; flex-direction: column; }
+  .modal .m-h { margin-bottom: 10px; }
+  .modal .m-h h3 { font-size: 15px; }
+  .modal .mx { font-size: 22px; padding: 6px 10px; margin: -6px -10px -6px 0; }
+  .modal > .m-b { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+  .modal:has(> .m-b) > .m-f {
+    position: sticky; bottom: 0; z-index: 2;
+    background: var(--panel);
+    margin: 10px -14px calc(-10px - env(safe-area-inset-bottom));
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border);
+  }
+  .modal .m-f .btn { flex: 1 1 0; justify-content: center; }
+
+  /* ---- بنود القوائم: كلٌّ منها هدف لمس مريح ---- */
+  .sheet-item, .sub-item { min-height: 48px; font-size: 14px; }
+
+  /* ---- الحقول داخل الصفوف الثنائية ---- */
+  .m2 { grid-template-columns: 1fr; gap: 0; }
+  label { font-size: 13.5px; margin-bottom: 5px; }
+}
+
+/* ============ زرّ الإملاء الصوتي ============
+   يطفو فوق الحقل المركَّز عليه — position:fixed لأن الحقل قد يكون
+   داخل نافذة أو حاوية تمرير، فالإحداثيات من الشاشة لا من الأب */
+.mic-b {
+  position: fixed;
+  z-index: 80;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--muted);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 59, 51, 0.14);
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.mic-b:hover { color: var(--gt-800); border-color: var(--g-400); }
+.mic-b.on {
+  background: #b13636;
+  border-color: #b13636;
+  color: #fff;
+  animation: mic-pulse 1.4s ease-in-out infinite;
+}
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(177, 54, 54, 0.45); }
+  50% { box-shadow: 0 0 0 7px rgba(177, 54, 54, 0); }
+}
+.mic-tip {
+  position: fixed;
+  z-index: 80;
+  transform: translateX(-4px);
+  background: var(--gt-900, #0d3d22);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 5px 9px;
+  border-radius: 8px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mic-b.on { animation: none; }
 }
