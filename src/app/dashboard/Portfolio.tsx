@@ -9,6 +9,7 @@ import { Cal } from "./Tools";
 import { EMPTY_NOTES, firstLine, preview, whenAr, type NotesData } from "./Notes";
 import { PIcon, IconPicker } from "./pickicons";
 import { IconGear } from "./icons";
+import MyEntities, { contribsOf, sumOf } from "./Entities";
 
 /* ============================================================
    محفظتي — الصفحة الشخصية لكل موظف.
@@ -89,7 +90,7 @@ export const WIDGETS: WDef[] = [
   { key: "notes", label: "ملاحظاتي", group: "top", icon: "note", color: "#c9a020" },
   { key: "tasks", label: "مهامي", group: "top", icon: "clipboard", color: "#016b5f" },
   { key: "projects", label: "المشاريع الاستراتيجية", group: "projects", icon: "rocket", color: "#0f8a8a", section: "projects" },
-  { key: "strategies", label: "البرامج والاستراتيجيات", group: "ops", icon: "map", color: "#016b5f", section: "entities" },
+  { key: "strategies", label: "جهاتي ومساهماتها", group: "ops", icon: "map", color: "#016b5f", section: "entities" },
   { key: "quarterly", label: "التقارير الربعية", group: "ops", icon: "calendar-check", color: "#1a9d5c", section: "entities" },
   { key: "contrib", label: "المساهمات في الخطة التشغيلية", group: "ops", icon: "puzzle", color: "#7a5cd1", section: "contrib" },
   { key: "changes", label: "طلبات التغيير", group: "ops", icon: "exchange", color: "#c9a020", section: "changes" },
@@ -1502,12 +1503,14 @@ export default function Portfolio({
   function stat(k: WKey): { count: number; pct: number; sub: string; warn?: string } {
     const rows = dataOf(k);
     switch (k) {
-      case "strategies":
+      case "strategies": {
+        const tot = sumOf(entities.flatMap((r) => contribsOf(r.data)));
         return {
           count: entities.length,
           pct: entities.length ? 100 : 0,
-          sub: `${entities.length} ${t("جهة", "entities")}`,
+          sub: `${tot.kpis} ${t("مؤشراً", "KPIs")} · ${tot.goals} ${t("هدفاً", "goals")} · ${tot.inits} ${t("مبادرة", "initiatives")}`,
         };
+      }
       case "quarterly": {
         const total = entities.length * 4 || 1;
         const done = entities.reduce(
@@ -1569,6 +1572,19 @@ export default function Portfolio({
             q[i] = q[i] ? 0 : 1;
             void pf.save("entities", r.id, { ...r.data, q }, r.ord);
           }}
+        />
+      );
+    if (k === "strategies")
+      return (
+        <MyEntities
+          rows={entities}
+          t={t}
+          onSave={(id, data) => void pf.save("entities", id, data, entities.length + 1)}
+          onDelete={(id) => {
+            if (confirm(t("حذف الجهة وكل مساهماتها؟", "Delete the entity and its contributions?")))
+              void pf.remove("entities", id);
+          }}
+          onAdd={(data) => void pf.save("entities", "ent-" + newId(), data, entities.length + 1)}
         />
       );
     if (k === "contrib" && prefs.mode === "tiles" && open !== k) return <Contrib rows={contrib} t={t} />;
