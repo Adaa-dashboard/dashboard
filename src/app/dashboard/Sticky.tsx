@@ -96,11 +96,14 @@ function Note({
     const host = (e.currentTarget as HTMLElement).closest(".stk-layer") as HTMLElement | null;
     if (!host) return;
     const r = host.getBoundingClientRect();
-    drag.current = { dx: e.clientX - (r.left + (n.x / 100) * r.width), dy: e.clientY - (r.top + (n.y / 100) * r.height) };
+    drag.current = {
+      dx: e.clientX - (r.left + (n.x / 100) * r.width),
+      dy: e.clientY - (r.top + (n.y / 100) * r.height),
+    };
     const move = (ev: MouseEvent) => {
       const x = ((ev.clientX - (drag.current?.dx || 0) - r.left) / r.width) * 100;
       const y = ((ev.clientY - (drag.current?.dy || 0) - r.top) / r.height) * 100;
-      onMove(n.id, Math.max(1, Math.min(97, x)), Math.max(1, Math.min(99, y)));
+      onMove(n.id, Math.max(0, Math.min(78, x)), Math.max(0, Math.min(96, y)));
     };
     const up = () => {
       drag.current = null;
@@ -113,7 +116,7 @@ function Note({
   }
 
   return (
-    <div className={`stk ${open ? "open" : ""}`} style={{ insetInlineStart: `${n.x}%`, top: `${n.y}%` }}>
+    <div className={`stk ${open ? "open" : ""}`} style={{ left: `${n.x}%`, top: `${n.y}%` }}>
       {!open ? (
         <button className="stk-pin" onClick={() => setOpen(true)} title={n.body.slice(0, 80)}>
           📌
@@ -224,8 +227,10 @@ export default function StickyLayer({
   async function place(e: React.MouseEvent) {
     if (!placing || !host.current) return;
     const r = host.current.getBoundingClientRect();
-    const x = ((e.clientX - r.left) / r.width) * 100;
-    const y = ((e.clientY - r.top) / r.height) * 100;
+    /* الإحداثي من الحافة اليسرى الفيزيائية — لا من «بداية السطر»،
+       فلا ينقلب المعنى بين العربية والإنجليزية */
+    const x = Math.max(0, Math.min(78, ((e.clientX - r.left) / r.width) * 100));
+    const y = Math.max(0, Math.min(96, ((e.clientY - r.top) / r.height) * 100));
     setPlacing(false);
     const res = await apiFetch("/api/stickies", {
       method: "POST",
