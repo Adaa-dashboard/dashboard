@@ -47,6 +47,24 @@ function Delta({ n }: { n: number }) {
   );
 }
 
+function Donut({ v }: { v: number | null }) {
+  const R = 46;
+  const C = 2 * Math.PI * R;
+  const p = v == null ? 0 : Math.max(0, Math.min(100, v));
+  return (
+    <svg className="wr-donut" viewBox="0 0 116 116" role="img" aria-label={`الأداء العام ${p}%`}>
+      <circle cx="58" cy="58" r={R} fill="none" stroke="#e9f1ef" strokeWidth="11" />
+      <circle
+        cx="58" cy="58" r={R} fill="none" stroke="#1a9d5c" strokeWidth="11" strokeLinecap="round"
+        strokeDasharray={`${(C * p) / 100} ${C}`} transform="rotate(-90 58 58)"
+      />
+      <text x="58" y="66" textAnchor="middle" className="wr-donut-t">
+        {v == null ? "—" : `${p}%`}
+      </text>
+    </svg>
+  );
+}
+
 const Buildings = () => (
   <svg className="wr-bld" viewBox="0 0 320 120" preserveAspectRatio="none" aria-hidden="true">
     <g fill="rgba(255,255,255,.10)">
@@ -140,6 +158,11 @@ export default function WeeklyReportView({
       <div className="wr-bd">
         {on("perf") && (
           <div className="wr-top">
+            <Donut v={r.overall} />
+            <div className="wr-tx">
+              <b>الأداء العام</b>
+              <span className="wr-note">متوسط تقدّم الأقسام المعروضة نحو غاياتها المعتمدة</span>
+            </div>
             <div className="wr-facts">
               {r.facts.map((f) => (
                 <div key={f.label}>
@@ -180,37 +203,45 @@ export default function WeeklyReportView({
             {r.asg.length === 0 ? (
               <div className="wr-empty">لا توجد تكاليف مفتوحة هذا الأسبوع.</div>
             ) : (
-              <div className="wr-asgs">
-                {r.asg.map((a, i) => {
-                  const bits = [
-                    { k: "الخطوات القادمة", v: a.next, s: true },
-                    { k: "التحدي", v: a.challenge, s: false },
-                    { k: "الدعم المطلوب", v: a.support, s: true },
-                  ].filter((b) => !!b.v);
-                  return (
-                    <div className="wr-ac" key={a.id}>
-                      <div className="wr-ah">
-                        <i>{i + 1}</i>
-                        <b>{a.title}</b>
-                        <span className="wr-st">
+              <div className="wr-tblw">
+                <table className="wr-tbl">
+                  <colgroup>
+                    <col style={{ width: "26px" }} />
+                    <col style={{ width: "26%" }} />
+                    <col style={{ width: "11%" }} />
+                    <col style={{ width: "11%" }} />
+                    <col style={{ width: "18%" }} />
+                    <col style={{ width: "17%" }} />
+                    <col style={{ width: "17%" }} />
+                  </colgroup>
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>موضوع التكليف</th>
+                      <th>الورود</th>
+                      <th>الحالة</th>
+                      <th>الخطوات القادمة</th>
+                      <th>التحدي</th>
+                      <th>الدعم المطلوب</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {r.asg.map((a, i) => (
+                      <tr key={a.id}>
+                        <td className="n">{i + 1}</td>
+                        <td className="sb">{a.title}</td>
+                        <td className="dt">{a.at ? arDate2(a.at) : "—"}</td>
+                        <td className="st">
                           <em style={{ background: DOT[a.state] }} />
                           {a.stateAr}
-                        </span>
-                        {a.at && <span className="wr-at">ورد في {arDate2(a.at)}</span>}
-                      </div>
-                      {bits.length > 0 && (
-                        <div className="wr-abs">
-                          {bits.map((b) => (
-                            <div className="wr-ab" key={b.k}>
-                              <span>{b.k}</span>
-                              <b className={b.s ? "s" : ""}>{b.v}</b>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                        </td>
+                        <td className={a.next ? "s" : "m"}>{a.next || "لا يوجد"}</td>
+                        <td className={a.challenge ? "" : "m"}>{a.challenge || "لا يوجد"}</td>
+                        <td className={a.support ? "s" : "m"}>{a.support || "لا يوجد"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </>
