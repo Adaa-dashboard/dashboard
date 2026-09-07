@@ -9285,3 +9285,32 @@ table.matrix thead th {
   border: 1px solid var(--line, #e6edea); border-radius: 20px; padding: 1px 8px;
 }
 .users-tbl tbody:first-of-type tr.u-grp td { border-top: 0; }
+
+/* ============================================================
+   سجل النشاط — صفحة تحقّق مؤقتة
+   ============================================================ */
+.au-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.au-bar select {
+  width: auto; min-width: 130px; padding: 7px 11px; font-size: 12px;
+  border: 1px solid var(--line, #e6edea); border-radius: 8px; background: #fff;
+}
+.au-sum { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 14px; }
+.au-sum button {
+  font: inherit; font-size: 11px; color: #4a5a56; cursor: pointer;
+  background: #f4f8f6; border: 1px solid var(--line, #e6edea);
+  border-radius: 20px; padding: 4px 11px;
+}
+.au-sum button b { color: #0d3d22; margin-inline-start: 5px; }
+.au-sum button.on { background: #1e7a48; border-color: #1e7a48; color: #fff; }
+.au-sum button.on b { color: #fff; }
+.au-tbl td { font-size: 11.5px; }
+.au-w { white-space: nowrap; color: #6b7c77; font-size: 11px; }
+.au-m { color: #7b8a86; }
+.au-k {
+  display: inline-block; font-size: 10px; color: var(--c);
+  border: 1px solid var(--c); border-radius: 20px; padding: 2px 9px; white-space: nowrap;
+}
+.au-x {
+  font-size: 9.5px; color: #b06a3a; background: #fdf3e8;
+  border-radius: 5px; padding: 1px 6px; margin-inline-start: 6px;
+}
