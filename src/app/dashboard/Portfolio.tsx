@@ -568,8 +568,8 @@ function NotesWidget({ t, onOpen }: { t: T; onOpen: () => void }) {
         <div className="nt-tip">
           <b>اكتب التاريخ داخل الملاحظة</b>
           <span>
-            «بكرة الساعة ٩ اجتماع الديوان» — يُقرأ الموعد من النص ويظهر في تقويمك وتنبيهاتك وحده.
-            وتُفهم: اليوم · بكرة · بعد بكرة · الأحد · الأربعاء ٢:٣٠ · بعد أسبوع · ١٥ سبتمبر.
+«بكرة الساعة ٩ اجتماع الديوان» — يُقرأ الموعد ويظهر في التقويم.
+            وتُفهم: اليوم · بكرة · الأحد · الأربعاء ٢:٣٠ · بعد أسبوع · ١٥ سبتمبر.
           </span>
         </div>
       )}
@@ -745,7 +745,7 @@ function RowForm({
 /* ---------------- التقارير الربعية ---------------- */
 function Quarterly({ rows, t, onToggle }: { rows: Row[]; t: T; onToggle: (r: Row, q: number) => void }) {
   const curQ = Math.floor(new Date().getMonth() / 3) + 1;
-  if (!rows.length) return <div className="pf-none">{t("أضف جهاتك أولاً من مربع «جهاتي».", "Add your entities first.")}</div>;
+  if (!rows.length) return <div className="pf-none">{t("لا توجد جهات بعد — تُضاف من «جهاتي ومساهماتها».", "Add your entities first.")}</div>;
   return (
     <div className="qg">
       {rows.map((r) => {
@@ -990,7 +990,7 @@ function EntitiesModal({
           </div>
           <div className="pf-hint">
             {t(
-              "ما تضيفينه هنا يظهر في «البرامج والاستراتيجيات» و«التقارير الربعية» تلقائياً.",
+              "ما يُضاف هنا يظهر في «جهاتي ومساهماتها» و«التقارير الربعية».",
               "Added entities appear in your strategies and quarterly widgets.",
             )}
           </div>
@@ -1089,7 +1089,7 @@ function GrantsBox({ prefs, meId, t }: { prefs: Prefs; meId: string; t: T }) {
       <div className="sec3">{t("من يرى محفظتي", "Who can see my portfolio")}</div>
       <p className="gr-hint">
         {t(
-          "محفظتك خاصة بك — لا يراها مديرك ولا أي أحد. امنح من تختاره اطّلاعاً عليها (بديلك أثناء الإجازة مثلاً)، وحدّد ما يراه، واسحبه متى شئت. المنح للاطّلاع فقط: لا يعدّل أحد في محفظتك.",
+          "المحفظة خاصة — لا يراها أحد. والمنح للاطّلاع فقط، ويُسحب في أي وقت.",
           "Your portfolio is private. Grant read access to whoever you choose.",
         )}
       </p>
@@ -1141,7 +1141,7 @@ function GrantsBox({ prefs, meId, t }: { prefs: Prefs; meId: string; t: T }) {
       </div>
       <p className="gr-hint sm">
         {t(
-          "ملاحظاتك وتقويمك يبقيان خاصين بك دائماً ولا يشملهما المنح.",
+          "الملاحظات والتقويم لا يشملهما المنح.",
           "Your notes and calendar are never shared.",
         )}
       </p>

@@ -193,7 +193,7 @@ export default function Structure({
 
           <p className="org-note">
             {t(
-              "الهيكل يُبنى من الحسابات نفسها — أضيفي موظفاً من «المستخدمون والصلاحيات» وأسندي له قطاعه فيظهر هنا مباشرة.",
+              "الهيكل يُبنى من الحسابات — يُضاف الموظف من «المستخدمون والصلاحيات» ويُسند له قطاعه فيظهر هنا.",
               "Built from user accounts — add a person and assign their sector and they appear here."
             )}
           </p>

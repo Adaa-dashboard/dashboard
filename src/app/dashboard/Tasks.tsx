@@ -101,8 +101,8 @@ export default function Tasks({
     add: asg ? t("تكليف جديد", "New assignment") : t("مهمة جديدة", "New task"),
     none: asg ? t("لا توجد تكاليف بعد", "No assignments yet") : t("لا توجد مهام بعد", "No tasks yet"),
     hint: asg
-      ? t("سجّلي أول تكليف وارد وأسنديه لمن يتابعه.", "Log the first assignment.")
-      : t("أنشئي أول مهمة وأسنديها لأحد المدراء.", "Create the first task and assign it."),
+      ? t("تُسجَّل التكاليف الواردة وتُسند لمن يتابعها.", "Log the first assignment.")
+      : t("تُنشأ المهام وتُسند لمن ينفّذها.", "Create the first task and assign it."),
   };
   const [tasks, setTasks] = useState<Task[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
@@ -489,7 +489,7 @@ function TaskDetail({
                           autoFocus
                           value={replyText}
                           onChange={(e) => setReplyText(e.target.value)}
-                          placeholder={t("اكتبي ردّك…", "Write your reply…")}
+                          placeholder={t("الرد…", "Write your reply…")}
                         />
                         <div className="rp-act">
                           <button
@@ -532,7 +532,7 @@ function TaskDetail({
                 rows={3}
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder={t("اكتبي ما استجدّ…", "What changed?")}
+                placeholder={t("ما استجدّ…", "What changed?")}
               />
             </>
           )}

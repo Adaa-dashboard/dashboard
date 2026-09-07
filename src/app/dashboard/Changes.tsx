@@ -234,7 +234,7 @@ export default function Changes({
     } catch {
       setErr(
         t(
-          "تعذّرت قراءة الملف. إن كان بصيغة xls القديمة فاحفظيه من إكسل بصيغة xlsx أو CSV، أو انسخي الجدول والصقيه.",
+          "تعذّرت قراءة الملف — يُحفظ من إكسل بصيغة xlsx أو CSV، أو يُلصق الجدول مباشرة.",
           "Could not read the file."
         )
       );
@@ -279,7 +279,7 @@ export default function Changes({
     try {
       await navigator.clipboard.writeText(tsv);
       setErr("");
-      setMsg(t(`نُسخ ${shown.length} طلباً — الصقيه في إكسل أو Word`, "Copied"));
+      setMsg(t(`نُسخ ${shown.length} طلباً — جاهز للّصق في إكسل أو Word`, "Copied"));
     } catch {
       setErr(t("تعذّر النسخ التلقائي — استخدمي «⬇ Excel».", "Copy failed — use Excel export."));
     }
@@ -358,7 +358,7 @@ export default function Changes({
           <b>{t("لا توجد طلبات تغيير بعد", "No change requests yet")}</b>
           {canEdit
             ? t(
-                "ارفعي ملف المتابعة اليومي المسحوب من منصة الرؤية، أو انسخي الجدول من البريد والصقيه.",
+                "رفع الملف اليومي من منصة الرؤية، أو لصق الجدول من البريد.",
                 "Upload the daily platform file, or paste the table."
               )
             : t(
@@ -454,7 +454,7 @@ export default function Changes({
             <div className="m-b">
               <label>
                 {t(
-                  "حدّدي الجدول في البريد أو إكسل، انسخيه، ثم الصقيه هنا بما فيه صف العناوين.",
+                  "يُلصق الجدول هنا بصف عناوينه.",
                   "Paste the table including its header row."
                 )}
               </label>

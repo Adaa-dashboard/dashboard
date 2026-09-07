@@ -377,9 +377,9 @@ export function Cal({ t, meId }: { t: (ar: string, en: string) => string; meId: 
         ) : (
           <p>
             {evs.length
-              ? t("لا تنبيهات — النقاط أيام فيها مواعيد، اضغطي يوماً لعرضها.", "No alerts.")
+              ? t("لا تنبيهات — النقطة يومٌ فيه موعد.", "No alerts.")
               : t(
-                  "لا مواعيد بعد. اكتبي في الملاحظات «بكرة الساعة ٩ اجتماع» فيظهر هنا.",
+                  "لا مواعيد — يظهر هنا ما يُكتب في الملاحظات بتاريخ.",
                   "Write a date in a note and it appears here."
                 )}
           </p>

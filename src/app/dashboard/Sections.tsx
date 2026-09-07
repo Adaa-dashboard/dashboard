@@ -1997,7 +1997,7 @@ export function CxPage({ t, canEdit }: { t: T; canEdit: boolean }) {
         <Empty
           title={t("لا توجد بيانات بعد", "No data yet")}
           note={t(
-            "ارفعي ملف المتابعة (Master Tracker) من زر «رفع ملف المتابعة» — تُقرأ كل الأعمدة كما هي.",
+            "رفع ملف المتابعة (Master Tracker) من الزر أعلاه — تُقرأ الأعمدة كما هي.",
             "Upload the Master Tracker file.",
           )}
         />
