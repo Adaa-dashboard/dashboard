@@ -47,24 +47,6 @@ function Delta({ n }: { n: number }) {
   );
 }
 
-function Donut({ v }: { v: number | null }) {
-  const R = 46;
-  const C = 2 * Math.PI * R;
-  const p = v == null ? 0 : Math.max(0, Math.min(100, v));
-  return (
-    <svg className="wr-donut" viewBox="0 0 116 116" role="img" aria-label={`الأداء العام ${p}%`}>
-      <circle cx="58" cy="58" r={R} fill="none" stroke="#e9f1ef" strokeWidth="11" />
-      <circle
-        cx="58" cy="58" r={R} fill="none" stroke="#1a9d5c" strokeWidth="11" strokeLinecap="round"
-        strokeDasharray={`${(C * p) / 100} ${C}`} transform="rotate(-90 58 58)"
-      />
-      <text x="58" y="66" textAnchor="middle" className="wr-donut-t">
-        {v == null ? "—" : `${p}%`}
-      </text>
-    </svg>
-  );
-}
-
 const Buildings = () => (
   <svg className="wr-bld" viewBox="0 0 320 120" preserveAspectRatio="none" aria-hidden="true">
     <g fill="rgba(255,255,255,.10)">
@@ -158,11 +140,6 @@ export default function WeeklyReportView({
       <div className="wr-bd">
         {on("perf") && (
           <div className="wr-top">
-            <Donut v={r.overall} />
-            <div className="wr-tx">
-              <b>الأداء العام</b>
-              <span className="wr-note">متوسط تقدّم الأقسام المعروضة نحو غاياتها المعتمدة</span>
-            </div>
             <div className="wr-facts">
               {r.facts.map((f) => (
                 <div key={f.label}>
