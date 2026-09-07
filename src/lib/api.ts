@@ -734,7 +734,7 @@ export async function apiFetch(path: string, init: Init = {}) {
         );
         return ok({ ok: true });
       }
-      const [ms, nt, tk, sec, ind, seen, tlog] = await Promise.all([
+      const [ms, nt, tk, sec, ind, seen, tlog, its, card] = await Promise.all([
         s.from("perf_measurements").select("*").order("updated_at", { ascending: false }).limit(30),
         s.from("perf_notes").select("*").order("at", { ascending: false }).limit(20),
         s.from("perf_tasks").select("*").order("created_at", { ascending: false }).limit(20),
@@ -742,7 +742,13 @@ export async function apiFetch(path: string, init: Init = {}) {
         s.from("perf_indicators").select("id,name"),
         s.from("perf_last_seen").select("at").eq("app_user_id", Number(me.id)).maybeSingle(),
         s.from("perf_target_log").select("*").order("at", { ascending: false }).limit(20),
+        s.from("perf_items").select("*").order("updated_at", { ascending: false }).limit(40),
+        s.rpc("perf_me"),
       ]);
+      const myScopes: string[] = (() => {
+        const c = Array.isArray(card.data) ? card.data[0] : card.data;
+        return Array.isArray(c?.scopes) ? (c.scopes as string[]) : [];
+      })();
       const secName = new Map((sec.data || []).map((x) => [x.id, x.name]));
       const indName = new Map((ind.data || []).map((x) => [x.id, x.name]));
       const since = seen.data?.at || "";
@@ -750,7 +756,7 @@ export async function apiFetch(path: string, init: Init = {}) {
       type Item = {
         id: string; kind: string; tone: string; title: string; sub: string;
         at: string; unread: boolean;
-        sectorId?: string; indicatorId?: string; taskId?: string;
+        sectorId?: string; indicatorId?: string; taskId?: string; section?: string;
       };
       const items: Item[] = [];
       for (const m of ms.data || []) {
@@ -763,13 +769,54 @@ export async function apiFetch(path: string, init: Init = {}) {
           sectorId: m.sector_id, indicatorId: m.indicator_id,
         });
       }
+      /* التعليق على مؤشر خاصٌّ بأصحابه: كاتبه ومن ذُكر فيه.
+         وما يعني الجميع هو تحديث البنود لا تعليقات الأفراد. */
       for (const n of nt.data || []) {
+        const mine =
+          String(n.by_id || "") === String(me.id) ||
+          (Array.isArray(n.mentions) ? n.mentions : []).some((x: unknown) => String(x) === String(me.id));
+        if (!mine) continue;
         items.push({
           id: "n" + n.id, kind: "note", tone: "warn",
-          title: `${n.by_name} كتب ملاحظة`,
+          title:
+            String(n.by_id || "") === String(me.id)
+              ? `ملاحظتك على ${indName.get(n.indicator_id) || ""}`
+              : `${n.by_name} ذكرك في ملاحظة`,
           sub: `${secName.get(n.sector_id) || ""} · ${indName.get(n.indicator_id) || ""}`,
           at: n.at, unread: !since || n.at > since,
           sectorId: n.sector_id, indicatorId: n.indicator_id,
+        });
+      }
+
+      /* تحديثات بنود الأقسام — لمن يملك صلاحية القسم وحده */
+      const SEC_AR: Record<string, string> = {
+        sessions: "جلسات مراجعة الأداء",
+        natstrat: "الاستراتيجيات الوطنية",
+        inststrat: "الاستراتيجيات المؤسسية",
+        outputs: "المخرجات الوطنية",
+        cx: "أعمال قياس تجربة المستفيد",
+        projects: "المشاريع الاستراتيجية",
+      };
+      const itemName = (d: unknown) => {
+        const o = (d || {}) as Record<string, unknown>;
+        for (const k of ["name", "owner", "entity", "title"]) {
+          const v = o[k];
+          if (typeof v === "string" && v.trim()) return v.trim();
+        }
+        return "";
+      };
+      for (const it of its.data || []) {
+        if (!myScopes.includes(it.section)) continue;
+        const nm = itemName(it.data);
+        items.push({
+          id: "i" + it.section + it.id,
+          kind: "section",
+          tone: "info",
+          title: `${it.updated_by ? `${it.updated_by} حدّث` : "تحديث"} ${SEC_AR[it.section] || it.section}`,
+          sub: nm || "بند",
+          at: it.updated_at,
+          unread: !since || it.updated_at > since,
+          section: it.section,
         });
       }
       for (const t of tk.data || []) {
@@ -786,6 +833,29 @@ export async function apiFetch(path: string, init: Init = {}) {
           taskId: t.id,
         });
       }
+      /* ردٌّ على مهمة أو تكليف — يصل مَن أسندها ومَن أُسندت له.
+         وصفوف perf_tasks محدودة أصلاً بمن يراها، فلا يتسرّب ردٌّ لغيرهم. */
+      type Rep = { id?: string; text?: string; byId?: string; byName?: string; at?: string };
+      for (const t of tk.data || []) {
+        const ups: Rep[] = Array.isArray(t.updates) ? (t.updates as Rep[]) : [];
+        const last = ups[ups.length - 1];
+        if (!last || !last.text) continue;
+        const mineToo =
+          String(t.created_by_id || "") === String(me.id) ||
+          String(t.assignee_id || "") === String(me.id);
+        if (!mineToo || String(last.byId || "") === String(me.id)) continue;
+        items.push({
+          id: "u" + t.id + (last.id || ""),
+          kind: t.kind === "assignment" ? "assignment" : "task",
+          tone: "info",
+          title: `${last.byName || "أحدهم"} ردّ على ${t.kind === "assignment" ? "التكليف" : "المهمة"}: ${t.title}`,
+          sub: String(last.text).slice(0, 90),
+          at: last.at || t.created_at,
+          unread: !since || (last.at || "") > since,
+          taskId: t.id,
+        });
+      }
+
       // تغيير المستهدف يعني المدير أكثر من غيره — يظهر بلونٍ منبّه
       const fmtT = (v: unknown) =>
         v === null || v === undefined ? "—" : Array.isArray(v) ? v.join(" · ") : String(v);

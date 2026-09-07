@@ -15,6 +15,8 @@ export type Item = {
   sectorId?: string;
   indicatorId?: string;
   taskId?: string;
+  /** قسم من العناوين الأساسية — زرّ «عرض» يفتح صفحته */
+  section?: string;
 };
 
 const TONE: Record<string, string> = {
@@ -113,7 +115,7 @@ export default function Activity({
                     {when(x.at)}
                   </span>
                 </span>
-                {onOpen && (x.indicatorId || x.taskId) && (
+                {onOpen && (x.indicatorId || x.taskId || x.section) && (
                   <button
                     className="up-go"
                     onClick={() => onOpen(x)}

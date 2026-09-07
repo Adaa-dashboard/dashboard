@@ -1085,6 +1085,8 @@ function Overview({
         <Activity
           t={t}
           onOpen={(it) => {
+            // تحديث قسم: تُفتح صفحته مباشرة
+            if (it.section) return onOpenTab(it.section as Scope);
             // التكاليف معروضة في هذه الصفحة نفسها، فلا داعي للانتقال
             if (it.kind === "assignment" && it.taskId) {
               setAsgFocus(it.taskId);
