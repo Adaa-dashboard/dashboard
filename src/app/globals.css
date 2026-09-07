@@ -9211,3 +9211,52 @@ table.matrix thead th {
   .sg-form label { flex: 1 1 100%; }
   .sg-tbl { display: block; overflow-x: auto; }
 }
+
+/* ============================================================
+   شاشة الصلاحيات — صفٌّ لكل صفحة: تُفتح؟ ومطّلع أم يعدّل؟
+   ============================================================ */
+.pm-n {
+  font-size: 10.5px; color: #7b8a86; font-weight: 400; margin-inline-start: 8px;
+  background: #f1f6f4; border-radius: 20px; padding: 2px 9px;
+}
+.pm { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 10px; }
+.pm-g { border: 1px solid var(--line, #e6edea); border-radius: 12px; padding: 10px 14px; }
+.pm-gh {
+  font-size: 10.5px; color: #7b8a86; font-weight: 600;
+  padding-bottom: 8px; margin-bottom: 2px; border-bottom: 1px solid #f2f6f5;
+}
+.pm-r {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 9px 0; border-bottom: 1px solid #f7faf9;
+}
+.pm-r:last-child { border-bottom: none; }
+.pm-c {
+  display: flex; align-items: flex-start; gap: 8px;
+  flex: 1 1 auto; min-width: 0; cursor: pointer; margin: 0;
+}
+/* الشامل input{width:100%} كان يبتلع الصفّ كلّه فيبقى الاسم بلا عرض */
+.pm-c input[type="checkbox"], .pm-x input[type="checkbox"] {
+  width: 15px; height: 15px; min-width: 15px; padding: 0; flex: none; margin: 3px 0 0;
+}
+.pm-c > span { flex: 1 1 auto; min-width: 0; }
+.pm-c b { display: block; font-size: 12px; font-weight: 600; color: #8f9c98; line-height: 1.6; }
+.pm-r.on .pm-c b { color: #0d3d22; font-weight: 700; }
+.pm-c i { display: block; font-style: normal; font-size: 10px; color: #a7b3b0; margin-top: 1px; }
+
+.pm-seg {
+  display: inline-flex; border: 1px solid #e2ebe8; border-radius: 8px;
+  overflow: hidden; flex: none; margin-inline-start: auto;
+}
+.pm-seg button {
+  background: #fff; border: 0; font: inherit; font-size: 10.5px; color: #7b8a86;
+  padding: 5px 12px; cursor: pointer; white-space: nowrap;
+}
+.pm-seg button + button { border-inline-start: 1px solid #e2ebe8; }
+.pm-seg button.on { background: #1e7a48; color: #fff; font-weight: 600; }
+
+.pm-x {
+  display: flex; align-items: center; gap: 6px; font-size: 10px; color: #7b8a86;
+  width: 100%; padding-inline-start: 24px; margin: -2px 0 0; cursor: pointer;
+}
+
+@media (max-width: 760px) { .pm { grid-template-columns: 1fr; } }
