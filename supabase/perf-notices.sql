@@ -12,19 +12,29 @@ alter table public.perf_notices enable row level security;
 grant select on public.perf_notices to authenticated;
 revoke insert, update, delete on public.perf_notices from authenticated;
 
+/* اسم دخول المستخدم الحالي — دالة security definer.
+   لا تضع قراءة perf_users داخل تعبير سياسة: تعابير RLS تُنفَّذ
+   بصلاحية القارئ نفسه، و perf_users محجوب عن authenticated عمداً،
+   فيفشل الاستعلام كله بـ«permission denied» بلا خطأ ظاهر للمستخدم. */
+create or replace function public.perf_my_username()
+returns text language sql stable security definer set search_path = public as $$
+  select u.username
+    from public.perf_sessions s
+    join public.perf_users u on u.id = s.app_user_id
+   where s.user_id = auth.uid() and u.active;
+$$;
+revoke all on function public.perf_my_username() from public, anon;
+grant execute on function public.perf_my_username() to authenticated;
+
 drop policy if exists "perf_notices_read" on public.perf_notices;
 create policy "perf_notices_read" on public.perf_notices
   for select to authenticated
   using (
     public.perf_signed_in()
     and (until is null or until >= current_date)
-    and (
-      cardinality(audience) = 0
-      or exists (
-        select 1 from public.perf_sessions s
-         join public.perf_users u on u.id = s.app_user_id
-        where s.user_id = auth.uid() and u.username = any(audience))
-    ));
+    and (cardinality(audience) = 0
+         or public.perf_my_username() = any(audience))
+  );
 
 -- الإدراج لا يتوقف بخطأ: الجمهور يُبنى مما وُجد، والتشخيص أدناه يقول ما نقص
 insert into public.perf_notices (id, title, body, audience)
