@@ -25,6 +25,7 @@ export type Scope =
   | "tasks:all"
   | "targets"
   | "weekly"
+  | "weekly:edit"
   | "users";
 
 export const SCOPE_GROUPS: { title: string; items: { key: Scope; label: string; note?: string }[] }[] = [
@@ -35,6 +36,7 @@ export const SCOPE_GROUPS: { title: string; items: { key: Scope; label: string; 
       { key: "details", label: "المؤشرات التفصيلية", note: "قطاعاته المسندة له" },
       { key: "tasks", label: "المهام", note: "المهام المسندة له" },
       { key: "weekly", label: "الإنجاز الأسبوعي" },
+      { key: "weekly:edit", label: "تحرير التقرير الأسبوعي", note: "اختيار أقسامه وكتابة خاناته" },
     ],
   },
   {

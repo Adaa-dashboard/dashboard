@@ -127,12 +127,13 @@ type Ctx = {
 /* ---------------- زبدة الأقسام الخمسة ----------------
    «عطني الزبدة من المخرجات الوطنية» وما شابهها. الملخّص يُبنى
    من نفس البيانات المعروضة في القسم، فلا يختلف رقمٌ عمّا تراه. */
-type SecKey = "sessions" | "natstrat" | "inststrat" | "outputs" | "projects";
+type SecKey = "sessions" | "natstrat" | "inststrat" | "outputs" | "cx" | "projects";
 const SEC_WORDS: [SecKey, string[]][] = [
   ["sessions", ["جلسات مراجعة", "جلسات المراجعة", "جلسة مراجعة", "الجلسات"]],
   ["natstrat", ["الاستراتيجيات الوطنية", "استراتيجيات وطنية", "الوطنية"]],
   ["inststrat", ["الاستراتيجيات المؤسسية", "استراتيجيات مؤسسية", "المؤسسية"]],
   ["outputs", ["المخرجات الوطنية", "مخرجات وطنية", "المخرجات"]],
+  ["cx", ["تجربة المستفيد", "تجربه المستفيد", "قياس تجربة", "المستفيدين", "الخدمات الحكومية", "BEX", "bex"]],
   ["projects", ["المشاريع الاستراتيجية", "مشاريع استراتيجية", "المشاريع"]],
 ];
 const SEC_NAME: Record<SecKey, string> = {
@@ -140,6 +141,7 @@ const SEC_NAME: Record<SecKey, string> = {
   natstrat: "الاستراتيجيات الوطنية",
   inststrat: "الاستراتيجيات المؤسسية",
   outputs: "المخرجات الوطنية",
+  cx: "أعمال قياس تجربة المستفيد",
   projects: "المشاريع الاستراتيجية",
 };
 const NAT_STEPS = ["طور الإعداد/التحديث", "قيد المراجعة", "معتمدة من اللجنة", "معتمدة من مجلس الوزراء"];
@@ -222,21 +224,62 @@ function sectionBrief(k: SecKey, items: Rec[]): Ans {
   }
 
   if (k === "inststrat") {
-    const stage = (x: Rec) => Math.max(1, Math.min(5, num(d(x).stage, 1)));
-    const counts = [1, 2, 3, 4, 5].map((n) => items.filter((x) => stage(x) === n).length);
-    const kpis = items.reduce((a, x) => a + num(d(x).kpis), 0);
+    /* الحقول هي أعمدة ملف المتابعة نفسه — لا مرحلة رقمية */
+    const g = (f: string, v: string) => items.filter((x) => txt(d(x)[f]) === v).length;
+    const q = (n: number) => items.filter((x) => txt(d(x).target) === `Q${n}`).length;
     return {
       title,
       icon: "building",
       chips: [
         { k: "الجهات", v: String(items.length) },
-        { k: "إجمالي المؤشرات", v: String(kpis) },
-        { k: "فُعِّل القياس", v: String(counts[4]), tone: "g" },
+        { k: "فُعِّل القياس", v: String(g("live", "مفعل")), tone: "g" },
+        { k: "عُقد الاجتماع", v: String(g("meet", "تم")) },
+        { k: "الوثائق مستلمة", v: String(g("docs", "✓")) },
       ],
       lines: [
-        ...INST_STAGES.map((n, i) => `${n}: ${counts[i]}`),
+        `مخطط تفعيلها: الربع الأول ${q(1)} · الثاني ${q(2)} · الثالث ${q(3)} · الرابع ${q(4)}`,
+        `Phase 1: ${g("phase", "Phase 1")} · Phase 2: ${g("phase", "Phase 2")}`,
         "—",
-        ...items.slice(0, 6).map((x) => `${txt(d(x).owner) || txt(d(x).name)} — ${txt(d(x).status) || INST_STAGES[stage(x) - 1]}`),
+        ...items.slice(0, 6).map(
+          (x) =>
+            `${txt(d(x).owner) || "بلا جهة"} — ${txt(d(x).live) || "لم يُحدَّد التفعيل"}${
+              txt(d(x).target) ? ` · مستهدف ${txt(d(x).target)}` : ""
+            }`,
+        ),
+      ],
+    };
+  }
+
+  if (k === "cx") {
+    /* المراحل متداخلة لا متتابعة — كما في ملف المتابعة نفسه */
+    const rows = items.filter((x) => x.id !== "cx-meta");
+    const meta = items.find((x) => x.id === "cx-meta");
+    const OK = "تم الاعتماد";
+    const NONE = "لم يتم الاستلام";
+    const prog = (v: string) => v !== "" && v !== OK && v !== NONE;
+    const QK = ["q0", "q1", "q2", "q3", "q4"];
+    const issued = rows.filter((x) => QK.some((qq) => txt(d(x)[`${qq}Issue`]) === OK)).length;
+    const measuring = rows.filter(
+      (x) =>
+        txt(d(x).survey) === OK && txt(d(x).card) === OK && txt(d(x).l1) === OK &&
+        QK.some((qq) => prog(txt(d(x)[`${qq}Share`]))),
+    ).length;
+    const prep = rows.filter((x) => txt(d(x).meet) === "تم" && txt(d(x).survey) !== OK).length;
+    const none = rows.filter((x) => txt(d(x).meet) === "لم يبدأ").length;
+    const target = num(meta ? d(meta).target : 0);
+    return {
+      title,
+      icon: "users",
+      chips: [
+        { k: "الأجهزة", v: String(rows.length) },
+        { k: "صدر لها تقرير", v: String(issued), tone: "g" },
+        { k: "في القياس", v: String(measuring), tone: "a" },
+        { k: "لم تبدأ", v: String(none), tone: none ? "a" : "g" },
+      ],
+      lines: [
+        target ? `المستهدف ${target} جهازاً — المحقق ${issued} (${Math.round((issued / target) * 100)}%)` : "لم يُسجَّل مستهدف في الملف بعد",
+        `في التهيئة ${prep} · في القياس ${measuring} · صدر لها تقرير ${issued}`,
+        "المراحل متداخلة لا متتابعة، فمجموعها يتجاوز عدد الأجهزة — كما في ملف المتابعة.",
       ],
     };
   }
@@ -257,6 +300,200 @@ function sectionBrief(k: SecKey, items: Rec[]): Ans {
       return `${txt(d(x).name)} — المخطط ${pl}% · الفعلي ${ac}%${gap > 0 ? ` (فجوة ${gap}%)` : " ✓"}`;
     }),
   };
+}
+
+/* ---------------- سؤال محدَّد عن قسم ----------------
+   «كم استراتيجية مؤسسية مخطط تفعيلها الربع الثالث؟» — الجواب
+   يُحسب من صفحة القسم نفسها لا من صياغة عامة. القاعدة: نلتقط
+   القيد من السؤال (ربع · حالة · قطاع)، ونعدّ الصفوف المطابقة،
+   ونسمّيها. وإن لم يُفهم القيد رجعنا إلى الزبدة الكاملة.
+   ---------------------------------------------------- */
+
+/** الربع المذكور في السؤال — رقماً من 1 إلى 4، أو 0 */
+function askedQuarter(q: string): number {
+  const m = q.match(/\bQ\s*([1-4])\b/i);
+  if (m) return Number(m[1]);
+  if (has(q, "الربع الأول", "الربع الاول", "ربع أول", "ربع اول")) return 1;
+  if (has(q, "الربع الثاني", "ربع ثاني")) return 2;
+  if (has(q, "الربع الثالث", "ربع ثالث")) return 3;
+  if (has(q, "الربع الرابع", "ربع رابع")) return 4;
+  return 0;
+}
+
+/** جواب عددي مباشر: العدد أولاً، ثم الصفوف التي كوّنته */
+function countAns(
+  title: string,
+  icon: string,
+  n: number,
+  of: number,
+  ofLabel: string,
+  names: string[],
+  note?: string,
+): Ans {
+  return {
+    title,
+    icon,
+    chips: [
+      { k: "العدد", v: String(n), tone: n ? "g" : "a" },
+      { k: `من ${of} ${ofLabel}`, v: of ? `${Math.round((n / of) * 100)}%` : "—" },
+    ],
+    lines: n
+      ? names.slice(0, 12).concat(names.length > 12 ? [`… و${names.length - 12} غيرها`] : [])
+      : ["لا يوجد صفٌّ مطابق في بيانات القسم."],
+    note: note || "محسوب من صفحة القسم الآن — لا رقم مخزَّن.",
+  };
+}
+
+function secQuery(k: SecKey, items: Rec[], q: string): Ans | null {
+  if (!items.length) return null;
+  const d = (x: Rec) => (x.data || {}) as Rec;
+  const nm = (x: Rec) => txt(d(x).owner) || txt(d(x).name) || txt(d(x).entity) || "بلا اسم";
+  const qn = askedQuarter(q);
+  const pick = (f: (x: Rec) => boolean) => items.filter(f);
+
+  if (k === "inststrat") {
+    /* «مخطط تفعيلها الربع الثالث» = عمود «تفعيل القياس (مستهدف)» */
+    if (qn && has(q, "مخطط", "المخطط", "مستهدف", "المستهدف", "تفعيل", "التفعيل", "خطة")) {
+      const rows = pick((x) => txt(d(x).target) === `Q${qn}`);
+      return countAns(
+        `الاستراتيجيات المؤسسية المخطط تفعيل قياسها في الربع ${["", "الأول", "الثاني", "الثالث", "الرابع"][qn]}`,
+        "building",
+        rows.length,
+        items.length,
+        "جهة",
+        rows.map((x) => `${nm(x)}${txt(d(x).live) === "مفعل" ? " — مفعّل بالفعل" : ""}`),
+        "من عمود «تفعيل القياس (مستهدف)» في صفحة الاستراتيجيات المؤسسية.",
+      );
+    }
+    if (has(q, "غير مفعل", "غير مفعّل", "ما فُعّل", "ما فعل")) {
+      const rows = pick((x) => txt(d(x).live) === "غير مفعل");
+      return countAns("جهات لم يُفعَّل قياسها بعد", "building", rows.length, items.length, "جهة", rows.map(nm));
+    }
+    if (has(q, "مفعل", "مفعّل", "فُعّل", "فعل القياس", "تفعيل القياس")) {
+      const rows = pick((x) => txt(d(x).live) === "مفعل");
+      return countAns("جهات فُعِّل قياسها", "building", rows.length, items.length, "جهة", rows.map(nm));
+    }
+    if (has(q, "الاجتماع التعريفي", "اجتماع تعريفي", "الاجتماعات")) {
+      const rows = pick((x) => txt(d(x).meet) === "تم");
+      return countAns("جهات عُقد معها الاجتماع التعريفي", "building", rows.length, items.length, "جهة", rows.map(nm));
+    }
+    if (has(q, "الوثائق", "وثائق", "المستندات")) {
+      const rows = pick((x) => txt(d(x).docs) === "✓");
+      return countAns("جهات استُلمت وثائقها", "building", rows.length, items.length, "جهة", rows.map(nm));
+    }
+    if (has(q, "ممثل", "تسمية ممثل")) {
+      const rows = pick((x) => txt(d(x).rep) === "تمت تسمية ممثل");
+      return countAns("جهات سمّت ممثلها", "building", rows.length, items.length, "جهة", rows.map(nm));
+    }
+    const ph = q.match(/phase\s*([12])/i);
+    if (ph) {
+      const rows = pick((x) => txt(d(x).phase) === `Phase ${ph[1]}`);
+      return countAns(`جهات Phase ${ph[1]}`, "building", rows.length, items.length, "جهة", rows.map(nm));
+    }
+    return null;
+  }
+
+  if (k === "natstrat") {
+    const steps: [string[], number][] = [
+      [["مجلس الوزراء", "معتمدة من مجلس"], 4],
+      [["اللجنة", "معتمدة من اللجنة"], 3],
+      [["قيد المراجعة", "تحت المراجعة"], 2],
+      [["طور الإعداد", "قيد الإعداد", "التحديث"], 1],
+    ];
+    for (const [words, n] of steps) {
+      if (has(q, ...words)) {
+        const rows = pick((x) => Math.max(1, Math.min(4, num(d(x).stage, 1))) === n);
+        return countAns(
+          `الاستراتيجيات الوطنية — ${["", "طور الإعداد/التحديث", "قيد المراجعة", "معتمدة من اللجنة", "معتمدة من مجلس الوزراء"][n]}`,
+          "flag",
+          rows.length,
+          items.length,
+          "استراتيجية",
+          rows.map((x) => `${txt(d(x).name)}${txt(d(x).owner) ? ` — ${txt(d(x).owner)}` : ""}`),
+        );
+      }
+    }
+    if (has(q, "قابلية القياس", "قابلية قياس", "ضعيفة", "منخفضة")) {
+      const rows = pick((x) => num(d(x).meas) > 0 && num(d(x).meas) < 70);
+      return countAns(
+        "استراتيجيات وطنية قابلية قياسها منخفضة (أقل من ٧٠٪)",
+        "flag", rows.length, items.length, "استراتيجية",
+        rows.map((x) => `${txt(d(x).name)} — ${num(d(x).meas)}%`),
+      );
+    }
+    return null;
+  }
+
+  if (k === "sessions") {
+    const st = (x: Rec) => {
+      const raw = Array.isArray(d(x).stages) ? d(x).stages : [];
+      const full = raw.length || 6;
+      return { done: Math.max(0, Math.min(full, num(d(x).done))), full };
+    };
+    if (qn) {
+      const rows = pick((x) => txt(d(x).quarter).includes(String(qn)));
+      return countAns(`جلسات الربع ${["", "الأول", "الثاني", "الثالث", "الرابع"][qn]}`, "clipboard",
+        rows.length, items.length, "جلسة", rows.map(nm));
+    }
+    if (has(q, "لم تبدأ", "ما بدأت", "مابدأت")) {
+      const rows = pick((x) => st(x).done === 0);
+      return countAns("جلسات لم تبدأ", "clipboard", rows.length, items.length, "جلسة", rows.map(nm));
+    }
+    if (has(q, "مكتمل", "مكتملة", "مغلقة", "انتهت")) {
+      const rows = pick((x) => st(x).done >= st(x).full);
+      return countAns("جلسات مكتملة", "clipboard", rows.length, items.length, "جلسة", rows.map(nm));
+    }
+    return null;
+  }
+
+  if (k === "cx") {
+    const rows0 = items.filter((x) => x.id !== "cx-meta");
+    const OK = "تم الاعتماد";
+    const NONE = "لم يتم الاستلام";
+    const prog = (v: string) => v !== "" && v !== OK && v !== NONE;
+    const QK = ["q0", "q1", "q2", "q3", "q4"];
+    const nmx = (x: Rec) => txt(d(x).name) || "بلا اسم";
+    if (qn) {
+      const key = `q${qn}`;
+      const rows = rows0.filter((x) => txt(d(x)[`${key}Issue`]) === OK);
+      return countAns(
+        `أجهزة صدر لها تقرير في الربع ${["", "الأول", "الثاني", "الثالث", "الرابع"][qn]} من ٢٠٢٦م`,
+        "users", rows.length, rows0.length, "جهاز", rows.map(nmx),
+      );
+    }
+    if (has(q, "صدر", "تقرير", "تقارير")) {
+      const rows = rows0.filter((x) => QK.some((z) => txt(d(x)[`${z}Issue`]) === OK));
+      return countAns("أجهزة صدر لها تقرير", "users", rows.length, rows0.length, "جهاز", rows.map(nmx));
+    }
+    if (has(q, "لم تبدأ", "ما بدأت", "لم يبدأ")) {
+      const rows = rows0.filter((x) => txt(d(x).meet) === "لم يبدأ");
+      return countAns("أجهزة لم تبدأ", "users", rows.length, rows0.length, "جهاز", rows.map(nmx));
+    }
+    if (has(q, "في القياس", "قيد القياس", "تُقاس")) {
+      const rows = rows0.filter(
+        (x) =>
+          txt(d(x).survey) === OK && txt(d(x).card) === OK && txt(d(x).l1) === OK &&
+          QK.some((z) => prog(txt(d(x)[`${z}Share`]))),
+      );
+      return countAns("أجهزة في مرحلة القياس", "users", rows.length, rows0.length, "جهاز", rows.map(nmx));
+    }
+    return null;
+  }
+
+  if (k === "projects") {
+    if (has(q, "متأخر", "متأخرة", "متعثر", "متعثرة", "خلف الخطة")) {
+      const rows = pick((x) => num(d(x).actual) < num(d(x).planned));
+      return countAns("مشاريع متأخرة عن الخطة", "rocket", rows.length, items.length, "مشروع",
+        rows.map((x) => `${txt(d(x).name)} — المخطط ${num(d(x).planned)}% · الفعلي ${num(d(x).actual)}%`));
+    }
+    if (has(q, "مكتمل", "مكتملة", "منتهية")) {
+      const rows = pick((x) => num(d(x).actual) >= 100);
+      return countAns("مشاريع مكتملة", "rocket", rows.length, items.length, "مشروع", rows.map((x) => txt(d(x).name)));
+    }
+    return null;
+  }
+
+  return null;
 }
 
 /* ---------------- دليل الاستخدام داخل المساعد ----------------
@@ -476,7 +713,9 @@ function answer(q0: string, c: Ctx): Ans {
         "«كم نسبة التزامي؟»",
         "«كم جهة ما سويت لها اجتماع ربعي؟»",
         "«ملخص الأسبوع»",
-        "«عطني الزبدة من الاستراتيجيات الوطنية» — وكذلك: جلسات مراجعة الأداء · الاستراتيجيات المؤسسية · المخرجات الوطنية · المشاريع الاستراتيجية",
+        "«عطني الزبدة من الاستراتيجيات الوطنية» — وكذلك: جلسات مراجعة الأداء · الاستراتيجيات المؤسسية · أعمال قياس تجربة المستفيد · المخرجات الوطنية · المشاريع الاستراتيجية",
+        "«كم استراتيجية مؤسسية مخطط تفعيلها الربع الثالث؟» — أسأل عن قسم بقيد، فأعدّ لك من صفحته وأسمّي الصفوف",
+        "«كم جهة فُعِّل قياسها؟» · «كم استراتيجية وطنية معتمدة من مجلس الوزراء؟» · «كم جهازاً لم يبدأ في تجربة المستفيد؟»",
       ],
       note: "الإجابات تُحسب من بياناتك داخل متصفحك — لا يخرج منها شيء.",
     };
@@ -485,7 +724,13 @@ function answer(q0: string, c: Ctx): Ans {
      «الاستراتيجيات» يخطفها فرع «جهاتي» وإلا */
   {
     const sec = whichSection(q);
-    if (sec) return sectionBrief(sec, c.sections[sec] || []);
+    if (sec) {
+      /* السؤال المحدَّد أولاً: «كم … الربع الثالث؟» يريد عدداً
+         لا زبدة. وإن لم يُفهم القيد رجعنا إلى الزبدة الكاملة. */
+      const direct = secQuery(sec, c.sections[sec] || [], q);
+      if (direct) return direct;
+      return sectionBrief(sec, c.sections[sec] || []);
+    }
   }
 
   /* ترتيب الصفحة */
@@ -637,6 +882,8 @@ const SUGGEST = [
   "وش أقدر أفتح؟",
   "أهم شي عندي الآن",
   "عطني الزبدة من الاستراتيجيات الوطنية",
+  "كم استراتيجية مؤسسية مخطط تفعيلها الربع الثالث؟",
+  "كم جهازاً صدر له تقرير في تجربة المستفيد؟",
   "أبرز أعمالي هذا الشهر",
   "رتّب صفحتي حسب الأهمية",
   "كم نسبة التزامي؟",
@@ -651,7 +898,7 @@ export default function Assistant({ me, t, onPin }: { me: Me; t: T; onPin: (p: P
   const box = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
-    const KEYS = ["sessions", "natstrat", "inststrat", "outputs", "projects"];
+    const KEYS = ["sessions", "natstrat", "inststrat", "outputs", "cx", "projects"];
     const [tk, pf, ...secs] = await Promise.all([
       apiFetch("/api/tasks").then((r) => r.json()).catch(() => ({})),
       apiFetch("/api/portfolio").then((r) => r.json()).catch(() => ({})),
