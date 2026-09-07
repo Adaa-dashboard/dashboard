@@ -9327,7 +9327,8 @@ table.matrix thead th {
   pointer-events: auto; cursor: crosshair;
   background: rgba(201, 160, 32, .05);
 }
-.stk { position: absolute; pointer-events: auto; transform: translate(50%, -6px); }
+/* الورقة تبدأ من نقطة النقر نفسها — بلا إزاحة تُبعدها عنها */
+.stk { position: absolute; pointer-events: auto; }
 
 .stk-pin {
   width: 28px; height: 28px; border-radius: 50%; border: 1px solid #e6d090;
@@ -9382,7 +9383,8 @@ table.matrix thead th {
 .stk-f .stk-del { color: #b0453a; }
 
 .stk-pen {
-  position: fixed; inset-block-end: 20px; inset-inline-start: 20px; z-index: 45;
+  /* داخل مساحة الصفحة البيضاء لا فوق الشريط الجانبي */
+  position: absolute; inset-block-start: 16px; inset-inline-start: 20px; z-index: 46;
   width: 44px; height: 44px; border-radius: 50%; cursor: pointer;
   background: #fff; border: 1px solid var(--line, #e6edea);
   box-shadow: 0 4px 14px rgba(0, 0, 0, .12); font-size: 17px; color: #6b7c77;
@@ -9395,7 +9397,7 @@ table.matrix thead th {
   color: #fff; font-size: 10px; line-height: 18px; text-align: center; padding: 0 4px;
 }
 .stk-hint {
-  position: fixed; inset-block-end: 22px; inset-inline-start: 76px; z-index: 45;
+  position: absolute; inset-block-start: 22px; inset-inline-start: 76px; z-index: 46;
   background: #0d3d22; color: #fff; font-size: 11.5px;
   border-radius: 20px; padding: 8px 15px; box-shadow: 0 4px 14px rgba(0, 0, 0, .2);
 }
@@ -9403,5 +9405,6 @@ table.matrix thead th {
 @media print { .stk-pen, .stk-hint, .stk-layer { display: none !important; } }
 @media (max-width: 720px) {
   .stk-card { width: 210px; }
-  .stk-pen { inset-block-end: 74px; }
+  .stk-pen { width: 38px; height: 38px; font-size: 15px; inset-block-start: 10px; inset-inline-start: 12px; }
+  .stk-hint { inset-inline-start: 58px; font-size: 10.5px; padding: 6px 11px; }
 }
