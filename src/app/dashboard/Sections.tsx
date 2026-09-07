@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { writeXlsx, readXlsxSheets } from "@/lib/sheet";
 import { asset } from "@/lib/base";
+import { publishUndo } from "@/lib/undoBus";
 import { IconGear } from "./icons";
 import SectionSettings from "./SectionSettings";
 
@@ -230,6 +231,9 @@ export function useItems(section: SectionKey, enabled = true) {
      الدائم هو audit_log في قاعدة البيانات. */
   const undoRef = useRef<UndoStep[]>([]);
   const [undoTop, setUndoTop] = useState<UndoStep | null>(null);
+  /* رأس المكدّس — مستقل عن شريط التراجع: إخفاء الشريط لا ينزع
+     الخطوة، فيبقى سهم التراجع في رأس اللوحة صالحاً */
+  const [stackTop, setStackTop] = useState<UndoStep | null>(null);
   const itemsRef = useRef<Item[]>([]);
   useEffect(() => {
     itemsRef.current = items;
@@ -239,6 +243,7 @@ export function useItems(section: SectionKey, enabled = true) {
     undoRef.current.push(st);
     if (undoRef.current.length > UNDO_MAX) undoRef.current.shift();
     setUndoTop(st);
+    setStackTop(st);
   }, []);
 
   /* الكتابة الخام — لا تسجّل خطوة تراجع، فيستعملها التراجع نفسه */
@@ -309,6 +314,7 @@ export function useItems(section: SectionKey, enabled = true) {
   const undo = useCallback(async () => {
     const st = undoRef.current.pop();
     setUndoTop(undoRef.current[undoRef.current.length - 1] || null);
+    setStackTop(undoRef.current[undoRef.current.length - 1] || null);
     if (!st) return null;
     const err = st.before ? await put(st.id, st.before, st.ord) : await del(st.id);
     return err;
@@ -317,6 +323,23 @@ export function useItems(section: SectionKey, enabled = true) {
   /* إخفاء الشريط دون إفراغ المكدّس — الخطوة تبقى قابلة للتراجع
      من الشريط التالي إن حدث تغيير آخر */
   const dismissUndo = useCallback(() => setUndoTop(null), []);
+
+  /* نشر رأس المكدّس لسهم التراجع في رأس اللوحة. المُعرّف يحمل القسم
+     فلا تمسح صفحةٌ خطوةَ غيرها، والتنظيف عند الخروج من الصفحة. */
+  const busId = useRef(`items:${section}:${Math.random().toString(36).slice(2)}`).current;
+  useEffect(() => {
+    publishUndo(
+      busId,
+      stackTop
+        ? {
+            kind: stackTop.kind,
+            label: stackTop.label,
+            run: () => undo().then((e) => e ?? null),
+          }
+        : null,
+    );
+  }, [busId, stackTop, undo]);
+  useEffect(() => () => publishUndo(busId, null), [busId]);
 
   return { items, loaded, error, reload: load, save, remove, undo, undoTop, dismissUndo };
 }
