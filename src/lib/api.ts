@@ -402,6 +402,31 @@ export async function apiFetch(path: string, init: Init = {}) {
       }
     }
 
+    /* إعادة بند محذوف كما كان — للتراجع عن الحذف.
+       يُدرج بمعرّفه وتاريخه وتحديثاته الأصلية، فلا يُعدّ بنداً جديداً. */
+    if (p === "/api/tasks/restore" && method === "POST") {
+      const x = (body.task || {}) as Record<string, unknown>;
+      const id = String(x.id || "");
+      if (!id) return err("لا يوجد بند لإعادته", 400);
+      const { error } = await s.from("perf_tasks").insert({
+        id,
+        title: String(x.title || ""),
+        description: String(x.description || ""),
+        assignee_id: String(x.assigneeId || ""),
+        priority: x.priority === "high" ? "high" : "mid",
+        due_date: x.dueDate,
+        indicator_id: x.indicatorId || null,
+        kind: x.kind === "assignment" ? "assignment" : "task",
+        state: x.state === "done" ? "done" : x.state === "risk" ? "risk" : "ok",
+        updates: Array.isArray(x.updates) ? x.updates : [],
+        created_by_id: String(x.createdById || ""),
+        created_at: x.createdAt || new Date().toISOString(),
+        completed_at: x.completedAt || null,
+      });
+      if (error) return err("تعذّرت إعادة البند", 403);
+      return ok({ ok: true });
+    }
+
     if (p.startsWith("/api/tasks/")) {
       const id = p.split("/")[3];
       if (method === "DELETE") {

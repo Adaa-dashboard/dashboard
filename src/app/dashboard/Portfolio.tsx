@@ -10,6 +10,7 @@ import { EMPTY_NOTES, firstLine, preview, whenAr, type NotesData } from "./Notes
 import { PIcon, IconPicker } from "./pickicons";
 import { IconGear } from "./icons";
 import MyEntities, { contribsOf, sumOf } from "./Entities";
+import { publishUndo } from "@/lib/undoBus";
 
 /* ============================================================
    محفظتي — الصفحة الشخصية لكل موظف.
@@ -184,10 +185,26 @@ const COLS: Record<string, Col[]> = {
   ],
 };
 
+/** اسم الصف كما يعرفه صاحبه — لتلميح سهم التراجع */
+function labelOfRow(r: Row): string {
+  const d = r.data as Record<string, unknown>;
+  for (const k of ["name", "title", "entity", "text", "desc"]) {
+    const v = d[k];
+    if (typeof v === "string" && v.trim()) return v.trim().slice(0, 60);
+  }
+  return r.id;
+}
+
 /* ---------------- تحميل صفوف المحفظة ---------------- */
 function usePortfolio(userId?: string) {
   const [rows, setRows] = useState<Row[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const rowsRef = useRef<Row[]>([]);
+  useEffect(() => {
+    rowsRef.current = rows;
+  }, [rows]);
+  const busId = useRef(`pf:${Math.random().toString(36).slice(2)}`).current;
+  useEffect(() => () => publishUndo(busId, null), [busId]);
 
   const load = useCallback(async () => {
     const r = await apiFetch(`/api/portfolio${userId ? `?user=${userId}` : ""}`);
@@ -225,12 +242,30 @@ function usePortfolio(userId?: string) {
     [load],
   );
 
+  /* الحذف يلتقط الصف قبل إزالته، فسهم التراجع يعيده بمعرّفه
+     وترتيبه وبياناته كما كان — لا نسخة جديدة منه */
   const remove = useCallback(
     async (section: string, id: string) => {
+      const before = rowsRef.current.find((r) => r.section === section && r.id === id);
       await apiFetch(`/api/portfolio?section=${section}&id=${encodeURIComponent(id)}`, { method: "DELETE" });
       await load();
+      if (!before) return;
+      publishUndo(busId, {
+        kind: "delete",
+        label: labelOfRow(before),
+        run: async () => {
+          await apiFetch("/api/portfolio", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ section, id, data: before.data, ord: before.ord }),
+          });
+          publishUndo(busId, null);
+          await load();
+          return null;
+        },
+      });
     },
-    [load],
+    [load, busId],
   );
 
   const of = useCallback((section: string) => rows.filter((r) => r.section === section), [rows]);
@@ -274,6 +309,8 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
 
   const [people, setPeople] = useState<Person[]>([]);
   const [busy, setBusy] = useState(false);
+  const tBusId = useRef(`pf-tasks:${Math.random().toString(36).slice(2)}`).current;
+  useEffect(() => () => publishUndo(tBusId, null), [tBusId]);
 
   const load = useCallback(async () => {
     const d = await apiFetch("/api/tasks").then((r) => r.json()).catch(() => ({}));
@@ -322,8 +359,32 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
   }
   async function del(id: string) {
     if (!confirm(t("حذف المهمة؟", "Delete task?"))) return;
-    await apiFetch(`/api/tasks/${id}`, { method: "DELETE" });
+    const before = tasks.find((x) => x.id === id);
+    const r = await apiFetch(`/api/tasks/${id}`, { method: "DELETE" }).then((x) => x.json()).catch(() => ({}));
+    if (r?.error) {
+      alert(r.error);
+      return;
+    }
     await load();
+    if (!before) return;
+    publishUndo(tBusId, {
+      kind: "delete",
+      label: before.title,
+      run: async () => {
+        const back = await apiFetch("/api/tasks/restore", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ task: before }),
+        }).then((x) => x.json()).catch(() => ({}));
+        publishUndo(tBusId, null);
+        if (back?.error) {
+          alert(back.error);
+          return back.error as string;
+        }
+        await load();
+        return null;
+      },
+    });
   }
   async function create() {
     const title = newT.title.trim();

@@ -2,8 +2,9 @@
 
 import { apiFetch } from "@/lib/api";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { IconReply } from "./icons";
+import { publishUndo } from "@/lib/undoBus";
 
 type State = "ok" | "risk" | "done";
 type Priority = "high" | "mid";
@@ -112,6 +113,8 @@ export default function Tasks({
   const [creating, setCreating] = useState(false);
   const [err, setErr] = useState("");
   const [showAll, setShowAll] = useState(false);
+  const busId = useRef(`tasks:${kind}:${Math.random().toString(36).slice(2)}`).current;
+  useEffect(() => () => publishUndo(busId, null), [busId]);
 
   const load = useCallback(async () => {
     const r = await apiFetch("/api/tasks").then((x) => x.json());
@@ -245,6 +248,26 @@ export default function Tasks({
     }
     setOpen(null);
     load();
+    /* البند محفوظ عندنا كما كان، فسهم التراجع يعيده بمعرّفه
+       وتحديثاته — لا نسخة جديدة منه */
+    publishUndo(busId, {
+      kind: "delete",
+      label: task.title,
+      run: async () => {
+        const back = await apiFetch("/api/tasks/restore", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ task }),
+        }).then((x) => x.json());
+        publishUndo(busId, null);
+        if (back.error) {
+          setErr(back.error);
+          return back.error as string;
+        }
+        load();
+        return null;
+      },
+    });
   }
 
   async function saveState(task: Task, state: State, text: string) {

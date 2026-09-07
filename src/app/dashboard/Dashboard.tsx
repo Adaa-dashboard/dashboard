@@ -3,9 +3,10 @@
 import { asset } from "@/lib/base";
 
 import { apiFetch } from "@/lib/api";
+import { subscribeUndo, undoSnapshot, undoServerSnapshot } from "@/lib/undoBus";
 
 import type { ReactElement, ReactNode } from "react";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Activity, { type Item as ActivityItem } from "./Activity";
 import Changes from "./Changes";
 import Backup from "./Backup";
@@ -200,23 +201,17 @@ export default function Dashboard({ me }: { me: Me }) {
      في الصفحة يستدعي history.back() نفسه — فالاثنان يعملان معاً */
   const tabRef = useRef<string>(firstTab);
   const backRef = useRef<string[]>([]);
-  const [canBack, setCanBack] = useState(false);
 
   const setTab = useCallback((next: string) => {
     if (tabRef.current === next) return;
     backRef.current.push(tabRef.current);
     tabRef.current = next;
-    setCanBack(true);
     setTabRaw(next);
     try {
       window.history.pushState({ t: next }, "");
     } catch {
       /* ignore */
     }
-  }, []);
-
-  const goBack = useCallback(() => {
-    if (backRef.current.length) window.history.back();
   }, []);
 
   useEffect(() => {
@@ -226,11 +221,23 @@ export default function Dashboard({ me }: { me: Me }) {
         tabRef.current = prev;
         setTabRaw(prev);
       }
-      setCanBack(backRef.current.length > 0);
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
+
+  /* سهم التراجع في رأس الصفحة: يتراجع عن آخر حذف أو تعديل في
+     الصفحة المفتوحة — لا يرجع للصفحة السابقة (رجوع المتصفح باقٍ
+     كما هو من سجل الصفحات أعلاه). الخطوة تصله من ناقل التراجع. */
+  const undoSlot = useSyncExternalStore(subscribeUndo, undoSnapshot, undoServerSnapshot);
+  const [undoBusy, setUndoBusy] = useState(false);
+  const runUndo = useCallback(async () => {
+    const e = undoSlot?.entry;
+    if (!e || undoBusy) return;
+    setUndoBusy(true);
+    await e.run();
+    setUndoBusy(false);
+  }, [undoSlot, undoBusy]);
   const [backupOpen, setBackupOpen] = useState(false);
   const [refData, setRefData] = useState<RefData>(EMPTY_REF);
   const [loaded, setLoaded] = useState(false);
@@ -511,12 +518,16 @@ export default function Dashboard({ me }: { me: Me }) {
             <div className="hsep" />
             <h1>{t(title[0], title[1])}</h1>
             <div className="grow" />
-            {canBack && (
+            {undoSlot && (
               <button
-                className="back-b"
-                onClick={goBack}
-                title={t("رجوع للصفحة السابقة", "Back")}
-                aria-label={t("رجوع", "Back")}
+                className="back-b undo-b"
+                onClick={runUndo}
+                disabled={undoBusy}
+                title={t(
+                  `${undoSlot.entry.kind === "delete" ? "تراجع عن حذف" : undoSlot.entry.kind === "add" ? "تراجع عن إضافة" : "تراجع عن تعديل"} «${undoSlot.entry.label}»`,
+                  `Undo: ${undoSlot.entry.label}`
+                )}
+                aria-label={t("تراجع", "Undo")}
               >
                 {/* سهم منحنٍ بلا خلفية — والاتجاه حسب لغة الصفحة،
                     فالـSVG لا يُقلب تلقائياً مع RTL */}
