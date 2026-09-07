@@ -19,6 +19,9 @@ export type Item = {
   section?: string;
 };
 
+/** إعلان من المطوّر — كتلة مستقلة تحت عنوانها */
+export type Notice = { id: string; title: string; body: string; at: string; unread: boolean };
+
 const TONE: Record<string, string> = {
   bad: "#d34a4a",
   warn: "#e0971a",
@@ -51,6 +54,8 @@ export default function Activity({
   onOpen?: (item: Item) => void;
 }) {
   const [items, setItems] = useState<Item[]>([]);
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [openN, setOpenN] = useState<string | null>(null);
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -58,6 +63,7 @@ export default function Activity({
   const load = useCallback(async () => {
     const r = await apiFetch("/api/activity").then((x) => x.json());
     setItems(r.activity || []);
+    setNotices(r.notices || []);
     setUnread(r.unread || 0);
     setLoaded(true);
   }, []);
@@ -93,6 +99,23 @@ export default function Activity({
         )}
         <span className="cv">▾</span>
       </button>
+
+      {notices.length > 0 && (
+        <div className="dev">
+          <div className="dev-h">{t("تحديثات إضافية من المطوّر", "From the developer")}</div>
+          {notices.map((n) => (
+            <div className={`dev-i ${openN === n.id ? "on" : ""}`} key={n.id}>
+              <button onClick={() => setOpenN(openN === n.id ? null : n.id)}>
+                <span className="dev-d" />
+                <b>{n.title}</b>
+                {n.unread && <span className="tg">{t("جديد", "new")}</span>}
+                <span className="cv">▾</span>
+              </button>
+              {openN === n.id && <p>{n.body}</p>}
+            </div>
+          ))}
+        </div>
+      )}
 
       {!loaded ? (
         <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>

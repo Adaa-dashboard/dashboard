@@ -734,7 +734,7 @@ export async function apiFetch(path: string, init: Init = {}) {
         );
         return ok({ ok: true });
       }
-      const [ms, nt, tk, sec, ind, seen, tlog, its, sti, card] = await Promise.all([
+      const [ms, nt, tk, sec, ind, seen, tlog, its, sti, ntc, card] = await Promise.all([
         s.from("perf_measurements").select("*").order("updated_at", { ascending: false }).limit(30),
         s.from("perf_notes").select("*").order("at", { ascending: false }).limit(20),
         s.from("perf_tasks").select("*").order("created_at", { ascending: false }).limit(20),
@@ -744,6 +744,7 @@ export async function apiFetch(path: string, init: Init = {}) {
         s.from("perf_target_log").select("*").order("at", { ascending: false }).limit(20),
         s.from("perf_items").select("*").order("updated_at", { ascending: false }).limit(40),
         s.from("perf_stickies").select("*").eq("done", false).order("at", { ascending: false }).limit(20),
+        s.from("perf_notices").select("*").order("at", { ascending: false }).limit(6),
         s.rpc("perf_me"),
       ]);
       const myScopes: string[] = (() => {
@@ -893,7 +894,20 @@ export async function apiFetch(path: string, init: Init = {}) {
       }
       items.sort((a, b) => (b.at || "").localeCompare(a.at || ""));
       const top = items.slice(0, 6);
-      return ok({ activity: top, unread: top.filter((x) => x.unread).length });
+      /* إعلانات المطوّر كتلةٌ مستقلة تحت عنوانها — لا تزاحم
+         تحديثات العمل ولا تُدفن تحتها */
+      const notices = (ntc.data || []).map((r) => ({
+        id: String(r.id),
+        title: String(r.title || ""),
+        body: String(r.body || ""),
+        at: r.at,
+        unread: !since || String(r.at) > since,
+      }));
+      return ok({
+        activity: top,
+        unread: top.filter((x) => x.unread).length,
+        notices,
+      });
     }
 
     /* ---------------- الإنجاز الأسبوعي ---------------- */
