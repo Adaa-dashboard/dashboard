@@ -2260,7 +2260,11 @@ function UsersManager({ refData }: { refData: RefData }) {
       .sort(byName);
     const out: { id: string; name: string; rows: UserRow[] }[] = [];
     if (head.length)
-      out.push({ id: "__dept", name: t("إدارة عمليات الأداء", "Performance Operations"), rows: head });
+      out.push({
+        id: "__dept",
+        name: t("المدير التنفيذي لإدارة عمليات الأداء", "Executive Director — Performance Operations"),
+        rows: head,
+      });
     for (const sec of refData.sectors) {
       const rows = shown.filter((u) => (u.sectorIds || []).includes(sec.id)).sort(byName);
       if (rows.length) out.push({ id: sec.id, name: sec.name, rows });
