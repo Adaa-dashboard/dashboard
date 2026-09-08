@@ -9366,6 +9366,9 @@ table.matrix thead th {
   box-shadow: 0 2px 6px rgba(0, 0, 0, .12);
 }
 .stk-pin:hover { transform: scale(1.1); }
+/* الدبّوس يُسحب: بلا touch-action تمرّر الشاشةُ الصفحةَ بدل نقله */
+.stk-pin.grab { cursor: grab; touch-action: none; }
+.stk-pin.grab:active { cursor: grabbing; }
 
 .stk-card {
   width: 250px; background: #fdf3d2; border: 1px solid #ecd898;
@@ -9553,6 +9556,9 @@ table.matrix thead th {
     border-top: 1px solid var(--border);
   }
   .modal .m-f .btn { flex: 1 1 0; justify-content: center; }
+
+  /* الدبّوس هدف سحبٍ بالإصبع — 28px صغيرة على اللمس */
+  .stk-pin { width: 34px; height: 34px; font-size: 15px; }
 
   /* ---- بنود القوائم: كلٌّ منها هدف لمس مريح ---- */
   .sheet-item, .sub-item { min-height: 48px; font-size: 14px; }

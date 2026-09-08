@@ -160,11 +160,12 @@ function Note({
   const [text, setText] = useState(n.body);
   const [until, setUntil] = useState<string>(n.pinnedUntil || "");
   const drag = useRef<{ dx: number; dy: number } | null>(null);
+  const dragged = useRef(false);
 
   /* السحب بالرأس وحده — فالنقر داخل النص لا يحرّك الورقة.
      أحداث المؤشر لا الفأرة: نفس الشيفرة تخدم الإصبع والفأرة،
      فالسحب صار يعمل على الجوال أيضاً. */
-  function down(e: React.PointerEvent) {
+  function down(e: React.PointerEvent, after?: (moved: boolean) => void) {
     if (!mine) return;
     const host = (e.currentTarget as HTMLElement).closest(".stk-layer") as HTMLElement | null;
     if (!host) return;
@@ -176,6 +177,9 @@ function Note({
     drag.current = { dx, dy };
     let moved = false;
     const move = (ev: PointerEvent) => {
+      /* عتبة صغيرة: الإصبع لا يثبت تماماً على الشاشة، فبلا عتبة
+         تصير كل ضغطة «سحباً» ولا يُفتح الدبّوس أبداً */
+      if (!moved && Math.abs(ev.clientX - e.clientX) < 5 && Math.abs(ev.clientY - e.clientY) < 5) return;
       moved = true;
       const x = ((ev.clientX - dx - r.left) / r.width) * 100;
       const y = ((ev.clientY - dy - r.top) / r.height) * 100;
@@ -190,6 +194,7 @@ function Note({
          والبند يُقرأ من زاوية الورقة لا من موضع الإصبع: الزاوية
          هي ما يراه المستخدم مستقرّاً على البطاقة */
       if (moved) onDrop(n.id, ev.clientX - dx + 8, ev.clientY - dy + 8);
+      after?.(moved);
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
@@ -199,7 +204,18 @@ function Note({
   return (
     <div className={`stk ${open ? "open" : ""}`} style={{ left: `${n.x}%`, top: `${n.y}%` }}>
       {!open ? (
-        <button className="stk-pin" onClick={() => setOpen(true)} title={n.body.slice(0, 80)}>
+        /* الدبّوس نفسه يُسحب: النقر يفتحه والجرّ ينقله — فلا حاجة
+           لفتح الملاحظة لتغيير مكانها. dragged يمنع الفتح بعد الجرّ،
+           لأن المتصفح يُطلق click في نهاية السحب أيضاً. */
+        <button
+          className={`stk-pin ${mine ? "grab" : ""}`}
+          onPointerDown={(e) => down(e, (moved) => { dragged.current = moved; })}
+          onClick={() => {
+            if (dragged.current) { dragged.current = false; return; }
+            setOpen(true);
+          }}
+          title={mine ? t("اضغط للفتح · اسحب لنقله", "Tap to open · drag to move") : n.body.slice(0, 80)}
+        >
           📌
         </button>
       ) : (
