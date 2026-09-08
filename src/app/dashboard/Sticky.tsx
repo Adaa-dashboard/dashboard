@@ -41,18 +41,20 @@ export type StickyRow = {
 const CARDS = ".card, .widget, .sx-card, .sx-box, .sx-grp, .pf-w, .tcol, .kp, section";
 const HEADS = "h1, h2, h3, h4, .sec-h, .sx-h, .wg-h, .tcol-h, .k";
 
-/** عنوان أقرب بطاقة تحوي هذه النقطة */
-function anchorAt(el: Element | null): string {
+/** أقرب بطاقة ذات عنوان تحوي هذه النقطة */
+function cardAt(el: Element | null): HTMLElement | null {
   let cur = el as HTMLElement | null;
   while (cur && cur !== document.body) {
-    if (cur.matches?.(CARDS)) {
-      const h = cur.querySelector(HEADS);
-      const txt = (h?.textContent || "").replace(/\s+/g, " ").trim();
-      if (txt) return txt.slice(0, 120);
-    }
+    if (cur.matches?.(CARDS) && headOf(cur)) return cur;
     cur = cur.parentElement;
   }
-  return "";
+  return null;
+}
+
+/** عنوان البطاقة كما يقرؤه المستخدم */
+function headOf(card: HTMLElement): string {
+  const h = card.querySelector(HEADS);
+  return (h?.textContent || "").replace(/\s+/g, " ").trim().slice(0, 120);
 }
 
 /** إيجاد البطاقة صاحبة هذا العنوان الآن */
@@ -61,11 +63,38 @@ function findAnchor(host: HTMLElement, anchor: string): HTMLElement | null {
   const want = anchor.replace(/\s+/g, " ").trim();
   const root = host.parentElement || document.body;
   for (const c of Array.from(root.querySelectorAll<HTMLElement>(CARDS))) {
-    const h = c.querySelector(HEADS);
-    const txt = (h?.textContent || "").replace(/\s+/g, " ").trim().slice(0, 120);
-    if (txt && txt === want) return c;
+    if (headOf(c) === want) return c;
   }
   return null;
+}
+
+const clamp = (v: number, hi = 100) => Math.max(0, Math.min(hi, v));
+
+/* الموضع الذي تُحفظ به ملاحظةٌ أُفلتت عند نقطة بعينها.
+   إن وقعت داخل بطاقة، فالنسبة **من البطاقة نفسها** لا من الصفحة:
+   هكذا يعني الموضعُ الشيءَ ذاته على الجوال وعلى الحاسوب مهما
+   اختلف عرض البطاقة وموقعها. وإن وقعت خارج كل بطاقة فالنسبة من
+   الصفحة كما كانت. */
+function spotAt(host: HTMLElement, cx: number, cy: number) {
+  // الطبقة تعلو المحتوى، فنُخفيها لحظةً لنقرأ ما تحتها
+  host.style.pointerEvents = "none";
+  const under = document.elementFromPoint(cx, cy);
+  host.style.pointerEvents = "";
+  const card = cardAt(under);
+  if (card) {
+    const r = card.getBoundingClientRect();
+    return {
+      anchor: headOf(card),
+      x: clamp(((cx - r.left) / r.width) * 100, 96),
+      y: clamp(((cy - r.top) / r.height) * 100, 96),
+    };
+  }
+  const hr = host.getBoundingClientRect();
+  return {
+    anchor: "",
+    x: clamp(((cx - hr.left) / hr.width) * 100, 78),
+    y: clamp(((cy - hr.top) / hr.height) * 100, 96),
+  };
 }
 
 const AR_MONTHS = [
@@ -111,6 +140,7 @@ function Note({
   canClose,
   t,
   onMove,
+  onDrop,
   onSave,
   onDone,
   onDelete,
@@ -120,6 +150,7 @@ function Note({
   canClose: boolean;
   t: T;
   onMove: (id: string, x: number, y: number) => void;
+  onDrop: (id: string, cx: number, cy: number) => void;
   onSave: (id: string, body: string, until: string | null) => void;
   onDone: (id: string) => void;
   onDelete: (id: string) => void;
@@ -138,24 +169,27 @@ function Note({
     const host = (e.currentTarget as HTMLElement).closest(".stk-layer") as HTMLElement | null;
     if (!host) return;
     const r = host.getBoundingClientRect();
-    drag.current = {
-      dx: e.clientX - (r.left + (n.x / 100) * r.width),
-      dy: e.clientY - (r.top + (n.y / 100) * r.height),
-    };
+    /* الفارق بين الإصبع وزاوية الورقة — يُحسب مرّة ويُستعمل في
+       التحريك وفي الإفلات معاً، فالورقة لا تقفز تحت الإصبع */
+    const dx = e.clientX - (r.left + (n.x / 100) * r.width);
+    const dy = e.clientY - (r.top + (n.y / 100) * r.height);
+    drag.current = { dx, dy };
     let moved = false;
     const move = (ev: PointerEvent) => {
       moved = true;
-      const x = ((ev.clientX - (drag.current?.dx || 0) - r.left) / r.width) * 100;
-      const y = ((ev.clientY - (drag.current?.dy || 0) - r.top) / r.height) * 100;
+      const x = ((ev.clientX - dx - r.left) / r.width) * 100;
+      const y = ((ev.clientY - dy - r.top) / r.height) * 100;
       onMove(n.id, Math.max(0, Math.min(78, x)), Math.max(0, Math.min(96, y)));
     };
-    const up = () => {
+    const up = (ev: PointerEvent) => {
       drag.current = null;
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);
-      // بلا حركة لا حفظ — الضغطة وحدها ليست نقلاً
-      if (moved) onSave(n.id, text, until || null);
+      /* بلا حركة لا حفظ — الضغطة وحدها ليست نقلاً.
+         والبند يُقرأ من زاوية الورقة لا من موضع الإصبع: الزاوية
+         هي ما يراه المستخدم مستقرّاً على البطاقة */
+      if (moved) onDrop(n.id, ev.clientX - dx + 8, ev.clientY - dy + 8);
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
@@ -276,17 +310,7 @@ export default function StickyLayer({
 
   async function place(e: React.MouseEvent) {
     if (!placing || !canWrite || !host.current) return;
-    const r = host.current.getBoundingClientRect();
-    /* الإحداثي من الحافة اليسرى الفيزيائية — لا من «بداية السطر»،
-       فلا ينقلب المعنى بين العربية والإنجليزية */
-    const x = Math.max(0, Math.min(78, ((e.clientX - r.left) / r.width) * 100));
-    const y = Math.max(0, Math.min(96, ((e.clientY - r.top) / r.height) * 100));
-    /* ما البند تحت الإصبع؟ الطبقة نفسها تلتقط الضغطة، فنُخفيها
-       لحظةً لنقرأ ما تحتها */
-    host.current.style.pointerEvents = "none";
-    const under = document.elementFromPoint(e.clientX, e.clientY);
-    host.current.style.pointerEvents = "";
-    const anchor = anchorAt(under);
+    const { anchor, x, y } = spotAt(host.current, e.clientX, e.clientY);
     setPlacing(false);
     const res = await apiFetch("/api/stickies", {
       method: "POST",
@@ -300,8 +324,32 @@ export default function StickyLayer({
       ]);
   }
 
+  /* أثناء السحب: تحريك مؤقّت للعرض وحده — لا يُحفظ ولا يمسّ الرسوّ.
+     الموضع النهائي يُحسب عند الإفلات في drop() أدناه. */
+  const [dragPos, setDragPos] = useState<Record<string, { x: number; y: number }>>({});
   const move = (id: string, x: number, y: number) =>
-    setRows((v) => v.map((r) => (r.id === id ? { ...r, x, y, anchor: "" } : r)));
+    setDragPos((v) => ({ ...v, [id]: { x, y } }));
+
+  /* الإفلات: تُعاد الملاحظة إلى البطاقة التي أُفلتت عندها.
+     مسحُ الرسوّ عند كل سحب كان يجعل الموضع نسبةً من شاشة الجهاز
+     الذي سُحبت فيه، فيقع على غير محلّه في الجهاز الآخر. */
+  async function drop(id: string, cx: number, cy: number) {
+    const h = host.current;
+    if (!h) return;
+    const spot = spotAt(h, cx, cy);
+    setDragPos((v) => {
+      const n = { ...v };
+      delete n[id];
+      return n;
+    });
+    setRows((v) => v.map((r) => (r.id === id ? { ...r, ...spot } : r)));
+    const cur = rows.find((r) => r.id === id);
+    await apiFetch("/api/stickies", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, x: spot.x, y: spot.y, anchor: spot.anchor, body: cur?.body ?? "", pinnedUntil: cur?.pinnedUntil ?? null }),
+    });
+  }
 
   /* ملاحظةٌ لها رسوّ توضع عند بطاقتها لا عند نسبتها المحفوظة.
      يُعاد الحساب مع كل تغيّر في المقاس أو المحتوى. */
@@ -317,9 +365,10 @@ export default function StickyLayer({
       const el = findAnchor(h, n.anchor);
       if (!el) continue;
       const r = el.getBoundingClientRect();
+      // x و y نسبةٌ من البطاقة حين يكون لها رسوّ — تُترجَم هنا إلى نسبة من الصفحة
       next[n.id] = {
-        x: Math.max(0, Math.min(78, ((r.left - hr.left + 10) / hr.width) * 100)),
-        y: Math.max(0, Math.min(96, ((r.top - hr.top + 10) / hr.height) * 100)),
+        x: clamp((((r.left - hr.left) + (n.x / 100) * r.width) / hr.width) * 100, 90),
+        y: clamp((((r.top - hr.top) + (n.y / 100) * r.height) / hr.height) * 100, 96),
       };
     }
     setFix((cur) => {
@@ -341,7 +390,6 @@ export default function StickyLayer({
     await apiFetch("/api/stickies", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      // من سحبها بيده اختار موضعاً صريحاً، فيُمحى رسوّها على البند
       body: JSON.stringify({ id, body, pinnedUntil: until, x: cur?.x, y: cur?.y, anchor: cur?.anchor ?? "" }),
     });
     setRows((v) => v.map((r) => (r.id === id ? { ...r, body, pinnedUntil: until } : r)));
@@ -370,11 +418,18 @@ export default function StickyLayer({
         {rows.map((n) => (
           <Note
             key={n.id}
-            n={fix[n.id] ? { ...n, x: fix[n.id].x, y: fix[n.id].y } : n}
+            n={
+              dragPos[n.id]
+                ? { ...n, x: dragPos[n.id].x, y: dragPos[n.id].y }
+                : fix[n.id]
+                  ? { ...n, x: fix[n.id].x, y: fix[n.id].y }
+                  : n
+            }
             mine={String(n.byId) === String(meId)}
             canClose={canClose && String(n.byId) !== String(meId)}
             t={t}
             onMove={move}
+            onDrop={drop}
             onSave={save}
             onDone={done}
             onDelete={del}
