@@ -288,6 +288,7 @@ export default function StickyLayer({
   const [rows, setRows] = useState<StickyRow[]>([]);
   const [meId, setMeId] = useState("");
   const [placing, setPlacing] = useState(false);
+  const [err, setErr] = useState("");
   const host = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(async () => {
@@ -344,11 +345,14 @@ export default function StickyLayer({
     });
     setRows((v) => v.map((r) => (r.id === id ? { ...r, ...spot } : r)));
     const cur = rows.find((r) => r.id === id);
-    await apiFetch("/api/stickies", {
+    const res = await apiFetch("/api/stickies", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, x: spot.x, y: spot.y, anchor: spot.anchor, body: cur?.body ?? "", pinnedUntil: cur?.pinnedUntil ?? null }),
-    });
+    }).then((r) => r.json()).catch(() => ({ error: "تعذّر الاتصال" }));
+    /* الفشل الصامت هنا مكلف: الورقة تتحرّك أمام العين ولا يُحفظ
+       شيء، فتعود لمكانها عند إعادة الفتح ويبدو الأمر عطلاً غامضاً */
+    if (res?.error) setErr(String(res.error));
   }
 
   /* ملاحظةٌ لها رسوّ توضع عند بطاقتها لا عند نسبتها المحفوظة.
@@ -378,12 +382,43 @@ export default function StickyLayer({
     });
   }, [rows]);
 
+  /* البطاقات تصل بعد جلبها من القاعدة، وأطوالها تتغيّر مع الصور
+     والخطوط. فمرّةٌ واحدة عند التركيب لا تكفي: نراقب تغيّر مقاس
+     الصفحة وتغيّر شجرتها، ونعيد المحاولة بضع مرات في أول ثوانٍ.
+     بلا هذا يُحسب الموضع قبل وجود البطاقة، فتقع الورقة على
+     الاحتياطي (نسبة الصفحة) وتبدو في مكان غير مكانها. */
   useEffect(() => {
     relayout();
-    const h = window.setTimeout(relayout, 400); // بعد اكتمال رسم البطاقات
+    const timers = [120, 400, 900, 1800, 3000].map((ms) => window.setTimeout(relayout, ms));
+    const host2 = host.current?.parentElement || null;
+    let raf = 0;
+    const soon = () => {
+      if (raf) return;
+      raf = window.requestAnimationFrame(() => { raf = 0; relayout(); });
+    };
+    const ro = host2 && "ResizeObserver" in window ? new ResizeObserver(soon) : null;
+    ro?.observe(host2!);
+    const mo = host2 ? new MutationObserver(soon) : null;
+    mo?.observe(host2!, { childList: true, subtree: true, characterData: true });
     window.addEventListener("resize", relayout);
-    return () => { window.clearTimeout(h); window.removeEventListener("resize", relayout); };
+    return () => {
+      timers.forEach((h) => window.clearTimeout(h));
+      if (raf) window.cancelAnimationFrame(raf);
+      ro?.disconnect();
+      mo?.disconnect();
+      window.removeEventListener("resize", relayout);
+    };
   }, [relayout]);
+
+  /* ورقةٌ لها رسوّ ولم تُوجد بطاقتها بعد: تُخفى ولا تُعرض على
+     الاحتياطي — إظهارها في غير موضعها أسوأ من تأخّرها لحظة.
+     فإن لم تظهر البطاقة خلال ثلاث ثوانٍ (عنوان تغيّر مثلاً)
+     تُعرض على الاحتياطي حتى لا تضيع. */
+  const [late, setLate] = useState(false);
+  useEffect(() => {
+    const h = window.setTimeout(() => setLate(true), 3000);
+    return () => window.clearTimeout(h);
+  }, []);
 
   async function save(id: string, body: string, until: string | null) {
     const cur = rows.find((r) => r.id === id);
@@ -415,7 +450,7 @@ export default function StickyLayer({
         className={`stk-layer ${placing ? "placing" : ""}`}
         onClick={place}
       >
-        {rows.map((n) => (
+        {rows.filter((n) => !n.anchor || fix[n.id] || dragPos[n.id] || late).map((n) => (
           <Note
             key={n.id}
             n={
@@ -453,6 +488,11 @@ export default function StickyLayer({
             {canWrite ? "✎" : "📌"}
             {rows.length > 0 && <span>{rows.length}</span>}
           </button>
+        )}
+        {err && (
+          <div className="stk-hint err no-print" onClick={() => setErr("")}>
+            {t("تعذّر حفظ الموضع", "Could not save")}: {err}
+          </div>
         )}
         {placing && (
           <div className="stk-hint no-print">
