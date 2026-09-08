@@ -297,7 +297,7 @@ textarea.th-input{display:block;resize:none;overflow:hidden;line-height:1.5;
 .td-del:hover{color:var(--red);}
 
 /* ── PAYMENT VIEW ── */
-.pay-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
+.pay-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}
 
 /* ── PRINT / PDF ── */
 /* Project Progress */
@@ -1020,6 +1020,17 @@ body.view-only #view-only-bar{display:block;}
 <!-- PAYMENT VIEW -->
 <div id="payment-view" class="view">
   <div class="pay-kpis" id="pay-kpis"></div>
+  <div class="tbl-sec" style="margin-bottom:14px;">
+    <div class="tbl-bar"><h3>📦 قيمة كل مخرج وما صُرف عليه</h3>
+      <span style="font-size:.58rem;color:rgba(255,255,255,.45)">المصروف = الأشهر المعلَّمة «تم الصرف» فقط</span>
+    </div>
+    <div class="tbl-scroll"><table class="main-tbl">
+      <thead><tr><th style="text-align:right">المخرج</th><th>المستهدف</th><th>سعر الوحدة<br>بدون ضريبة</th>
+        <th>قيمة المخرج<br>شامل الضريبة</th><th>المنجز المصروف</th>
+        <th>المصروف عليه<br>شامل الضريبة</th><th>النسبة</th><th>المتبقي<br>شامل الضريبة</th></tr></thead>
+      <tbody id="pay-out-tbody"></tbody><tfoot id="pay-out-tfoot"></tfoot>
+    </table></div>
+  </div>
   <div class="tbl-sec">
     <div class="tbl-bar"><h3 id="pay-tbl-title">💰 جدول خطة الصرف</h3>
       <div class="plan-tools">
@@ -1157,8 +1168,12 @@ const mPay=(m,pl)=>(pl?MP[m]:acts[m-1]).reduce((s,v,i)=>s+v*UP[i],0);
 // كان يعطي 11,885,553.60 بدل 11,870,208 في ملف «خطة الصرف» المعتمد.
 const outValue = i => TGT[i] * UP[i];                    // بدون ضريبة
 const contractEx = () => TGT.reduce((s, v, i) => s + v * UP[i], 0);
-// المصروف على مخرج حتى شهر — من المنجز التراكمي لا من الفواتير
-const outSpent = (i, m) => cumA(i, m) * UP[i];           // بدون ضريبة
+// **المصروف يُحتسب للأشهر المعلَّمة «✅ تم الصرف» وحدها** — بطلب المستخدمة،
+// حتى يكون الرقم صرفاً فعلياً لا استحقاقاً. شهرٌ غير معلَّم لا يدخل أي حساب صرف.
+const paidUpTo = m => { const a = []; for(let j = 1; j <= m; j++) if(paidMonths[j-1]) a.push(j); return a; };
+const paidQty  = (i, m) => paidUpTo(m).reduce((s, j) => s + (acts[j-1][i] || 0), 0);
+const outSpent = (i, m) => paidQty(i, m) * UP[i];        // مخرج واحد · بدون ضريبة
+const paidSpentEx = m => paidUpTo(m).reduce((s, j) => s + mPay(j, false), 0);   // الكل
 
 document.getElementById('today-lbl').textContent=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
 
@@ -2079,7 +2094,8 @@ function paidBadge(m){
 function togglePaidM(m){
   paidMonths[m-1] = !paidMonths[m-1];
   savePlanMonth(m);
-  renderFin(); renderPay();
+  // بطاقات المخرجات وجدول المتابعة تعتمد على «تم الصرف» أيضاً ⇒ renderDash لا renderFin وحدها
+  renderDash(); renderPay();
 }
 
 function renderFin(){
@@ -2087,10 +2103,9 @@ function renderFin(){
   const planMonth = mPay(curM, true) * 1.15;
   // Actual payment this month
   const actMonth  = mPay(curM, false) * 1.15;
-  // Cumulative actual (all months so far)
-  let cumAct = 0;
-  for(let m=1;m<=curM;m++) cumAct += mPay(m,false);
-  cumAct *= 1.15;
+  // التراكمي = الأشهر المعلَّمة «تم الصرف» فقط
+  const paidN  = paidUpTo(curM).length;
+  const cumAct = paidSpentEx(curM) * 1.15;
   // Total contract value with VAT
   const totalContract = contractEx() * 1.15;
 
@@ -2108,7 +2123,7 @@ function renderFin(){
     <div class="fin-card" style="border-top:3px solid var(--g2)">
       <div class="fn-lbl">الصرف التراكمي حتى الشهر ${curM}</div>
       <div class="fn-val" style="color:var(--g2)">${f(cumAct,2)} <small style="font-size:.55rem;color:var(--muted)">ر.س</small></div>
-      <div class="fn-sub">شامل الضريبة 15%</div>
+      <div class="fn-sub">شامل الضريبة 15% · ${paidN} من ${curM} ${paidN===1?'شهر معلَّم':'أشهر معلَّمة'} «تم الصرف»</div>
     </div>
     <div class="fin-card" style="border-top:3px solid var(--gold)">
       <div class="fn-lbl">إجمالي قيمة العقد</div>
@@ -3583,21 +3598,45 @@ async function impRun(){
 // ═══════════════════════════════════════════════════════════
 function renderPay(){
   document.getElementById('pay-tbl-title').textContent='💰 جدول خطة الصرف – '+projectMonths+' فاتورة';
-  let totEx=INV.reduce((a,b)=>a+b,0), totAct=0;
-  for(let m=1;m<=curM;m++) totAct+=mPay(m,false);
+  // قيمة العقد من TGT×UP لا من مجموع الفواتير — مجموع INV خطة صرف قد تتجاوز العقد
+  const conEx = contractEx(), invEx = INV.reduce((a,b)=>a+b,0);
+  const paidN = paidUpTo(curM).length, spentEx = paidSpentEx(curM);
   document.getElementById('pay-kpis').innerHTML=`
-    <div class="fin-card"><div class="fn-lbl">إجمالي العقد (بدون ضريبة)</div><div class="fn-val" style="color:var(--g2)">${f(totEx,2)} ر.س</div></div>
-    <div class="fin-card"><div class="fn-lbl">إجمالي العقد (شامل الضريبة)</div><div class="fn-val" style="color:var(--g2)">${f(totEx*1.15,2)} ر.س</div></div>
-    <div class="fin-card" style="border-color:var(--g5)"><div class="fn-lbl">المصروف الفعلي حتى الشهر ${curM}</div><div class="fn-val" style="color:var(--g4)">${f(totAct,2)} ر.س</div><div class="fn-sub">${fp(totAct/totEx)} من العقد</div></div>`;
+    <div class="fin-card"><div class="fn-lbl">إجمالي العقد (بدون ضريبة)</div><div class="fn-val" style="color:var(--g2)">${f(conEx,2)} ر.س</div><div class="fn-sub">المستهدف × سعر الوحدة</div></div>
+    <div class="fin-card"><div class="fn-lbl">إجمالي العقد (شامل الضريبة)</div><div class="fn-val" style="color:var(--g2)">${f(conEx*1.15,2)} ر.س</div><div class="fn-sub">شامل الضريبة 15%</div></div>
+    <div class="fin-card" style="border-color:var(--gold)"><div class="fn-lbl">إجمالي الفواتير المخططة (بدون ضريبة)</div><div class="fn-val" style="color:var(--gold)">${f(invEx,2)} ر.س</div><div class="fn-sub">${invEx===conEx ? 'مطابق لقيمة العقد'
+        : (invEx>conEx?'يتجاوز العقد بـ ':'أقل من العقد بـ ') + f(Math.abs(invEx-conEx),2) + ' ر.س — راجع خطة الكميات'}</div></div>
+    <div class="fin-card" style="border-color:var(--g5)"><div class="fn-lbl">المصروف الفعلي حتى الشهر ${curM}</div><div class="fn-val" style="color:var(--g4)">${f(spentEx*1.15,2)} ر.س</div><div class="fn-sub">${fp(spentEx/conEx)} من العقد · ${paidN} ${paidN===1?'شهر معلَّم':'أشهر معلَّمة'} «تم الصرف»</div></div>`;
+
+  // ── جدول قيمة كل مخرج وما صُرف عليه ──
+  let oV=0,oS=0;
+  document.getElementById('pay-out-tbody').innerHTML=[0,1,2,3].map(i=>{
+    const val=outValue(i)*1.15, qty=paidQty(i,curM), sp=outSpent(i,curM)*1.15;
+    oV+=val; oS+=sp;
+    return `<tr>
+      <td style="text-align:right;font-weight:700;color:${CLR[i]}">${OI[i]} ${ON_S[i]}</td>
+      <td>${f(TGT[i])} ${OU[i]}</td>
+      <td>${f(UP[i],2)}</td>
+      <td style="font-weight:700;color:var(--g2)">${f(val,2)}</td>
+      <td style="font-weight:700;color:${CLR[i]}">${f(qty)} ${OU[i]}</td>
+      <td style="font-weight:700;color:var(--gold)">${f(sp,2)}</td>
+      <td style="font-weight:700;color:${CLR[i]}">${fp(val?sp/val:0)}</td>
+      <td style="color:var(--red)">${f(val-sp,2)}</td></tr>`;
+  }).join('');
+  document.getElementById('pay-out-tfoot').innerHTML=`<tr><td colspan="3">الإجمالي</td>
+    <td>${f(oV,2)}</td><td>—</td><td>${f(oS,2)}</td><td>${fp(oV?oS/oV:0)}</td><td>${f(oV-oS,2)}</td></tr>`;
   let tV=0,tT=0,tA=0;
   document.getElementById('pay-tbody').innerHTML=INV.map((ex,idx)=>{
-    const m=idx+1,vat=ex*.15,total=ex+vat,apay=mPay(m,false);
+    const m=idx+1,vat=ex*.15,total=ex+vat;
+    // الشهر غير المعلَّم «تم الصرف» لا يُحتسب صرفاً فعلياً
+    const apay=(paidMonths[m-1]?mPay(m,false):0)*1.15;
     tV+=vat;tT+=total;tA+=apay;
     const chip=m<curM?'<span class="chip chip-ok">✅ مستحق</span>':m===curM?'<span class="chip chip-cur">⏳ الحالي</span>':'<span class="chip chip-nd">🔜 قادم</span>';
     return`<tr class="${m===curM?'cur-row':''}"><td>${m}</td><td style="text-align:right">${INV_M[idx]}</td>
       <td style="padding:0"><input class="edit-cell" style="width:40px" value="${MP[m][0]}" onchange="MP[${m}][0]=parseInt(this.value)||0;savePlanSoon(${m});renderPay()"></td><td style="padding:0"><input class="edit-cell" style="width:44px" value="${MP[m][1]}" onchange="MP[${m}][1]=parseInt(this.value)||0;savePlanSoon(${m});renderPay()"></td><td style="padding:0"><input class="edit-cell" style="width:50px" value="${MP[m][2]}" onchange="MP[${m}][2]=parseInt(this.value)||0;savePlanSoon(${m});renderPay()"></td><td style="padding:0"><input class="edit-cell" style="width:40px" value="${MP[m][3]}" onchange="MP[${m}][3]=parseInt(this.value)||0;savePlanSoon(${m});renderPay()"></td>
       <td style="padding:0"><input class="edit-cell" style="width:88px" value="${ex}" onchange="INV[${idx}]=parseFloat(this.value)||0;savePlanSoon(${m});renderPay()" title="الفاتورة بدون ضريبة"></td><td>${f(vat,2)}</td><td style="font-weight:700;color:var(--g2)">${f(total,2)}</td>
-      <td style="font-weight:700;color:var(--g4)">${f(apay,2)}</td><td>${chip}</td></tr>`;
+      <td style="font-weight:700;color:${apay?'var(--g4)':'var(--muted)'}">${apay?f(apay,2):'—'}</td>
+      <td style="white-space:nowrap">${chip}<div style="margin-top:4px">${paidBadge(m)}</div></td></tr>`;
   }).join('');
   document.getElementById('pay-tfoot').innerHTML=`<tr><td colspan="6">الإجمالي</td><td>${f(INV.reduce((a,b)=>a+b,0),2)}</td><td>${f(tV,2)}</td><td>${f(tT,2)}</td><td>${f(tA,2)}</td><td>${projectMonths} فاتورة</td></tr>`;
 }
@@ -3863,7 +3902,7 @@ function generateReport(){
     function buildFin(){
     const planMonth = mPay(curM,true)*1.15;
     const actMonth  = mPay(curM,false)*1.15;
-    let cumAct=0; for(let m=1;m<=curM;m++) cumAct+=mPay(m,false); cumAct*=1.15;
+    const cumAct = paidSpentEx(curM)*1.15;
     const totalContract = contractEx()*1.15;
     return`<div class="r-section-title">💰 ملخص الصرف المالي</div>
     <div class="r-fin-grid" style="grid-template-columns:repeat(4,1fr)">
