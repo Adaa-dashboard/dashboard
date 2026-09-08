@@ -1152,6 +1152,13 @@ const mActPct=m=>acts[m-1].reduce((s,v,i)=>s+(v/TGT[i])*WTS[i],0);
 const overallAct=()=>acts.reduce((s,r)=>s+r.reduce((ss,v,i)=>ss+(v/TGT[i])*WTS[i],0),0);
 const overallPlan=()=>{let t=0;for(let m=1;m<=curM;m++)t+=mPlanPct(m);return t;};
 const mPay=(m,pl)=>(pl?MP[m]:acts[m-1]).reduce((s,v,i)=>s+v*UP[i],0);
+// قيمة العقد التعاقدية = المستهدف × سعر الوحدة — **لا مجموع الفواتير**.
+// خطة الكميات MP قد تتجاوز المستهدف (م1 مخطط له 64 مقابل 60)، فمجموع INV
+// كان يعطي 11,885,553.60 بدل 11,870,208 في ملف «خطة الصرف» المعتمد.
+const outValue = i => TGT[i] * UP[i];                    // بدون ضريبة
+const contractEx = () => TGT.reduce((s, v, i) => s + v * UP[i], 0);
+// المصروف على مخرج حتى شهر — من المنجز التراكمي لا من الفواتير
+const outSpent = (i, m) => cumA(i, m) * UP[i];           // بدون ضريبة
 
 document.getElementById('today-lbl').textContent=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
 
@@ -2011,6 +2018,13 @@ function renderCmp(){
             ${f(cumAct)}<span style="font-size:.6rem;font-weight:700;color:var(--muted)"> / ${f(TGT[i])} ${OU[i]}</span>
           </div>
         </div>
+        <!-- المصروف على هذا المخرج — بالذهبي تمييزاً للمال عن الكمية -->
+        <div style="margin-top:5px;background:var(--gold-pale);border:1px solid var(--gold);border-radius:7px;padding:7px 9px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <div style="font-size:.58rem;color:var(--muted);font-weight:700;">المصروف حتى الآن<br><span style="font-weight:500;opacity:.85">بدون ضريبة</span></div>
+          <div style="direction:ltr;font-size:1rem;font-weight:800;color:var(--gold);white-space:nowrap;">
+            ${f(outSpent(i,curM))}<span style="font-size:.6rem;font-weight:700;color:var(--muted)"> / ${f(outValue(i))} ر.س</span>
+          </div>
+        </div>
       </div>
     </div>`;
   }
@@ -2078,7 +2092,7 @@ function renderFin(){
   for(let m=1;m<=curM;m++) cumAct += mPay(m,false);
   cumAct *= 1.15;
   // Total contract value with VAT
-  const totalContract = INV.reduce((a,b)=>a+b,0) * 1.15;
+  const totalContract = contractEx() * 1.15;
 
   document.getElementById('fin-strip').innerHTML=`
     <div class="fin-card" style="border-top:3px solid var(--blue)">
@@ -3835,6 +3849,12 @@ function generateReport(){
               ${f(cumAct)}<span style="font-size:.6rem;font-weight:700;color:#7a9e87"> / ${f(TGT[i])} ${OU[i]}</span>
             </div>
           </div>
+          <div style="margin-top:5px;background:#fdf8e8;border:1px solid #c9a020;border-radius:7px;padding:7px 9px;display:flex;align-items:center;justify-content:space-between;gap:8px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
+            <div style="font-size:.58rem;color:#7a9e87;font-weight:700;">المصروف حتى الآن<br><span style="font-weight:500;opacity:.85">بدون ضريبة</span></div>
+            <div style="direction:ltr;font-size:1rem;font-weight:800;color:#c9a020;white-space:nowrap;">
+              ${f(outSpent(i,curM))}<span style="font-size:.6rem;font-weight:700;color:#7a9e87"> / ${f(outValue(i))} ر.س</span>
+            </div>
+          </div>
         </div>
       </div>`;
     }).join('')}</div>`;
@@ -3844,7 +3864,7 @@ function generateReport(){
     const planMonth = mPay(curM,true)*1.15;
     const actMonth  = mPay(curM,false)*1.15;
     let cumAct=0; for(let m=1;m<=curM;m++) cumAct+=mPay(m,false); cumAct*=1.15;
-    const totalContract = INV.reduce((a,b)=>a+b,0)*1.15;
+    const totalContract = contractEx()*1.15;
     return`<div class="r-section-title">💰 ملخص الصرف المالي</div>
     <div class="r-fin-grid" style="grid-template-columns:repeat(4,1fr)">
       <div class="r-fin-card" style="border-top:3px solid #1a4f8a"><div class="r-fin-lbl">الصرف المخطط للشهر ${MN[curM-1]}</div><div class="r-fin-val" style="color:#1a4f8a">${f(planMonth,2)} ر.س</div><div class="r-fin-sub">شامل الضريبة 15%</div></div>
