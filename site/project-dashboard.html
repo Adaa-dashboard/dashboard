@@ -1027,7 +1027,7 @@ body.view-only #view-only-bar{display:block;}
     <div class="tbl-scroll"><table class="main-tbl">
       <thead><tr><th style="text-align:right">المخرج</th><th>المستهدف</th><th>سعر الوحدة<br>بدون ضريبة</th>
         <th>قيمة المخرج<br>شامل الضريبة</th><th>المنجز المصروف</th>
-        <th>المصروف عليه<br>شامل الضريبة</th><th>النسبة</th><th>المتبقي<br>شامل الضريبة</th></tr></thead>
+        <th>المصروف عليه<br>شامل الضريبة</th><th>نسبة الصرف<br>من قيمته</th><th>المتبقي<br>شامل الضريبة</th></tr></thead>
       <tbody id="pay-out-tbody"></tbody><tfoot id="pay-out-tfoot"></tfoot>
     </table></div>
   </div>
@@ -1042,7 +1042,8 @@ body.view-only #view-only-bar{display:block;}
       </div>
     </div>
     <div class="tbl-scroll"><table class="main-tbl">
-      <thead><tr><th>#</th><th>موعد الاستحقاق</th><th>م1</th><th>م2</th><th>م3</th><th>م4</th><th>بدون ضريبة</th><th>ضريبة 15%</th><th>شامل الضريبة</th><th>صرف فعلي (شامل الضريبة)</th><th>الحالة</th></tr></thead>
+      <thead><tr><th>#</th><th>موعد الاستحقاق</th><th>م1</th><th>م2</th><th>م3</th><th>م4</th><th>بدون ضريبة</th><th>ضريبة 15%</th><th>شامل الضريبة</th><th>صرف فعلي (شامل الضريبة)</th>
+        <th>نسبة الصرف<br>التراكمية من العقد</th><th>الحالة</th></tr></thead>
       <tbody id="pay-tbody"></tbody><tfoot id="pay-tfoot"></tfoot>
     </table></div>
   </div>
@@ -3606,7 +3607,7 @@ function renderPay(){
     <div class="fin-card"><div class="fn-lbl">إجمالي العقد (شامل الضريبة)</div><div class="fn-val" style="color:var(--g2)">${f(conEx*1.15,2)} ر.س</div><div class="fn-sub">شامل الضريبة 15%</div></div>
     <div class="fin-card" style="border-color:var(--gold)"><div class="fn-lbl">إجمالي الفواتير المخططة (بدون ضريبة)</div><div class="fn-val" style="color:var(--gold)">${f(invEx,2)} ر.س</div><div class="fn-sub">${invEx===conEx ? 'مطابق لقيمة العقد'
         : (invEx>conEx?'يتجاوز العقد بـ ':'أقل من العقد بـ ') + f(Math.abs(invEx-conEx),2) + ' ر.س — راجع خطة الكميات'}</div></div>
-    <div class="fin-card" style="border-color:var(--g5)"><div class="fn-lbl">المصروف الفعلي حتى الشهر ${curM}</div><div class="fn-val" style="color:var(--g4)">${f(spentEx*1.15,2)} ر.س</div><div class="fn-sub">${fp(spentEx/conEx)} من العقد · ${paidN} ${paidN===1?'شهر معلَّم':'أشهر معلَّمة'} «تم الصرف»</div></div>`;
+    <div class="fin-card" style="border-color:var(--g5)"><div class="fn-lbl">المصروف الفعلي حتى الشهر ${curM}</div><div class="fn-val" style="color:var(--g4)">${f(spentEx*1.15,2)} ر.س</div><div class="fn-sub"><b style="color:var(--gold);font-size:.8rem">${fp(conEx?spentEx/conEx:0)}</b> من قيمة العقد · ${paidN} ${paidN===1?'شهر معلَّم':'أشهر معلَّمة'} «تم الصرف»</div></div>`;
 
   // ── جدول قيمة كل مخرج وما صُرف عليه ──
   let oV=0,oS=0;
@@ -3630,15 +3631,18 @@ function renderPay(){
     const m=idx+1,vat=ex*.15,total=ex+vat;
     // الشهر غير المعلَّم «تم الصرف» لا يُحتسب صرفاً فعلياً
     const apay=(paidMonths[m-1]?mPay(m,false):0)*1.15;
+    // تراكمية حتى هذا الشهر — البسط والمقام بلا ضريبة فالنسبة واحدة في الحالين
+    const cumPct = conEx ? paidSpentEx(m)/conEx : 0;
     tV+=vat;tT+=total;tA+=apay;
     const chip=m<curM?'<span class="chip chip-ok">✅ مستحق</span>':m===curM?'<span class="chip chip-cur">⏳ الحالي</span>':'<span class="chip chip-nd">🔜 قادم</span>';
     return`<tr class="${m===curM?'cur-row':''}"><td>${m}</td><td style="text-align:right">${INV_M[idx]}</td>
       <td style="padding:0"><input class="edit-cell" style="width:40px" value="${MP[m][0]}" onchange="MP[${m}][0]=parseInt(this.value)||0;savePlanSoon(${m});renderPay()"></td><td style="padding:0"><input class="edit-cell" style="width:44px" value="${MP[m][1]}" onchange="MP[${m}][1]=parseInt(this.value)||0;savePlanSoon(${m});renderPay()"></td><td style="padding:0"><input class="edit-cell" style="width:50px" value="${MP[m][2]}" onchange="MP[${m}][2]=parseInt(this.value)||0;savePlanSoon(${m});renderPay()"></td><td style="padding:0"><input class="edit-cell" style="width:40px" value="${MP[m][3]}" onchange="MP[${m}][3]=parseInt(this.value)||0;savePlanSoon(${m});renderPay()"></td>
       <td style="padding:0"><input class="edit-cell" style="width:88px" value="${ex}" onchange="INV[${idx}]=parseFloat(this.value)||0;savePlanSoon(${m});renderPay()" title="الفاتورة بدون ضريبة"></td><td>${f(vat,2)}</td><td style="font-weight:700;color:var(--g2)">${f(total,2)}</td>
       <td style="font-weight:700;color:${apay?'var(--g4)':'var(--muted)'}">${apay?f(apay,2):'—'}</td>
+      <td style="font-weight:700;color:${cumPct?'var(--gold)':'var(--muted)'}">${fp(cumPct)}</td>
       <td style="white-space:nowrap">${chip}<div style="margin-top:4px">${paidBadge(m)}</div></td></tr>`;
   }).join('');
-  document.getElementById('pay-tfoot').innerHTML=`<tr><td colspan="6">الإجمالي</td><td>${f(INV.reduce((a,b)=>a+b,0),2)}</td><td>${f(tV,2)}</td><td>${f(tT,2)}</td><td>${f(tA,2)}</td><td>${projectMonths} فاتورة</td></tr>`;
+  document.getElementById('pay-tfoot').innerHTML=`<tr><td colspan="6">الإجمالي</td><td>${f(invEx,2)}</td><td>${f(tV,2)}</td><td>${f(tT,2)}</td><td>${f(tA,2)}</td><td style="color:var(--gold)">${fp(conEx?spentEx/conEx:0)}</td><td>${projectMonths} فاتورة</td></tr>`;
 }
 
 // ═══════════════════════════════════════════════════════════
