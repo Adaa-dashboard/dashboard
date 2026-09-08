@@ -2020,9 +2020,9 @@ function renderCmp(){
         </div>
         <!-- المصروف على هذا المخرج — بالذهبي تمييزاً للمال عن الكمية -->
         <div style="margin-top:5px;background:var(--gold-pale);border:1px solid var(--gold);border-radius:7px;padding:7px 9px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
-          <div style="font-size:.58rem;color:var(--muted);font-weight:700;">المصروف حتى الآن<br><span style="font-weight:500;opacity:.85">بدون ضريبة</span></div>
+          <div style="font-size:.58rem;color:var(--muted);font-weight:700;">المصروف حتى الآن<br><span style="font-weight:500;opacity:.85">شامل الضريبة 15%</span></div>
           <div style="direction:ltr;font-size:1rem;font-weight:800;color:var(--gold);white-space:nowrap;">
-            ${f(outSpent(i,curM))}<span style="font-size:.6rem;font-weight:700;color:var(--muted)"> / ${f(outValue(i))} ر.س</span>
+            ${f(outSpent(i,curM)*1.15,2)}<span style="font-size:.6rem;font-weight:700;color:var(--muted)"> / ${f(outValue(i)*1.15,2)} ر.س</span>
           </div>
         </div>
       </div>
@@ -3850,9 +3850,9 @@ function generateReport(){
             </div>
           </div>
           <div style="margin-top:5px;background:#fdf8e8;border:1px solid #c9a020;border-radius:7px;padding:7px 9px;display:flex;align-items:center;justify-content:space-between;gap:8px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
-            <div style="font-size:.58rem;color:#7a9e87;font-weight:700;">المصروف حتى الآن<br><span style="font-weight:500;opacity:.85">بدون ضريبة</span></div>
+            <div style="font-size:.58rem;color:#7a9e87;font-weight:700;">المصروف حتى الآن<br><span style="font-weight:500;opacity:.85">شامل الضريبة 15%</span></div>
             <div style="direction:ltr;font-size:1rem;font-weight:800;color:#c9a020;white-space:nowrap;">
-              ${f(outSpent(i,curM))}<span style="font-size:.6rem;font-weight:700;color:#7a9e87"> / ${f(outValue(i))} ر.س</span>
+              ${f(outSpent(i,curM)*1.15,2)}<span style="font-size:.6rem;font-weight:700;color:#7a9e87"> / ${f(outValue(i)*1.15,2)} ر.س</span>
             </div>
           </div>
         </div>
