@@ -126,6 +126,12 @@ export async function apiFetch(path: string, init: Init = {}) {
       });
       if (error) return err(error.message, 500);
       if (!data) return err("اسم المستخدم أو رقم الجوال غير صحيح", 401);
+      /* «مقفل»: الجوال المخزَّن ليس رقماً — لا خطأ فيما أدخله.
+         الرسالة العامة كانت تدور بالموظف بلا فائدة */
+      if (data.error === "locked")
+        return err("حسابك لم يُجهَّز بعد: لم يُسجَّل رقم جوالك. راجع مدير المنصة لإضافته ثم أعد المحاولة.", 403);
+      if (data.error === "phone") return err("أدخل رقم جوال صحيح", 400);
+      if (data.error === "phone_taken") return err("رقم الجوال مسجَّل لحساب آخر", 400);
       if (data.error === "short") return err("كلمة المرور لا تقل عن ٦ أحرف", 400);
       return ok({ ok: true, role: data.role });
     }
