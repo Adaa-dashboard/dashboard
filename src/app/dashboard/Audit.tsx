@@ -14,6 +14,13 @@ import { sb } from "@/lib/supa";
 type T = (ar: string, en: string) => string;
 
 type LogRow = { at: string; who: string; kind: string; what: string; where: string };
+/* الاستخدام: عدّاد لكل نوع نشاط — بلا أي محتوى */
+type UseRow = {
+  name: string; job_title: string; activated: boolean;
+  last_login: string | null; last_act: string | null;
+  items: number; meas: number; notes: number; stickies: number;
+  tasks: number; replies: number; portfolio: number; own_notes: number; total: number;
+};
 type UserRow = {
   name: string; username: string; active: boolean; is_lead: boolean;
   job_title: string; created_at: string; activated_at: string | null;
@@ -42,12 +49,17 @@ const KIND_TONE: Record<string, string> = {
   "تكليف": "#e07a3a",
   "ردّ": "#0f8a8a",
   "تفويض": "#a24160",
+  "ملاحظة لاصقة": "#c9a020",
+  "محفظتي": "#5a7d8c",
+  "ملاحظاته الخاصة": "#8a9a95",
+  "صفحته الخاصة": "#8a9a95",
 };
 
 export default function Audit({ t }: { t: T }) {
   const [days, setDays] = useState(30);
   const [log, setLog] = useState<LogRow[]>([]);
   const [users, setUsers] = useState<UserRow[]>([]);
+  const [use, setUse] = useState<UseRow[]>([]);
   const [who, setWho] = useState("");
   const [kind, setKind] = useState("");
   const [loading, setLoading] = useState(true);
@@ -56,13 +68,16 @@ export default function Audit({ t }: { t: T }) {
   const load = useCallback(async () => {
     setLoading(true);
     setErr("");
-    const [a, b] = await Promise.all([
+    const [a, b, c] = await Promise.all([
       sb().rpc("perf_audit_log", { p_days: days, p_limit: 500 }),
       sb().rpc("perf_audit_users"),
+      sb().rpc("perf_usage", { p_days: days }),
     ]);
     if (a.error || b.error) setErr(a.error?.message || b.error?.message || "");
     setLog((a.data || []) as LogRow[]);
     setUsers((b.data || []) as UserRow[]);
+    /* الدالة قد لا تكون منصَّبة بعد — لا يسقط باقي الصفحة لأجلها */
+    setUse(c.error ? [] : ((c.data || []) as UseRow[]));
     setLoading(false);
   }, [days]);
 
@@ -143,6 +158,52 @@ export default function Audit({ t }: { t: T }) {
           </tbody>
         </table>
       </div>
+
+      {use.length > 0 && (
+        <div className="card" style={{ marginBottom: 20 }}>
+          <h2 className="section-title">{t("مدى الاستخدام", "Usage")}</h2>
+          <p className="muted" style={{ marginTop: -6 }}>
+            {t(`خلال ${days} يوماً — عدد ما فعله كلٌّ منهم. لا يظهر محتوى أي ملاحظة.`,
+               `Last ${days} days — counts only, no content.`)}
+          </p>
+          <table className="users-tbl au-tbl">
+            <thead>
+              <tr>
+                <th>{t("الاسم", "Name")}</th>
+                <th>{t("آخر نشاط", "Last activity")}</th>
+                <th title={t("بنود الأقسام", "Section items")}>{t("أقسام", "Sections")}</th>
+                <th title={t("ملاحظات على المؤشرات", "KPI notes")}>{t("ملاحظات", "Notes")}</th>
+                <th title={t("ملاحظات القلم اللاصقة", "Sticky notes")}>{t("لاصقة", "Sticky")}</th>
+                <th title={t("مهام وتكاليف أنشأها", "Tasks created")}>{t("مهام", "Tasks")}</th>
+                <th title={t("ردود على المهام", "Replies")}>{t("ردود", "Replies")}</th>
+                <th title={t("بنود محفظته", "Portfolio items")}>{t("محفظتي", "Portfolio")}</th>
+                <th title={t("ملاحظاته الخاصة — العدد فقط", "Private notes — count only")}>{t("خاصة", "Private")}</th>
+                <th>{t("المجموع", "Total")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {use.map((u) => (
+                <tr key={u.name} className={u.total === 0 ? "au-idle" : ""}>
+                  <td className="u-name">
+                    {u.name}
+                    {u.job_title && <span className="u-job">{u.job_title}</span>}
+                    {!u.activated && <span className="au-x">{t("لم يُفعّل", "not activated")}</span>}
+                  </td>
+                  <td>{when(u.last_act)}</td>
+                  <td>{u.items || "—"}</td>
+                  <td>{u.notes || "—"}</td>
+                  <td>{u.stickies || "—"}</td>
+                  <td>{u.tasks || "—"}</td>
+                  <td>{u.replies || "—"}</td>
+                  <td>{u.portfolio || "—"}</td>
+                  <td>{u.own_notes || "—"}</td>
+                  <td><b>{u.total}</b></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div className="card">
         <div className="au-bar">

@@ -9705,3 +9705,7 @@ table.matrix thead th {
   border: 1px solid var(--dgr-bd);
 }
 .u-nophone { color: var(--dgr-tx); font-size: 12px; }
+
+/* صفٌّ بلا نشاط في جدول الاستخدام — يُقرأ أنه ساكن بلمحة */
+.au-idle { opacity: 0.55; }
+.au-idle b { color: var(--muted); }
