@@ -9697,3 +9697,11 @@ table.matrix thead th {
   white-space: normal;
   line-height: 1.6;
 }
+
+/* حساب لا يمكنه التفعيل: جواله المخزَّن ليس رقماً */
+.badge-danger {
+  background: var(--dgr-bg);
+  color: var(--dgr-tx);
+  border: 1px solid var(--dgr-bd);
+}
+.u-nophone { color: var(--dgr-tx); font-size: 12px; }

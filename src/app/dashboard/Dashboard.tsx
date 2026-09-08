@@ -2196,6 +2196,14 @@ interface UserRow {
   isLead?: boolean;
   jobTitle?: string;
 }
+/** الجوال جاهز للتفعيل: إمّا فارغ (يكتبه صاحبه) أو رقم مكتمل.
+    ما بينهما — نصٌّ مثل «لم يُسجَّل» — يمنع التفعيل بلا أن يُفهم سببه. */
+function phoneReady(v: string): boolean {
+  const t = String(v || "").trim();
+  if (!t) return true;
+  return t.replace(/[^0-9]/g, "").length >= 9;
+}
+
 function UsersManager({ refData }: { refData: RefData }) {
   const { t } = useT();
   const [users, setUsers] = useState<UserRow[]>([]);
