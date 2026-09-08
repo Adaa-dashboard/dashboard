@@ -9681,3 +9681,13 @@ table.matrix thead th {
 :root[data-theme="dark"] .nb-due .tag,
 :root[data-theme="dark"] .nb-item .s .due { color: #3b2f73; }
 :root[data-theme="dark"] .sg.on { color: #14663f; }
+
+/* رسالة تعذّر حفظ موضع الملاحظة — تُلمس فتزول */
+.stk-hint.err {
+  background: #b13636;
+  color: #fff;
+  cursor: pointer;
+  max-width: 260px;
+  white-space: normal;
+  line-height: 1.6;
+}
