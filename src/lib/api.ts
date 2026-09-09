@@ -539,6 +539,46 @@ export async function apiFetch(path: string, init: Init = {}) {
     /* ---------------- صلاحيات محفظتي ----------------
        المحفظة خاصة بصاحبها، ولا يراها أحد — ولو كان مديره — إلا
        بمنحٍ صريح منه. الحراسة الحقيقية في RLS؛ ما هنا واجهة فقط. */
+    /* «فريقي» — موظفو قطاع المدير وأحجام محافظهم.
+       الصلاحية يحرسها RLS (perf_can_see_pf): من ليس مديراً
+       لا تُرجع له استعلاماتُ المحافظ شيئاً أصلاً. */
+    if (p === "/api/portfolio/team" && method === "GET") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const { data: card } = await s.rpc("perf_me");
+      const c = Array.isArray(card) ? card[0] : card;
+      if (c?.is_lead !== true) return ok({ team: [] });
+      const mine = new Set((me.sectorIds || []).map(String));
+      const team = (await people()).filter(
+        (u: { id: string; sectorIds: string[] }) =>
+          String(u.id) !== String(me.id) && (u.sectorIds || []).some((x) => mine.has(String(x))),
+      );
+      if (!team.length) return ok({ team: [] });
+      const ids = team.map((u: { id: string }) => Number(u.id));
+      const { data: rows } = await s
+        .from("perf_portfolio")
+        .select("app_user_id, updated_at")
+        .in("app_user_id", ids);
+      const stat = new Map<string, { n: number; at: string }>();
+      for (const r of (rows || []) as { app_user_id: number; updated_at: string }[]) {
+        const k = String(r.app_user_id);
+        const cur = stat.get(k) || { n: 0, at: "" };
+        cur.n += 1;
+        if (!cur.at || String(r.updated_at) > cur.at) cur.at = String(r.updated_at);
+        stat.set(k, cur);
+      }
+      type TeamRow = { userId: string; name: string; jobTitle: string; count: number; lastAt: string };
+      const list: TeamRow[] = team.map((u: { id: string; name: string; jobTitle: string }) => ({
+        userId: String(u.id),
+        name: String(u.name || ""),
+        jobTitle: u.jobTitle || "",
+        count: stat.get(String(u.id))?.n || 0,
+        lastAt: stat.get(String(u.id))?.at || "",
+      }));
+      list.sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, "ar"));
+      return ok({ team: list });
+    }
+
     if (p === "/api/portfolio/grants" && method === "GET") {
       const me = await whoAmI();
       if (!me) return err("غير مصرّح", 401);
