@@ -9709,3 +9709,59 @@ table.matrix thead th {
 /* صفٌّ بلا نشاط في جدول الاستخدام — يُقرأ أنه ساكن بلمحة */
 .au-idle { opacity: 0.55; }
 .au-idle b { color: var(--muted); }
+
+/* ============================================================
+   «فريقي» — محافظ موظفي القطاع في صفحة المدير
+   شارةٌ تفرّقه عن «شورِكت معي»: هذا بحكم الإدارة وذاك بمنحٍ
+   من صاحب المحفظة، والخلط بينهما يضيّع المعنى.
+   ============================================================ */
+/* ===== شريط «فريقي» — مقترح ===== */
+.pf-team {
+  border: 1px solid var(--tint-bd);
+  background: linear-gradient(180deg, var(--panel), var(--bg2));
+  border-radius: 15px;
+  padding: 12px 14px 14px;
+  margin-bottom: 16px;
+}
+.pf-team-h { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 11px; }
+.pf-team-h b { color: var(--gt-800); font-size: 13.5px; font-weight: 800; }
+.pf-team-n { color: var(--muted); font-size: 12px; }
+.pf-team-tag {
+  margin-inline-start: auto; font-size: 11px; font-weight: 700;
+  color: #8a6d12; background: #fdf3e0; border: 1px solid #f0e0b8;
+  border-radius: 999px; padding: 3px 10px;
+}
+.pf-team-g { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 10px; }
+.pf-tm {
+  display: grid; grid-template-columns: 34px 1fr; align-items: center;
+  gap: 4px 10px; text-align: start;
+  background: var(--soft); border: 1px solid var(--border); border-radius: 13px;
+  padding: 10px 12px; font: inherit; cursor: pointer; width: 100%;
+}
+.pf-tm:hover { border-color: var(--g-400); background: var(--tint); }
+.pf-tm .av {
+  flex: none; width: 34px; height: 34px; border-radius: 50%;
+  background: linear-gradient(140deg, var(--g-700), var(--g-500));
+  color: #fff; font-weight: 800; font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+}
+.pf-tm .tm-w { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.pf-tm .tm-w b { font-size: 13px; color: var(--gt-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pf-tm .tm-w em { font-style: normal; font-size: 11px; color: var(--muted); }
+/* السطر الثاني يمتدّ تحت الاسم لا بجانبه — وإلا ضاق الاسم فانكسر */
+.pf-tm .tm-m {
+  grid-column: 2; font-size: 11px; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pf-tm .tm-m i { font-style: normal; font-weight: 800; color: var(--gt-700); }
+.pf-tm.idle { opacity: .6; }
+
+/* سطر إشعار الموظف */
+.pf-note-lead {
+  display: flex; gap: 11px; align-items: flex-start;
+  background: var(--tint); border: 1px solid var(--tint-bd);
+  border-radius: 13px; padding: 11px 14px;
+}
+.pf-note-lead b { display: block; font-size: 13px; color: var(--gt-900); }
+.pf-note-lead em { font-style: normal; font-size: 12px; color: var(--ink-2); line-height: 1.8; }
+.pf-priv { font-size: 12px; color: var(--muted); margin-top: 12px; }

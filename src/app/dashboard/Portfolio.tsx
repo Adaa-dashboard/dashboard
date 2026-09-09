@@ -1065,6 +1065,8 @@ function EntitiesModal({
    المحفظة خاصة بصاحبها: لا يراها مديره ولا أي أحد إلا بمنحٍ منه.
    المنح للاطّلاع فقط — لا يكتب الممنوح له شيئاً، والحراسة في RLS. */
 type Grant = { userId: string; name: string; jobTitle?: string; scopes: string[]; at?: string };
+/** موظف في قطاع المدير — حجم محفظته وآخر تحديث فيها */
+type TeamRow = { userId: string; name: string; jobTitle: string; count: number; lastAt: string };
 
 /* خيارات المنح بأقسام perf_portfolio لا بالويدجت:
    «البرامج والاستراتيجيات» و«التقارير الربعية» يقرآن قسم entities
@@ -1458,13 +1460,36 @@ export default function Portfolio({
   /* محافظ منحني أصحابها الاطّلاع عليها */
   const [shared, setShared] = useState<Grant[]>([]);
   const [viewing, setViewing] = useState<Grant | null>(null);
+  /* فريقي: موظفو قطاعي — للمدير وحده، وبحكم الإدارة لا بمنحٍ منهم */
+  const [team, setTeam] = useState<TeamRow[]>([]);
+  /* ومن يطّلع على محفظتي بحكم الإدارة — يُقال لصاحبها صراحةً */
+  const [myLeads, setMyLeads] = useState<string[]>([]);
 
   useEffect(() => {
     void apiFetch("/api/portfolio/grants")
       .then((r) => r.json())
       .then((d) => setShared(Array.isArray(d.shared) ? d.shared : []))
       .catch(() => setShared([]));
-  }, []);
+    void apiFetch("/api/portfolio/team")
+      .then((r) => r.json())
+      .then((d) => setTeam(Array.isArray(d.team) ? d.team : []))
+      .catch(() => setTeam([]));
+    /* مدير قطاعي: من عُلِّم مديراً ويشاركني قطاعاً — ولستُ أنا */
+    void apiFetch("/api/people")
+      .then((r) => r.json())
+      .then((d) => {
+        const all = (d.people || []) as { id: string; name: string; isLead?: boolean; sectorIds?: string[] }[];
+        const me2 = all.find((x) => String(x.id) === String(me.id));
+        if (!me2 || me2.isLead) { setMyLeads([]); return; }
+        const mine = new Set((me2.sectorIds || []).map(String));
+        setMyLeads(
+          all
+            .filter((x) => x.isLead && String(x.id) !== String(me.id) && (x.sectorIds || []).some((k) => mine.has(String(k))))
+            .map((x) => x.name),
+        );
+      })
+      .catch(() => setMyLeads([]));
+  }, [me.id]);
 
   useEffect(() => {
     void loadUserData<Partial<Prefs>>("portfolio", {}).then((d) => {
@@ -1786,6 +1811,56 @@ export default function Portfolio({
               {g.name}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* «فريقي» — بحكم الإدارة لا بمنحٍ من أصحابها، فيُفصل عن
+          الشريط أعلاه وتُوضع عليه شارته حتى لا يختلط البابان */}
+      {team.length > 0 && (
+        <div className="pf-team">
+          <div className="pf-team-h">
+            <b>{t("فريقي", "My team")}</b>
+            <span className="pf-team-n">
+              {t(`${team.length} من قطاعي`, `${team.length} in my sector`)}
+            </span>
+            <span className="pf-team-tag">{t("بحكم الإدارة · اطّلاع فقط", "As manager · read only")}</span>
+          </div>
+          <div className="pf-team-g">
+            {team.map((x) => (
+              <button
+                key={x.userId}
+                className={`pf-tm ${x.count === 0 ? "idle" : ""}`}
+                onClick={() => setViewing({ userId: x.userId, name: x.name, jobTitle: x.jobTitle, scopes: ["*"] })}
+              >
+                <span className="av">{(x.name || "?").trim().charAt(0)}</span>
+                <span className="tm-w">
+                  <b>{x.name}</b>
+                  {x.jobTitle && <em>{x.jobTitle}</em>}
+                </span>
+                <span className="tm-m">
+                  {x.count === 0
+                    ? t("لا بنود بعد", "Nothing yet")
+                    : t(`${x.count} بنداً · آخر تحديث ${whenAr(x.lastAt)}`, `${x.count} items · ${whenAr(x.lastAt)}`)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* الموظف يعرف من يطّلع عليه — قبل أن يكتشفه */}
+      {myLeads.length > 0 && (
+        <div className="pf-note-lead">
+          <span>👁️</span>
+          <div>
+            <b>{t("مدير قطاعك يطّلع على أعمال محفظتك", "Your manager can view your portfolio")}</b>
+            <em>
+              {t(
+                `${myLeads.join(" · ")} — اطّلاع فقط، ولا يستطيع التعديل. وملاحظاتك وتقويمك لا يراهما أحد.`,
+                `${myLeads.join(" · ")} — read only. Your notes and calendar stay private.`,
+              )}
+            </em>
+          </div>
         </div>
       )}
 
