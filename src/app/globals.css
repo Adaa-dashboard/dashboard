@@ -9902,3 +9902,24 @@ table.matrix thead th {
 .en-reg-c input { font-size: 12px; padding: 7px 9px; border-radius: 8px; }
 .en-reg-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 @media (max-width: 700px) { .en-reg-2 { grid-template-columns: 1fr; } }
+
+/* خريطة قراءة ملف الجهات — تُعرض قبل الحفظ */
+.imp-map { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; max-height: 210px; overflow: auto; }
+.imp-map > div { display: flex; align-items: center; gap: 7px; font-size: 11.5px; }
+.imp-map span { flex: none; border-radius: 999px; padding: 2px 8px; font-weight: 700; font-size: 10px; }
+.imp-map .us { background: var(--tint); color: var(--gt-800); }
+.imp-map .them { background: var(--soft2); color: var(--muted); }
+.imp-map .ro { background: transparent; color: var(--muted); }
+.imp-map .fl { background: transparent; color: var(--ink-2); min-width: 48px; }
+.imp-map b { color: var(--gt-900); font-weight: 600; }
+.imp-s { background: var(--soft); border: 1px solid var(--border); border-radius: 10px; padding: 9px 11px; margin-bottom: 8px; }
+.imp-s > b { display: block; font-size: 12.5px; color: var(--gt-900); margin-bottom: 5px; }
+.imp-s > div { font-size: 11.5px; color: var(--ink-2); margin-top: 3px; }
+.imp-s > div span { font-size: 10px; font-weight: 800; color: var(--muted); margin-inline-end: 6px; }
+
+/* البديل يُميَّز عن الأساسي بلا أن يزاحمه */
+.en2-p.alt { opacity: 0.92; padding-inline-start: 8px; border-inline-start: 2px solid var(--tint-bd); }
+.en2-alt {
+  font-size: 9.5px; font-weight: 800; color: var(--muted);
+  background: var(--soft2); border-radius: 999px; padding: 1px 7px; margin-inline-end: 5px;
+}
