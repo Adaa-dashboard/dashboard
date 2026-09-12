@@ -31,6 +31,11 @@ export type Ans = {
   files?: { id: string; title: string; kind: string; url: string; pages: number }[];
   /** مقاطع من نصّ المنهجيات — كلٌّ بمصدره وصفحته */
   passages?: { title: string; page: number; heading: string; body: string }[];
+  /** جهات ونقاط تواصلها — جوابُ «هل عندنا نقطة تواصل مع…» */
+  entities?: {
+    id: string; name: string; kind: string;
+    ours: Record<string, string>[]; theirs: Record<string, string>[];
+  }[];
 };
 
 const txt = (v: unknown) => (v === null || v === undefined ? "" : String(v));
@@ -1048,7 +1053,8 @@ export default function Assistant({
       const r = await apiFetch(`/api/docs/ask?q=${encodeURIComponent(t2)}`).then((x) => x.json());
       const files = (r.files || []) as { id: string; title: string; kind: string; filePath: string; pages: number }[];
       const passages = (r.passages || []) as { title: string; page: number; heading: string; body: string }[];
-      if (!files.length && !passages.length) return;
+      const ents = (r.entities || []) as Ans["entities"];
+      if (!files.length && !passages.length && !ents?.length) return;
       setAns((cur) => {
         const base = cur || local;
         return {
@@ -1057,6 +1063,7 @@ export default function Assistant({
             id: f.id, title: f.title, kind: f.kind, pages: f.pages, url: docUrl(f.filePath),
           })),
           passages: passages.slice(0, 2),
+          entities: ents?.slice(0, 3),
         };
       });
     } catch {
@@ -1157,6 +1164,47 @@ export default function Assistant({
                       {show.open.label} ‹
                     </button>
                   )}
+                  {/* الجهات أولاً: «هل عندنا نقطة تواصل مع…» جوابُه
+                      اسمٌ ورقم، لا إحالةٌ إلى صفحة */}
+                  {!!show.entities?.length && (
+                    <div className="ai-ents">
+                      {show.entities.map((e) => (
+                        <div className="ai-ent" key={e.id}>
+                          <b>{e.name}</b>
+                          <div className="ai-ent-r">
+                            <span className="l">{t("من المركز", "Ours")}</span>
+                            {e.ours?.length ? (
+                              <span className="v">
+                                {e.ours.map((c) => c.name).filter(Boolean).join(" · ")}
+                                {e.ours[0]?.phone ? ` — ${e.ours[0].phone}` : ""}
+                              </span>
+                            ) : (
+                              <span className="v no">{t("لا توجد نقطة تواصل عندنا", "None yet")}</span>
+                            )}
+                          </div>
+                          <div className="ai-ent-r">
+                            <span className="l">{t("من الجهة", "Theirs")}</span>
+                            {e.theirs?.length ? (
+                              <span className="v">
+                                {e.theirs[0].name}
+                                {e.theirs[0].jobTitle ? ` — ${e.theirs[0].jobTitle}` : ""}
+                                {e.theirs[0].phone ? ` · ${e.theirs[0].phone}` : ""}
+                                {e.theirs[0].email ? ` · ${e.theirs[0].email}` : ""}
+                              </span>
+                            ) : (
+                              <span className="v no">{t("غير مسجَّلة", "Not recorded")}</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      {onOpenTab && (
+                        <button className="ai-open" onClick={() => { onOpenTab("entities"); setOpen(false); }}>
+                          {t("صفحة الجهات ونقاط التواصل", "Entities page")} ‹
+                        </button>
+                      )}
+                    </div>
+                  )}
+
                   {/* من نصّ المنهجيات — المقطع ومصدره وصفحته، فيتحقّق
                       السائل بنفسه بدل أن يثق بجوابٍ بلا مرجع */}
                   {!!show.passages?.length && (
