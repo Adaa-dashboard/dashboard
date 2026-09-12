@@ -7459,6 +7459,29 @@ table.matrix thead th {
   font: inherit;
   font-size: 13px;
 }
+/* الرجوع من الجواب إلى «أهم ما عندك الآن» بلا إغلاق النافذة */
+.ai-back {
+  flex: none;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+.ai-back:hover {
+  background: var(--tint);
+  border-color: var(--tint-bd);
+  color: var(--gt-700);
+}
+/* زرّ التثبيت يلي زر الرجوع، فلا يزاحمه على المسافة التلقائية */
+.ai-t .ai-back + .ai-pin {
+  margin-inline-start: 6px;
+}
+
 /* زر ⓘ في رأس المساعد — يكشف الأسئلة المقترحة عند الحاجة وحدها */
 .ai-i {
   width: 22px;

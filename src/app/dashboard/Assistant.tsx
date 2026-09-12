@@ -1074,6 +1074,16 @@ export default function Assistant({
     }
   }
 
+  /* الإغلاق يعيد النافذة لحالتها الأولى: «أهم ما عندك الآن».
+     بدونه يبقى آخر جواب معروضاً كل مرة تُفتح فيها، فيبدو أن
+     الأهم اختفى وإنما هو خلف الجواب القديم */
+  const close = () => {
+    setOpen(false);
+    setAns(null);
+    setQ("");
+    setTips(false);
+  };
+
   const pinIt = () => {
     if (!ans) return;
     onPin({
@@ -1096,7 +1106,7 @@ export default function Assistant({
       </button>
 
       {open && (
-        <div className="modal-overlay" onClick={() => setOpen(false)}>
+        <div className="modal-overlay" onClick={close}>
           <div className="modal ai" onClick={(e) => e.stopPropagation()}>
             <div className="m-h">
               <span className="ai-dot">
@@ -1112,7 +1122,7 @@ export default function Assistant({
               >
                 i
               </button>
-              <button className="mx" onClick={() => setOpen(false)} aria-label="close">
+              <button className="mx" onClick={close} aria-label="close">
                 ✕
               </button>
             </div>
@@ -1155,6 +1165,18 @@ export default function Assistant({
                       <PIcon id={show.icon} size={15} />
                     </span>
                     <b>{show.title}</b>
+                    {!!ans && (
+                      <button
+                        className="ai-back"
+                        onClick={() => {
+                          setAns(null);
+                          setQ("");
+                        }}
+                        title={t("رجوع إلى أهم ما عندك الآن", "Back to priorities")}
+                      >
+                        {t("الأهم الآن", "Priorities")}
+                      </button>
+                    )}
                     <button className="ai-pin" onClick={pinIt} title={t("تثبيت أعلى الصفحات", "Pin")}>
                       📌 {t("تثبيت", "Pin")}
                     </button>
@@ -1178,7 +1200,7 @@ export default function Assistant({
                       className="ai-open"
                       onClick={() => {
                         onOpenTab(show.open!.tab);
-                        setOpen(false);
+                        close();
                       }}
                     >
                       {show.open.label} ‹
@@ -1218,7 +1240,7 @@ export default function Assistant({
                         </div>
                       ))}
                       {onOpenTab && (
-                        <button className="ai-open" onClick={() => { onOpenTab("entities"); setOpen(false); }}>
+                        <button className="ai-open" onClick={() => { onOpenTab("entities"); close(); }}>
                           {t("صفحة الجهات ونقاط التواصل", "Entities page")} ‹
                         </button>
                       )}
