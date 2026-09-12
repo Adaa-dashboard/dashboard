@@ -2782,8 +2782,12 @@ table.matrix thead th {
     display: flex;
     flex-direction: column;
     gap: 2px;
+    /* dvh يحسب شريط المتصفح المتحرّك في الجوال — بـ vh وحدها
+       يمتدّ أسفل الورقة تحت الشريط فتُقتطع آخر بنودها */
     max-height: 82vh;
+    max-height: 82dvh;
     overflow: auto;
+    overscroll-behavior: contain;
   }
   .sheet-grip {
     width: 42px;

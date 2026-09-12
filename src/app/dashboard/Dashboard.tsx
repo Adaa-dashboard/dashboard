@@ -696,7 +696,13 @@ export default function Dashboard({ me }: { me: Me }) {
               can(key) ? <SheetItem key={key} id={key} label={SECTION_NAV_TITLE[key] ?? SECTION_TITLE[key]} /> : null,
             )}
             <SheetItem id="mypage" label={["محفظتي", "My portfolio"]} />
+            {/* الصفحات التي لا مكان لها في الشريط السفلي — بدونها كانت
+                تُرى على اللابتوب وحده */}
+            {can("weekly") && <SheetItem id="report" label={["الإنجاز الأسبوعي", "Weekly Achievement"]} />}
+            {can("docs") && <SheetItem id="docs" label={["منهجيات أداء", "Methodologies"]} />}
+            {can("entities") && <SheetItem id="entities" label={["الجهات ونقاط التواصل", "Entities"]} />}
             {can("users") && <SheetItem id="users" label={["المستخدمون والصلاحيات", "Users & Roles"]} />}
+            {can("audit") && <SheetItem id="audit" label={["سجل النشاط", "Activity log"]} />}
             {can("structure") && <SheetItem id="structure" label={["الهيكل التنظيمي", "Org chart"]} />}
             <button
               className="sheet-item"
