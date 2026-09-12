@@ -20,11 +20,20 @@
 -- ------------------------------------------------------------
 create or replace function public.perf_ar_norm(p text)
 returns text language sql immutable as $$
+  /* توحيد النصّ قبل المطابقة:
+     · إسقاط التشكيل والتطويل
+     · توحيد الألف والياء والتاء المربوطة
+     · توحيد «لا» و«ال» في رمز واحد — استخراج نصّ الـPDF يقلب
+       حرفَي ليغاتورة لام‑ألف، فتُكتب «خلال» وتُستخرج «خالل».
+       وتوحيدهما على الطرفين (النصّ المخزَّن والسؤال معاً) يجعل
+       المطابقة تعمل بلا أن نُصلح النصّ نفسه. */
   select lower(
     regexp_replace(
-      translate(
-        regexp_replace(coalesce(p,''), '[ً-ْـ]', '', 'g'),  -- تشكيل وتطويل
-        'أإآٱىة', 'اااايه'),
+      replace(replace(
+        translate(
+          regexp_replace(coalesce(p,''), '[ً-ْـ]', '', 'g'),
+          'أإآٱىة', 'اااايه'),
+        'لا', 'ﻻ'), 'ال', 'ﻻ'),
       '\s+', ' ', 'g')
   );
 $$;
@@ -125,21 +134,47 @@ $$;
 revoke all on function public.perf_docs_find(text, int) from public, anon;
 grant execute on function public.perf_docs_find(text, int) to authenticated;
 
+drop function if exists public.perf_kb_search(text, int);
+-- ============================================================
+--  بحث المعرفة — ترجيح الكلمات النادرة
+--  ------------------------------------------------------------
+--  العدّ المجرّد للكلمات المتطابقة يُصعّد المقاطع المليئة بالكلمات
+--  الشائعة («مؤشر» · «الأداء») فوق المقطع الذي فيه الكلمة المقصودة
+--  («قطبية»). فصار وزن كل كلمة عكسَ شيوعها: النادرة تُرجّح، والشائعة
+--  تكاد لا تؤثر، وكلماتُ السؤال الحشوية تُسقط أصلاً.
+-- ============================================================
 create or replace function public.perf_kb_search(p_q text, p_limit int default 4)
 returns table (doc_id text, title text, page int, heading text, body text,
-               file_path text, file_name text, hits int)
+               file_path text, file_name text, score numeric)
 language sql stable security definer set search_path = public as $$
-  with words as (
-    select t from (select unnest(string_to_array(public.perf_ar_norm(p_q), ' ')) as t) w
+  with raw as (
+    select distinct unnest(string_to_array(public.perf_ar_norm(p_q), ' ')) as t
+  ), words as (
+    select t from raw
      where length(t) >= 3
-  )
+       and t not in (  -- حشو السؤال: لا يدلّ على شيء
+         public.perf_ar_norm('ما'), public.perf_ar_norm('هي'), public.perf_ar_norm('هو'),
+         public.perf_ar_norm('كيف'), public.perf_ar_norm('وش'), public.perf_ar_norm('متى'),
+         public.perf_ar_norm('اين'), public.perf_ar_norm('لماذا'), public.perf_ar_norm('معنى'),
+         public.perf_ar_norm('يتم'), public.perf_ar_norm('عن'), public.perf_ar_norm('في'),
+         public.perf_ar_norm('من'), public.perf_ar_norm('على'), public.perf_ar_norm('الى'),
+         public.perf_ar_norm('ابي'), public.perf_ar_norm('اريد'), public.perf_ar_norm('عطني'),
+         public.perf_ar_norm('ملف'), public.perf_ar_norm('وثيقة'))
+  ), df as (  -- كم مقطعاً تظهر فيه كل كلمة
+    select w.t, greatest(1, count(c.*)) as n
+      from words w
+      left join public.perf_doc_chunks c on c.body_n like '%' || w.t || '%'
+     group by w.t
+  ), tot as (select greatest(1, count(*))::numeric as n from public.perf_doc_chunks)
   select c.doc_id, d.title, c.page, c.heading, c.body, d.file_path, d.file_name,
-         (select count(*)::int from words x where c.body_n like '%' || x.t || '%') as hits
+         round(sum(ln((select n from tot) / df.n) + 0.1)::numeric, 3) as score
     from public.perf_doc_chunks c
     join public.perf_docs d on d.id = c.doc_id and d.active
+    join df on c.body_n like '%' || df.t || '%'
    where public.perf_signed_in()
-     and (select count(*) from words x where c.body_n like '%' || x.t || '%') >= 2
-   order by hits desc, length(c.body) asc
+   group by c.doc_id, d.title, c.page, c.heading, c.body, d.file_path, d.file_name
+  having count(*) >= least(2, (select count(*) from words))
+   order by score desc, length(c.body) asc
    limit greatest(1, p_limit);
 $$;
 revoke all on function public.perf_kb_search(text, int) from public, anon;
