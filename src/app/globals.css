@@ -7459,6 +7459,31 @@ table.matrix thead th {
   font: inherit;
   font-size: 13px;
 }
+/* زر ⓘ في رأس المساعد — يكشف الأسئلة المقترحة عند الحاجة وحدها */
+.ai-i {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.ai-i.on,
+.ai-i:hover {
+  background: var(--tint);
+  border-color: var(--tint-bd);
+  color: var(--gt-700);
+}
 .ai-sg {
   display: flex;
   gap: 6px;

@@ -1013,6 +1013,9 @@ export default function Assistant({
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [ans, setAns] = useState<Ans | null>(null);
+  /* الأسئلة المقترحة تزحم الشاشة — صارت خلف زر ⓘ، تبقى مفتوحة
+     لمن يفتحها حتى نهاية الجلسة فلا يعيد فتحها كل مرة */
+  const [tips, setTips] = useState(false);
   const [ctx, setCtx] = useState<Ctx | null>(null);
   const box = useRef<HTMLInputElement>(null);
 
@@ -1100,6 +1103,15 @@ export default function Assistant({
                 <PIcon id="idea" size={14} />
               </span>
               <h3>{t("المساعد الذكي", "Assistant")}</h3>
+              <button
+                className={`ai-i ${tips ? "on" : ""}`}
+                onClick={() => setTips((v) => !v)}
+                aria-pressed={tips}
+                title={t("أمثلة على ما يمكن سؤاله", "Example questions")}
+                aria-label={t("أمثلة على ما يمكن سؤاله", "Example questions")}
+              >
+                i
+              </button>
               <button className="mx" onClick={() => setOpen(false)} aria-label="close">
                 ✕
               </button>
@@ -1117,13 +1129,21 @@ export default function Assistant({
                 {t("اسأل", "Ask")}
               </button>
             </div>
-            <div className="ai-sg">
-              {SUGGEST.map((s) => (
-                <span key={s} onClick={() => ask(s)}>
-                  {s}
-                </span>
-              ))}
-            </div>
+            {tips && (
+              <div className="ai-sg">
+                {SUGGEST.map((s) => (
+                  <span
+                    key={s}
+                    onClick={() => {
+                      setTips(false);
+                      ask(s);
+                    }}
+                  >
+                    {s}
+                  </span>
+                ))}
+              </div>
+            )}
 
             {!ctx ? (
               <div className="pf-none">{t("جارٍ قراءة بياناتك...", "Reading your data...")}</div>
