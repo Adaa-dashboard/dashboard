@@ -568,6 +568,7 @@ export async function apiFetch(path: string, init: Init = {}) {
         entities: (ents.data || []).map((e: Record<string, unknown>) => ({
           id: String(e.id), name: String(e.name || ""), kind: String(e.kind || ""),
           sector: String(e.sector || ""), note: String(e.note || ""),
+          extra: (e.extra || {}) as Record<string, string>,
           ours: by.get(String(e.id))?.ours || [], theirs: by.get(String(e.id))?.theirs || [],
         })),
       });
@@ -579,7 +580,7 @@ export async function apiFetch(path: string, init: Init = {}) {
       const me = await whoAmI();
       if (!me) return err("غير مصرّح", 401);
       type InC = { side: string; role: string; name: string; jobTitle: string; phone: string; email: string };
-      type InE = { name: string; kind: string; sector: string; note: string; contacts: InC[] };
+      type InE = { name: string; kind: string; sector: string; note: string; contacts: InC[]; extra?: Record<string, string> };
       const ents = (Array.isArray(body.entities) ? body.entities : []) as InE[];
       if (!ents.length) return err("لا توجد جهات", 400);
 
@@ -590,7 +591,8 @@ export async function apiFetch(path: string, init: Init = {}) {
         const { data: cur } = await s.from("perf_entities").select("id").eq("name", nm).maybeSingle();
         const eid = cur?.id ? String(cur.id) : "ent-" + newId();
         const { error: e1 } = await s.from("perf_entities").upsert({
-          id: eid, name: nm, kind: str(E.kind), sector: str(E.sector), note: str(E.note), active: true,
+          id: eid, name: nm, kind: str(E.kind), sector: str(E.sector), note: str(E.note),
+          extra: E.extra && typeof E.extra === "object" ? E.extra : {}, active: true,
         });
         if (e1) return err("الرفع لمن يملك صلاحية «الجهات»", 403);
         nE++;
@@ -649,6 +651,33 @@ export async function apiFetch(path: string, init: Init = {}) {
       const { data, error } = await s.from("perf_contacts").delete().eq("id", id).select("id");
       if (error || !data?.length) return err("الحذف لمن يتولّى هذه الجهة", 403);
       return ok({ ok: true });
+    }
+
+    /* المراجعة الربعية: ما استحقّ منها، وختمُها بعد التأكيد */
+    if (p === "/api/entities/review" && method === "GET") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const [due, st] = await Promise.all([
+        s.rpc("perf_review_due"),
+        s.rpc("perf_review_status"),
+      ]);
+      return ok({
+        due: (due.data || []).map((r: Record<string, unknown>) => ({
+          entityId: String(r.entity_id), entity: String(r.entity || ""),
+          reviewedAt: r.reviewed_at || null,
+        })),
+        status: (st.data || []).map((r: Record<string, unknown>) => ({
+          name: String(r.name || ""), entities: Number(r.entities || 0),
+          reviewed: Number(r.reviewed || 0), lastAt: r.last_at || null,
+        })),
+      });
+    }
+    if (p === "/api/entities/review" && method === "POST") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const { data, error } = await s.rpc("perf_review_done", { p_entity: str(body.entityId) || null });
+      if (error) return err(error.message, 403);
+      return ok({ ok: true, marked: Number(data || 0) });
     }
 
     /* جهاتي — ما أنا نقطة التواصل فيه، تُقرأ في محفظتي بلا تعبئة */
