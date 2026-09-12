@@ -16,7 +16,7 @@ import { PIcon } from "./pickicons";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Rec = Record<string, any>;
 type T = (ar: string, en: string) => string;
-type Me = { id: string; name: string; scopes: string[] };
+type Me = { id: string; name: string; scopes: string[]; isLead?: boolean };
 
 export type Pin = { id: string; title: string; icon: string; lines: string[]; at: string };
 export type Ans = {
@@ -140,6 +140,11 @@ type Ctx = {
   changes: Rec[];
   /* بنود الأقسام الخمسة من نظرة عامة — مفتاحها اسم القسم */
   sections: Record<string, Rec[]>;
+  /* أسماء الأشخاص — لنسبة المهمة المتأخرة إلى من كُلِّف بها */
+  people: { id: string; name: string }[];
+  /* تغطية الاجتماعات الربعية لكل عضو في الفريق — أعداد فقط،
+     تأتي من دالة في القاعدة ولا تحمل شيئاً من محتوى المحافظ */
+  team: { name: string; done: number; total: number }[];
 };
 
 /* ---------------- زبدة الأقسام الخمسة ----------------
@@ -739,6 +744,17 @@ const asksHow = (q: string) =>
 
 const DONE = ["مغلقة", "مكتمل", "مكتملة", "منجز", "معتمدة"];
 
+/* عدد مراحل جلسة المراجعة حين لا يذكر البند مراحله — كما في صفحة الجلسات */
+const SESS_FULL = 6;
+
+/** صياغة الأيام بالعربية: يوم واحد · يومان · ٣ أيام · ١١ يوماً */
+function arDays(n: number): string {
+  if (n === 1) return "يوماً واحداً";
+  if (n === 2) return "يومين";
+  if (n <= 10) return `${n} أيام`;
+  return `${n} يوماً`;
+}
+
 /* بطاقة «وش أقدر أسوي؟» — يعرضها زر ⓘ ويعرضها طلب المساعدة */
 const HELP: Ans = {
       title: "وش أقدر أسوي؟",
@@ -968,6 +984,73 @@ function answer(q0: string, c: Ctx): Ans {
         : ["لا توجد جهات مسجّلة بعد."],
     };
 
+  /* ---- بطاقة المدير: من له فريق يرى حال إدارته لا حاله هو ----
+     مدير الإدارة أو مدير القطاع يُسند العمل ولا يُسند إليه، فبطاقة
+     «المسند إليّ» تطلع له أصفاراً وهو لا يعرف شيئاً عمّا يجري.
+     ثلاثة أرقام: ما أسنده وتأخّر · الاجتماعات الربعية · جلسات المراجعة */
+  if (c.me.isLead || c.me.scopes.includes("users")) {
+    const nameOf = (id: string) => c.people.find((x) => x.id === id)?.name || "—";
+    const mineOut = c.tasks.filter(
+      (x) => txt(x.createdById) === c.me.id && txt(x.assigneeId) !== c.me.id,
+    );
+    const outLate = mineOut
+      .filter((x) => x.state !== "done" && txt(x.dueDate) && daysTo(txt(x.dueDate)) < 0)
+      .sort((a, b) => daysTo(txt(a.dueDate)) - daysTo(txt(b.dueDate)));
+
+    /* الاجتماعات الربعية — الأسوأ تغطيةً أولاً، فهو ما يحتاج تدخّلاً */
+    const team = [...c.team].sort((a, b) => a.done / (a.total || 1) - b.done / (b.total || 1));
+    const qDone = team.reduce((n, x) => n + x.done, 0);
+    const qTot = team.reduce((n, x) => n + x.total, 0);
+    const worst = team.find((x) => x.total > x.done);
+
+    /* جلسات مراجعة الأداء — من القسم نفسه لا من المحافظ */
+    const sess = c.sections.sessions || [];
+    let sDone = 0;
+    let sLive = 0;
+    let sIdle = 0;
+    for (const it of sess) {
+      const d = (it.data || {}) as Rec;
+      const st = Array.isArray(d.stages) ? d.stages : [];
+      const full = st.length || SESS_FULL;
+      const done = Math.max(0, Math.min(full, num(d.done)));
+      if (done >= full) sDone++;
+      else if (done > 0) sLive++;
+      else sIdle++;
+    }
+
+    const lines = [
+      ...outLate.slice(0, 3).map(
+        (x) =>
+          `متأخرة ${arDays(Math.abs(daysTo(txt(x.dueDate))))} — ${nameOf(txt(x.assigneeId))}: ${txt(x.title)}`,
+      ),
+      ...(team.length
+        ? [`الاجتماعات الربعية حسب الاستشاري — ${team.slice(0, 5).map((x) => `${x.name} ${x.done}/${x.total}`).join(" · ")}`]
+        : []),
+      ...(worst
+        ? [`الأقل تغطية: ${worst.name} — ${worst.total - worst.done} جهة لم يُعقد لها اجتماع هذا الربع`]
+        : []),
+      ...(sess.length
+        ? [`جلسات مراجعة الأداء — ${sDone} مكتملة · ${sLive} جارية · ${sIdle} لم تبدأ`]
+        : []),
+    ];
+
+    return {
+      title: "أهم ما عند إدارتك الآن",
+      icon: "alert",
+      chips: [
+        { k: "تكاليف أسندتَها وتأخّرت", v: String(outLate.length), tone: outLate.length ? "r" : "g" },
+        ...(qTot
+          ? [{ k: `اجتماعات الربع ${curQ}`, v: `${qDone}/${qTot}`, tone: qDone >= qTot ? "g" : "a" }]
+          : []),
+        ...(sess.length
+          ? [{ k: "جلسات مراجعة لم تبدأ", v: String(sIdle), tone: sIdle ? "r" : "g" }]
+          : []),
+      ],
+      lines: lines.length ? lines : ["كل شيء تحت السيطرة 👌"],
+      open: c.me.scopes.includes("tasks") ? { tab: "tasks", label: "افتح صفحة المهام" } : undefined,
+    };
+  }
+
   /* الافتراضي: أهم ما عندك الآن */
   return {
     title: "أهم ما عندك الآن",
@@ -1025,9 +1108,15 @@ export default function Assistant({
 
   const load = useCallback(async () => {
     const KEYS = ["sessions", "natstrat", "inststrat", "outputs", "cx", "projects"];
-    const [tk, pf, ...secs] = await Promise.all([
+    /* تغطية الفريق لا تُطلب إلا لمن له فريق — والدالة نفسها
+       تتحقّق في القاعدة، فالطلب هنا توفيرٌ لا حماية */
+    const leads = me.isLead || me.scopes.includes("users");
+    const [tk, pf, tm, ...secs] = await Promise.all([
       apiFetch("/api/tasks").then((r) => r.json()).catch(() => ({})),
       apiFetch("/api/portfolio").then((r) => r.json()).catch(() => ({})),
+      leads
+        ? apiFetch("/api/team/quarter").then((r) => r.json()).catch(() => ({}))
+        : Promise.resolve({}),
       /* القسم الذي لا يملك صاحب الحساب صلاحيته يرجع فارغاً من RLS،
          فلا يرى في الزبدة ما لا يراه في الصفحة */
       ...KEYS.map((k) =>
@@ -1038,7 +1127,15 @@ export default function Assistant({
     KEYS.forEach((k, i) => {
       sections[k] = (secs[i]?.items || []) as Rec[];
     });
-    setCtx({ me, tasks: tk.tasks || [], rows: pf.items || [], changes: [], sections });
+    setCtx({
+      me,
+      tasks: tk.tasks || [],
+      rows: pf.items || [],
+      changes: [],
+      sections,
+      people: (tk.people || []) as { id: string; name: string }[],
+      team: (tm.team || []) as { name: string; done: number; total: number }[],
+    });
   }, [me]);
 
   useEffect(() => {

@@ -480,6 +480,24 @@ export async function apiFetch(path: string, init: Init = {}) {
 
     /* ---------------- محفظتي — صفوف كل موظف ----------------
        القراءة يحرسها RLS (صاحبها ومديره)، والكتابة لصاحبها وحده. */
+    /* تغطية الاجتماعات الربعية على مستوى الإدارة — أعداد فقط.
+       الدالة في القاعدة تتحقّق بنفسها ممّن يحقّ له، ولا تُرجع أي
+       محتوى من المحافظ: اسم صاحب المحفظة وعدد جهاته وكم منها
+       عُقد اجتماع ربعه الحالي. */
+    if (p === "/api/team/quarter" && method === "GET") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const { data, error } = await s.rpc("perf_team_quarter");
+      if (error) return ok({ team: [] });
+      return ok({
+        team: (Array.isArray(data) ? data : []).map((r: Record<string, unknown>) => ({
+          name: String(r.user_name || ""),
+          done: Number(r.done || 0),
+          total: Number(r.total || 0),
+        })),
+      });
+    }
+
     if (p === "/api/portfolio" && method === "GET") {
       const me = await whoAmI();
       if (!me) return err("غير مصرّح", 401);
