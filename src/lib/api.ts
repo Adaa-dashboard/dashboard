@@ -666,6 +666,42 @@ export async function apiFetch(path: string, init: Init = {}) {
       return ok({ entities: nE, contacts: nC, linked: Number(L?.linked || 0), unmatched: Number(L?.unmatched || 0) });
     }
 
+    /* تعديل نقطة تواصل — من السجلّ أو من صفحة من يتولّى الجهة.
+       من يملك ماذا تحسمه RLS ومحرّس القاعدة، لا هذه الدالة. */
+    if (p === "/api/entities/contact" && (method === "POST" || method === "PATCH")) {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const id = str(body.id);
+      const patch: Record<string, unknown> = {};
+      for (const [k, col] of [["name", "name"], ["jobTitle", "job_title"],
+                              ["email", "email"], ["phone", "phone"], ["note", "note"]] as const)
+        if (body[k] !== undefined) patch[col] = str(body[k]);
+      if (id) {
+        const { data, error } = await s.from("perf_contacts").update(patch).eq("id", id).select("id");
+        if (error) return err(error.message, 403);
+        if (!data?.length) return err("التعديل لمن يتولّى هذه الجهة أو لصاحب صلاحية «الجهات»", 403);
+        return ok({ ok: true, id });
+      }
+      const entityId = str(body.entityId);
+      if (!entityId) return err("لا توجد جهة", 400);
+      const { data, error } = await s.from("perf_contacts").insert({
+        id: "con-" + newId(), entity_id: entityId,
+        side: str(body.side) || "الجهة", ...patch,
+      }).select("id");
+      if (error) return err(error.message, 403);
+      if (!data?.length) return err("الإضافة لمن يتولّى هذه الجهة", 403);
+      return ok({ ok: true, id: String(data[0].id) });
+    }
+
+    if (p.startsWith("/api/entities/contact/") && method === "DELETE") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const id = p.split("/")[4];
+      const { data, error } = await s.from("perf_contacts").delete().eq("id", id).select("id");
+      if (error || !data?.length) return err("الحذف لمن يتولّى هذه الجهة", 403);
+      return ok({ ok: true });
+    }
+
     /* جهاتي — ما أنا نقطة التواصل فيه، تُقرأ في محفظتي بلا تعبئة */
     if (p === "/api/entities/mine" && method === "GET") {
       const me = await whoAmI();
@@ -675,6 +711,7 @@ export async function apiFetch(path: string, init: Init = {}) {
         mine: (data || []).map((r: Record<string, unknown>) => ({
           entityId: String(r.entity_id), name: String(r.name || ""),
           kind: String(r.kind || ""), sector: String(r.sector || ""),
+          myContactId: String(r.my_contact_id || ""),
           myRole: String(r.my_role || ""), theirs: r.theirs || [],
         })),
       });
@@ -747,9 +784,10 @@ export async function apiFetch(path: string, init: Init = {}) {
       if (!me) return err("غير مصرّح", 401);
       const qq = q.get("q") || "";
       if (!qq.trim()) return ok({ files: [], passages: [] });
-      const [f, k] = await Promise.all([
+      const [f, k, en] = await Promise.all([
         s.rpc("perf_docs_find", { p_q: qq, p_limit: 4 }),
         s.rpc("perf_kb_search", { p_q: qq, p_limit: 3 }),
+        s.rpc("perf_entities_find", { p_q: qq, p_limit: 3 }),
       ]);
       return ok({
         files: (f.data || []).map((r: Record<string, unknown>) => ({
@@ -761,6 +799,11 @@ export async function apiFetch(path: string, init: Init = {}) {
           docId: String(r.doc_id), title: String(r.title || ""), page: Number(r.page || 0),
           heading: String(r.heading || ""), body: String(r.body || ""),
           filePath: String(r.file_path || ""),
+        })),
+        entities: (en.data || []).map((r: Record<string, unknown>) => ({
+          id: String(r.id), name: String(r.name || ""), kind: String(r.kind || ""),
+          ours: (r.ours || []) as Record<string, string>[],
+          theirs: (r.theirs || []) as Record<string, string>[],
         })),
       });
     }

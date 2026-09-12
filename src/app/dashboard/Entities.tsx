@@ -109,8 +109,9 @@ function Num({
 
 /** جهةٌ أنا نقطة تواصلها في السجلّ المركزي */
 type Reg = {
-  entityId: string; name: string; kind: string; sector: string; myRole: string;
-  theirs: { name?: string; jobTitle?: string; email?: string; phone?: string }[];
+  entityId: string; name: string; kind: string; sector: string;
+  myContactId: string; myRole: string;
+  theirs: { id?: string; name?: string; jobTitle?: string; email?: string; phone?: string }[];
 };
 
 export default function MyEntities({
@@ -134,12 +135,26 @@ export default function MyEntities({
      جاهزة بلا تعبئة، وتُعدَّل من السجلّ لا من هنا فيبقى مرجعاً
      واحداً لا نسختين تتعارضان */
   const [reg, setReg] = useState<Reg[]>([]);
-  useEffect(() => {
-    void apiFetch("/api/entities/mine")
+  const [regErr, setRegErr] = useState("");
+  const loadReg = () =>
+    apiFetch("/api/entities/mine")
       .then((r) => r.json())
       .then((d) => setReg(Array.isArray(d.mine) ? d.mine : []))
       .catch(() => setReg([]));
-  }, []);
+  useEffect(() => { void loadReg(); }, []);
+
+  /* التعديل يكتب في السجلّ المركزي مباشرة — لا نسخة هنا ونسخة
+     هناك. والقاعدة تمنع من لا يتولّى الجهة، فالحارس ليس الواجهة. */
+  async function saveContact(body: Record<string, unknown>) {
+    setRegErr("");
+    const r = await apiFetch("/api/entities/contact", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then((x) => x.json()).catch(() => ({ error: "تعذّر الاتصال" }));
+    if (r?.error) { setRegErr(String(r.error)); return; }
+    await loadReg();
+  }
 
   const per = useMemo(
     () => rows.map((r) => ({ row: r, list: contribsOf(r.data) })),
@@ -181,23 +196,61 @@ export default function MyEntities({
             <b>{t("جهاتي من سجلّ المركز", "From the central registry")}</b>
             <span>{t(`${reg.length} جهة أنت نقطة التواصل فيها`, `${reg.length} entities`)}</span>
           </div>
+          {regErr && <div className="alert alert-error">{regErr}</div>}
           <div className="en-reg-g">
-            {reg.map((x) => (
-              <div className="en-reg-c" key={x.entityId}>
-                <b>{x.name}</b>
-                {x.myRole && <em>{x.myRole}</em>}
-                {x.theirs?.[0]?.name && (
-                  <span>
-                    {t("نقطة تواصلهم", "Their contact")}: {x.theirs[0].name}
-                    {x.theirs[0].phone ? ` · ${x.theirs[0].phone}` : ""}
-                  </span>
-                )}
-              </div>
-            ))}
+            {reg.map((x) => {
+              const c = x.theirs?.[0];
+              return (
+                <div className="en-reg-c" key={x.entityId}>
+                  <b>{x.name}</b>
+                  <label className="en-reg-l">{t("دوري فيها", "My role")}</label>
+                  <input
+                    defaultValue={x.myRole}
+                    placeholder={t("مثال: نقطة التواصل الرئيسية", "e.g. main contact")}
+                    onBlur={(e) => {
+                      if (e.target.value === x.myRole) return;
+                      void saveContact({ id: x.myContactId, note: e.target.value });
+                    }}
+                  />
+                  <label className="en-reg-l">{t("نقطة التواصل من الجهة", "Their contact")}</label>
+                  <input
+                    defaultValue={c?.name || ""}
+                    placeholder={t("الاسم", "Name")}
+                    onBlur={(e) => {
+                      const v = e.target.value.trim();
+                      if (v === (c?.name || "")) return;
+                      void saveContact(c?.id ? { id: c.id, name: v } : { entityId: x.entityId, side: "الجهة", name: v });
+                    }}
+                  />
+                  <div className="en-reg-2">
+                    <input
+                      dir="ltr"
+                      defaultValue={c?.phone || ""}
+                      placeholder={t("الجوال", "Phone")}
+                      onBlur={(e) => {
+                        const v = e.target.value.trim();
+                        if (v === (c?.phone || "")) return;
+                        void saveContact(c?.id ? { id: c.id, phone: v } : { entityId: x.entityId, side: "الجهة", phone: v, name: c?.name || "" });
+                      }}
+                    />
+                    <input
+                      dir="ltr"
+                      defaultValue={c?.email || ""}
+                      placeholder={t("البريد", "Email")}
+                      onBlur={(e) => {
+                        const v = e.target.value.trim();
+                        if (v === (c?.email || "")) return;
+                        void saveContact(c?.id ? { id: c.id, email: v } : { entityId: x.entityId, side: "الجهة", email: v, name: c?.name || "" });
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
           <p className="en-reg-n">
-            {t("تُحدَّث من صفحة «الجهات ونقاط التواصل» — فالمرجع واحد لا نسختان.",
-               "Maintained in the central registry.")}
+            {t("ما تكتبه هنا يظهر فوراً في صفحة «الجهات ونقاط التواصل» للجميع — فالمرجع واحد لا نسختان.",
+               "Edits here appear immediately in the central registry.")}
           </p>
         </div>
       )}
