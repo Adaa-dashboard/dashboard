@@ -35,7 +35,9 @@ export type Scope =
   | "sticky"
   | "audit"
   | "docs"
-  | "docs:edit";
+  | "docs:edit"
+  | "entities"
+  | "entities:edit";
 
 export const SCOPE_GROUPS: { title: string; items: { key: Scope; label: string; note?: string }[] }[] = [
   {
@@ -48,6 +50,8 @@ export const SCOPE_GROUPS: { title: string; items: { key: Scope; label: string; 
       { key: "weekly:edit", label: "تحرير التقرير الأسبوعي", note: "اختيار أقسامه وكتابة خاناته" },
       { key: "docs", label: "منهجيات أداء", note: "مكتبة المنهجيات والنماذج" },
       { key: "docs:edit", label: "رفع المنهجيات", note: "إضافة الوثائق وحذفها" },
+      { key: "entities", label: "الجهات ونقاط التواصل", note: "سجلّ الجهات ومن نتواصل معه فيها" },
+      { key: "entities:edit", label: "تحرير الجهات", note: "رفع الملف وتعديل نقاط التواصل" },
     ],
   },
   {
@@ -141,6 +145,10 @@ export const PAGE_ROWS: { title: string; rows: PageRow[] }[] = [
         view: "docs", label: "منهجيات أداء", note: "المنهجيات والنماذج — ومنها يجيب المساعد",
         edit: "docs:edit", editLabel: "رفع الوثائق وحذفها",
       },
+      {
+        view: "entities", label: "الجهات ونقاط التواصل", note: "من نتواصل معه في كل جهة",
+        edit: "entities:edit", editLabel: "رفع ملف الجهات وتعديلها",
+      },
     ],
   },
   {
@@ -169,7 +177,7 @@ export const PAGE_ROWS: { title: string; rows: PageRow[] }[] = [
 
 /* الموظف الجديد: نظرة عامة ومهامه في محفظتي ولا شيء غيرهما —
    والإنجاز الأسبوعي وصفحات الأقسام تُمنح لمن يخصّه */
-export const DEFAULT_SCOPES: Scope[] = ["overview", "tasks", "docs"];
+export const DEFAULT_SCOPES: Scope[] = ["overview", "tasks", "docs", "entities"];
 
 export const scopeLabel = (k: string): string =>
   SCOPE_GROUPS.flatMap((g) => g.items).find((i) => i.key === k)?.label || k;
