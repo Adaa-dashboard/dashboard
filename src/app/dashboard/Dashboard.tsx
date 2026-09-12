@@ -11,6 +11,7 @@ import Activity, { type Item as ActivityItem } from "./Activity";
 import Changes from "./Changes";
 import Backup from "./Backup";
 import Mic from "./Mic";
+import Docs from "./Docs";
 import Tools from "./Tools";
 import Portfolio from "./Portfolio";
 import Audit from "./Audit";
@@ -358,6 +359,7 @@ export default function Dashboard({ me }: { me: Me }) {
     mypage: ["محفظتي", "My portfolio"],
     report: ["الإنجاز الأسبوعي", "Weekly Achievement"],
     audit: ["سجل النشاط", "Activity log"],
+    docs: ["منهجيات أداء", "Adaa methodologies"],
     structure: ["الهيكل التنظيمي", "Org chart"],
     users: ["المستخدمون والصلاحيات", "Users & Roles"],
     sessions: SECTION_TITLE.sessions,
@@ -460,6 +462,7 @@ export default function Dashboard({ me }: { me: Me }) {
             <NavItem id="tasks" icon={<IconTask />} label={["المهام", "Tasks"]} />
           )}
           {can("weekly") && <NavItem id="report" icon={<IconWeek />} label={["الإنجاز الأسبوعي", "Weekly Achievement"]} />}
+          {can("docs") && <NavItem id="docs" icon={<IconFolder />} label={["منهجيات أداء", "Methodologies"]} />}
 
           <div className="rail-gap" />
 
@@ -626,6 +629,7 @@ export default function Dashboard({ me }: { me: Me }) {
               )}
               {tab === "users" && can("users") && <UsersManager refData={refData} />}
               {tab === "audit" && can("audit") && <Audit t={t} />}
+              {tab === "docs" && can("docs") && <Docs t={t} canEdit={can("docs:edit")} />}
               {SECTION_NAV.map(([key]) =>
                 tab === key && can(key) ? (
                   <SectionPage key={key} section={key} canEdit={can(`${key}:edit` as Scope)} meId={me.id} t={t} />

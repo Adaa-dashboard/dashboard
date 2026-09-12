@@ -539,6 +539,91 @@ export async function apiFetch(path: string, init: Init = {}) {
     /* ---------------- صلاحيات محفظتي ----------------
        المحفظة خاصة بصاحبها، ولا يراها أحد — ولو كان مديره — إلا
        بمنحٍ صريح منه. الحراسة الحقيقية في RLS؛ ما هنا واجهة فقط. */
+    /* ---------------- منهجيات أداء ----------------
+       الوثيقة وملفها للتنزيل، ونصّها مقطّعاً ليبحث فيه المساعد.
+       الحارس RLS: القراءة لكل من دخل، والرفع بصلاحية docs:edit. */
+    if (p === "/api/docs" && method === "GET") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const { data, error } = await s
+        .from("perf_docs").select("*").eq("active", true).order("at", { ascending: false });
+      if (error) return err(error.message, 403);
+      return ok({
+        docs: (data || []).map((r: Record<string, unknown>) => ({
+          id: String(r.id), title: String(r.title || ""), kind: String(r.kind || ""),
+          tags: (r.tags || []) as string[], summary: String(r.summary || ""),
+          filePath: String(r.file_path || ""), fileName: String(r.file_name || ""),
+          size: Number(r.size || 0), pages: Number(r.pages || 0),
+          addedBy: String(r.added_by || ""), at: r.at,
+        })),
+      });
+    }
+
+    if (p === "/api/docs" && method === "POST") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const id = str(body.id) || "doc-" + newId();
+      const { error } = await s.from("perf_docs").upsert({
+        id,
+        title: str(body.title),
+        kind: str(body.kind) || "منهجية",
+        tags: Array.isArray(body.tags) ? body.tags.map(String) : [],
+        summary: str(body.summary),
+        file_path: str(body.filePath),
+        file_name: str(body.fileName),
+        mime: str(body.mime),
+        size: num(body.size) ?? 0,
+        pages: num(body.pages) ?? 0,
+        added_by: me.name || me.username || "",
+      });
+      if (error) return err("الرفع لمن يملك صلاحية «منهجيات أداء»", 403);
+      /* المقاطع تُستبدل بالكامل: إعادة رفع الوثيقة تعني نصّاً جديداً */
+      const chunks = (Array.isArray(body.chunks) ? body.chunks : []) as Record<string, unknown>[];
+      await s.from("perf_doc_chunks").delete().eq("doc_id", id);
+      for (let i = 0; i < chunks.length; i += 400) {
+        const part = chunks.slice(i, i + 400).map((c) => ({
+          doc_id: id, idx: num(c.idx) ?? 0, page: num(c.page) ?? 0,
+          heading: str(c.heading).slice(0, 180), body: str(c.body).slice(0, 1500),
+        }));
+        const { error: e2 } = await s.from("perf_doc_chunks").insert(part);
+        if (e2) return err("حُفظت الوثيقة ولم يكتمل نصّها: " + e2.message, 500);
+      }
+      return ok({ ok: true, id, chunks: chunks.length });
+    }
+
+    if (p.startsWith("/api/docs/") && method === "DELETE") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const id = p.split("/")[3];
+      const { data, error } = await s.from("perf_docs").delete().eq("id", id).select("id");
+      if (error || !data?.length) return err("الحذف لمن يملك صلاحية «منهجيات أداء»", 403);
+      return ok({ ok: true });
+    }
+
+    /* بحث المساعد: ملفٌ بالاسم، أو جوابٌ من نصّ المنهجيات */
+    if (p === "/api/docs/ask" && method === "GET") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const qq = q.get("q") || "";
+      if (!qq.trim()) return ok({ files: [], passages: [] });
+      const [f, k] = await Promise.all([
+        s.rpc("perf_docs_find", { p_q: qq, p_limit: 4 }),
+        s.rpc("perf_kb_search", { p_q: qq, p_limit: 3 }),
+      ]);
+      return ok({
+        files: (f.data || []).map((r: Record<string, unknown>) => ({
+          id: String(r.id), title: String(r.title || ""), kind: String(r.kind || ""),
+          filePath: String(r.file_path || ""), fileName: String(r.file_name || ""),
+          pages: Number(r.pages || 0), hits: Number(r.hits || 0),
+        })),
+        passages: (k.data || []).map((r: Record<string, unknown>) => ({
+          docId: String(r.doc_id), title: String(r.title || ""), page: Number(r.page || 0),
+          heading: String(r.heading || ""), body: String(r.body || ""),
+          filePath: String(r.file_path || ""),
+        })),
+      });
+    }
+
     /* «فريقي» — موظفو قطاع المدير وأحجام محافظهم.
        الصلاحية يحرسها RLS (perf_can_see_pf): من ليس مديراً
        لا تُرجع له استعلاماتُ المحافظ شيئاً أصلاً. */
