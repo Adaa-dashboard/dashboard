@@ -556,6 +556,7 @@ export async function apiFetch(path: string, init: Init = {}) {
         if (!by.has(k)) by.set(k, { ours: [], theirs: [] });
         const row = {
           id: String(c.id), side: String(c.side || ""), name: String(c.name || ""),
+          role: String(c.role || "أساسي"),
           jobTitle: String(c.job_title || ""), email: String(c.email || ""),
           phone: String(c.phone || ""), note: String(c.note || ""),
           userId: c.user_id ? String(c.user_id) : null,
@@ -572,91 +573,39 @@ export async function apiFetch(path: string, init: Init = {}) {
       });
     }
 
-    /* استيراد ملف الجهات — الأعمدة تُطابَق بعناوينها مهما اختلفت
-       صياغتها، فلا يُفرض على الملف ترتيبٌ ولا تسميةٌ بعينها.
-       والصفوف تتجمّع بالجهة: صفٌّ لكل نقطة تواصل أو صفٌّ يجمعها. */
+    /* استيراد ملف الجهات — الواجهة تقرأ الملف وتُصنّف أعمدته
+       وتعرض الخريطة على المستخدم، فلا يصل هنا إلا ما أقرّه. */
     if (p === "/api/entities/import" && method === "POST") {
       const me = await whoAmI();
       if (!me) return err("غير مصرّح", 401);
-      const rows = (Array.isArray(body.rows) ? body.rows : []) as Record<string, string>[];
-      if (!rows.length) return err("لا توجد صفوف", 400);
-
-      const nrm = (v: string) =>
-        String(v || "").replace(/[\u064B-\u0652\u0640]/g, "")
-          .replace(/[أإآٱ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه")
-          .replace(/\s+/g, " ").trim().toLowerCase();
-      /** أول عمود يحمل إحدى هذه الكلمات في عنوانه */
-      const pick = (o: Record<string, string>, words: string[], not: string[] = []) => {
-        for (const k of Object.keys(o)) {
-          const h = nrm(k);
-          if (not.some((n) => h.includes(nrm(n)))) continue;
-          if (words.some((w) => h.includes(nrm(w)))) {
-            const v = String(o[k] || "").trim();
-            if (v) return v;
-          }
-        }
-        return "";
-      };
-
-      type C = { side: string; name: string; job: string; email: string; phone: string; note: string };
-      const ents = new Map<string, { name: string; kind: string; sector: string; note: string; cs: C[] }>();
-      for (const r of rows) {
-        const name = pick(r, ["اسم الجهة", "الجهة", "جهة", "entity", "organization"]);
-        if (!name) continue;
-        const key = nrm(name);
-        if (!ents.has(key))
-          ents.set(key, {
-            name,
-            kind: pick(r, ["نوع الجهة", "التصنيف", "النوع", "kind", "type"]),
-            sector: pick(r, ["القطاع", "sector"]),
-            note: pick(r, ["ملاحظات", "ملاحظة", "note"]),
-            cs: [],
-          });
-        const E = ents.get(key)!;
-        // نقطة التواصل من المركز
-        const ourName = pick(r, ["نقطة التواصل من المركز", "من المركز", "المسؤول من المركز",
-                                 "منسوب المركز", "موظف المركز", "نقطة تواصلنا", "المسؤول"],
-                              ["الجهة", "لدى الجهة", "من الجهة"]);
-        if (ourName)
-          E.cs.push({
-            side: "نحن", name: ourName,
-            job: pick(r, ["مسمى المركز", "مسمى المسؤول"], ["الجهة"]),
-            email: pick(r, ["ايميل المركز", "بريد المركز"], ["الجهة"]),
-            phone: pick(r, ["جوال المركز", "هاتف المركز"], ["الجهة"]),
-            note: "",
-          });
-        // نقطة التواصل من الجهة
-        const theirName = pick(r, ["نقطة التواصل من الجهة", "من الجهة", "ممثل الجهة",
-                                   "مسؤول الجهة", "اسم المنسق", "المنسق", "نقطة التواصل"],
-                               ["المركز", "من المركز"]);
-        if (theirName)
-          E.cs.push({
-            side: "الجهة", name: theirName,
-            job: pick(r, ["المسمى", "المنصب", "الوظيفة", "title"], ["المركز"]),
-            email: pick(r, ["البريد", "ايميل", "email"], ["المركز"]),
-            phone: pick(r, ["الجوال", "الهاتف", "رقم", "phone", "mobile"], ["المركز"]),
-            note: "",
-          });
-      }
-      if (!ents.size) return err("لم يُعثر على عمود اسم الجهة في الملف", 400);
+      type InC = { side: string; role: string; name: string; jobTitle: string; phone: string; email: string };
+      type InE = { name: string; kind: string; sector: string; note: string; contacts: InC[] };
+      const ents = (Array.isArray(body.entities) ? body.entities : []) as InE[];
+      if (!ents.length) return err("لا توجد جهات", 400);
 
       let nE = 0, nC = 0;
-      for (const [, E] of ents) {
-        const id = "ent-" + newId();
-        const { data: cur } = await s.from("perf_entities").select("id").eq("name", E.name).maybeSingle();
-        const eid = cur?.id ? String(cur.id) : id;
+      for (const E of ents) {
+        const nm = String(E.name || "").trim();
+        if (!nm) continue;
+        const { data: cur } = await s.from("perf_entities").select("id").eq("name", nm).maybeSingle();
+        const eid = cur?.id ? String(cur.id) : "ent-" + newId();
         const { error: e1 } = await s.from("perf_entities").upsert({
-          id: eid, name: E.name, kind: E.kind, sector: E.sector, note: E.note, active: true,
+          id: eid, name: nm, kind: str(E.kind), sector: str(E.sector), note: str(E.note), active: true,
         });
         if (e1) return err("الرفع لمن يملك صلاحية «الجهات»", 403);
         nE++;
-        for (const c of E.cs) {
+        for (const c of E.contacts || []) {
+          const side = c.side === "نحن" ? "نحن" : "الجهة";
+          const role = c.role === "بديل" ? "بديل" : "أساسي";
+          /* المفتاح (الجهة · الطرف · الدور): إعادة الرفع تُحدِّث
+             الشخص نفسه ولا تُكرّره، وتغييرُ الاسم تصحيحٌ لا إضافة */
           const { data: dup } = await s.from("perf_contacts").select("id")
-            .eq("entity_id", eid).eq("side", c.side).eq("name", c.name).maybeSingle();
+            .eq("entity_id", eid).eq("side", side).eq("role", role).maybeSingle();
           const { error: e2 } = await s.from("perf_contacts").upsert({
             id: dup?.id ? String(dup.id) : "con-" + newId(),
-            entity_id: eid, side: c.side, name: c.name,
-            job_title: c.job, email: c.email, phone: c.phone, note: c.note,
+            entity_id: eid, side, role,
+            name: str(c.name), job_title: str(c.jobTitle),
+            email: str(c.email), phone: str(c.phone),
           });
           if (!e2) nC++;
         }
