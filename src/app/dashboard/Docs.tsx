@@ -32,10 +32,27 @@ function human(n: number): string {
   return `${(n / 1024 / 1024).toFixed(1)} ميجابايت`;
 }
 
-/** رابط تنزيل الملف من تخزين المنصة */
-export function docUrl(path: string): string {
+/** رابط تنزيل الملف من تخزين المنصة.
+    الاسم الأصلي يُمرَّر ليصل الملف باسمه العربي لا بمفتاح التخزين */
+export function docUrl(path: string, fileName?: string): string {
   if (!path) return "";
-  return sb().storage.from("docs").getPublicUrl(path).data.publicUrl;
+  const o = fileName ? { download: fileName } : undefined;
+  return sb().storage.from("docs").getPublicUrl(path, o).data.publicUrl;
+}
+
+/** مفتاح التخزين — لاتيني بحت.
+    تخزين Supabase يرفض الحروف العربية في المفتاح («Invalid key»)،
+    فالمفتاح اسم محايد والاسم الأصلي يُحفظ في قاعدة المنصة ويظهر
+    للناس ويُنزَّل الملف به. */
+function storageKey(name: string): string {
+  const dot = name.lastIndexOf(".");
+  const ext = (dot > 0 ? name.slice(dot + 1) : "").replace(/[^A-Za-z0-9]/g, "").toLowerCase();
+  const base = (dot > 0 ? name.slice(0, dot) : name)
+    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/^[-.]+|[-.]+$/g, "")
+    .slice(0, 40);
+  const rnd = Math.random().toString(36).slice(2, 7);
+  return `${Date.now()}-${rnd}${base ? `-${base}` : ""}${ext ? `.${ext}` : ""}`;
 }
 
 export default function Docs({ t, canEdit }: { t: T; canEdit: boolean }) {
@@ -70,7 +87,7 @@ export default function Docs({ t, canEdit }: { t: T; canEdit: boolean }) {
     setErr("");
     try {
       setBusy(t("يُرفع الملف…", "Uploading…"));
-      const path = `${Date.now()}-${f.name.replace(/[^\w.\-؀-ۿ]+/g, "_")}`;
+      const path = storageKey(f.name);
       const up = await sb().storage.from("docs").upload(path, f, { upsert: true });
       if (up.error) throw new Error(up.error.message);
 
@@ -185,7 +202,7 @@ export default function Docs({ t, canEdit }: { t: T; canEdit: boolean }) {
                 {d.addedBy && <span>{t("أضافها", "by")} {d.addedBy}</span>}
               </div>
               <div className="dc-a">
-                <a className="btn2" href={docUrl(d.filePath)} target="_blank" rel="noreferrer" download={d.fileName}>
+                <a className="btn2" href={docUrl(d.filePath, d.fileName)} target="_blank" rel="noreferrer" download={d.fileName}>
                   ⬇ {t("تنزيل", "Download")}
                 </a>
                 {canEdit && (
