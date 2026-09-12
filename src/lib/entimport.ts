@@ -75,7 +75,12 @@ export function mapHeaders(heads: string[]): MapResult {
 }
 
 export type OutContact = { side: string; role: string; name: string; jobTitle: string; phone: string; email: string };
-export type OutEntity = { name: string; kind: string; sector: string; note: string; contacts: OutContact[] };
+export type OutEntity = {
+  name: string; kind: string; sector: string; note: string;
+  contacts: OutContact[];
+  /** كل عمود لم يُقرأ كنقطة تواصل — يُحفظ كما هو فلا تضيع معلومة */
+  extra: Record<string, string>;
+};
 
 export function buildRows(rows: Record<string, string>[], map: MapResult): OutEntity[] {
   const out = new Map<string, OutEntity>();
@@ -93,9 +98,16 @@ export function buildRows(rows: Record<string, string>[], map: MapResult): OutEn
         sector: secCol ? String(r[secCol] || "").trim() : "",
         note: noteCol ? String(r[noteCol] || "").trim() : "",
         contacts: [],
+        extra: {},
       });
     }
     const E = out.get(key)!;
+    /* الأعمدة التي لم تُصنَّف نقاطَ تواصل تُحفظ بعناوينها كما هي:
+       الملف قد يحمل ما لم يخطر ببالنا، وإهمالُه ضياع معلومة. */
+    for (const k of map.ignored) {
+      const v = String(r[k] || "").trim();
+      if (v && !E.extra[k]) E.extra[k] = v;
+    }
     // تجميع الأعمدة في أشخاص: لكل (طرف × دور) شخصٌ واحد
     const people = new Map<string, OutContact>();
     for (const c of map.cols) {

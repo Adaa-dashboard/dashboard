@@ -23,6 +23,8 @@ type Contact = {
 };
 export type Entity = {
   id: string; name: string; kind: string; sector: string; note: string;
+  /** أعمدة الملف التي لم تُقرأ نقاطَ تواصل — تُعرض كما وردت */
+  extra: Record<string, string>;
   ours: Contact[]; theirs: Contact[];
 };
 
@@ -50,6 +52,12 @@ export default function Entities2({ t, canEdit }: { t: T; canEdit: boolean }) {
   const [err, setErr] = useState("");
   const file = useRef<HTMLInputElement | null>(null);
   const [prev, setPrev] = useState<{ map: MapResult; built: OutEntity[] } | null>(null);
+  const [rev, setRev] = useState<{ name: string; entities: number; reviewed: number }[]>([]);
+  useEffect(() => {
+    if (!canEdit) return;
+    void apiFetch("/api/entities/review").then((r) => r.json())
+      .then((d) => setRev(Array.isArray(d.status) ? d.status : [])).catch(() => setRev([]));
+  }, [canEdit]);
 
   const load = useCallback(async () => {
     const r = await apiFetch("/api/entities").then((x) => x.json()).catch(() => ({}));
@@ -154,6 +162,17 @@ export default function Entities2({ t, canEdit }: { t: T; canEdit: boolean }) {
         )}
       </div>
 
+      {canEdit && rev.length > 0 && rev.some((x) => x.reviewed < x.entities) && (
+        <div className="en2-rev">
+          <b>{t("مراجعة هذا الربع", "This quarter's review")}</b>
+          {rev.map((x) => (
+            <span key={x.name} className={x.reviewed >= x.entities ? "ok" : ""}>
+              {x.name} <i>{x.reviewed}/{x.entities}</i>
+            </span>
+          ))}
+        </div>
+      )}
+
       {msg && <div className="dcs-busy">{msg}</div>}
       {err && <div className="alert alert-error">{err}</div>}
 
@@ -249,6 +268,13 @@ export default function Entities2({ t, canEdit }: { t: T; canEdit: boolean }) {
                     : <div className="en2-no">{t("لا يوجد", "None")}</div>}
                 </div>
               </div>
+              {e.extra && Object.keys(e.extra).length > 0 && (
+                <div className="en2-ex">
+                  {Object.entries(e.extra).map(([k, v]) => (
+                    <span key={k}><i>{k}</i>{v}</span>
+                  ))}
+                </div>
+              )}
               {e.note && <p className="en2-n">{e.note}</p>}
             </div>
           ))}

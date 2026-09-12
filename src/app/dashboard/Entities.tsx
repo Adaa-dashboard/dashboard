@@ -136,12 +136,20 @@ export default function MyEntities({
      واحداً لا نسختين تتعارضان */
   const [reg, setReg] = useState<Reg[]>([]);
   const [regErr, setRegErr] = useState("");
+  /* المراجعة الربعية: السجلّ يشيخ بلا مراجعة — الأشخاص ينتقلون
+     وأرقامهم تتغيّر. التنبيه يزول بالتأكيد لا بالتجاهل. */
+  const [due, setDue] = useState<{ entityId: string; entity: string }[]>([]);
+  const loadDue = () =>
+    apiFetch("/api/entities/review")
+      .then((r) => r.json())
+      .then((d) => setDue(Array.isArray(d.due) ? d.due : []))
+      .catch(() => setDue([]));
   const loadReg = () =>
     apiFetch("/api/entities/mine")
       .then((r) => r.json())
       .then((d) => setReg(Array.isArray(d.mine) ? d.mine : []))
       .catch(() => setReg([]));
-  useEffect(() => { void loadReg(); }, []);
+  useEffect(() => { void loadReg(); void loadDue(); }, []);
 
   /* التعديل يكتب في السجلّ المركزي مباشرة — لا نسخة هنا ونسخة
      هناك. والقاعدة تمنع من لا يتولّى الجهة، فالحارس ليس الواجهة. */
@@ -154,6 +162,11 @@ export default function MyEntities({
     }).then((x) => x.json()).catch(() => ({ error: "تعذّر الاتصال" }));
     if (r?.error) { setRegErr(String(r.error)); return; }
     await loadReg();
+  }
+
+  async function reviewed() {
+    await apiFetch("/api/entities/review", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+    await loadDue();
   }
 
   const per = useMemo(
@@ -190,6 +203,23 @@ export default function MyEntities({
 
   return (
     <div className="en">
+      {due.length > 0 && (
+        <div className="en-due">
+          <div>
+            <b>{t("راجع بيانات جهاتك — مراجعة هذا الربع", "Quarterly review due")}</b>
+            <em>
+              {t(
+                `${due.length} جهة تنتظر تأكيدك: ${due.slice(0, 3).map((x) => x.entity).join(" · ")}${due.length > 3 ? " …" : ""}. تأكّد من اسم نقطة التواصل ورقمها، فالأشخاص ينتقلون وأرقامهم تتغيّر.`,
+                `${due.length} entities need review.`,
+              )}
+            </em>
+          </div>
+          <button className="btn btn-sm" onClick={() => void reviewed()}>
+            {t("راجعتُ وبياناتي صحيحة", "Reviewed — all correct")}
+          </button>
+        </div>
+      )}
+
       {reg.length > 0 && (
         <div className="en-reg">
           <div className="en-reg-h">

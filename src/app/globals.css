@@ -9923,3 +9923,34 @@ table.matrix thead th {
   font-size: 9.5px; font-weight: 800; color: var(--muted);
   background: var(--soft2); border-radius: 999px; padding: 1px 7px; margin-inline-end: 5px;
 }
+
+/* تذكير المراجعة الربعية — يزول بالتأكيد لا بالتجاهل */
+.en-due {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  background: #fdf3e0; border: 1px solid #f0e0b8; border-radius: 13px;
+  padding: 12px 15px; margin-bottom: 14px;
+}
+.en-due b { display: block; font-size: 13px; color: #7a5c0e; }
+.en-due em { font-style: normal; font-size: 11.5px; color: #8a6d12; line-height: 1.8; }
+.en-due .btn { margin-inline-start: auto; flex: none; }
+:root[data-theme="dark"] .en-due { background: #3a2f13; border-color: #5a4a1e; }
+:root[data-theme="dark"] .en-due b { color: #f0d08a; }
+:root[data-theme="dark"] .en-due em { color: #d8bd7e; }
+
+/* من راجع ومن لم يراجع — لصاحب صلاحية الجهات */
+.en2-rev { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; font-size: 11.5px; }
+.en2-rev > b { color: var(--muted); font-size: 11px; }
+.en2-rev > span {
+  background: var(--dgr-bg); border: 1px solid var(--dgr-bd); color: var(--dgr-tx);
+  border-radius: 999px; padding: 3px 10px; font-weight: 700;
+}
+.en2-rev > span.ok { background: var(--ok-bg); border-color: var(--ok-bd); color: var(--ok-tx); }
+.en2-rev i { font-style: normal; opacity: 0.8; }
+
+/* أعمدة الملف التي حُفظت كما وردت */
+.en2-ex { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.en2-ex span {
+  font-size: 11px; color: var(--ink-2); background: var(--soft);
+  border: 1px solid var(--border); border-radius: 8px; padding: 3px 9px;
+}
+.en2-ex i { font-style: normal; color: var(--muted); font-weight: 700; margin-inline-end: 5px; }
