@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { docUrl } from "./Docs";
 import { loadUserData, saveUserData } from "@/lib/userdata";
 import { PIcon } from "./pickicons";
 
@@ -26,6 +27,10 @@ export type Ans = {
   note?: string;
   /** صفحة القسم التي بُنيت منها الإجابة — زرٌّ يفتحها من داخل المساعد */
   open?: { tab: string; label: string };
+  /** ملفات من «منهجيات أداء» — تُنزَّل من داخل الإجابة */
+  files?: { id: string; title: string; kind: string; url: string; pages: number }[];
+  /** مقاطع من نصّ المنهجيات — كلٌّ بمصدره وصفحته */
+  passages?: { title: string; page: number; heading: string; body: string }[];
 };
 
 const txt = (v: unknown) => (v === null || v === undefined ? "" : String(v));
@@ -1029,10 +1034,34 @@ export default function Assistant({
     if (open) setTimeout(() => box.current?.focus(), 60);
   }, [open, ctx, load]);
 
-  function ask(text: string) {
+  /* الجواب المحلي أولاً (فوري من بيانات المنصة)، ثم يُستكمل من
+     «منهجيات أداء» إن كان السؤال عن ملف أو عن مضمون منهجية.
+     الترتيب مقصود: لا تنتظر الشبكةَ إجابةٌ تُحسب في المتصفح. */
+  async function ask(text: string) {
     setQ(text);
     if (!ctx) return;
-    setAns(answer(text, ctx));
+    const local = answer(text, ctx);
+    setAns(local);
+    const t2 = text.trim();
+    if (t2.length < 4) return;
+    try {
+      const r = await apiFetch(`/api/docs/ask?q=${encodeURIComponent(t2)}`).then((x) => x.json());
+      const files = (r.files || []) as { id: string; title: string; kind: string; filePath: string; pages: number }[];
+      const passages = (r.passages || []) as { title: string; page: number; heading: string; body: string }[];
+      if (!files.length && !passages.length) return;
+      setAns((cur) => {
+        const base = cur || local;
+        return {
+          ...base,
+          files: files.slice(0, 3).map((f) => ({
+            id: f.id, title: f.title, kind: f.kind, pages: f.pages, url: docUrl(f.filePath),
+          })),
+          passages: passages.slice(0, 2),
+        };
+      });
+    } catch {
+      /* تعذّر الوصول للمكتبة: يبقى الجواب المحلي كما هو */
+    }
   }
 
   const pinIt = () => {
@@ -1127,6 +1156,33 @@ export default function Assistant({
                     >
                       {show.open.label} ‹
                     </button>
+                  )}
+                  {/* من نصّ المنهجيات — المقطع ومصدره وصفحته، فيتحقّق
+                      السائل بنفسه بدل أن يثق بجوابٍ بلا مرجع */}
+                  {!!show.passages?.length && (
+                    <div className="ai-kb">
+                      {show.passages.map((x, i) => (
+                        <div className="ai-kb-i" key={i}>
+                          {x.heading && <b>{x.heading}</b>}
+                          <p>{x.body}</p>
+                          <span>
+                            {x.title} · {t("صفحة", "p.")} {x.page}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {!!show.files?.length && (
+                    <div className="ai-files">
+                      <b>{t("ملفات ذات صلة", "Related files")}</b>
+                      {show.files.map((f) => (
+                        <a key={f.id} className="ai-file" href={f.url} target="_blank" rel="noreferrer">
+                          <span className="k">{f.kind}</span>
+                          {f.title}
+                          <span className="dl">⬇</span>
+                        </a>
+                      ))}
+                    </div>
                   )}
                   {show.note && <div className="ai-note">{show.note}</div>}
                 </div>
