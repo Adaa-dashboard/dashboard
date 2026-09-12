@@ -539,6 +539,147 @@ export async function apiFetch(path: string, init: Init = {}) {
     /* ---------------- صلاحيات محفظتي ----------------
        المحفظة خاصة بصاحبها، ولا يراها أحد — ولو كان مديره — إلا
        بمنحٍ صريح منه. الحراسة الحقيقية في RLS؛ ما هنا واجهة فقط. */
+    /* ---------------- الجهات ونقاط التواصل ---------------- */
+    if (p === "/api/entities" && method === "GET") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const [ents, cons, ppl] = await Promise.all([
+        s.from("perf_entities").select("*").eq("active", true).order("name"),
+        s.from("perf_contacts").select("*"),
+        people(),
+      ]);
+      if (ents.error) return err(ents.error.message, 403);
+      const nameOf = new Map(ppl.map((u: { id: string; name: string }) => [String(u.id), u.name]));
+      const by = new Map<string, { ours: Record<string, unknown>[]; theirs: Record<string, unknown>[] }>();
+      for (const c of (cons.data || []) as Record<string, unknown>[]) {
+        const k = String(c.entity_id);
+        if (!by.has(k)) by.set(k, { ours: [], theirs: [] });
+        const row = {
+          id: String(c.id), side: String(c.side || ""), name: String(c.name || ""),
+          jobTitle: String(c.job_title || ""), email: String(c.email || ""),
+          phone: String(c.phone || ""), note: String(c.note || ""),
+          userId: c.user_id ? String(c.user_id) : null,
+          userName: c.user_id ? nameOf.get(String(c.user_id)) || "" : "",
+        };
+        (String(c.side) === "نحن" ? by.get(k)!.ours : by.get(k)!.theirs).push(row);
+      }
+      return ok({
+        entities: (ents.data || []).map((e: Record<string, unknown>) => ({
+          id: String(e.id), name: String(e.name || ""), kind: String(e.kind || ""),
+          sector: String(e.sector || ""), note: String(e.note || ""),
+          ours: by.get(String(e.id))?.ours || [], theirs: by.get(String(e.id))?.theirs || [],
+        })),
+      });
+    }
+
+    /* استيراد ملف الجهات — الأعمدة تُطابَق بعناوينها مهما اختلفت
+       صياغتها، فلا يُفرض على الملف ترتيبٌ ولا تسميةٌ بعينها.
+       والصفوف تتجمّع بالجهة: صفٌّ لكل نقطة تواصل أو صفٌّ يجمعها. */
+    if (p === "/api/entities/import" && method === "POST") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const rows = (Array.isArray(body.rows) ? body.rows : []) as Record<string, string>[];
+      if (!rows.length) return err("لا توجد صفوف", 400);
+
+      const nrm = (v: string) =>
+        String(v || "").replace(/[\u064B-\u0652\u0640]/g, "")
+          .replace(/[أإآٱ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه")
+          .replace(/\s+/g, " ").trim().toLowerCase();
+      /** أول عمود يحمل إحدى هذه الكلمات في عنوانه */
+      const pick = (o: Record<string, string>, words: string[], not: string[] = []) => {
+        for (const k of Object.keys(o)) {
+          const h = nrm(k);
+          if (not.some((n) => h.includes(nrm(n)))) continue;
+          if (words.some((w) => h.includes(nrm(w)))) {
+            const v = String(o[k] || "").trim();
+            if (v) return v;
+          }
+        }
+        return "";
+      };
+
+      type C = { side: string; name: string; job: string; email: string; phone: string; note: string };
+      const ents = new Map<string, { name: string; kind: string; sector: string; note: string; cs: C[] }>();
+      for (const r of rows) {
+        const name = pick(r, ["اسم الجهة", "الجهة", "جهة", "entity", "organization"]);
+        if (!name) continue;
+        const key = nrm(name);
+        if (!ents.has(key))
+          ents.set(key, {
+            name,
+            kind: pick(r, ["نوع الجهة", "التصنيف", "النوع", "kind", "type"]),
+            sector: pick(r, ["القطاع", "sector"]),
+            note: pick(r, ["ملاحظات", "ملاحظة", "note"]),
+            cs: [],
+          });
+        const E = ents.get(key)!;
+        // نقطة التواصل من المركز
+        const ourName = pick(r, ["نقطة التواصل من المركز", "من المركز", "المسؤول من المركز",
+                                 "منسوب المركز", "موظف المركز", "نقطة تواصلنا", "المسؤول"],
+                              ["الجهة", "لدى الجهة", "من الجهة"]);
+        if (ourName)
+          E.cs.push({
+            side: "نحن", name: ourName,
+            job: pick(r, ["مسمى المركز", "مسمى المسؤول"], ["الجهة"]),
+            email: pick(r, ["ايميل المركز", "بريد المركز"], ["الجهة"]),
+            phone: pick(r, ["جوال المركز", "هاتف المركز"], ["الجهة"]),
+            note: "",
+          });
+        // نقطة التواصل من الجهة
+        const theirName = pick(r, ["نقطة التواصل من الجهة", "من الجهة", "ممثل الجهة",
+                                   "مسؤول الجهة", "اسم المنسق", "المنسق", "نقطة التواصل"],
+                               ["المركز", "من المركز"]);
+        if (theirName)
+          E.cs.push({
+            side: "الجهة", name: theirName,
+            job: pick(r, ["المسمى", "المنصب", "الوظيفة", "title"], ["المركز"]),
+            email: pick(r, ["البريد", "ايميل", "email"], ["المركز"]),
+            phone: pick(r, ["الجوال", "الهاتف", "رقم", "phone", "mobile"], ["المركز"]),
+            note: "",
+          });
+      }
+      if (!ents.size) return err("لم يُعثر على عمود اسم الجهة في الملف", 400);
+
+      let nE = 0, nC = 0;
+      for (const [, E] of ents) {
+        const id = "ent-" + newId();
+        const { data: cur } = await s.from("perf_entities").select("id").eq("name", E.name).maybeSingle();
+        const eid = cur?.id ? String(cur.id) : id;
+        const { error: e1 } = await s.from("perf_entities").upsert({
+          id: eid, name: E.name, kind: E.kind, sector: E.sector, note: E.note, active: true,
+        });
+        if (e1) return err("الرفع لمن يملك صلاحية «الجهات»", 403);
+        nE++;
+        for (const c of E.cs) {
+          const { data: dup } = await s.from("perf_contacts").select("id")
+            .eq("entity_id", eid).eq("side", c.side).eq("name", c.name).maybeSingle();
+          const { error: e2 } = await s.from("perf_contacts").upsert({
+            id: dup?.id ? String(dup.id) : "con-" + newId(),
+            entity_id: eid, side: c.side, name: c.name,
+            job_title: c.job, email: c.email, phone: c.phone, note: c.note,
+          });
+          if (!e2) nC++;
+        }
+      }
+      const { data: link } = await s.rpc("perf_contacts_link");
+      const L = Array.isArray(link) ? link[0] : link;
+      return ok({ entities: nE, contacts: nC, linked: Number(L?.linked || 0), unmatched: Number(L?.unmatched || 0) });
+    }
+
+    /* جهاتي — ما أنا نقطة التواصل فيه، تُقرأ في محفظتي بلا تعبئة */
+    if (p === "/api/entities/mine" && method === "GET") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const { data } = await s.rpc("perf_my_entities");
+      return ok({
+        mine: (data || []).map((r: Record<string, unknown>) => ({
+          entityId: String(r.entity_id), name: String(r.name || ""),
+          kind: String(r.kind || ""), sector: String(r.sector || ""),
+          myRole: String(r.my_role || ""), theirs: r.theirs || [],
+        })),
+      });
+    }
+
     /* ---------------- منهجيات أداء ----------------
        الوثيقة وملفها للتنزيل، ونصّها مقطّعاً ليبحث فيه المساعد.
        الحارس RLS: القراءة لكل من دخل، والرفع بصلاحية docs:edit. */

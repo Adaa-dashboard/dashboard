@@ -12,6 +12,7 @@ import Changes from "./Changes";
 import Backup from "./Backup";
 import Mic from "./Mic";
 import Docs from "./Docs";
+import Entities2 from "./Entities2";
 import Tools from "./Tools";
 import Portfolio from "./Portfolio";
 import Audit from "./Audit";
@@ -55,6 +56,7 @@ import {
   IconCx,
   IconSettings,
   IconFolder,
+  IconOrg,
 } from "./icons";
 import WeeklyPanel from "./WeeklyPanel";
 import Details from "./Details";
@@ -360,6 +362,7 @@ export default function Dashboard({ me }: { me: Me }) {
     report: ["الإنجاز الأسبوعي", "Weekly Achievement"],
     audit: ["سجل النشاط", "Activity log"],
     docs: ["منهجيات أداء", "Adaa methodologies"],
+    entities: ["الجهات ونقاط التواصل", "Entities & contacts"],
     structure: ["الهيكل التنظيمي", "Org chart"],
     users: ["المستخدمون والصلاحيات", "Users & Roles"],
     sessions: SECTION_TITLE.sessions,
@@ -463,6 +466,7 @@ export default function Dashboard({ me }: { me: Me }) {
           )}
           {can("weekly") && <NavItem id="report" icon={<IconWeek />} label={["الإنجاز الأسبوعي", "Weekly Achievement"]} />}
           {can("docs") && <NavItem id="docs" icon={<IconFolder />} label={["منهجيات أداء", "Methodologies"]} />}
+          {can("entities") && <NavItem id="entities" icon={<IconOrg />} label={["الجهات ونقاط التواصل", "Entities"]} />}
 
           <div className="rail-gap" />
 
@@ -630,6 +634,7 @@ export default function Dashboard({ me }: { me: Me }) {
               {tab === "users" && can("users") && <UsersManager refData={refData} />}
               {tab === "audit" && can("audit") && <Audit t={t} />}
               {tab === "docs" && can("docs") && <Docs t={t} canEdit={can("docs:edit")} />}
+              {tab === "entities" && can("entities") && <Entities2 t={t} canEdit={can("entities:edit")} />}
               {SECTION_NAV.map(([key]) =>
                 tab === key && can(key) ? (
                   <SectionPage key={key} section={key} canEdit={can(`${key}:edit` as Scope)} meId={me.id} t={t} />

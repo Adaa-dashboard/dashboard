@@ -13,8 +13,9 @@
    وتُحفظ في perf_portfolio كما بقية بنود «محفظتي».
    ============================================================ */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Row } from "./Portfolio";
+import { apiFetch } from "@/lib/api";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Rec = Record<string, any>;
@@ -106,6 +107,12 @@ function Num({
   );
 }
 
+/** جهةٌ أنا نقطة تواصلها في السجلّ المركزي */
+type Reg = {
+  entityId: string; name: string; kind: string; sector: string; myRole: string;
+  theirs: { name?: string; jobTitle?: string; email?: string; phone?: string }[];
+};
+
 export default function MyEntities({
   rows,
   t,
@@ -123,6 +130,16 @@ export default function MyEntities({
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
+  /* الجهات المسندة إليّ في «الجهات ونقاط التواصل» — تظهر هنا
+     جاهزة بلا تعبئة، وتُعدَّل من السجلّ لا من هنا فيبقى مرجعاً
+     واحداً لا نسختين تتعارضان */
+  const [reg, setReg] = useState<Reg[]>([]);
+  useEffect(() => {
+    void apiFetch("/api/entities/mine")
+      .then((r) => r.json())
+      .then((d) => setReg(Array.isArray(d.mine) ? d.mine : []))
+      .catch(() => setReg([]));
+  }, []);
 
   const per = useMemo(
     () => rows.map((r) => ({ row: r, list: contribsOf(r.data) })),
@@ -158,6 +175,32 @@ export default function MyEntities({
 
   return (
     <div className="en">
+      {reg.length > 0 && (
+        <div className="en-reg">
+          <div className="en-reg-h">
+            <b>{t("جهاتي من سجلّ المركز", "From the central registry")}</b>
+            <span>{t(`${reg.length} جهة أنت نقطة التواصل فيها`, `${reg.length} entities`)}</span>
+          </div>
+          <div className="en-reg-g">
+            {reg.map((x) => (
+              <div className="en-reg-c" key={x.entityId}>
+                <b>{x.name}</b>
+                {x.myRole && <em>{x.myRole}</em>}
+                {x.theirs?.[0]?.name && (
+                  <span>
+                    {t("نقطة تواصلهم", "Their contact")}: {x.theirs[0].name}
+                    {x.theirs[0].phone ? ` · ${x.theirs[0].phone}` : ""}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+          <p className="en-reg-n">
+            {t("تُحدَّث من صفحة «الجهات ونقاط التواصل» — فالمرجع واحد لا نسختان.",
+               "Maintained in the central registry.")}
+          </p>
+        </div>
+      )}
       <div className="en-sum">
         <div>
           <b>{rows.length}</b>
