@@ -7459,6 +7459,21 @@ table.matrix thead th {
   font: inherit;
   font-size: 13px;
 }
+/* لوحة ⓘ: الأسئلة المقترحة والشرح — تُفتح بطلب صاحبها وحده */
+.ai-help {
+  background: var(--soft);
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  padding: 12px 14px 8px;
+  margin-bottom: 12px;
+}
+.ai-help .ai-sg {
+  margin-bottom: 10px;
+}
+.ai-help .ai-lines {
+  margin: 0;
+}
+
 /* الرجوع من الجواب إلى «أهم ما عندك الآن» بلا إغلاق النافذة */
 .ai-back {
   flex: none;
