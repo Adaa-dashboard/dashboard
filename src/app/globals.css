@@ -6910,6 +6910,21 @@ table.matrix thead th {
 }
 
 /* جداول المحفظة */
+/* خلية تاريخ الإدخال — أرقام لاتينية متساوية العرض فتُقرأ عمودياً */
+.pf .pf-t td.stamp {
+  direction: ltr;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+/* حقل تاريخ نصّي — الصيغة واحدة على كل جهاز (YYYY-MM-DD) */
+input.cell-date {
+  direction: ltr;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
 .pf .pf-tb {
   display: flex;
   align-items: center;

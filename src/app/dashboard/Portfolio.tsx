@@ -33,6 +33,10 @@ const num = (v: unknown, d = 0) => {
   return Number.isFinite(n) ? n : d;
 };
 const txt = (v: unknown) => (v === null || v === undefined ? "" : String(v));
+/** تاريخ اليوم بصيغة YYYY-MM-DD */
+const todayISO = () => new Date().toISOString().slice(0, 10);
+/** مفتاح تاريخ الإدخال — يُختم على كل بند جديد ويبقى قابلاً للتعديل */
+const ADDED = "addedAt";
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
 /* صياغة العدد بالعربية: يوم · يومان · أيام · يوماً */
@@ -125,6 +129,8 @@ type Prefs = {
   /** أعمدة جداول الأقسام كما عدّلها صاحب المحفظة — المفتاح اسم القسم.
       غيابُه يعني الأعمدة الافتراضية */
   cols?: Record<string, Col[]>;
+  /** إخفاء عمود «تاريخ الإدخال» في قسم بعينه — الظهور هو الأصل */
+  noStamp?: Record<string, boolean>;
   /** علامة ترحيل الترتيب الافتراضي الجديد */
   v2?: boolean;
 };
@@ -667,6 +673,8 @@ function SectionTable({
   rows,
   cols,
   custom,
+  stamp = true,
+  onStamp,
   t,
   onSave,
   onDelete,
@@ -680,6 +688,9 @@ function SectionTable({
   cols: Col[];
   /** هل الأعمدة الحالية معدَّلة؟ عندها يظهر خيار استرجاع الافتراضية */
   custom?: boolean;
+  /** ختم تاريخ الإدخال: عمود يُملأ تلقائياً ويبقى قابلاً للتعديل */
+  stamp?: boolean;
+  onStamp?: (on: boolean) => void;
   t: T;
   onSave: (id: string, data: Rec) => void;
   onDelete: (id: string) => void;
@@ -737,6 +748,13 @@ function SectionTable({
                 <button onClick={() => { setMenu(false); onImport(); }}>
                   {t("لصق جدول بأعمدته…", "Paste a table with its columns…")}
                 </button>
+                {onStamp && (
+                  <button onClick={() => { setMenu(false); onStamp(!stamp); }}>
+                    {stamp
+                      ? t("إخفاء عمود تاريخ الإدخال", "Hide the added-on column")
+                      : t("إظهار عمود تاريخ الإدخال", "Show the added-on column")}
+                  </button>
+                )}
                 {custom && (
                   <button
                     className="dg"
@@ -764,6 +782,7 @@ function SectionTable({
               {cols.map((c) => (
                 <th key={c.k}>{c.label}</th>
               ))}
+              {stamp && <th style={{ width: 110 }}>{t("تاريخ الإدخال", "Added on")}</th>}
               <th style={{ width: 70 }} />
             </tr>
           </thead>
@@ -779,6 +798,7 @@ function SectionTable({
                     )}
                   </td>
                 ))}
+                {stamp && <td className="stamp">{txt(r.data[ADDED]) || "—"}</td>}
                 <td className="acts3">
                   <span onClick={() => setEdit(r)}>{t("تعديل", "Edit")}</span>
                   <span className="del" onClick={() => onDelete(r.id)}>
@@ -789,7 +809,7 @@ function SectionTable({
             ))}
             {!rows.length && (
               <tr>
-                <td colSpan={cols.length + 1} className="pf-none">
+                <td colSpan={cols.length + (stamp ? 2 : 1)} className="pf-none">
                   {t("لا توجد بيانات — أضف بنداً أو ارفع ملفاً.", "No data yet.")}
                 </td>
               </tr>
@@ -800,6 +820,7 @@ function SectionTable({
       {edit && (
         <RowForm
           cols={cols}
+          stamp={stamp}
           row={edit === "new" ? null : edit}
           t={t}
           onClose={(data) => {
@@ -941,15 +962,23 @@ function ColsModal({
 function RowForm({
   cols,
   row,
+  stamp = true,
   t,
   onClose,
 }: {
   cols: Col[];
   row: Row | null;
+  /** ختم تاريخ الإدخال — يُملأ بتاريخ اليوم للبند الجديد */
+  stamp?: boolean;
   t: T;
   onClose: (data: Rec | null) => void;
 }) {
-  const [form, setForm] = useState<Rec>(() => ({ ...(row?.data || {}) }));
+  /* البند الجديد يُختم بتاريخ اليوم فوراً — والحقل ظاهر فمن أراد
+     تاريخاً غيره غيّره قبل الحفظ أو بعده */
+  const [form, setForm] = useState<Rec>(() => ({
+    ...(row?.data || {}),
+    ...(stamp && !txt(row?.data?.[ADDED]) ? { [ADDED]: todayISO() } : {}),
+  }));
   return (
     <div className="modal-overlay" onClick={() => onClose(null)}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -982,6 +1011,18 @@ function RowForm({
               )}
             </label>
           ))}
+          {stamp && (
+            <label>
+              <span>{t("تاريخ الإدخال", "Added on")}</span>
+              <input
+                className="cell-date"
+                dir="ltr"
+                placeholder="YYYY-MM-DD"
+                value={txt(form[ADDED])}
+                onChange={(e) => setForm({ ...form, [ADDED]: e.target.value })}
+              />
+            </label>
+          )}
         </div>
         <div className="m-f">
           <button className="btn btn-ghost" onClick={() => onClose(null)}>
@@ -1904,6 +1945,17 @@ export default function Portfolio({
         rows={rows}
         cols={colsOf(sec, base)}
         custom={!!prefs.cols?.[sec]?.length}
+        stamp={!prefs.noStamp?.[sec]}
+        onStamp={(on) => {
+          setPrefs((old) => {
+            const map = { ...(old.noStamp || {}) };
+            if (on) delete map[sec];
+            else map[sec] = true;
+            const out = { ...old, noStamp: map };
+            void saveUserData("portfolio", out);
+            return out;
+          });
+        }}
         t={t}
         onSave={save}
         onDelete={del}
@@ -2332,7 +2384,15 @@ export default function Portfolio({
           onRows={async (items, newCols) => {
             /* «اعتمد أعمدة المُلصَق»: الأعمدة أولاً ثم الصفوف بمفاتيحها */
             if (newCols) setCols(imp, newCols);
-            await pf.saveMany(items.map((d, i) => ({ section: imp, data: d, ord: 100 + i })));
+            /* المرفوع يُختم بتاريخ اليوم كالمُدخَل يدوياً — إلا ما جاء مختوماً */
+            const day = todayISO();
+            await pf.saveMany(
+              items.map((d, i) => ({
+                section: imp,
+                data: txt(d[ADDED]) ? d : { ...d, [ADDED]: day },
+                ord: 100 + i,
+              })),
+            );
             setImp(null);
           }}
         />
