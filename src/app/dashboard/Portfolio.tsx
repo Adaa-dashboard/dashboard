@@ -122,6 +122,9 @@ type Prefs = {
   joined: string;
   /** تغيير اسم أو أيقونة أو لون أي بند — بما فيه الأصلية */
   look: Record<string, { label?: string; icon?: string; color?: string }>;
+  /** أعمدة جداول الأقسام كما عدّلها صاحب المحفظة — المفتاح اسم القسم.
+      غيابُه يعني الأعمدة الافتراضية */
+  cols?: Record<string, Col[]>;
   /** علامة ترحيل الترتيب الافتراضي الجديد */
   v2?: boolean;
 };
@@ -137,6 +140,7 @@ const DEFAULT_PREFS: Prefs = {
   sections: [],
   joined: "",
   look: {},
+  cols: {},
 };
 
 /* أعمدة كل قسم — تُستعمل في الجداول وفي نافذة الإدخال */
@@ -661,22 +665,39 @@ function SectionTable({
   section,
   sectionKey,
   rows,
+  cols,
+  custom,
   t,
   onSave,
   onDelete,
   onImport,
+  onCols,
 }: {
   section: string;
   sectionKey?: string;
   rows: Row[];
+  /** أعمدة هذا الجدول — المعدَّلة إن عُدِّلت، وإلا الافتراضية */
+  cols: Col[];
+  /** هل الأعمدة الحالية معدَّلة؟ عندها يظهر خيار استرجاع الافتراضية */
+  custom?: boolean;
   t: T;
   onSave: (id: string, data: Rec) => void;
   onDelete: (id: string) => void;
   onImport: () => void;
+  /** حفظ أعمدة الجدول — null يعيدها للافتراضي */
+  onCols?: (cols: Col[] | null) => void;
 }) {
-  const cols = COLS[section] || COLS.custom;
   void sectionKey;
   const [edit, setEdit] = useState<Row | "new" | null>(null);
+  const [menu, setMenu] = useState(false);
+  const [colsOpen, setColsOpen] = useState(false);
+  /* القائمة تُغلق بالضغط خارجها — وإلا بقيت مفتوحة فوق النافذة */
+  useEffect(() => {
+    if (!menu) return;
+    const h = () => setMenu(false);
+    window.addEventListener("click", h);
+    return () => window.removeEventListener("click", h);
+  }, [menu]);
   return (
     <>
       <div className="pf-tb">
@@ -684,8 +705,54 @@ function SectionTable({
           ⬆ {t("رفع إكسل / لصق", "Import")}
         </button>
         <button className="b" onClick={() => setEdit("new")}>
-          + {t("إضافة", "Add")}
+          + {t("إضافة صف", "Add row")}
         </button>
+        {onCols && (
+          <span className="pf-gear" onClick={(e) => e.stopPropagation()}>
+            <button
+              className={`b ${menu ? "on" : ""}`}
+              onClick={() => setMenu(!menu)}
+              title={t("إعدادات الجدول", "Table settings")}
+              aria-label={t("إعدادات الجدول", "Table settings")}
+            >
+              ⚙
+            </button>
+            {menu && (
+              <div className="pf-menu">
+                <button onClick={() => { setMenu(false); setEdit("new"); }}>
+                  {t("إضافة صف", "Add row")}
+                </button>
+                <button
+                  onClick={() => {
+                    setMenu(false);
+                    onCols([...cols, { k: newColKey(cols), label: t("عمود جديد", "New column") }]);
+                    setColsOpen(true);
+                  }}
+                >
+                  {t("إضافة عمود", "Add column")}
+                </button>
+                <button onClick={() => { setMenu(false); setColsOpen(true); }}>
+                  {t("تعديل الأعمدة…", "Edit columns…")}
+                </button>
+                <button onClick={() => { setMenu(false); onImport(); }}>
+                  {t("لصق جدول بأعمدته…", "Paste a table with its columns…")}
+                </button>
+                {custom && (
+                  <button
+                    className="dg"
+                    onClick={() => {
+                      setMenu(false);
+                      if (confirm(t("إرجاع الأعمدة الافتراضية؟ الصفوف تبقى كما هي.", "Restore default columns? Rows are kept.")))
+                        onCols(null);
+                    }}
+                  >
+                    {t("إرجاع الأعمدة الافتراضية", "Restore default columns")}
+                  </button>
+                )}
+              </div>
+            )}
+          </span>
+        )}
         <span className="cnt">
           {t("إجمالي", "Total")}: {rows.length}
         </span>
@@ -741,7 +808,133 @@ function SectionTable({
           }}
         />
       )}
+      {colsOpen && onCols && (
+        <ColsModal
+          cols={cols}
+          t={t}
+          onClose={() => setColsOpen(false)}
+          onSave={(next) => {
+            onCols(next);
+            setColsOpen(false);
+          }}
+        />
+      )}
     </>
+  );
+}
+
+/** مفتاح عمود جديد لا يصادم الموجود — البيانات تُحفظ به */
+function newColKey(cols: Col[]): string {
+  const used = new Set(cols.map((c) => c.k));
+  for (let i = 1; i < 200; i++) if (!used.has(`c${i}`)) return `c${i}`;
+  return "c" + Date.now().toString(36);
+}
+
+/** أعمدة مشتقّة من صف عناوين مُلصَق أو مرفوع */
+function colsFromHead(head: string[]): Col[] {
+  const out: Col[] = [];
+  head.forEach((h, i) => {
+    const label = txt(h).trim();
+    out.push({ k: `c${i + 1}`, label: label || `عمود ${i + 1}` });
+  });
+  return out.length ? out : [{ k: "c1", label: "البند" }];
+}
+
+/* ---------------- أعمدة الجدول ----------------
+   التعديل هنا لا يمسّ صفاً واحداً: حذف عمود يخفي قيمه ولا يمحوها
+   من الصف، فإرجاعه يعيدها كما كانت. */
+function ColsModal({
+  cols,
+  t,
+  onClose,
+  onSave,
+}: {
+  cols: Col[];
+  t: T;
+  onClose: () => void;
+  onSave: (cols: Col[]) => void;
+}) {
+  const [list, setList] = useState<Col[]>(() => cols.map((c) => ({ ...c })));
+  const set = (i: number, p: Partial<Col>) =>
+    setList((v) => v.map((c, j) => (i === j ? { ...c, ...p } : c)));
+  const move = (i: number, d: number) =>
+    setList((v) => {
+      const n = [...v];
+      const j = i + d;
+      if (j < 0 || j >= n.length) return v;
+      [n[i], n[j]] = [n[j], n[i]];
+      return n;
+    });
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="m-h">
+          <h3>{t("أعمدة الجدول", "Table columns")}</h3>
+          <button className="mx" onClick={onClose} aria-label="close">
+            ✕
+          </button>
+        </div>
+        <div className="pf-cols">
+          {list.map((c, i) => (
+            <div className="pf-col" key={c.k}>
+              <input
+                value={c.label}
+                onChange={(e) => set(i, { label: e.target.value })}
+                placeholder={t("اسم العمود", "Column name")}
+              />
+              <select value={c.kind || "text"} onChange={(e) => set(i, { kind: e.target.value as Col["kind"] })}>
+                <option value="text">{t("نص", "Text")}</option>
+                <option value="num">{t("رقم", "Number")}</option>
+                <option value="date">{t("تاريخ", "Date")}</option>
+                <option value="sel">{t("قائمة", "List")}</option>
+              </select>
+              <button className="ic" onClick={() => move(i, -1)} title={t("لأعلى", "Up")}>↑</button>
+              <button className="ic" onClick={() => move(i, 1)} title={t("لأسفل", "Down")}>↓</button>
+              <button
+                className="ic dg"
+                onClick={() => setList((v) => v.filter((_, j) => j !== i))}
+                title={t("حذف العمود", "Delete column")}
+              >
+                ✕
+              </button>
+              {c.kind === "sel" && (
+                <input
+                  className="opts"
+                  value={(c.opts || []).join(" · ")}
+                  onChange={(e) =>
+                    set(i, { opts: e.target.value.split(/[·,|\n]/).map((x) => x.trim()).filter(Boolean) })
+                  }
+                  placeholder={t("خيارات القائمة مفصولة بـ ·", "Options separated by ·")}
+                />
+              )}
+            </div>
+          ))}
+          <button
+            className="pf-addcol"
+            onClick={() => setList((v) => [...v, { k: newColKey(v), label: "" }])}
+          >
+            + {t("إضافة عمود", "Add column")}
+          </button>
+        </div>
+        <div className="pf-hint">
+          {t(
+            "حذف عمود يخفي قيمه ولا يمحوها — إرجاعه يعيدها كما كانت.",
+            "Removing a column hides its values; it does not delete them.",
+          )}
+        </div>
+        <div className="m-f">
+          <button className="btn btn-ghost" onClick={onClose}>
+            {t("إلغاء", "Cancel")}
+          </button>
+          <button
+            className="btn"
+            onClick={() => onSave(list.filter((c) => c.label.trim()).map((c) => ({ ...c, label: c.label.trim() })))}
+          >
+            {t("حفظ", "Save")}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1531,6 +1724,29 @@ export default function Portfolio({
     });
   }, []);
 
+  /** أعمدة قسم: المعدَّلة إن وُجدت، وإلا الافتراضية */
+  const colsOf = useCallback(
+    (sec: string, base: string): Col[] => {
+      const mine = prefs.cols?.[sec];
+      return mine && mine.length ? mine : COLS[base] || COLS.custom;
+    },
+    [prefs.cols],
+  );
+  /** حفظ أعمدة قسم — null يعيده للافتراضي. لا يمسّ الصفوف */
+  const setCols = useCallback(
+    (sec: string, next: Col[] | null) => {
+      setPrefs((old) => {
+        const map = { ...(old.cols || {}) };
+        if (next && next.length) map[sec] = next;
+        else delete map[sec];
+        const out = { ...old, cols: map };
+        void saveUserData("portfolio", out);
+        return out;
+      });
+    },
+    [],
+  );
+
   /* الترتيب: ما في الإعدادات أولاً ثم أي ويدجت جديدة */
   const allKeys = useMemo(
     () => [...WIDGETS.map((w) => w.key), ...prefs.custom.map((c) => c.key)],
@@ -1575,8 +1791,14 @@ export default function Portfolio({
                 ? projects
                 : [];
 
-  const doneOf = (rows: Row[]) =>
-    rows.filter((r) => ["مغلقة", "مكتمل", "مكتملة", "منجز"].includes(txt(r.data.status))).length;
+  /* عمود «الحالة» قد يتغيّر اسمه ومفتاحه إن اعتمد صاحب المحفظة
+     أعمدة جدولٍ لصقه — فنبحث عنه بعنوانه قبل الرجوع للمفتاح الأصلي */
+  const statusKeyOf = useCallback(
+    (sec: string) => prefs.cols?.[sec]?.find((c) => c.label.includes("حالة"))?.k || "status",
+    [prefs.cols],
+  );
+  const doneOf = (rows: Row[], sec = "") =>
+    rows.filter((r) => ["مغلقة", "مكتمل", "مكتملة", "منجز"].includes(txt(r.data[statusKeyOf(sec)]))).length;
 
   const lateChanges = changes.filter((r) => txt(r.data.status) === "متأخر").length;
   const commit = changes.length ? Math.round(((changes.length - lateChanges) / changes.length) * 100) : 0;
@@ -1624,7 +1846,7 @@ export default function Portfolio({
         return { count: rows.length, pct: p, sub: KINDS.map((x) => rows.filter((r) => txt(r.data.kind) === x).length).join(" · ") };
       }
       default: {
-        const d = doneOf(rows);
+        const d = doneOf(rows, WMAP[k]?.section || "");
         return {
           count: rows.length,
           pct: rows.length ? Math.round((d / rows.length) * 100) : 0,
@@ -1674,15 +1896,19 @@ export default function Portfolio({
         />
       );
     if (k === "contrib" && prefs.mode === "tiles" && open !== k) return <Contrib rows={contrib} t={t} />;
+    const base = k.startsWith("cw-") ? "custom" : sec;
     return (
       <SectionTable
-        section={k.startsWith("cw-") ? "custom" : sec}
+        section={base}
         sectionKey={sec}
         rows={rows}
+        cols={colsOf(sec, base)}
+        custom={!!prefs.cols?.[sec]?.length}
         t={t}
         onSave={save}
         onDelete={del}
         onImport={() => setImp(sec)}
+        onCols={(next) => setCols(sec, next)}
       />
     );
   }
@@ -2100,9 +2326,12 @@ export default function Portfolio({
       {imp && (
         <ImportModal
           section={imp}
+          cols={colsOf(imp, imp.startsWith("cw-") ? "custom" : imp)}
           t={t}
           onClose={() => setImp(null)}
-          onRows={async (items) => {
+          onRows={async (items, newCols) => {
+            /* «اعتمد أعمدة المُلصَق»: الأعمدة أولاً ثم الصفوف بمفاتيحها */
+            if (newCols) setCols(imp, newCols);
             await pf.saveMany(items.map((d, i) => ({ section: imp, data: d, ord: 100 + i })));
             setImp(null);
           }}
@@ -2115,16 +2344,23 @@ export default function Portfolio({
 /* ---------------- رفع إكسل / لصق ---------------- */
 function ImportModal({
   section,
+  cols,
   t,
   onClose,
   onRows,
 }: {
   section: string;
+  /** أعمدة الجدول الحالية — إليها تُطابَق الأعمدة المرفوعة */
+  cols: Col[];
   t: T;
   onClose: () => void;
-  onRows: (rows: Rec[]) => void;
+  /** الصفوف، ومعها أعمدةٌ جديدة إن اختار اعتماد أعمدة المُلصَق */
+  onRows: (rows: Rec[], cols?: Col[]) => void;
 }) {
-  const cols = COLS[section] || COLS.custom;
+  void section;
+  /* «طابق الأعمدة» يضع الملصق في أعمدة الجدول الحالية،
+     و«اعتمد أعمدة المُلصَق» يجعل الجدول بأعمدته هو */
+  const [adopt, setAdopt] = useState(false);
   const [aoa, setAoa] = useState<string[][]>([]);
   const [map, setMap] = useState<Record<string, number>>({});
   const [head, setHead] = useState(true);
@@ -2209,28 +2445,73 @@ function ImportModal({
               <input type="checkbox" checked={head} onChange={(e) => setHead(e.target.checked)} />
               <span>{t("الصف الأول عناوين", "First row is a header")}</span>
             </label>
-            <div className="sec3">{t("طابق الأعمدة", "Map the columns")}</div>
-            <div className="pf-map">
-              {cols.map((c) => (
-                <label key={c.k}>
-                  <span>{c.label}</span>
-                  <select
-                    value={map[c.k] ?? -1}
-                    onChange={(e) => setMap({ ...map, [c.k]: Number(e.target.value) })}
-                  >
-                    <option value={-1}>{t("— تجاهل —", "— skip —")}</option>
-                    {(aoa[0] || []).map((h, i) => (
-                      <option key={i} value={i}>
-                        {head ? txt(h) || `عمود ${i + 1}` : `عمود ${i + 1}`}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ))}
+            <div className="pf-way">
+              <label>
+                <input type="radio" checked={!adopt} onChange={() => setAdopt(false)} />
+                <span>{t("ضَعْه في أعمدة الجدول الحالية", "Map into the current columns")}</span>
+              </label>
+              <label>
+                <input type="radio" checked={adopt} onChange={() => setAdopt(true)} disabled={!head} />
+                <span>{t("اجعل الجدول بأعمدة المُلصَق", "Adopt the pasted table's columns")}</span>
+              </label>
             </div>
-            <div className="pf-hint">
-              {body.length} {t("صف سيُضاف", "rows will be added")}
-            </div>
+            {adopt ? (
+              <>
+                <div className="sec3">{t("أعمدة الجدول بعد الحفظ", "Columns after saving")}</div>
+                <div className="pf-tw">
+                  <table className="pf-t">
+                    <thead>
+                      <tr>
+                        {(aoa[0] || []).map((h, i) => (
+                          <th key={i}>{txt(h).trim() || `عمود ${i + 1}`}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {body.slice(0, 3).map((r, i) => (
+                        <tr key={i}>
+                          {(aoa[0] || []).map((_, j) => (
+                            <td key={j}>{txt(r[j]) || "—"}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="pf-hint">
+                  {(aoa[0] || []).length} {t("عموداً", "columns")} · {body.length} {t("صفاً", "rows")} —{" "}
+                  {t(
+                    "الصفوف القديمة تبقى محفوظة، لكن قيمها لا تظهر تحت الأعمدة الجديدة.",
+                    "Existing rows are kept, but their values will not show under the new columns.",
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="sec3">{t("طابق الأعمدة", "Map the columns")}</div>
+                <div className="pf-map">
+                  {cols.map((c) => (
+                    <label key={c.k}>
+                      <span>{c.label}</span>
+                      <select
+                        value={map[c.k] ?? -1}
+                        onChange={(e) => setMap({ ...map, [c.k]: Number(e.target.value) })}
+                      >
+                        <option value={-1}>{t("— تجاهل —", "— skip —")}</option>
+                        {(aoa[0] || []).map((h, i) => (
+                          <option key={i} value={i}>
+                            {head ? txt(h) || `عمود ${i + 1}` : `عمود ${i + 1}`}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                </div>
+                <div className="pf-hint">
+                  {body.length} {t("صف سيُضاف", "rows will be added")}
+                </div>
+              </>
+            )}
             {err && <div className="alert alert-error">{err}</div>}
             <div className="m-f">
               <button className="btn btn-ghost" onClick={() => setAoa([])}>
@@ -2238,7 +2519,21 @@ function ImportModal({
               </button>
               <button
                 className="btn"
-                onClick={() =>
+                onClick={() => {
+                  if (adopt) {
+                    const nc = colsFromHead(aoa[0] || []);
+                    onRows(
+                      body.map((r) => {
+                        const o: Rec = {};
+                        nc.forEach((c, i) => {
+                          o[c.k] = txt(r[i]).trim();
+                        });
+                        return o;
+                      }),
+                      nc,
+                    );
+                    return;
+                  }
                   onRows(
                     body.map((r) => {
                       const o: Rec = {};
@@ -2248,10 +2543,10 @@ function ImportModal({
                       });
                       return o;
                     }),
-                  )
-                }
+                  );
+                }}
               >
-                {t("إضافة الصفوف", "Add rows")}
+                {adopt ? t("اعتمد الأعمدة وأضف الصفوف", "Adopt columns & add rows") : t("إضافة الصفوف", "Add rows")}
               </button>
             </div>
           </>
