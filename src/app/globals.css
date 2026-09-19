@@ -40,6 +40,9 @@
   --dgr-bd: #f3cfcf;
   --dgr-tx: #a83232;
   --on-rail: #ffffff;   /* البند المحدَّد داخل الشريط الجانبي */
+  /* إطار اللوحة: خلفية داكنة يطفو فوقها الشريط ولوحة المحتوى */
+  --frame: #0d2c22;
+  --rail-bg: #15503d;
 
   /* الأخضر حين يكون نصاً لا خلفية — يفتحُ في الوضع الداكن وحده،
      بينما تبقى الخلفيات الخضراء داكنة في الوضعين */
@@ -84,6 +87,8 @@
   --dgr-bd: #5c2c2c;
   --dgr-tx: #f0a3a3;
   --on-rail: #d8ece7;
+  --frame: #060d0c;
+  --rail-bg: #12302a;
 
   --shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
   --glow: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 10px 26px rgba(0, 0, 0, 0.45);
@@ -1065,12 +1070,15 @@ table.matrix thead th {
 .shell {
   display: flex;
   min-height: 100vh;
-  background: var(--bg);
+  /* الشريط ولوحة المحتوى لوحتان مستديرتان تطفوان فوق إطار داكن */
+  background: var(--frame);
+  padding: 14px;
+  gap: 0;
 }
 
 .rail {
   flex: 0 0 250px;
-  background: linear-gradient(180deg, var(--g-800), var(--g-700));
+  background: var(--rail-bg);
   padding: 26px 13px;
   display: flex;
   flex-direction: column;
@@ -1136,15 +1144,68 @@ table.matrix thead th {
 .nav-item.open .cv {
   transform: rotate(180deg);
 }
+/* البند المحدَّد: لسانٌ بلون لوحة المحتوى يخرج من الشريط فيلتحم بها،
+   وزاويتاه المقعّرتان تجعلان الأخضر ينساب حوله. المنحنى مرسوم بتدرّج
+   دائري لأن الظلال لا تُحاكي اللون المتغيّر بين الوضعين. */
 .nav-item.active {
-  /* الشريط أخضر داكن دائماً، فالبند المحدَّد شريحة فاتحة بنصّ أخضر —
-     لا يتبع --panel وإلا صار داكناً على داكن في الوضع الليلي */
-  background: var(--on-rail);
-  color: #00584c;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
+  background: var(--bg);
+  color: var(--gt-800);
+  /* يمتدّ نحو لوحة المحتوى حتى حافة الشريط (يلغي حشوة .rail-in)،
+     ويبقى طرفه الداخلي مستديراً */
+  margin-inline-end: -13px;
+  padding-inline-end: 25px;
+  border-start-start-radius: 22px;
+  border-end-start-radius: 22px;
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+  position: relative;
 }
 .nav-item.active:hover {
-  background: var(--on-rail);
+  background: var(--bg);
+}
+.nav-item.active::before,
+.nav-item.active::after {
+  content: "";
+  position: absolute;
+  inset-inline-end: 0;
+  width: 22px;
+  height: 22px;
+  pointer-events: none;
+  /* مركز الدائرة عند الزاوية البعيدة عن المحتوى — يمين في العربية */
+  --cx: 22px;
+}
+[dir="ltr"] .nav-item.active::before,
+[dir="ltr"] .nav-item.active::after {
+  --cx: 0px;
+}
+[dir="ltr"] .rail-wm {
+  transform: translateX(-50%);
+}
+.nav-item.active::before {
+  top: -22px;
+  background: radial-gradient(circle at var(--cx) 0, var(--rail-bg) 0 22px, var(--bg) 22px);
+}
+.nav-item.active::after {
+  bottom: -22px;
+  background: radial-gradient(circle at var(--cx) 100%, var(--rail-bg) 0 22px, var(--bg) 22px);
+}
+
+/* شعار أداء باهتاً أسفل الشريط */
+.rail-wm {
+  position: absolute;
+  inset-inline-start: 50%;
+  transform: translateX(50%);
+  bottom: 96px;
+  width: 118px;
+  height: auto;
+  opacity: 0.09;
+  filter: brightness(0) invert(1);
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+}
+.rail.col .rail-wm {
+  display: none;
 }
 
 .subnav {
@@ -1245,7 +1306,12 @@ table.matrix thead th {
 .main-area {
   flex: 1;
   min-width: 0;
+  background: var(--bg);
+  border-radius: 26px;
+  /* تندسّ تحت الشريط بمقدار انحناء زاويته فلا يظهر بينهما فاصل */
+  margin-inline-end: -26px;
   padding: 24px 30px 40px;
+  padding-inline-end: 56px;
   /* مرجع الملاحظات اللاصقة: مواضعها نسبةٌ من هذه المساحة */
   position: relative;
 }
@@ -2694,8 +2760,13 @@ table.matrix thead th {
   }
   .shell {
     display: block;
+    /* لا شريط جانبي على الجوال ⇒ لا إطار حوله */
+    background: var(--bg);
+    padding: 0;
   }
   .main-area {
+    border-radius: 0;
+    margin-inline-end: 0;
     /* مساحة أسفل الصفحة للشريط السفلي + منطقة الإيماء في آيفون */
     padding: 14px 14px calc(86px + env(safe-area-inset-bottom));
   }
@@ -4579,9 +4650,13 @@ table.matrix thead th {
   transition: flex-basis 0.18s ease;
   /* الزوايا الداخلية مستديرة، والتمرير انتقل إلى .rail-in
      حتى لا يُقتطع زر الطيّ المعلَّق على الحافة */
-  border-radius: 26px 0 0 26px;
+  border-radius: 26px;
   overflow: visible;
   padding: 0;
+  z-index: 2;
+  top: 14px;
+  height: calc(100vh - 28px);
+  height: calc(100dvh - 28px);
 }
 .rail-in {
   height: 100%;
@@ -4595,7 +4670,8 @@ table.matrix thead th {
 }
 .rail-tog {
   position: absolute;
-  top: 74px;
+  /* بمحاذاة الترويسة لا بمحاذاة أول بند — وإلا زاحم لسان البند المفتوح */
+  top: 30px;
   inset-inline-end: -15px;
   width: 28px;
   height: 28px;
@@ -4635,6 +4711,11 @@ table.matrix thead th {
 .rail.col .nav-item {
   justify-content: center;
   padding: 10px 0;
+}
+/* حشوة الشريط المطويّ 11px، فيقف اللسان عند حافته تماماً */
+.rail.col .nav-item.active {
+  margin-inline-end: -11px;
+  padding-inline-end: 11px;
 }
 .rail.col .whoami {
   justify-content: center;
