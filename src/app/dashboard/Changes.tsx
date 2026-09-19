@@ -144,10 +144,35 @@ export default function Changes({
   const [pasted, setPasted] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
+  /* الاستشاري صاحب الطلب يُعرف من جهته: كل طلبٍ يحمل «الجهة المالكة»،
+     وسجلّ الجهات يقول من نقطة تواصلها من المركز. فلا عمود جديد في
+     ملف المنصة ولا إدخال يدوي. */
+  const [ownerOf, setOwnerOf] = useState<Map<string, { name: string; photo: string }>>(new Map());
+
   const load = useCallback(async () => {
     const r = await apiFetch("/api/changes").then((x) => x.json());
     setItems(r.changes || []);
     setLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    void (async () => {
+      const [ents, ppl] = await Promise.all([
+        apiFetch("/api/entities").then((x) => x.json()).catch(() => ({})),
+        apiFetch("/api/people").then((x) => x.json()).catch(() => ({})),
+      ]);
+      const photo = new Map<string, string>();
+      for (const u of Array.isArray(ppl.people) ? ppl.people : [])
+        if (u?.name) photo.set(norm(String(u.name)), String(u.photoUrl || ""));
+      const m = new Map<string, { name: string; photo: string }>();
+      for (const e of Array.isArray(ents.entities) ? ents.entities : []) {
+        const ours = Array.isArray(e.ours) ? e.ours : [];
+        const c = ours.find((x: { role?: string }) => (x.role || "أساسي") === "أساسي") || ours[0];
+        const nm = String(c?.userName || c?.name || "").trim();
+        if (nm) m.set(norm(String(e.name || "")), { name: nm, photo: photo.get(norm(nm)) || "" });
+      }
+      setOwnerOf(m);
+    })();
   }, []);
 
   useEffect(() => {
@@ -164,6 +189,31 @@ export default function Changes({
       done: items.filter((x) => x.status === "closed").length,
     };
   }, [items]);
+
+  /* الالتزام: نسبة طلباته التي لم تتجاوز مدة الخدمة — والأسرع
+     إغلاقاً يتقدّم عند التساوي. الطلب بلا مدة أو بلا أيام لا يُحتسب،
+     فلا يُظلم أحد بسبب صفٍّ ناقص في الملف. */
+  const tops = useMemo(() => {
+    type Row = { name: string; photo: string; total: number; late: number; days: number };
+    const by = new Map<string, Row>();
+    for (const c of items) {
+      if (c.sla == null || c.workDays == null) continue;
+      const o = ownerOf.get(norm(c.owner || ""));
+      if (!o?.name) continue;
+      const r = by.get(o.name) || { name: o.name, photo: o.photo, total: 0, late: 0, days: 0 };
+      r.total++;
+      r.days += c.workDays;
+      if (c.workDays >= c.sla) r.late++;
+      by.set(o.name, r);
+    }
+    return [...by.values()]
+      .map((r) => ({
+        ...r,
+        pct: Math.round(((r.total - r.late) / r.total) * 100),
+        avg: r.total ? Math.round((r.days / r.total) * 10) / 10 : 0,
+      }))
+      .sort((a, b) => b.pct - a.pct || a.avg - b.avg || b.total - a.total);
+  }, [items, ownerOf]);
 
   const shown = useMemo(() => {
     const open = items.filter((x) => x.status === "open");
@@ -303,8 +353,44 @@ export default function Changes({
     { key: "ok", label: t("ضمن المدة", "On time"), n: stats.ok, c: TONE_COLOR.ok },
   ];
 
+  const RANK = [
+    { label: "الأول", en: "1st", c: "#1a7a48" },
+    { label: "الثاني", en: "2nd", c: "#7a5cd1" },
+    { label: "الثالث", en: "3rd", c: "#c9a020" },
+  ];
+
   return (
     <div className="cr">
+      {tops.length > 0 && (
+        <div className="card cr-top">
+          <div className="card-top">
+            <h3>{t("أعلى الاستشاريين التزاماً", "Most on-time consultants")}</h3>
+            <span className="muted" style={{ fontSize: 11 }}>
+              {t("إغلاق الطلبات ضمن مدّتها", "Requests closed within SLA")}
+            </span>
+          </div>
+          <div className="cr-podium">
+            {tops.slice(0, 3).map((x, i) => (
+              <div className="cr-p" key={x.name} style={{ ["--c" as string]: RANK[i].c }}>
+                <span className="av2">
+                  {x.photo ? <img src={x.photo} alt="" /> : (x.name || "?").trim().charAt(0)}
+                </span>
+                <b>{x.name}</b>
+                <em>{x.pct}%</em>
+                <i>{t(`${x.total} طلباً · متوسط ${x.avg} يوم`, `${x.total} requests`)}</i>
+                <span className="rk">{t(RANK[i].label, RANK[i].en)}</span>
+              </div>
+            ))}
+          </div>
+          {tops.length > 3 && (
+            <div className="cr-rest">
+              {t("ثم:", "Then:")}{" "}
+              {tops.slice(3, 8).map((x) => `${x.name} ${x.pct}%`).join(" · ")}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="cr-bar">
         <span className="pills">
           {CHIPS.map((c) => (

@@ -1711,6 +1711,43 @@ export default function Portfolio({
   const [custom, setCustom] = useState(false);
   const [arrange, setArrange] = useState(false);
   const [ents, setEnts] = useState(false);
+  /* صورة الموظف: يرفعها لنفسه، فتظهر هنا وفي «أعلى الاستشاريين
+     التزاماً». تُخزَّن في مجلد avatars/ داخل سلّة الوثائق */
+  const [photo, setPhoto] = useState("");
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const photoRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    void apiFetch("/api/people").then((r) => r.json())
+      .then((d) => {
+        const mine = (Array.isArray(d.people) ? d.people : []).find(
+          (u: Rec) => String(u.id) === String(me.id),
+        );
+        setPhoto(String(mine?.photoUrl || ""));
+      })
+      .catch(() => setPhoto(""));
+  }, [me.id]);
+
+  async function uploadPhoto(f: File) {
+    if (!f.type.startsWith("image/")) return;
+    setPhotoBusy(true);
+    const ext = (f.name.split(".").pop() || "jpg").replace(/[^A-Za-z0-9]/g, "").toLowerCase();
+    const key = `avatars/${me.id}-${Date.now()}.${ext || "jpg"}`;
+    const up = await sb().storage.from("docs").upload(key, f, { upsert: true });
+    if (up.error) {
+      setPhotoBusy(false);
+      alert(up.error.message);
+      return;
+    }
+    const url = sb().storage.from("docs").getPublicUrl(key).data.publicUrl;
+    const r = await apiFetch("/api/people/photo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: me.id, url }),
+    }).then((x) => x.json()).catch(() => ({ error: "تعذّر الاتصال" }));
+    setPhotoBusy(false);
+    if (r?.error) { alert(r.error); return; }
+    setPhoto(url);
+  }
   const [open, setOpen] = useState<WKey | null>(null);
   const [drag, setDrag] = useState<WKey | null>(null);
   const [imp, setImp] = useState<string | null>(null);
@@ -2193,7 +2230,26 @@ export default function Portfolio({
       )}
 
       <div className="pf-hero">
-        <div className="av">{(me.name || "?").trim().charAt(0)}</div>
+        <button
+          className="av"
+          title={t("تغيير صورتي", "Change my photo")}
+          onClick={() => photoRef.current?.click()}
+          disabled={photoBusy}
+        >
+          {photo ? <img src={photo} alt="" /> : (me.name || "?").trim().charAt(0)}
+          <span className="cam">{photoBusy ? "…" : "✎"}</span>
+        </button>
+        <input
+          ref={photoRef}
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void uploadPhoto(f);
+            e.target.value = "";
+          }}
+        />
         <div className="who">
           <h1>{me.name}</h1>
           <div className="sb">{me.jobTitle || t("عضو فريق إدارة عمليات الأداء", "Team member")}</div>
