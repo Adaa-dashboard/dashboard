@@ -4652,8 +4652,12 @@ table.matrix thead th {
   transition: flex-basis 0.18s ease;
   /* الزوايا الداخلية مستديرة، والتمرير انتقل إلى .rail-in
      حتى لا يُقتطع زر الطيّ المعلَّق على الحافة */
-  /* زوايا حادة — بطلب صاحبة المنصة */
-  border-radius: 0;
+  /* الجهة الملاصقة للوحة المحتوى حادة فتلتحم بها بلا فاصل،
+     والجهة الخارجية تبقى مستديرة */
+  border-start-start-radius: 24px;
+  border-end-start-radius: 24px;
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
   overflow: visible;
   padding: 0;
   z-index: 2;
