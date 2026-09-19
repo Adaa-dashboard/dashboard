@@ -1172,13 +1172,13 @@ table.matrix thead th {
    هالةً شفافة حول البند — بطلب صاحبة المنصة أُزيلت، فصار اللسان
    شريحةً نظيفة تلتحم بلوحة المحتوى من طرفها وحده */
 
-/* شعار أداء كاملاً أسفل الشريط — بلون أفتح من الخلفية، بلا اقتطاع */
+/* علامة أداء وحدها أسفل الشريط — بلا كلمات، بلون أفتح من الخلفية */
 .rail-wm {
   position: absolute;
   inset-inline-start: 50%;
   transform: translateX(50%);
-  bottom: 96px;
-  width: calc(100% - 40px);
+  bottom: 92px;
+  width: 104px;
   max-width: none;
   height: auto;
   opacity: 0.16;
