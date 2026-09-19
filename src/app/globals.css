@@ -1191,18 +1191,30 @@ table.matrix thead th {
   background: radial-gradient(circle at var(--cx) 100%, var(--rail-bg) 0 22px, var(--bg) 22px);
 }
 
-/* شعار أداء باهتاً أسفل الشريط */
+/* علامة أداء أسفل الشريط: كبيرة بلون أفتح من الخلفية، وتُقتطع
+   عند حافّتيه كما في هوية العروض — لا شعاراً صغيراً منسوخاً */
 .rail-wm {
   position: absolute;
-  inset-inline-start: 50%;
-  transform: translateX(50%);
-  bottom: 14px;
-  width: 132px;
+  inset-inline-start: -46px;
+  bottom: -54px;
+  width: 268px;
+  max-width: none;
   height: auto;
-  opacity: 0.08;
+  opacity: 0.14;
+  /* أبيض ثم شفافية ⇒ درجة أفتح من أخضر الشريط نفسه */
   filter: brightness(0) invert(1);
   pointer-events: none;
   user-select: none;
+  z-index: 0;
+}
+/* غلافٌ يقتطع ما تجاوز زوايا الشريط — ولا يقتطع زرّ الطيّ
+   لأنه خارج هذا الغلاف */
+.rail-wm-wrap {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
   z-index: 0;
 }
 .rail.col .rail-wm {
