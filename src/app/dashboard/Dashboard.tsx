@@ -697,7 +697,13 @@ export default function Dashboard({ me }: { me: Me }) {
               {tab === "users" && can("users") && <UsersManager refData={refData} />}
               {tab === "audit" && can("audit") && <Audit t={t} />}
               {tab === "docs" && can("docs") && <Docs t={t} canEdit={can("docs:edit")} />}
-              {tab === "entities" && can("entities") && <Entities2 t={t} canEdit={can("entities:edit")} />}
+              {tab === "entities" && can("entities") && (
+                <Entities2
+                  t={t}
+                  canEdit={can("entities:edit")}
+                  me={{ id: me.id, sectorIds: me.sectorIds || [], scopes: me.scopes || [] }}
+                />
+              )}
               {SECTION_NAV.map(([key]) =>
                 tab === key && can(key) ? (
                   <SectionPage key={key} section={key} canEdit={can(`${key}:edit` as Scope)} meId={me.id} t={t} />

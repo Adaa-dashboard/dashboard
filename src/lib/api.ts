@@ -573,6 +573,13 @@ export async function apiFetch(path: string, init: Init = {}) {
       ]);
       if (ents.error) return err(ents.error.message, 403);
       const nameOf = new Map(ppl.map((u: { id: string; name: string }) => [String(u.id), u.name]));
+      /* قطاعات صاحب نقطة التواصل عندنا — بها تُفلتر الجهات على قطاعات
+         الإدارة الأربعة، وبها يُعرف من يحقّ له رؤية بيانات التواصل */
+      const secsOf = new Map(
+        ppl.map((u: { id: string; sectorIds?: string[] }) => [
+          String(u.id), Array.isArray(u.sectorIds) ? u.sectorIds.map(String) : [],
+        ]),
+      );
       const by = new Map<string, { ours: Record<string, unknown>[]; theirs: Record<string, unknown>[] }>();
       for (const c of (cons.data || []) as Record<string, unknown>[]) {
         const k = String(c.entity_id);
@@ -584,6 +591,7 @@ export async function apiFetch(path: string, init: Init = {}) {
           phone: String(c.phone || ""), note: String(c.note || ""),
           userId: c.user_id ? String(c.user_id) : null,
           userName: c.user_id ? nameOf.get(String(c.user_id)) || "" : "",
+          sectorIds: c.user_id ? secsOf.get(String(c.user_id)) || [] : [],
         };
         (String(c.side) === "نحن" ? by.get(k)!.ours : by.get(k)!.theirs).push(row);
       }

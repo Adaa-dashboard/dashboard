@@ -10279,7 +10279,17 @@ input.cell-date {
 .en2-c {
   background: linear-gradient(180deg, var(--panel), var(--bg2));
   border: 1px solid var(--border); border-radius: 15px; padding: 14px 16px;
+  /* البطاقة زرٌّ يفتح التفاصيل، فتُعاد إليها هيئة الكتلة */
+  display: block; width: 100%; text-align: start; font: inherit; color: inherit;
+  cursor: pointer; transition: border-color .15s, box-shadow .15s, transform .15s;
 }
+.en2-c:hover { border-color: var(--g-400); box-shadow: 0 6px 18px rgba(1, 61, 34, .07); }
+.en2-c:focus-visible { outline: 2px solid var(--g-400); outline-offset: 2px; }
+.en2-more {
+  display: block; margin-top: 10px; font-size: 11px; font-weight: 700; color: var(--gt-700);
+  opacity: 0; transition: opacity .15s;
+}
+.en2-c:hover .en2-more, .en2-c:focus-visible .en2-more { opacity: 1; }
 /* جهةٌ بلا نقطة تواصل عندنا — تُرى بلمحة، فهي ثغرة لا حالة عادية */
 .en2-c.bare { border-inline-start: 3px solid var(--dgr-bd); }
 .en2-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 11px; }
