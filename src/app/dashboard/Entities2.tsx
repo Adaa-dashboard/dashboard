@@ -204,7 +204,7 @@ export default function Entities2({
       if (only === "none" && e.ours.length) return false;
       if (only === "nothem" && e.theirs.length) return false;
       if (sector && !e.ours.some((c) => (c.sectorIds || []).includes(sector))) return false;
-      if (who && !e.ours.some((c) => c.name === who)) return false;
+      if (who && !e.ours.some((c) => (c.userName || c.name || "").trim() === who)) return false;
       if (!term) return true;
       const hay = [e.name, e.kind, e.sector, ...e.ours.map((c) => c.name + " " + c.jobTitle),
                    ...e.theirs.map((c) => c.name + " " + c.jobTitle)].join(" ");
@@ -215,11 +215,20 @@ export default function Entities2({
   const withOurs = rows.filter((e) => e.ours.length).length;
   const withTheirs = rows.filter((e) => e.theirs.length).length;
   /* خيارات الأسماء من البيانات نفسها لا من قائمة ثابتة */
-  const whos = useMemo(
-    () => [...new Set(rows.flatMap((e) => e.ours.map((c) => c.name)).filter(Boolean))]
-      .sort((a, b) => a.localeCompare(b, "ar")),
-    [rows],
-  );
+  /* أسماء الاستشاريين وحدهم: نقاط التواصل من المركز، ومن رُبط منها
+     بحسابٍ يظهر باسم الحساب. وتُستبعد العلامات النائبة («—» · «_»
+     · «لا يوجد») فهي ليست أسماء */
+  const whos = useMemo(() => {
+    const bad = /^[-_—–.\s]*$/;
+    const out = new Set<string>();
+    for (const e of rows)
+      for (const c of e.ours) {
+        const n = (c.userName || c.name || "").trim();
+        if (!n || bad.test(n) || /لا ?يوجد|لم ?ي/.test(n)) continue;
+        out.add(n);
+      }
+    return [...out].sort((a, b) => a.localeCompare(b, "ar"));
+  }, [rows]);
   const filtered = only !== "" || !!sector || !!who || !!q.trim();
 
   /* بيانات التواصل لمن يتولّى الجهة، أو لزميلٍ في قطاعه، أو لصاحب
@@ -378,7 +387,7 @@ export default function Entities2({
           ))}
         </select>
         <select className="en2-sel" value={who} onChange={(e) => setWho(e.target.value)}>
-          <option value="">{t("كل الأسماء", "All names")}</option>
+          <option value="">{t(`كل الاستشاريين · ${whos.length}`, `All consultants · ${whos.length}`)}</option>
           {whos.map((x) => (
             <option key={x} value={x}>{x}</option>
           ))}
