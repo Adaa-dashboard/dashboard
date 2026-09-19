@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { readXlsxSheets } from "@/lib/sheet";
-import { mapHeaders, buildRows, type MapResult, type OutEntity } from "@/lib/entimport";
+import { mapHeaders, buildRows, type MapResult, type Mapped, type Field } from "@/lib/entimport";
 
 type T = (ar: string, en: string) => string;
 
@@ -27,6 +27,40 @@ export type Entity = {
   extra: Record<string, string>;
   ours: Contact[]; theirs: Contact[];
 };
+
+/* شعار الجهة إن وُجد في الملف عمودٌ يحمله، وإلا حرفان من اسمها
+   بلونٍ ثابت مشتقٍّ من الاسم نفسه — فلكل جهة وجهٌ يُعرف بلمحة */
+function logoOf(e: Entity): string {
+  for (const [k, v] of Object.entries(e.extra || {})) {
+    const n = k.toLowerCase();
+    if ((n.includes("شعار") || n.includes("logo")) && /^https?:\/\//i.test(v)) return v;
+  }
+  return "";
+}
+const LOGO_SKIP = new Set(["ال", "في", "من", "على", "و", "عن", "مع"]);
+function initials(name: string): string {
+  const w = String(name || "").replace(/[«»"'()]/g, " ").split(/\s+/).filter((x) => x && !LOGO_SKIP.has(x));
+  const head = (x: string) => (x.startsWith("ال") && x.length > 2 ? x[2] : x[0]);
+  if (!w.length) return "؟";
+  return w.length === 1 ? head(w[0]) : head(w[0]) + head(w[1]);
+}
+const LOGO_TONES = ["#016b5f", "#1a9d5c", "#2f7fd1", "#7a5cd1", "#c9a020", "#d34a4a", "#e0971a", "#5aaba2"];
+function toneOf(s: string): string {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return LOGO_TONES[h % LOGO_TONES.length];
+}
+
+function Logo({ e }: { e: Entity }) {
+  const src = logoOf(e);
+  const c = toneOf(e.name);
+  return (
+    <span className="en2-lg" style={{ background: c + "1f", color: c }}>
+      <i>{initials(e.name)}</i>
+      {src && <img src={src} alt="" onError={(ev) => { ev.currentTarget.style.display = "none"; }} />}
+    </span>
+  );
+}
 
 function Person({ c, t }: { c: Contact; t: T }) {
   return (
@@ -47,11 +81,15 @@ export default function Entities2({ t, canEdit }: { t: T; canEdit: boolean }) {
   const [rows, setRows] = useState<Entity[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [q, setQ] = useState("");
-  const [only, setOnly] = useState<"" | "ours" | "none">("");
+  const [only, setOnly] = useState<"" | "ours" | "none" | "nothem">("");
+  const [sector, setSector] = useState("");
+  const [who, setWho] = useState("");
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
   const file = useRef<HTMLInputElement | null>(null);
-  const [prev, setPrev] = useState<{ map: MapResult; built: OutEntity[] } | null>(null);
+  /* الملف يبقى في اليد حتى تُقرّ الخريطة: تعديل عمودٍ يعيد البناء
+     فوراً، فترى المستخدمة أثر التغيير قبل أن يُكتب شيء */
+  const [prev, setPrev] = useState<{ heads: string[]; rowsIn: Record<string, string>[]; map: MapResult } | null>(null);
   const [rev, setRev] = useState<{ name: string; entities: number; reviewed: number }[]>([]);
   useEffect(() => {
     if (!canEdit) return;
@@ -71,14 +109,34 @@ export default function Entities2({ t, canEdit }: { t: T; canEdit: boolean }) {
     return rows.filter((e) => {
       if (only === "ours" && !e.ours.length) return false;
       if (only === "none" && e.ours.length) return false;
+      if (only === "nothem" && e.theirs.length) return false;
+      if (sector && e.sector !== sector) return false;
+      if (who && !e.ours.some((c) => c.name === who)) return false;
       if (!term) return true;
       const hay = [e.name, e.kind, e.sector, ...e.ours.map((c) => c.name + " " + c.jobTitle),
                    ...e.theirs.map((c) => c.name + " " + c.jobTitle)].join(" ");
       return hay.includes(term);
     });
-  }, [rows, q, only]);
+  }, [rows, q, only, sector, who]);
 
   const withOurs = rows.filter((e) => e.ours.length).length;
+  const withTheirs = rows.filter((e) => e.theirs.length).length;
+  /* خيارات الفلترة من البيانات نفسها لا من قائمة ثابتة */
+  const sectors = useMemo(
+    () => [...new Set(rows.map((e) => e.sector).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ar")),
+    [rows],
+  );
+  const whos = useMemo(
+    () => [...new Set(rows.flatMap((e) => e.ours.map((c) => c.name)).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b, "ar")),
+    [rows],
+  );
+  const filtered = only !== "" || !!sector || !!who || !!q.trim();
+
+  /* ما سيُحفظ — يُعاد بناؤه مع كل تعديل على الخريطة */
+  const built = useMemo(() => (prev ? buildRows(prev.rowsIn, prev.map) : []), [prev]);
+  const nUs = built.reduce((n, e) => n + e.contacts.filter((c) => c.side === "نحن").length, 0);
+  const nThem = built.reduce((n, e) => n + e.contacts.filter((c) => c.side !== "نحن").length, 0);
 
   /* الاستيراد: الأعمدة تُطابَق بعناوينها مهما اختلفت صياغتها،
      فلا يُطلب من المستخدم ترتيبٌ بعينه */
@@ -103,21 +161,37 @@ export default function Entities2({ t, canEdit }: { t: T; canEdit: boolean }) {
       const heads = [...new Set(rowsIn.flatMap((r) => Object.keys(r)))];
       const m = mapHeaders(heads);
       if (!m.entityCol) throw new Error(t("لم يُعثر على عمود اسم الجهة", "No entity-name column"));
-      const built = buildRows(rowsIn, m);
       setMsg("");
-      setPrev({ map: m, built });
+      setPrev({ heads, rowsIn, map: m });
     } catch (e) {
       setMsg(""); setErr(e instanceof Error ? e.message : String(e));
     }
   }
 
+  /* تغيير قراءة عمود: طرفُه أو حقلُه أو دورُه، أو ألّا يُقرأ أصلاً.
+     التخمين يخطئ أحياناً — العمود «المستشار» قد يُقرأ من الجهة —
+     فالقرار للمستخدمة، وأثره يظهر في العيّنة وفي العدّادين فوراً. */
+  function setCol(h: string, patch: Partial<Mapped> | null) {
+    setPrev((p) => {
+      if (!p) return p;
+      const cols = p.map.cols.filter((c) => c.header !== h);
+      const ignored = p.map.ignored.filter((x) => x !== h);
+      if (patch === null) return { ...p, map: { ...p.map, cols, ignored: [...ignored, h] } };
+      const cur: Mapped =
+        p.map.cols.find((c) => c.header === h) ?? { header: h, side: "نحن", role: "أساسي", field: "name" };
+      const next = { ...cur, ...patch };
+      const all = [...cols, next].sort((x, y) => p.heads.indexOf(x.header) - p.heads.indexOf(y.header));
+      return { ...p, map: { ...p.map, cols: all, ignored } };
+    });
+  }
+
   async function commit() {
     if (!prev) return;
-    setMsg(t(`يُحفظ ${prev.built.length} جهة…`, `Saving…`));
+    setMsg(t(`يُحفظ ${built.length} جهة…`, `Saving…`));
     const res = await apiFetch("/api/entities/import", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ entities: prev.built }),
+      body: JSON.stringify({ entities: built }),
     }).then((x) => x.json()).catch(() => ({ error: "تعذّر الاتصال" }));
     if (res.error) { setMsg(""); setErr(res.error); return; }
     setPrev(null);
@@ -148,8 +222,23 @@ export default function Entities2({ t, canEdit }: { t: T; canEdit: boolean }) {
           {t("لها نقطة تواصل عندنا", "We have a contact")} · {withOurs}
         </button>
         <button className={`chip ${only === "none" ? "on" : ""}`} onClick={() => setOnly("none")}>
-          {t("بلا نقطة تواصل", "No contact yet")} · {rows.length - withOurs}
+          {t("بلا نقطة من المركز", "No contact of ours")} · {rows.length - withOurs}
         </button>
+        <button className={`chip ${only === "nothem" ? "on" : ""}`} onClick={() => setOnly("nothem")}>
+          {t("بلا نقطة من الجهة", "No contact of theirs")} · {rows.length - withTheirs}
+        </button>
+        <select className="en2-sel" value={sector} onChange={(e) => setSector(e.target.value)}>
+          <option value="">{t("كل القطاعات", "All sectors")}</option>
+          {sectors.map((x) => (
+            <option key={x} value={x}>{x}</option>
+          ))}
+        </select>
+        <select className="en2-sel" value={who} onChange={(e) => setWho(e.target.value)}>
+          <option value="">{t("كل الأسماء", "All names")}</option>
+          {whos.map((x) => (
+            <option key={x} value={x}>{x}</option>
+          ))}
+        </select>
         <div style={{ flex: 1 }} />
         {canEdit && (
           <>
@@ -173,6 +262,17 @@ export default function Entities2({ t, canEdit }: { t: T; canEdit: boolean }) {
         </div>
       )}
 
+      {filtered && loaded && (
+        <div className="en2-cnt">
+          {t(`عرض ${shown.length} من ${rows.length}`, `${shown.length} of ${rows.length}`)}
+          <button
+            onClick={() => { setOnly(""); setSector(""); setWho(""); setQ(""); }}
+          >
+            {t("مسح الفلاتر", "Clear filters")}
+          </button>
+        </div>
+      )}
+
       {msg && <div className="dcs-busy">{msg}</div>}
       {err && <div className="alert alert-error">{err}</div>}
 
@@ -186,32 +286,67 @@ export default function Entities2({ t, canEdit }: { t: T; canEdit: boolean }) {
             <div className="m-b">
               <p className="muted" style={{ marginTop: 0 }}>
                 {t(
-                  `${prev.built.length} جهة · ${prev.built.reduce((n, e) => n + e.contacts.length, 0)} نقطة تواصل. عمود اسم الجهة: «${prev.map.entityCol}».`,
-                  `${prev.built.length} entities.`,
+                  `${built.length} جهة · ${nUs} نقطة تواصل من المركز · ${nThem} من الجهة. عمود اسم الجهة: «${prev.map.entityCol}».`,
+                  `${built.length} entities.`,
                 )}
               </p>
-              <label>{t("كيف قُرئت الأعمدة", "Column mapping")}</label>
-              <div className="imp-map">
-                {prev.map.cols.map((c) => (
-                  <div key={c.header}>
-                    <span className={c.side === "نحن" ? "us" : "them"}>{c.side}</span>
-                    <span className="ro">{c.role}</span>
-                    <span className="fl">
-                      {c.field === "name" ? t("الاسم", "Name")
-                        : c.field === "jobTitle" ? t("المسمّى", "Title")
-                        : c.field === "phone" ? t("الجوال", "Phone") : t("البريد", "Email")}
-                    </span>
-                    <b>{c.header}</b>
-                  </div>
-                ))}
-              </div>
-              {prev.map.ignored.length > 0 && (
-                <p className="muted" style={{ fontSize: 11.5 }}>
-                  {t("أعمدة لم تُقرأ كنقاط تواصل:", "Not read as contacts:")} {prev.map.ignored.join(" · ")}
-                </p>
+              {nUs === 0 && (
+                <div className="alert alert-info" style={{ marginBottom: 10 }}>
+                  {t(
+                    "لم يُقرأ أي عمود على أنه نقطة تواصل من المركز — حدّدي عمود الاستشاري أدناه واجعلي طرفه «من المركز».",
+                    "No column was read as our contact.",
+                  )}
+                </div>
               )}
+              <label>{t("كيف تُقرأ الأعمدة — عدّليها إن أخطأ التخمين", "Column mapping")}</label>
+              <div className="imp-map edit">
+                {prev.heads
+                  .filter((h) => h && h !== prev.map.entityCol)
+                  .map((h) => {
+                    const c = prev.map.cols.find((x) => x.header === h) || null;
+                    return (
+                      <div key={h}>
+                        <b>{h}</b>
+                        <select
+                          value={c ? c.side : ""}
+                          onChange={(ev) =>
+                            setCol(h, ev.target.value ? { side: ev.target.value as Mapped["side"] } : null)
+                          }
+                        >
+                          <option value="">{t("لا تُقرأ", "Skip")}</option>
+                          <option value="نحن">{t("من المركز", "Ours")}</option>
+                          <option value="الجهة">{t("من الجهة", "Theirs")}</option>
+                        </select>
+                        <select
+                          value={c ? c.field : "name"}
+                          disabled={!c}
+                          onChange={(ev) => setCol(h, { field: ev.target.value as Field })}
+                        >
+                          <option value="name">{t("الاسم", "Name")}</option>
+                          <option value="jobTitle">{t("المسمّى", "Title")}</option>
+                          <option value="phone">{t("الجوال", "Phone")}</option>
+                          <option value="email">{t("البريد", "Email")}</option>
+                        </select>
+                        <select
+                          value={c ? c.role : "أساسي"}
+                          disabled={!c}
+                          onChange={(ev) => setCol(h, { role: ev.target.value as Mapped["role"] })}
+                        >
+                          <option value="أساسي">{t("أساسي", "Primary")}</option>
+                          <option value="بديل">{t("بديل", "Alternate")}</option>
+                        </select>
+                      </div>
+                    );
+                  })}
+              </div>
+              <p className="muted" style={{ fontSize: 11.5 }}>
+                {t(
+                  "العمود «لا تُقرأ» يُحفظ كما هو تحت بطاقة الجهة، فلا تضيع معلومة.",
+                  "Skipped columns are kept as-is on the entity card.",
+                )}
+              </p>
               <label>{t("عيّنة — أول جهتين", "Sample")}</label>
-              {prev.built.slice(0, 2).map((e) => (
+              {built.slice(0, 2).map((e) => (
                 <div className="imp-s" key={e.name}>
                   <b>{e.name}</b>
                   {e.contacts.map((c, i) => (
@@ -250,6 +385,7 @@ export default function Entities2({ t, canEdit }: { t: T; canEdit: boolean }) {
           {shown.map((e) => (
             <div className={`en2-c ${e.ours.length ? "" : "bare"}`} key={e.id}>
               <div className="en2-h">
+                <Logo e={e} />
                 <b>{e.name}</b>
                 {e.kind && <span className="en2-k">{e.kind}</span>}
                 {e.sector && <span className="en2-s">{e.sector}</span>}

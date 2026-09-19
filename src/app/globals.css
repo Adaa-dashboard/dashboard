@@ -10283,6 +10283,31 @@ input.cell-date {
 /* جهةٌ بلا نقطة تواصل عندنا — تُرى بلمحة، فهي ثغرة لا حالة عادية */
 .en2-c.bare { border-inline-start: 3px solid var(--dgr-bd); }
 .en2-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 11px; }
+/* وجه الجهة: شعارها إن جاء في الملف، وإلا حرفان بلونٍ ثابت من اسمها */
+.en2-lg {
+  position: relative; flex: none; width: 38px; height: 38px; border-radius: 11px;
+  display: grid; place-items: center; overflow: hidden;
+}
+.en2-lg i { font-style: normal; font-weight: 800; font-size: 13.5px; }
+.en2-lg img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: contain; background: #fff; padding: 3px;
+}
+/* قوائم الفلترة في شريط الأدوات — بهيئة الشرائح نفسها */
+.en2-sel {
+  border: 1px solid var(--border); background: var(--panel); color: var(--ink);
+  border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 12px;
+  max-width: 190px; cursor: pointer;
+}
+.en2-sel:focus { border-color: var(--g-400); outline: none; }
+.en2-cnt {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  font-size: 11.5px; color: var(--muted); margin: -6px 0 12px;
+}
+.en2-cnt button {
+  background: none; border: none; padding: 0; font: inherit; font-size: 11.5px;
+  color: var(--gt-700); text-decoration: underline; cursor: pointer;
+}
 .en2-h b { font-size: 14.5px; color: var(--gt-900); }
 .en2-k, .en2-s {
   font-size: 10.5px; font-weight: 700; border-radius: 999px; padding: 2px 9px;
@@ -10345,6 +10370,19 @@ input.cell-date {
 .imp-map .ro { background: transparent; color: var(--muted); }
 .imp-map .fl { background: transparent; color: var(--ink-2); min-width: 48px; }
 .imp-map b { color: var(--gt-900); font-weight: 600; }
+/* الخريطة قابلة للتعديل: عنوان العمود ثم ثلاث قوائم صغيرة */
+.imp-map.edit { max-height: 290px; gap: 6px; }
+.imp-map.edit > div { gap: 6px; }
+.imp-map.edit > div > b {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.imp-map.edit select {
+  /* `width:100%` العامة تبتلع الصف كله هنا، فالعرض بالمحتوى */
+  flex: none; width: auto; min-width: 74px;
+  border: 1px solid var(--border); background: var(--panel); color: var(--ink);
+  border-radius: 8px; padding: 4px 7px; font: inherit; font-size: 11px; cursor: pointer;
+}
+.imp-map.edit select:disabled { opacity: 0.45; cursor: default; }
 .imp-s { background: var(--soft); border: 1px solid var(--border); border-radius: 10px; padding: 9px 11px; margin-bottom: 8px; }
 .imp-s > b { display: block; font-size: 12.5px; color: var(--gt-900); margin-bottom: 5px; }
 .imp-s > div { font-size: 11.5px; color: var(--ink-2); margin-top: 3px; }
