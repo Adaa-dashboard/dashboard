@@ -618,6 +618,7 @@ export async function apiFetch(path: string, init: Init = {}) {
         entities: (ents.data || []).map((e: Record<string, unknown>) => ({
           id: String(e.id), name: String(e.name || ""), kind: String(e.kind || ""),
           sector: String(e.sector || ""), note: String(e.note || ""),
+          aliases: Array.isArray(e.aliases) ? (e.aliases as string[]).map(String) : [],
           extra: (e.extra || {}) as Record<string, string>,
           ours: ordered(by.get(String(e.id))?.ours || []),
           theirs: ordered(by.get(String(e.id))?.theirs || []),
@@ -781,6 +782,19 @@ export async function apiFetch(path: string, init: Init = {}) {
           addedByName: String(r.added_by_name || ""),
         })),
       });
+    }
+
+    /* اسمٌ بديل للجهة — صيغتها في ملف منصة الرؤية، فتُطابَق بعدها
+       تلقائياً. لمن يحرّر الجهات أو يرفع ملف الطلبات. */
+    if (p === "/api/entities/alias" && method === "POST") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const { error } = await s.rpc("perf_entity_alias", {
+        p_entity: str(body.entityId),
+        p_alias: str(body.alias),
+      });
+      if (error) return err(error.message, 403);
+      return ok({ ok: true });
     }
 
     /* إضافة جهة من «محفظتي» — الدالة تنشئ الجهة وتُسندها لمن أضافها

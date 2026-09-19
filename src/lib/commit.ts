@@ -18,7 +18,10 @@ export const nrm = (v: unknown) =>
 
 export type ChangeLite = { owner: string; sla: number | null; workDays: number | null };
 export type EntityLite = {
+  id?: string;
   name: string;
+  /** صيغ اسم الجهة كما ترد في ملف منصة الرؤية */
+  aliases?: string[];
   ours?: { name?: string; userName?: string; role?: string }[];
 };
 export type Owner = { name: string; photo: string };
@@ -30,7 +33,10 @@ export function ownerMap(entities: EntityLite[], photoOf?: Map<string, string>):
     const ours = Array.isArray(e.ours) ? e.ours : [];
     const c = ours.find((x) => (x.role || "أساسي") === "أساسي");
     const name = String(c?.userName || c?.name || "").trim();
-    if (name) m.set(nrm(e.name), { name, photo: photoOf?.get(nrm(name)) || "" });
+    if (!name) continue;
+    const who = { name, photo: photoOf?.get(nrm(name)) || "" };
+    m.set(nrm(e.name), who);
+    for (const a of e.aliases || []) if (a) m.set(nrm(a), who);
   }
   return m;
 }

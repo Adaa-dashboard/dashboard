@@ -137,10 +137,13 @@ function mapRows(grid: string[][]): Parsed {
 export default function Changes({
   t,
   canEdit,
+  canLink = false,
 }: {
   t: (ar: string, en: string) => string;
   /** الرفع لمن يسحب الملف من المنصة · والبقية يقرؤون ويصدّرون */
   canEdit: boolean;
+  /** مطابقة أسماء الجهات: لمن يحرّر الجهات أو يرفع الملف */
+  canLink?: boolean;
 }) {
   const [items, setItems] = useState<Change[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -158,6 +161,25 @@ export default function Changes({
      وسجلّ الجهات يقول من نقطة تواصلها من المركز. فلا عمود جديد في
      ملف المنصة ولا إدخال يدوي. */
   const [ownerOf, setOwnerOf] = useState<Map<string, { name: string; photo: string }>>(new Map());
+  /* سجلّ الجهات كاملاً — لنافذة مطابقة الأسماء غير المعروفة */
+  type Ent = { id: string; name: string; sector?: string };
+  const [ents, setEnts] = useState<Ent[]>([]);
+  const [fixing, setFixing] = useState(false);
+  const [pick, setPick] = useState<Record<string, string>>({});
+  const [fixMsg, setFixMsg] = useState("");
+
+  const loadEnts = useCallback(async () => {
+    const [entRes, ppl] = await Promise.all([
+      apiFetch("/api/entities").then((x) => x.json()).catch(() => ({})),
+      apiFetch("/api/people").then((x) => x.json()).catch(() => ({})),
+    ]);
+    const photo = new Map<string, string>();
+    for (const u of Array.isArray(ppl.people) ? ppl.people : [])
+      if (u?.name) photo.set(nrm(String(u.name)), String(u.photoUrl || ""));
+    const list = Array.isArray(entRes.entities) ? entRes.entities : [];
+    setEnts(list.map((e: Ent) => ({ id: String(e.id), name: String(e.name || ""), sector: e.sector })));
+    setOwnerOf(ownerMap(list, photo));
+  }, []);
 
   const load = useCallback(async () => {
     const r = await apiFetch("/api/changes").then((x) => x.json());
@@ -166,21 +188,12 @@ export default function Changes({
   }, []);
 
   useEffect(() => {
-    void (async () => {
-      const [ents, ppl] = await Promise.all([
-        apiFetch("/api/entities").then((x) => x.json()).catch(() => ({})),
-        apiFetch("/api/people").then((x) => x.json()).catch(() => ({})),
-      ]);
-      const photo = new Map<string, string>();
-      for (const u of Array.isArray(ppl.people) ? ppl.people : [])
-        if (u?.name) photo.set(nrm(String(u.name)), String(u.photoUrl || ""));
-      setOwnerOf(ownerMap(Array.isArray(ents.entities) ? ents.entities : [], photo));
-    })();
-  }, []);
-
-  useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    void loadEnts();
+  }, [loadEnts]);
 
   const stats = useMemo(() => {
     const open = items.filter((x) => x.status === "open");
@@ -192,6 +205,30 @@ export default function Changes({
       done: items.filter((x) => x.status === "closed").length,
     };
   }, [items]);
+
+  /* أسماء جهاتٍ في الملف لا تطابق السجلّ — طلباتها لا تُنسب لأحد */
+  const unmatched = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const c of items) {
+      if (c.status !== "open") continue;
+      const nm = String(c.owner || "").trim();
+      if (!nm || ownerOf.has(nrm(nm))) continue;
+      m.set(nm, (m.get(nm) || 0) + 1);
+    }
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  }, [items, ownerOf]);
+
+  async function linkAlias(alias: string, entityId: string) {
+    setFixMsg("");
+    const r = await apiFetch("/api/entities/alias", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entityId, alias }),
+    }).then((x) => x.json()).catch(() => ({ error: "تعذّر الاتصال" }));
+    if (r?.error) { setFixMsg(String(r.error)); return; }
+    setPick((o) => ({ ...o, [alias]: "" }));
+    await loadEnts();
+  }
 
   /* الحسبة في `lib/commit.ts` — يشترك فيها هذا الجدول ومحفظة
      الموظف، فالرقم واحد في المكانين */
@@ -347,6 +384,78 @@ export default function Changes({
 
   return (
     <div className="cr">
+      {canLink && unmatched.length > 0 && (
+        <div className="cr-unmatched">
+          <b>
+            {t(
+              `${unmatched.length} جهة في الملف لا تطابق سجلّ الجهات`,
+              `${unmatched.length} unmatched entities`,
+            )}
+          </b>
+          <span>
+            {t(
+              `${unmatched.reduce((n, x) => n + x[1], 0)} طلباً لا تُحتسب على أحد — طابِقي أسماءها مرة واحدة فتُعرف بعدها تلقائياً`,
+              "Their requests count for nobody",
+            )}
+          </span>
+          <button className="btn btn-sm" onClick={() => setFixing(true)}>
+            {t("مطابقة الأسماء", "Match names")}
+          </button>
+        </div>
+      )}
+
+      {fixing && (
+        <div className="modal-overlay" onClick={() => setFixing(false)}>
+          <div className="modal" style={{ maxWidth: 680 }} onClick={(e) => e.stopPropagation()}>
+            <div className="m-h">
+              <h3>{t("مطابقة أسماء الجهات", "Match entity names")}</h3>
+              <button className="mx" onClick={() => setFixing(false)}>✕</button>
+            </div>
+            <div className="m-b">
+              <p className="muted" style={{ marginTop: 0 }}>
+                {t(
+                  "الاسم كما ورد في ملف منصة الرؤية إلى يمينه، واختاري الجهة المقابلة من السجلّ. يُحفظ اسماً بديلاً لها، ولا يتغيّر اسمها المعتمد.",
+                  "Pick the registry entity for each name in the file.",
+                )}
+              </p>
+              {fixMsg && <div className="alert alert-error">{fixMsg}</div>}
+              {unmatched.length === 0 && (
+                <div className="soon"><b>{t("لا يوجد اسمٌ بلا مطابقة", "Nothing left")}</b></div>
+              )}
+              {unmatched.map(([nm, n]) => (
+                <div className="cr-fix" key={nm}>
+                  <span className="n">
+                    {nm}
+                    <i>{t(`${n} طلباً`, `${n}`)}</i>
+                  </span>
+                  <select
+                    value={pick[nm] || ""}
+                    onChange={(e) => setPick((o) => ({ ...o, [nm]: e.target.value }))}
+                  >
+                    <option value="">{t("اختاري الجهة…", "Choose…")}</option>
+                    {ents.map((e) => (
+                      <option key={e.id} value={e.id}>{e.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    className="btn btn-sm"
+                    disabled={!pick[nm]}
+                    onClick={() => void linkAlias(nm, pick[nm])}
+                  >
+                    {t("اربطي", "Link")}
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="m-f">
+              <button className="btn btn-ghost btn-sm" onClick={() => setFixing(false)}>
+                {t("إغلاق", "Close")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {tops.length > 0 && (
         <div className="card cr-top">
           <div className="card-top">
