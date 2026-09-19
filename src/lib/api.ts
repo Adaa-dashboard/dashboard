@@ -88,6 +88,7 @@ async function people() {
   return (data || []).map((u: Record<string, unknown>) => ({
     id: String(u.id), name: u.name, role: u.role, sectorIds: u.sector_ids || [],
     isLead: u.is_lead === true, jobTitle: u.job_title || "",
+    photoUrl: String(u.photo_url || ""),
   }));
 }
 
@@ -156,6 +157,17 @@ export async function apiFetch(path: string, init: Init = {}) {
       const me = await whoAmI();
       if (!me) return err("غير مصرّح", 401);
       return ok({ people: await people() });
+    }
+
+    /* صورة الموظف — لنفسه، أو لغيره بصلاحية «المستخدمون».
+       الحارس في القاعدة: الدالة تتحقّق بنفسها. */
+    if (p === "/api/people/photo" && method === "POST") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const id = str(body.id) || me.id;
+      const { error } = await s.rpc("perf_set_photo", { p_id: Number(id), p_url: str(body.url) });
+      if (error) return err(error.message, 403);
+      return ok({ ok: true });
     }
 
     if (p === "/api/me") {
