@@ -1255,7 +1255,7 @@ function Overview({
             kind="assignment"
             limit={3}
             monthOnly
-            onlyMine={!hasScope(me.scopes, "tasks:all")}
+            onlyMine={false}
             focusId={asgFocus}
             onFocusDone={() => setAsgFocus(null)}
           />
@@ -1987,7 +1987,9 @@ function TasksPage({
         indicators={indicators}
         t={t}
         kind={kind}
-        onlyMine={onlyMine}
+        /* التكاليف واردة للمركز لا مهامَ أشخاص: من يملك صلاحيتها
+           يراها كلها. والمهام تبقى لصاحبها ولمن أسندها */
+        onlyMine={kind === "task" && onlyMine}
         focusId={focusId && kind === focusKind ? focusId : null}
         onFocusDone={onFocusDone}
       />
