@@ -198,7 +198,16 @@ export function useEvents(meId: string) {
           date: x.dueDate,
           title: x.title,
           sort: x.kind === "assignment" ? "assignment" : "task",
-          tone: x.state === "done" ? "done" : diff < 0 ? "late" : diff <= 3 ? "soon" : "ok",
+          tone:
+            x.state === "done"
+              ? "done"
+              : x.state === "hold"
+                ? "ok"
+                : diff < 0
+                  ? "late"
+                  : diff <= 3
+                    ? "soon"
+                    : "ok",
         });
       }
     } catch {

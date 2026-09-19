@@ -1861,7 +1861,8 @@ table.matrix thead th {
 
 .tboard {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* عدد الأعمدة من اللوحة نفسها: التكاليف أربعة والمهام خمسة */
+  grid-template-columns: repeat(var(--tcols, 4), 1fr);
   gap: 12px;
   align-items: start;
 }
