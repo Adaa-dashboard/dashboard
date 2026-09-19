@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { apiFetch } from "@/lib/api";
 import { loadUserData, saveUserData } from "@/lib/userdata";
 import { sb } from "@/lib/supa";
+import { commitStats, ownerMap, nrm, type CommitRow } from "@/lib/commit";
 import { Cal } from "./Tools";
 import { EMPTY_NOTES, firstLine, preview, whenAr, type NotesData } from "./Notes";
 import { PIcon, IconPicker } from "./pickicons";
@@ -1898,6 +1899,25 @@ export default function Portfolio({
   );
   const contrib = pf.of("contrib");
   const changes = pf.of("changes");
+  /* التزامي محسوبٌ من طلبات جهاتي في الجدول المركزي — بنفس حسبة
+     «أعلى الاستشاريين التزاماً»، فالرقم واحد في المكانين. والبديل
+     لا تُحتسب عليه طلبات الجهة */
+  type MyChange = { code: string; owner: string; itemName: string; sla: number | null; workDays: number | null; status: string };
+  const [myCommit, setMyCommit] = useState<CommitRow | null>(null);
+  const [myChanges, setMyChanges] = useState<MyChange[]>([]);
+  useEffect(() => {
+    void (async () => {
+      const [ch, en] = await Promise.all([
+        apiFetch("/api/changes").then((r) => r.json()).catch(() => ({})),
+        apiFetch("/api/entities").then((r) => r.json()).catch(() => ({})),
+      ]);
+      const list: MyChange[] = Array.isArray(ch.changes) ? ch.changes : [];
+      const owners = ownerMap(Array.isArray(en.entities) ? en.entities : []);
+      const rows = commitStats(list, owners);
+      setMyCommit(rows.find((r) => nrm(r.name) === nrm(me.name)) || null);
+      setMyChanges(list.filter((c) => nrm(owners.get(nrm(c.owner))?.name || "") === nrm(me.name)));
+    })();
+  }, [me.name]);
   const reverse = pf.of("reverse");
   const workflow = pf.of("workflow");
   const projects = pf.of("projects");
@@ -1960,13 +1980,22 @@ export default function Portfolio({
           warn: qLate ? `${qLate} ${t("متأخرة", "late")}` : undefined,
         };
       }
-      case "changes":
+      case "changes": {
+        /* ما لم تُربط جهاتي بعد، يبقى المحسوب من بنود المحفظة */
+        if (myCommit)
+          return {
+            count: myCommit.total,
+            pct: myCommit.pct,
+            sub: `${t("التزام", "On time")} ${myCommit.pct}%`,
+            warn: myCommit.late ? `${myCommit.late} ${t("متأخرة", "late")}` : undefined,
+          };
         return {
           count: changes.length,
           pct: commit,
           sub: `${t("التزام", "On time")} ${commit}%`,
           warn: lateChanges ? `${lateChanges} ${t("متأخرة", "late")}` : undefined,
         };
+      }
       case "contrib": {
         const p = rows.length
           ? Math.round(rows.reduce((a, r) => a + num(r.data.pct), 0) / rows.length)
@@ -2026,7 +2055,40 @@ export default function Portfolio({
     if (k === "contrib" && prefs.mode === "tiles" && open !== k) return <Contrib rows={contrib} t={t} />;
     const base = k.startsWith("cw-") ? "custom" : sec;
     return (
-      <SectionTable
+      <>
+        {k === "changes" && myChanges.length > 0 && (
+          <div className="pf-cr">
+            <div className="pf-cr-h">
+              <b>{t("طلبات جهاتي", "My entities' requests")}</b>
+              <span>
+                {t(
+                  `${myChanges.length} طلباً · من صفحة «طلبات التغيير» — تُحدَّث مع رفع ملف المنصة`,
+                  `${myChanges.length} from the central page`,
+                )}
+              </span>
+            </div>
+            {[...myChanges]
+              .sort((a, b) => {
+                const la = a.sla != null && a.workDays != null && a.workDays >= a.sla ? 0 : 1;
+                const lb = b.sla != null && b.workDays != null && b.workDays >= b.sla ? 0 : 1;
+                return la - lb || (b.workDays ?? 0) - (a.workDays ?? 0);
+              })
+              .slice(0, 6)
+              .map((c) => {
+                const late = c.sla != null && c.workDays != null && c.workDays >= c.sla;
+                return (
+                  <div className={`pf-cr-r ${late ? "late" : ""}`} key={c.code}>
+                    <span className="n">{c.itemName || c.code}</span>
+                    <span className="o">{c.owner}</span>
+                    <span className="d">
+                      {c.workDays ?? "—"}/{c.sla ?? "—"} {t("يوم", "d")}
+                    </span>
+                  </div>
+                );
+              })}
+          </div>
+        )}
+        <SectionTable
         section={base}
         sectionKey={sec}
         rows={rows}
@@ -2049,6 +2111,7 @@ export default function Portfolio({
         onImport={() => setImp(sec)}
         onCols={(next) => setCols(sec, next)}
       />
+      </>
     );
   }
 
@@ -2310,8 +2373,14 @@ export default function Portfolio({
         </div>
         <div className="kp">
           <div className="k">{t("نسبة التزامي", "On-time rate")}</div>
-          <div className="v">{changes.length ? `${commit}%` : "—"}</div>
-          <div className="s">{t("طلبات التغيير", "Change requests")}</div>
+          <div className="v">
+            {myCommit ? `${myCommit.pct}%` : changes.length ? `${commit}%` : "—"}
+          </div>
+          <div className="s">
+            {myCommit
+              ? t(`${myCommit.ok} من ${myCommit.total} ضمن مدّتها`, `${myCommit.ok}/${myCommit.total} on time`)
+              : t("طلبات التغيير", "Change requests")}
+          </div>
         </div>
       </div>
 
