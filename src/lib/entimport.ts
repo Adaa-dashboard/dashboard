@@ -16,7 +16,11 @@
    ------------------------------------------------------------ */
 
 export type Field = "name" | "jobTitle" | "phone" | "email";
-export type Mapped = { header: string; side: "نحن" | "الجهة"; role: "أساسي" | "بديل"; field: Field };
+export type Side = "نحن" | "الجهة";
+/** الدور نصٌّ حرّ: «أساسي» · «بديل» · أو تسمية العمود نفسه حين
+    يحمل الملف أكثر من شخصين لطرفٍ واحد (قائد VRO · نقطة الاتصال
+    · قائد رضا المستفيد…). فالطرف والدور معاً يميّزان الشخص. */
+export type Mapped = { header: string; side: Side; role: string; field: Field };
 export type MapResult = { entityCol: string; cols: Mapped[]; ignored: string[] };
 
 const nrm = (v: string) =>
@@ -27,51 +31,92 @@ const nrm = (v: string) =>
 
 const has = (h: string, ...w: string[]) => w.some((x) => h.includes(nrm(x)));
 
+/** أعمدةٌ تصف الجهة لا تسمّيها — لا تصلح مفتاحاً للصف */
+const NOT_ENTITY = ["رمز", "كود", "رقم", "قطاع", "حاله", "نوع", "تصنيف", "ملاحظ",
+                    "ممثل", "منسق", "مسؤول", "جوال", "بريد", "ايميل", "مسمي"];
+
 /** أي عمود يحمل اسم الجهة — يُبحث عنه أولاً فهو مفتاح كل صف */
 function findEntityCol(heads: string[]): string {
+  const ok = (n: string) => !has(n, ...NOT_ENTITY);
   for (const h of heads) {
     const n = nrm(h);
-    if (has(n, "اسم الجهه", "اسم الجهة") && !has(n, "ممثل", "منسق", "مسؤول")) return h;
+    if ((n === "الجهه" || n === "الجهات" || n === "اسم الجهه") && ok(n)) return h;
   }
   for (const h of heads) {
     const n = nrm(h);
-    if (has(n, "الجهه", "جهه", "entity", "organization") &&
-        !has(n, "ممثل", "منسق", "مسؤول", "جوال", "بريد", "ايميل", "مسمي")) return h;
+    if (has(n, "اسم الجهه") && ok(n)) return h;
+  }
+  for (const h of heads) {
+    const n = nrm(h);
+    if (has(n, "الجهه", "جهه", "entity", "organization") && ok(n)) return h;
   }
   return "";
 }
 
+/** تسمية قصيرة للشخص من عنوان عموده — حين لا يكفي «أساسي/بديل» */
+function labelOf(h: string): string {
+  let s = String(h || "").replace(/\s+/g, " ").trim();
+  s = s.split(/\s+(?:او|أو)\s+/)[0];              // «… او مدير الجهة» ⇐ الأول
+  s = s.replace(/^(اسم|أسم)\s+/, "").trim();
+  const w = s.split(" ").filter(Boolean);
+  return w.length <= 4 ? s : w.slice(0, 4).join(" ") + "…";
+}
+
+function fieldOf(n: string): Field | null {
+  return has(n, "جوال", "هاتف", "تلفون", "رقم التواصل", "phone", "mobile") ? "phone"
+    : has(n, "بريد", "ايميل", "email", "mail") ? "email"
+    : has(n, "مسمي", "منصب", "وظيفه", "title", "position") ? "jobTitle"
+    : has(n, "اسم", "الاسم", "ممثل", "منسق", "مسؤول", "استشاري", "مستشار",
+           "المتابع", "متابع", "consultant", "advisor", "قائد", "مدير",
+           "نقطه تواصل", "نقطه التواصل", "نقطه الاتصال", "اتصال", "جهه اتصال",
+           "contact", "name") ? "name"
+    : null;
+}
+
+function sideOf(n: string): Side | null {
+  return has(n, "المركز", "اداء", "لدينا", "عندنا", "الاستشاري", "استشاري",
+             "المستشار", "مستشار", "consultant", "advisor", "المتابع") ? "نحن"
+    : has(n, "الجهه", "جهه", "الوزاره", "الهيئه") ? "الجهة"
+    : null;
+}
+
+/* عمود «الاسم» يبدأ شخصاً جديداً، وما بعده من جوال وبريد ومسمّى
+   يلتحق به. فملفٌ فيه أربعة أشخاص من الجهة يُقرأ أربعةً لا واحداً —
+   والنموذج السابق (طرف × أساسي/بديل) كان يدمجهم في شخصين. */
 export function mapHeaders(heads: string[]): MapResult {
   const entityCol = findEntityCol(heads);
   const cols: Mapped[] = [];
   const ignored: string[] = [];
-  let lastSide: "نحن" | "الجهة" | null = null;
+  const used: Record<Side, Set<string>> = { نحن: new Set(), الجهة: new Set() };
+  let cur: { side: Side; role: string } | null = null;
+  let lastSide: Side | null = null;
+
+  /** دورٌ فريد داخل الطرف الواحد، وإلا ابتلع أحدُهما الآخر عند الحفظ */
+  const uniq = (side: Side, want: string) => {
+    let r = want || "أساسي";
+    for (let i = 2; used[side].has(r); i++) r = `${want} ${i}`;
+    used[side].add(r);
+    return r;
+  };
+  const roleFor = (h: string, n: string, side: Side) => {
+    if (has(n, "بديل", "احتياطي", "الثاني", "نائب", "backup", "alternate")) return uniq(side, "بديل");
+    if (!used[side].size) return uniq(side, "أساسي");
+    return uniq(side, labelOf(h));
+  };
 
   for (const h of heads) {
     if (!h || h === entityCol) continue;
     const n = nrm(h);
-
-    const field: Field | null =
-      has(n, "جوال", "هاتف", "تلفون", "رقم التواصل", "phone", "mobile") ? "phone"
-      : has(n, "بريد", "ايميل", "email", "mail") ? "email"
-      : has(n, "مسمي", "منصب", "وظيفه", "title", "position") ? "jobTitle"
-      : has(n, "اسم", "الاسم", "ممثل", "منسق", "مسؤول", "استشاري", "مستشار",
-             "المتابع", "متابع", "consultant", "advisor",
-             "نقطه تواصل", "نقطه التواصل", "جهه اتصال", "contact", "name") ? "name"
-      : null;
+    const field = fieldOf(n);
     if (!field) { ignored.push(h); continue; }
+    const side = sideOf(n);
 
-    const side: "نحن" | "الجهة" | null =
-      has(n, "المركز", "اداء", "لدينا", "عندنا", "الاستشاري", "استشاري",
-          "المستشار", "مستشار", "consultant", "advisor", "المتابع") ? "نحن"
-      : has(n, "الجهه", "جهه", "الوزاره", "الهيئه") ? "الجهة"
-      : null;
-    const role: "أساسي" | "بديل" =
-      has(n, "بديل", "احتياطي", "الثاني", "نائب", "backup", "alternate") ? "بديل" : "أساسي";
-
-    const use = side ?? lastSide ?? "الجهة";
-    if (side) lastSide = side;
-    cols.push({ header: h, side: use, role, field });
+    if (field === "name" || !cur || (side && side !== cur.side)) {
+      const use: Side = side ?? lastSide ?? "الجهة";
+      lastSide = use;
+      cur = { side: use, role: roleFor(h, n, use) };
+    }
+    cols.push({ header: h, side: cur.side, role: cur.role, field });
   }
   return { entityCol, cols, ignored };
 }
@@ -92,7 +137,7 @@ export function buildRows(rows: Record<string, string>[], map: MapResult): OutEn
     const key = nrm(name);
     if (!out.has(key)) {
       const kindCol = Object.keys(r).find((k) => has(nrm(k), "نوع", "تصنيف", "kind", "type"));
-      const secCol = Object.keys(r).find((k) => has(nrm(k), "القطاع", "sector"));
+      const secCol = Object.keys(r).find((k) => has(nrm(k), "قطاع", "sector"));
       const noteCol = Object.keys(r).find((k) => has(nrm(k), "ملاحظ", "note"));
       out.set(key, {
         name,
@@ -107,6 +152,9 @@ export function buildRows(rows: Record<string, string>[], map: MapResult): OutEn
     /* الأعمدة التي لم تُصنَّف نقاطَ تواصل تُحفظ بعناوينها كما هي:
        الملف قد يحمل ما لم يخطر ببالنا، وإهمالُه ضياع معلومة. */
     for (const k of map.ignored) {
+      const n = nrm(k);
+      // القطاع والنوع والملاحظة لها مكانها في البطاقة، فلا تُكرَّر أسفلها
+      if (has(n, "قطاع", "sector", "نوع", "تصنيف", "ملاحظ", "note")) continue;
       const v = String(r[k] || "").trim();
       if (v && !E.extra[k]) E.extra[k] = v;
     }
