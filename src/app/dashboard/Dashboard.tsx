@@ -451,9 +451,10 @@ export default function Dashboard({ me }: { me: Me }) {
               {railCol ? <path d="M15 5 8 12l7 7" /> : <path d="M9 5l7 7-7 7" />}
             </svg>
           </button>
-          {/* علامة أداء كبيرة باهتة أسفل الشريط — خلف البنود لا فوقها */}
-          <div className="rail-wm-wrap" aria-hidden="true">
-            <img className="rail-wm" src={asset("/adaa-mark.png")} alt="" />
+          {/* صورة مبنى المركز باهتة أسفل الشريط تتلاشى في الأخضر —
+              خلف البنود لا فوقها */}
+          <div className="rail-photo" aria-hidden="true">
+            <img src={asset("/rail-photo.jpg")} alt="" />
           </div>
           <div className="rail-in">
           <div className="rail-brand">

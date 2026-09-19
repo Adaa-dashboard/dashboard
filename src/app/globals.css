@@ -1172,33 +1172,33 @@ table.matrix thead th {
    هالةً شفافة حول البند — بطلب صاحبة المنصة أُزيلت، فصار اللسان
    شريحةً نظيفة تلتحم بلوحة المحتوى من طرفها وحده */
 
-/* علامة أداء وحدها أسفل الشريط — بلا كلمات، بلون أفتح من الخلفية */
-.rail-wm {
+/* صورة أسفل الشريط: بلا ألوان، تتلاشى صاعدةً في الأخضر فلا حدّ لها.
+   موضعها قبل .rail-in في الترتيب فتبقى خلف البنود لا فوقها. */
+.rail-photo {
   position: absolute;
-  inset-inline-start: 50%;
-  transform: translateX(50%);
-  bottom: 92px;
-  width: 104px;
-  max-width: none;
-  height: auto;
-  opacity: 0.16;
-  /* أبيض ثم شفافية ⇒ درجة أفتح من أخضر الشريط نفسه */
-  filter: brightness(0) invert(1);
+  inset-inline: 0;
+  bottom: 0;
+  height: 340px;
+  overflow: hidden;
   pointer-events: none;
   user-select: none;
   z-index: 0;
+  border-end-start-radius: inherit;
+  border-end-end-radius: inherit;
 }
-/* غلافٌ يقتطع ما تجاوز زوايا الشريط — ولا يقتطع زرّ الطيّ
-   لأنه خارج هذا الغلاف */
-.rail-wm-wrap {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  border-radius: inherit;
-  pointer-events: none;
-  z-index: 0;
+.rail-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center bottom;
+  opacity: 0.22;
+  filter: grayscale(1);
+  -webkit-mask-image: linear-gradient(to top, #000 28%, rgba(0, 0, 0, 0.5) 62%, transparent 100%);
+  mask-image: linear-gradient(to top, #000 28%, rgba(0, 0, 0, 0.5) 62%, transparent 100%);
 }
-.rail.col .rail-wm {
+/* الشريط المطويّ ضيّق جداً فلا تظهر الصورة فيه */
+.rail.col .rail-photo {
   display: none;
 }
 
