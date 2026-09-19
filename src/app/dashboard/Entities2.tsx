@@ -127,13 +127,13 @@ function EntityModal({
           )}
           <div className="en2-two">
             <div>
-              <div className="en2-t">{t("نقطة التواصل من المركز", "Our contact")}</div>
+              <div className="en2-t">{e.ours.length > 1 ? t("نقاط التواصل من المركز", "Our contacts") : t("نقطة التواصل من المركز", "Our contact")}</div>
               {e.ours.length
                 ? e.ours.map((c) => <Person key={c.id} c={c} t={t} full={full} />)
                 : <div className="en2-no">{t("لا يوجد — لم تُسند بعد", "None yet")}</div>}
             </div>
             <div>
-              <div className="en2-t">{t("نقطة التواصل من الجهة", "Their contact")}</div>
+              <div className="en2-t">{e.theirs.length > 1 ? t("نقاط التواصل من الجهة", "Their contacts") : t("نقطة التواصل من الجهة", "Their contact")}</div>
               {e.theirs.length
                 ? e.theirs.map((c) => <Person key={c.id} c={c} t={t} full={full} />)
                 : <div className="en2-no">{t("لا يوجد", "None")}</div>}
@@ -318,7 +318,7 @@ export default function Entities2({
           : (() => {
               const was: Mapped =
                 sh.map.cols.find((c) => c.header === h) ??
-                { header: h, side: "نحن", role: "أساسي", field: "name" };
+                { header: h, side: "نحن", role: "أساسي", field: "name", title: "" };
               const next = { ...was, ...patch };
               const all = [...cols, next].sort(
                 (x, y) => sh.heads.indexOf(x.header) - sh.heads.indexOf(y.header),
@@ -569,13 +569,13 @@ export default function Entities2({
               </div>
               <div className="en2-two">
                 <div>
-                  <div className="en2-t">{t("نقطة التواصل من المركز", "Our contact")}</div>
+                  <div className="en2-t">{e.ours.length > 1 ? t("نقاط التواصل من المركز", "Our contacts") : t("نقطة التواصل من المركز", "Our contact")}</div>
                   {e.ours.length
                     ? e.ours.map((c) => <Person key={c.id} c={c} t={t} />)
                     : <div className="en2-no">{t("لا يوجد — لم تُسند بعد", "None yet")}</div>}
                 </div>
                 <div>
-                  <div className="en2-t">{t("نقطة التواصل من الجهة", "Their contact")}</div>
+                  <div className="en2-t">{e.theirs.length > 1 ? t("نقاط التواصل من الجهة", "Their contacts") : t("نقطة التواصل من الجهة", "Their contact")}</div>
                   {e.theirs.length
                     ? e.theirs.map((c) => <Person key={c.id} c={c} t={t} />)
                     : <div className="en2-no">{t("لا يوجد", "None")}</div>}

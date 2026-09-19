@@ -20,7 +20,12 @@ export type Side = "نحن" | "الجهة";
 /** الدور نصٌّ حرّ: «أساسي» · «بديل» · أو تسمية العمود نفسه حين
     يحمل الملف أكثر من شخصين لطرفٍ واحد (قائد VRO · نقطة الاتصال
     · قائد رضا المستفيد…). فالطرف والدور معاً يميّزان الشخص. */
-export type Mapped = { header: string; side: Side; role: string; field: Field };
+export type Mapped = {
+  header: string; side: Side; role: string; field: Field;
+  /** صفة الشخص كما سمّاها الملف: «قائد مكتب تحقيق الرؤية» · «نقطة
+      الاتصال لدى الجهة» — تُكتب مسمّىً له فيُعرف عمّن يليه */
+  title: string;
+};
 export type MapResult = { entityCol: string; cols: Mapped[]; ignored: string[] };
 
 const nrm = (v: string) =>
@@ -53,11 +58,17 @@ function findEntityCol(heads: string[]): string {
   return "";
 }
 
-/** تسمية قصيرة للشخص من عنوان عموده — حين لا يكفي «أساسي/بديل» */
-function labelOf(h: string): string {
+/** صفة الشخص كاملةً من عنوان عموده — تُعرض مسمّىً تحت اسمه */
+function titleOf(h: string): string {
   let s = String(h || "").replace(/\s+/g, " ").trim();
   s = s.split(/\s+(?:او|أو)\s+/)[0];              // «… او مدير الجهة» ⇐ الأول
-  s = s.replace(/^(اسم|أسم)\s+/, "").trim();
+  s = s.replace(/^(اسم|أسم)\s+/, "").replace(/^بديل\s+/, "").trim();
+  return s;
+}
+
+/** تسمية قصيرة للشخص من عنوان عموده — حين لا يكفي «أساسي/بديل» */
+function labelOf(h: string): string {
+  const s = titleOf(h);
   const w = s.split(" ").filter(Boolean);
   return w.length <= 4 ? s : w.slice(0, 4).join(" ") + "…";
 }
@@ -88,7 +99,7 @@ export function mapHeaders(heads: string[]): MapResult {
   const cols: Mapped[] = [];
   const ignored: string[] = [];
   const used: Record<Side, Set<string>> = { نحن: new Set(), الجهة: new Set() };
-  let cur: { side: Side; role: string } | null = null;
+  let cur: { side: Side; role: string; title: string } | null = null;
   let lastSide: Side | null = null;
 
   /** دورٌ فريد داخل الطرف الواحد، وإلا ابتلع أحدُهما الآخر عند الحفظ */
@@ -114,9 +125,9 @@ export function mapHeaders(heads: string[]): MapResult {
     if (field === "name" || !cur || (side && side !== cur.side)) {
       const use: Side = side ?? lastSide ?? "الجهة";
       lastSide = use;
-      cur = { side: use, role: roleFor(h, n, use) };
+      cur = { side: use, role: roleFor(h, n, use), title: field === "name" ? titleOf(h) : "" };
     }
-    cols.push({ header: h, side: cur.side, role: cur.role, field });
+    cols.push({ header: h, side: cur.side, role: cur.role, field, title: cur.title });
   }
   return { entityCol, cols, ignored };
 }
@@ -168,6 +179,10 @@ export function buildRows(rows: Record<string, string>[], map: MapResult): OutEn
         people.set(k, { side: c.side, role: c.role, name: "", jobTitle: "", phone: "", email: "" });
       const P = people.get(k)!;
       if (!P[c.field]) P[c.field] = v;
+      /* صفةُ العمود مسمّىً للشخص ما لم يحمل الملف عمود مسمّى —
+         فيُعرف «قائد مكتب تحقيق الرؤية» من «نقطة الاتصال لدى الجهة»
+         ولا يبدوان نقطتَي تواصل مكرَّرتين */
+      if (!P.jobTitle && c.title && c.title !== c.role) P.jobTitle = c.title;
     }
     for (const P of people.values()) {
       if (!P.name && !P.phone && !P.email) continue;   // عمودٌ فارغ لا يصنع شخصاً
