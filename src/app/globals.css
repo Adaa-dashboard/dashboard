@@ -1150,9 +1150,10 @@ table.matrix thead th {
 .nav-item.active {
   background: var(--bg);
   color: var(--gt-800);
-  /* يمتدّ نحو لوحة المحتوى حتى حافة الشريط (يلغي حشوة .rail-in)،
-     ويبقى طرفه الداخلي مستديراً */
-  margin-inline-end: -13px;
+  /* يمتدّ نحو لوحة المحتوى حتى حافة الشريط (يتجاوز حشوة .rail-in).
+     بالعرض لا بالهامش السالب: الهامش السالب على الجهة الأخرى يُهمَل
+     حين تُضبط العرض والهامشان معاً (over-constrained) فلا يمتدّ شيء. */
+  width: calc(100% + 13px);
   padding-inline-end: 25px;
   border-start-start-radius: 22px;
   border-end-start-radius: 22px;
@@ -1195,10 +1196,10 @@ table.matrix thead th {
   position: absolute;
   inset-inline-start: 50%;
   transform: translateX(50%);
-  bottom: 96px;
-  width: 118px;
+  bottom: 14px;
+  width: 132px;
   height: auto;
-  opacity: 0.09;
+  opacity: 0.08;
   filter: brightness(0) invert(1);
   pointer-events: none;
   user-select: none;
@@ -4662,11 +4663,18 @@ table.matrix thead th {
   height: 100%;
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* شريط التمرير يقع على جهة المحتوى فيقطع التحام اللسان باللوحة —
+     يُخفى شكلاً ويبقى التمرير عاملاً */
+  scrollbar-width: none;
   padding: 26px 13px;
   display: flex;
   flex-direction: column;
   gap: 6px;
   border-radius: inherit;
+}
+.rail-in::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 .rail-tog {
   position: absolute;
@@ -4714,7 +4722,7 @@ table.matrix thead th {
 }
 /* حشوة الشريط المطويّ 11px، فيقف اللسان عند حافته تماماً */
 .rail.col .nav-item.active {
-  margin-inline-end: -11px;
+  width: calc(100% + 11px);
   padding-inline-end: 11px;
 }
 .rail.col .whoami {
