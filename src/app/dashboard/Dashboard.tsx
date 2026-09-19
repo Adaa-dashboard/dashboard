@@ -180,6 +180,17 @@ const STICKY_PAGES: Record<string, Scope> = {
 const GAUGE_TRACK = "#e9f1ef";
 
 /* الأقسام الخمسة في القائمة الجانبية — الترتيب هو ترتيب ظهورها */
+/** اسم مختصر تحت عمود المؤشر — أسماء المؤشرات جملٌ كاملة لا تسع
+    تحت عمود، والاسم الكامل يبقى في تلميح العمود */
+function shortKpi(name: string): string {
+  const n = String(name || "")
+    .replace(/^\s*(نسبة|عدد|مستوى|معدل)\s+/, "")
+    .replace(/^\s*(إلمام|الإلمام)\s+/, "")
+    .trim();
+  const w = n.split(/\s+/);
+  return w.length <= 3 ? n : w.slice(0, 3).join(" ") + "…";
+}
+
 const SECTION_NAV: [SectionKey, (p: { size?: number }) => ReactElement][] = [
   ["sessions", IconSess],
   ["natstrat", IconNat],
@@ -1166,21 +1177,70 @@ function Overview({
       <div className="ov-top">
         <div className="card">
           <div className="card-top">
-            <h3>{t("الأداء العام", "Overall performance")}</h3>
-            {rangeTabs}
+            <h3>{t("حالة المؤشرات", "KPI status")}</h3>
+            <span className="pills">
+              {bands.map((b) => (
+                <button
+                  key={b.label}
+                  className={`pill ${statusFilter === b.label ? "on" : ""}`}
+                  style={{ ["--c" as string]: b.color }}
+                  onClick={() => setStatusFilter(statusFilter === b.label ? null : b.label)}
+                >
+                  <i />
+                  {b.label}
+                  <b>{bandCounts[b.label] || 0}</b>
+                </button>
+              ))}
+            </span>
           </div>
-          <LineChart
-            lines={[
-              {
-                name: t("الأداء العام", "Overall"),
-                color: "#00584c",
-                dash: "",
-                points: overallSeries,
-              },
-            ]}
-            labels={overallSeries.map((p) => p.label)}
-            emptyText={t("لا توجد قياسات كافية لرسم المسار بعد.", "Not enough measurements yet.")}
-          />
+          {/* المؤشرات أعمدةً: الأطول إنجازاً أولاً، ولونُ كلٍّ لون حالته،
+              وما لا قياس له عمودٌ مخطَّط بـ«—» فلا يختفي من اللوحة */}
+          {loading ? (
+            <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>
+          ) : !shownInd.length ? (
+            <div className="empty">{t("لا توجد مؤشرات مطابقة.", "No matching KPIs.")}</div>
+          ) : (
+            <>
+              <div className="kb">
+                {[...shownInd]
+                  .sort((a, b) => (b.value ?? -1) - (a.value ?? -1))
+                  .map((ind) => (
+                    <button
+                      key={ind.id}
+                      className={`c ${ind.value == null ? "na" : ""}`}
+                      title={ind.name}
+                      onClick={() => setOpenIndicator(ind)}
+                    >
+                      <span className="v">{ind.value == null ? "—" : `${ind.value}%`}</span>
+                      <span
+                        className="bar"
+                        style={
+                          ind.value == null
+                            ? undefined
+                            : {
+                                height: `${Math.max(2, Math.min(100, ind.value))}%`,
+                                background: ind.band?.color ?? "var(--g-700)",
+                              }
+                        }
+                      />
+                      <span className="lb">{shortKpi(ind.name)}</span>
+                    </button>
+                  ))}
+              </div>
+              <div className="kb-legend">
+                {bands.map((b) => (
+                  <span key={b.label}>
+                    <i style={{ background: b.color }} />
+                    {b.label}
+                  </span>
+                ))}
+                <span>
+                  <i className="na" />
+                  {t("لا قياس", "No data")}
+                </span>
+              </div>
+            </>
+          )}
         </div>
 
         <Activity
@@ -1201,7 +1261,7 @@ function Overview({
 
       <Sec
         id="kpis"
-        title={t("حالة المؤشرات", "KPI status")}
+        title={t("تفاصيل المؤشرات", "KPI details")}
         chips={
         <span className="pills">
           {bands.map((b) => (
