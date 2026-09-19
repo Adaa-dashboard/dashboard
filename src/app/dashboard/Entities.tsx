@@ -110,8 +110,8 @@ function Num({
 /** جهةٌ أنا نقطة تواصلها في السجلّ المركزي */
 type Reg = {
   entityId: string; name: string; kind: string; sector: string;
-  myContactId: string; myRole: string;
-  theirs: { id?: string; name?: string; jobTitle?: string; email?: string; phone?: string }[];
+  myContactId: string; myRole: string; addedByName?: string;
+  theirs: { id?: string; name?: string; role?: string; jobTitle?: string; email?: string; phone?: string }[];
 };
 
 export default function MyEntities({
@@ -131,6 +131,8 @@ export default function MyEntities({
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
+  const [addMsg, setAddMsg] = useState("");
+  const [busy, setBusy] = useState(false);
   /* الجهات المسندة إليّ في «الجهات ونقاط التواصل» — تظهر هنا
      جاهزة بلا تعبئة، وتُعدَّل من السجلّ لا من هنا فيبقى مرجعاً
      واحداً لا نسختين تتعارضان */
@@ -161,6 +163,32 @@ export default function MyEntities({
       body: JSON.stringify(body),
     }).then((x) => x.json()).catch(() => ({ error: "تعذّر الاتصال" }));
     if (r?.error) { setRegErr(String(r.error)); return; }
+    await loadReg();
+  }
+
+  /* الإضافة تذهب إلى السجلّ المركزي لا إلى نسخةٍ هنا: الجهة تظهر
+     فوراً في «الجهات ونقاط التواصل»، وتُسند لمن أضافها، ويصل خبرُها
+     صاحبَ صلاحية «الجهات» في «آخر التحديثات». ويُفتح لها سطرٌ في
+     المحفظة لتسجيل مساهماتها (مؤشرات · أهداف · مبادرات). */
+  async function addEntity() {
+    const name = newName.trim();
+    if (!name || busy) return;
+    setBusy(true); setAddMsg("");
+    const r = await apiFetch("/api/entities/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    }).then((x) => x.json()).catch(() => ({ error: "تعذّر الاتصال" }));
+    setBusy(false);
+    if (r?.error) { setAddMsg(String(r.error)); return; }
+    onAdd({ name, type: "", contribs: [] });
+    setNewName("");
+    setAddMsg(
+      r.existed
+        ? t(`«${name}» موجودة في السجلّ — نقطة التواصل فيها: ${r.owner || "—"}`,
+            `"${name}" already in the registry`)
+        : t(`أُضيفت «${name}» إلى السجلّ المركزي وأُسندت إليك.`, `"${name}" added.`),
+    );
     await loadReg();
   }
 
@@ -233,6 +261,9 @@ export default function MyEntities({
               return (
                 <div className="en-reg-c" key={x.entityId}>
                   <b>{x.name}</b>
+                  {(x.sector || x.kind) && (
+                    <span className="en-reg-s">{[x.kind, x.sector].filter(Boolean).join(" · ")}</span>
+                  )}
                   <label className="en-reg-l">{t("دوري فيها", "My role")}</label>
                   <input
                     defaultValue={x.myRole}
@@ -274,6 +305,18 @@ export default function MyEntities({
                       }}
                     />
                   </div>
+                  {x.theirs.length > 1 && (
+                    <div className="en-reg-x">
+                      {x.theirs.slice(1).map((o, i) => (
+                        <span key={o.id || i}>
+                          {o.role && o.role !== "أساسي" && <i>{o.role}</i>}
+                          {o.name || "—"}
+                          {o.phone ? ` · ${o.phone}` : ""}
+                          {o.email ? ` · ${o.email}` : ""}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -458,29 +501,24 @@ export default function MyEntities({
       })}
 
       {canEdit && (
-        <div className="en-add">
-          <input
-            value={newName}
-            placeholder={t("اسم جهة جديدة", "New entity name")}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && newName.trim()) {
-                onAdd({ name: newName.trim(), type: "", contribs: [] });
-                setNewName("");
-              }
-            }}
-          />
-          <button
-            className="btn btn-sm"
-            disabled={!newName.trim()}
-            onClick={() => {
-              onAdd({ name: newName.trim(), type: "", contribs: [] });
-              setNewName("");
-            }}
-          >
-            ＋ {t("إضافة جهة", "Add entity")}
-          </button>
-        </div>
+        <>
+          <div className="en-add">
+            <input
+              value={newName}
+              placeholder={t("اسم جهة جديدة", "New entity name")}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") void addEntity(); }}
+            />
+            <button className="btn btn-sm" disabled={!newName.trim() || busy} onClick={() => void addEntity()}>
+              ＋ {busy ? t("يُضاف…", "Adding…") : t("إضافة جهة", "Add entity")}
+            </button>
+          </div>
+          <p className="en-reg-n">
+            {t("الجهة الجديدة تُضاف إلى «الجهات ونقاط التواصل» وتُسند إليك، ويصل خبرها لمن يتولّى السجلّ.",
+               "New entities go to the central registry and are assigned to you.")}
+          </p>
+          {addMsg && <div className="alert alert-info">{addMsg}</div>}
+        </>
       )}
     </div>
   );

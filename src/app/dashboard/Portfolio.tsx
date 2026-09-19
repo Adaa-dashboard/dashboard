@@ -1811,6 +1811,14 @@ export default function Portfolio({
   }, [prefs.custom, prefs.look]);
 
   const entities = pf.of("entities");
+  /* جهات السجلّ المسندة إليّ — البطاقة تعدّها مع جهات المحفظة،
+     فالعدد يوافق ما تراه داخل المربّع لا نصفه */
+  const [regNames, setRegNames] = useState<string[]>([]);
+  useEffect(() => {
+    void apiFetch("/api/entities/mine").then((r) => r.json())
+      .then((d) => setRegNames(Array.isArray(d.mine) ? d.mine.map((x: Rec) => String(x.name || "")) : []))
+      .catch(() => setRegNames([]));
+  }, []);
   const contrib = pf.of("contrib");
   const changes = pf.of("changes");
   const reverse = pf.of("reverse");
@@ -1856,9 +1864,13 @@ export default function Portfolio({
     switch (k) {
       case "strategies": {
         const tot = sumOf(entities.flatMap((r) => contribsOf(r.data)));
+        const all = new Set<string>([
+          ...entities.map((r) => String(r.data.name || "").trim()).filter(Boolean),
+          ...regNames.map((x) => x.trim()).filter(Boolean),
+        ]);
         return {
-          count: entities.length,
-          pct: entities.length ? 100 : 0,
+          count: all.size,
+          pct: all.size ? 100 : 0,
           sub: `${tot.kpis} ${t("مؤشراً", "KPIs")} · ${tot.goals} ${t("هدفاً", "goals")} · ${tot.inits} ${t("مبادرة", "initiatives")}`,
         };
       }

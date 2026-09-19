@@ -755,7 +755,33 @@ export async function apiFetch(path: string, init: Init = {}) {
           kind: String(r.kind || ""), sector: String(r.sector || ""),
           myContactId: String(r.my_contact_id || ""),
           myRole: String(r.my_role || ""), theirs: r.theirs || [],
+          addedByName: String(r.added_by_name || ""),
         })),
+      });
+    }
+
+    /* إضافة جهة من «محفظتي» — الدالة تنشئ الجهة وتُسندها لمن أضافها
+       في طلبٍ واحد، وتتحقّق بنفسها ممّن يحقّ له. */
+    if (p === "/api/entities/add" && method === "POST") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const name = str(body.name).trim();
+      if (!name) return err("اسم الجهة مطلوب", 400);
+      const { data, error } = await s.rpc("perf_entity_add", {
+        p_name: name,
+        p_kind: str(body.kind),
+        p_sector: str(body.sector),
+        p_note: str(body.note),
+        p_their_name: str(body.theirName),
+        p_their_phone: str(body.theirPhone),
+        p_their_email: str(body.theirEmail),
+      });
+      if (error) return err(error.message, 403);
+      const r = (Array.isArray(data) ? data[0] : data) || {};
+      return ok({
+        id: String(r.ent_id || ""),
+        existed: r.existed === true,
+        owner: String(r.owner || ""),
       });
     }
 
@@ -1119,7 +1145,7 @@ export async function apiFetch(path: string, init: Init = {}) {
         );
         return ok({ ok: true });
       }
-      const [ms, nt, tk, sec, ind, seen, tlog, its, sti, ntc, card] = await Promise.all([
+      const [ms, nt, tk, sec, ind, seen, tlog, its, sti, ntc, card, ents] = await Promise.all([
         s.from("perf_measurements").select("*").order("updated_at", { ascending: false }).limit(30),
         s.from("perf_notes").select("*").order("at", { ascending: false }).limit(20),
         s.from("perf_tasks").select("*").order("created_at", { ascending: false }).limit(20),
@@ -1131,6 +1157,8 @@ export async function apiFetch(path: string, init: Init = {}) {
         s.from("perf_stickies").select("*").eq("done", false).order("at", { ascending: false }).limit(20),
         s.from("perf_notices").select("*").order("at", { ascending: false }).limit(6),
         s.rpc("perf_me"),
+        s.from("perf_entities").select("id,name,sector,at,added_by,added_by_name")
+          .neq("added_by_name", "").order("at", { ascending: false }).limit(20),
       ]);
       const myScopes: string[] = (() => {
         const c = Array.isArray(card.data) ? card.data[0] : card.data;
@@ -1204,6 +1232,24 @@ export async function apiFetch(path: string, init: Init = {}) {
           at: it.updated_at,
           unread: !since || it.updated_at > since,
           section: it.section,
+        });
+      }
+      /* جهةٌ أضافها استشاري من محفظته — خبرُها لصاحب صلاحية «الجهات»
+         ليراجعها، ولمن أضافها ليطمئنّ أنها وصلت السجلّ */
+      for (const e of ents.data || []) {
+        const mineAdd = String(e.added_by || "") === String(me.id);
+        if (!mineAdd && !myScopes.includes("entities:edit")) continue;
+        items.push({
+          id: "e" + e.id,
+          kind: "entity",
+          tone: "info",
+          title: mineAdd
+            ? `أضفتَ جهة: ${e.name}`
+            : `${e.added_by_name} أضاف جهة: ${e.name}`,
+          sub: String(e.sector || "") || "الجهات ونقاط التواصل",
+          at: e.at,
+          unread: !since || String(e.at) > since,
+          section: "entities",
         });
       }
       for (const t of tk.data || []) {
