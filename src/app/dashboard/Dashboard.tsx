@@ -1238,7 +1238,7 @@ function Overview({
         <div id="ov-asg">
           <Sec
             id="assignments"
-            title={t("تكاليف هذا الشهر", "This month's assignments")}
+            title={t("التكاليف الواردة للمركز", "Incoming assignments")}
             extra={
               hasScope(me.scopes, "tasks") ? (
                 <button className="sx-link" onClick={() => onOpenTab("tasks")}>
