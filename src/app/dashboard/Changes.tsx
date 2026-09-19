@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { asset } from "@/lib/base";
 import { readDelimited, readXlsx } from "@/lib/sheet";
 
 /* ============================================================
@@ -355,8 +356,10 @@ export default function Changes({
 
   const RANK = [
     { label: "الأول", en: "1st", c: "#1a7a48" },
-    { label: "الثاني", en: "2nd", c: "#7a5cd1" },
+    { label: "الثاني", en: "2nd", c: "#6b53c9" },
     { label: "الثالث", en: "3rd", c: "#c9a020" },
+    { label: "الرابع", en: "4th", c: "#2f7fd1" },
+    { label: "الخامس", en: "5th", c: "#158b7e" },
   ];
 
   return (
@@ -370,8 +373,10 @@ export default function Changes({
             </span>
           </div>
           <div className="cr-podium">
-            {tops.slice(0, 3).map((x, i) => (
+            {tops.slice(0, 5).map((x, i) => (
               <div className="cr-p" key={x.name} style={{ ["--c" as string]: RANK[i].c }}>
+                {/* شعار أداء شفافاً خلف البطاقة بدل الزخرفة */}
+                <img className="mark" src={asset("/adaa-mark.png")} alt="" aria-hidden />
                 <span className="av2">
                   {x.photo ? <img src={x.photo} alt="" /> : (x.name || "?").trim().charAt(0)}
                 </span>
@@ -382,10 +387,10 @@ export default function Changes({
               </div>
             ))}
           </div>
-          {tops.length > 3 && (
+          {tops.length > 5 && (
             <div className="cr-rest">
               {t("ثم:", "Then:")}{" "}
-              {tops.slice(3, 8).map((x) => `${x.name} ${x.pct}%`).join(" · ")}
+              {tops.slice(5, 10).map((x) => `${x.name} ${x.pct}%`).join(" · ")}
             </div>
           )}
         </div>
