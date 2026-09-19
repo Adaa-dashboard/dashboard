@@ -377,14 +377,14 @@ export default function Changes({
     { key: "ok", label: t("ضمن المدة", "On time"), n: stats.ok, c: TONE_COLOR.ok },
   ];
 
-  /* تدرّج ألوان أداء الأساسية — الأغمق للأول ثم يخفّ. والثلاثة
-     الفاتحة تُكتب بحبرٍ داكن، فالأبيض عليها لا يُقرأ */
+  /* تدرّج ألوان أداء الأساسية — الأغمق للأول ثم يخفّ.
+     والخط أبيض في الخمس جميعاً بطلب المستخدمة */
   const RANK = [
-    { label: "الأول", en: "1st", c: "#006F68", light: false },
-    { label: "الثاني", en: "2nd", c: "#008B84", light: false },
-    { label: "الثالث", en: "3rd", c: "#5AABA2", light: true },
-    { label: "الرابع", en: "4th", c: "#90BFB7", light: true },
-    { label: "الخامس", en: "5th", c: "#BFD9D6", light: true },
+    { label: "الأول", en: "1st", c: "#006F68" },
+    { label: "الثاني", en: "2nd", c: "#008B84" },
+    { label: "الثالث", en: "3rd", c: "#5AABA2" },
+    { label: "الرابع", en: "4th", c: "#90BFB7" },
+    { label: "الخامس", en: "5th", c: "#BFD9D6" },
   ];
 
   return (
@@ -400,7 +400,7 @@ export default function Changes({
           <div className="cr-podium">
             {tops.slice(0, 5).map((x, i) => (
               <div
-                className={`cr-p ${RANK[i].light ? "light" : ""}`}
+                className="cr-p"
                 key={x.name}
                 style={{ ["--c" as string]: RANK[i].c }}
                 title={t(
