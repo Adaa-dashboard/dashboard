@@ -179,13 +179,36 @@ const STICKY_PAGES: Record<string, Scope> = {
 /* الأقسام الخمسة في القائمة الجانبية — الترتيب هو ترتيب ظهورها */
 /** اسم مختصر تحت عمود المؤشر — أسماء المؤشرات جملٌ كاملة لا تسع
     تحت عمود، والاسم الكامل يبقى في تلميح العمود */
+/* ---------------- الاسم المختصر للمؤشر ----------------
+   أسماء المؤشرات جملٌ كاملة لا تسع تحت عمود، والاقتطاع الأعمى يجعل
+   مؤشّرين مختلفين يظهران باسمٍ واحد («الأجهزة العامة التي…» مرتين).
+   فلكل مؤشر معروف اسمٌ مختصر دالّ، ولغيره اختصارٌ يحذف الحشو.
+   والاسم الكامل يبقى في تلميح العمود دائماً. */
+const KPI_SHORT: { has: string[]; short: string }[] = [
+  { has: ["خدمات"], short: "قياس الخدمات" },
+  { has: ["جلسات", "منخفض"], short: "جلسات المراجعة" },
+  { has: ["مخرجات"], short: "قابلية المخرجات" },
+  { has: ["وزراء"], short: "الاستراتيجيات الوطنية" },
+  { has: ["مؤسسي"], short: "الاستراتيجيات المؤسسية" },
+  { has: ["تكليف"], short: "التكليفات المباشرة" },
+  { has: ["فردي"], short: "الخطة الفردية" },
+  { has: ["توثيق"], short: "التزام التوثيق" },
+  { has: ["ربع"], short: "الاجتماعات الربعية" },
+];
+/** كلماتٌ لا تعرّف مؤشراً — تُحذف قبل اختصار الاسم غير المعروف */
+const KPI_FILLER = new Set([
+  "نسبة", "عدد", "مستوى", "معدل", "إلمام", "الإلمام",
+  "الأجهزة", "العامة", "التي", "تم", "يتم", "لها", "من", "على", "أو", "في", "ذات", "عقد",
+]);
 function shortKpi(name: string): string {
-  const n = String(name || "")
-    .replace(/^\s*(نسبة|عدد|مستوى|معدل)\s+/, "")
-    .replace(/^\s*(إلمام|الإلمام)\s+/, "")
-    .trim();
-  const w = n.split(/\s+/);
-  return w.length <= 3 ? n : w.slice(0, 3).join(" ") + "…";
+  const full = String(name || "").trim();
+  const n = full.replace(/[أإآ]/g, "ا").replace(/ة/g, "ه");
+  for (const r of KPI_SHORT) {
+    if (r.has.every((k) => n.includes(k.replace(/[أإآ]/g, "ا").replace(/ة/g, "ه")))) return r.short;
+  }
+  const w = full.split(/\s+/).filter((x) => !KPI_FILLER.has(x));
+  if (!w.length) return full;
+  return w.length <= 3 ? w.join(" ") : w.slice(0, 3).join(" ") + "…";
 }
 
 const SECTION_NAV: [SectionKey, (p: { size?: number }) => ReactElement][] = [
@@ -1125,18 +1148,29 @@ function Overview({
                       title={ind.name}
                       onClick={() => setOpenIndicator(ind)}
                     >
-                      <span className="v">{ind.value == null ? "—" : `${ind.value}%`}</span>
-                      <span
-                        className="bar"
-                        style={
-                          ind.value == null
-                            ? undefined
-                            : {
-                                height: `${Math.max(2, Math.min(100, ind.value))}%`,
-                                background: ind.band?.color ?? "var(--g-700)",
-                              }
-                        }
-                      />
+                      {/* العمود داخل مساره وحده: ارتفاعه نسبةٌ مما تبقّى بعد
+                          الاسم، والقيمة ملتصقة بقمّته — فلا ينضغط الاسم مهما
+                          طال العمود ولا تفترق القيمة عن عمودها */}
+                      <span className="ktrk">
+                        <span
+                          className="bw"
+                          style={
+                            ind.value == null
+                              ? undefined
+                              : { height: `${Math.max(2, Math.min(100, ind.value))}%` }
+                          }
+                        >
+                          <span className="v">{ind.value == null ? "—" : `${ind.value}%`}</span>
+                          <span
+                            className="bar"
+                            style={
+                              ind.value == null
+                                ? undefined
+                                : { background: ind.band?.color ?? "var(--g-700)" }
+                            }
+                          />
+                        </span>
+                      </span>
                       <span className="lb">{shortKpi(ind.name)}</span>
                     </button>
                   ))}
