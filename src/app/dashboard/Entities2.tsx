@@ -21,6 +21,13 @@ type Contact = {
   id: string; side: string; role: string; name: string; jobTitle: string;
   email: string; phone: string; note: string; userId: string | null; userName: string;
 };
+/** ورقةٌ من الملف بعد قراءتها: عناوينها وصفوفها وخريطة أعمدتها */
+type Sheet = {
+  name: string;
+  heads: string[];
+  rowsIn: Record<string, string>[];
+  map: MapResult;
+};
 export type Entity = {
   id: string; name: string; kind: string; sector: string; note: string;
   /** أعمدة الملف التي لم تُقرأ نقاطَ تواصل — تُعرض كما وردت */
@@ -63,9 +70,12 @@ function Logo({ e }: { e: Entity }) {
 }
 
 function Person({ c, t }: { c: Contact; t: T }) {
+  /* الملف قد يحمل أكثر من شخصين للطرف الواحد (قائد VRO · نقطة الاتصال
+     · رضا المستفيد)، فالدور يُعرض كما هو لا «بديل» وحده */
+  const tag = c.role && c.role !== "أساسي" ? c.role : "";
   return (
-    <div className={`en2-p ${c.role === "بديل" ? "alt" : ""}`}>
-      {c.role === "بديل" && <span className="en2-alt">{t("بديل", "Alternate")}</span>}
+    <div className={`en2-p ${tag ? "alt" : ""}`}>
+      {tag && <span className="en2-alt">{tag === "بديل" ? t("بديل", "Alternate") : tag}</span>}
       <b>{c.name || t("— بلا اسم —", "—")}</b>
       {c.jobTitle && <em>{c.jobTitle}</em>}
       <span className="en2-w">
@@ -89,7 +99,8 @@ export default function Entities2({ t, canEdit }: { t: T; canEdit: boolean }) {
   const file = useRef<HTMLInputElement | null>(null);
   /* الملف يبقى في اليد حتى تُقرّ الخريطة: تعديل عمودٍ يعيد البناء
      فوراً، فترى المستخدمة أثر التغيير قبل أن يُكتب شيء */
-  const [prev, setPrev] = useState<{ heads: string[]; rowsIn: Record<string, string>[]; map: MapResult } | null>(null);
+  const [prev, setPrev] = useState<{ sheets: Sheet[]; pick: number } | null>(null);
+  const cur = prev ? prev.sheets[prev.pick] : null;
   const [rev, setRev] = useState<{ name: string; entities: number; reviewed: number }[]>([]);
   useEffect(() => {
     if (!canEdit) return;
@@ -134,7 +145,12 @@ export default function Entities2({ t, canEdit }: { t: T; canEdit: boolean }) {
   const filtered = only !== "" || !!sector || !!who || !!q.trim();
 
   /* ما سيُحفظ — يُعاد بناؤه مع كل تعديل على الخريطة */
-  const built = useMemo(() => (prev ? buildRows(prev.rowsIn, prev.map) : []), [prev]);
+  const built = useMemo(() => (cur ? buildRows(cur.rowsIn, cur.map) : []), [cur]);
+  /* خيارات الدور: «أساسي» و«بديل» وما اشتقّه القارئ من عناوين الملف */
+  const roleOpts = useMemo(
+    () => [...new Set(["أساسي", "بديل", ...(cur?.map.cols || []).map((c) => c.role)])],
+    [cur],
+  );
   const nUs = built.reduce((n, e) => n + e.contacts.filter((c) => c.side === "نحن").length, 0);
   const nThem = built.reduce((n, e) => n + e.contacts.filter((c) => c.side !== "نحن").length, 0);
 
@@ -143,26 +159,45 @@ export default function Entities2({ t, canEdit }: { t: T; canEdit: boolean }) {
   /* القراءة تسبق الحفظ: تُعرض خريطة الأعمدة وعيّنة على المستخدم
      أولاً. نسبة الأعمدة التي تُخمَّن من ترتيبها تجعل التأكيد
      واجباً لا ترفاً — والملف لا يُكتب حتى تُقرّه. */
+  /* كل ورقة على حدة: ملف الجهات يحمل عادةً أوراقاً أخرى (تصنيف
+     الأنشطة مثلاً) بعناوين مختلفة. دمجُها كان يخلط الصفوف، فيُختار
+     عمودُ اسم الجهة من ورقة وتُهمل صفوف الأخرى كأنها بلا اسم. */
+  function sheetRows(sh: { name: string; rows: string[][] }): Sheet | null {
+    if (sh.rows.length < 2) return null;
+    const raw = sh.rows[0].map((x) => String(x ?? "").trim());
+    /* عنوانٌ مكرَّر (بريد الأساسي وبريد البديل باسم واحد) يُميَّز برقمه،
+       وإلا ابتلع الثاني الأول وضاعت بيانات البديل */
+    const seen = new Map<string, number>();
+    const heads = raw.map((h) => {
+      if (!h) return "";
+      const n = (seen.get(h) || 0) + 1;
+      seen.set(h, n);
+      return n === 1 ? h : `${h} (${n})`;
+    });
+    const rowsIn: Record<string, string>[] = [];
+    for (const r of sh.rows.slice(1)) {
+      const o: Record<string, string> = {};
+      heads.forEach((h, i) => { if (h) o[h] = String(r[i] ?? "").trim(); });
+      if (Object.values(o).some((v) => v)) rowsIn.push(o);
+    }
+    if (!rowsIn.length) return null;
+    const map = mapHeaders(heads.filter(Boolean));
+    return { name: sh.name, heads: heads.filter(Boolean), rowsIn, map };
+  }
+
   async function readFile(f: File) {
     setErr(""); setMsg(t("يُقرأ الملف…", "Reading…"));
     try {
-      const sheets = await readXlsxSheets(await f.arrayBuffer());
-      const rowsIn: Record<string, string>[] = [];
-      for (const sh of sheets) {
-        if (sh.rows.length < 2) continue;
-        const head = sh.rows[0].map((x) => String(x ?? "").trim());
-        for (const r of sh.rows.slice(1)) {
-          const o: Record<string, string> = {};
-          head.forEach((h, i) => { if (h) o[h] = String(r[i] ?? "").trim(); });
-          if (Object.values(o).some((v) => v)) rowsIn.push(o);
-        }
-      }
-      if (!rowsIn.length) throw new Error(t("الملف فارغ", "Empty file"));
-      const heads = [...new Set(rowsIn.flatMap((r) => Object.keys(r)))];
-      const m = mapHeaders(heads);
-      if (!m.entityCol) throw new Error(t("لم يُعثر على عمود اسم الجهة", "No entity-name column"));
+      const all = (await readXlsxSheets(await f.arrayBuffer()))
+        .map(sheetRows)
+        .filter((x): x is Sheet => !!x && !!x.map.entityCol);
+      if (!all.length) throw new Error(t("لم يُعثر على عمود اسم الجهة", "No entity-name column"));
+      /* الورقة المرشَّحة: أكثرها أعمدةَ نقاط تواصل، ثم أكثرها صفوفاً */
+      const best = [...all].sort(
+        (x, y) => y.map.cols.length - x.map.cols.length || y.rowsIn.length - x.rowsIn.length,
+      )[0];
       setMsg("");
-      setPrev({ heads, rowsIn, map: m });
+      setPrev({ sheets: all, pick: all.indexOf(best) });
     } catch (e) {
       setMsg(""); setErr(e instanceof Error ? e.message : String(e));
     }
@@ -174,14 +209,24 @@ export default function Entities2({ t, canEdit }: { t: T; canEdit: boolean }) {
   function setCol(h: string, patch: Partial<Mapped> | null) {
     setPrev((p) => {
       if (!p) return p;
-      const cols = p.map.cols.filter((c) => c.header !== h);
-      const ignored = p.map.ignored.filter((x) => x !== h);
-      if (patch === null) return { ...p, map: { ...p.map, cols, ignored: [...ignored, h] } };
-      const cur: Mapped =
-        p.map.cols.find((c) => c.header === h) ?? { header: h, side: "نحن", role: "أساسي", field: "name" };
-      const next = { ...cur, ...patch };
-      const all = [...cols, next].sort((x, y) => p.heads.indexOf(x.header) - p.heads.indexOf(y.header));
-      return { ...p, map: { ...p.map, cols: all, ignored } };
+      const sh = p.sheets[p.pick];
+      const cols = sh.map.cols.filter((c) => c.header !== h);
+      const ignored = sh.map.ignored.filter((x) => x !== h);
+      const map: MapResult =
+        patch === null
+          ? { ...sh.map, cols, ignored: [...ignored, h] }
+          : (() => {
+              const was: Mapped =
+                sh.map.cols.find((c) => c.header === h) ??
+                { header: h, side: "نحن", role: "أساسي", field: "name" };
+              const next = { ...was, ...patch };
+              const all = [...cols, next].sort(
+                (x, y) => sh.heads.indexOf(x.header) - sh.heads.indexOf(y.header),
+              );
+              return { ...sh.map, cols: all, ignored };
+            })();
+      const sheets = p.sheets.map((x, i) => (i === p.pick ? { ...x, map } : x));
+      return { ...p, sheets };
     });
   }
 
@@ -284,9 +329,26 @@ export default function Entities2({ t, canEdit }: { t: T; canEdit: boolean }) {
               <button className="mx" onClick={() => setPrev(null)}>✕</button>
             </div>
             <div className="m-b">
+              {prev.sheets.length > 1 && (
+                <>
+                  <label>{t("ورقة الملف", "Sheet")}</label>
+                  <select
+                    value={prev.pick}
+                    onChange={(ev) => setPrev((p) => (p ? { ...p, pick: Number(ev.target.value) } : p))}
+                    style={{ marginBottom: 12 }}
+                  >
+                    {prev.sheets.map((sh, i) => (
+                      <option key={sh.name} value={i}>
+                        {sh.name} — {t(`${sh.rowsIn.length} صف · ${sh.map.cols.length} عمود تواصل`,
+                                       `${sh.rowsIn.length} rows`)}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
               <p className="muted" style={{ marginTop: 0 }}>
                 {t(
-                  `${built.length} جهة · ${nUs} نقطة تواصل من المركز · ${nThem} من الجهة. عمود اسم الجهة: «${prev.map.entityCol}».`,
+                  `${built.length} جهة · ${nUs} نقطة تواصل من المركز · ${nThem} من الجهة. عمود اسم الجهة: «${cur?.map.entityCol}».`,
                   `${built.length} entities.`,
                 )}
               </p>
@@ -300,10 +362,10 @@ export default function Entities2({ t, canEdit }: { t: T; canEdit: boolean }) {
               )}
               <label>{t("كيف تُقرأ الأعمدة — عدّليها إن أخطأ التخمين", "Column mapping")}</label>
               <div className="imp-map edit">
-                {prev.heads
-                  .filter((h) => h && h !== prev.map.entityCol)
+                {(cur?.heads || [])
+                  .filter((h) => h && h !== cur?.map.entityCol)
                   .map((h) => {
-                    const c = prev.map.cols.find((x) => x.header === h) || null;
+                    const c = cur?.map.cols.find((x) => x.header === h) || null;
                     return (
                       <div key={h}>
                         <b>{h}</b>
@@ -330,10 +392,11 @@ export default function Entities2({ t, canEdit }: { t: T; canEdit: boolean }) {
                         <select
                           value={c ? c.role : "أساسي"}
                           disabled={!c}
-                          onChange={(ev) => setCol(h, { role: ev.target.value as Mapped["role"] })}
+                          onChange={(ev) => setCol(h, { role: ev.target.value })}
                         >
-                          <option value="أساسي">{t("أساسي", "Primary")}</option>
-                          <option value="بديل">{t("بديل", "Alternate")}</option>
+                          {roleOpts.map((r) => (
+                            <option key={r} value={r}>{r}</option>
+                          ))}
                         </select>
                       </div>
                     );

@@ -607,34 +607,67 @@ export async function apiFetch(path: string, init: Init = {}) {
       const ents = (Array.isArray(body.entities) ? body.entities : []) as InE[];
       if (!ents.length) return err("لا توجد جهات", 400);
 
-      let nE = 0, nC = 0;
+      /* الرفع على دفعات لا صفّاً صفّاً: ملفٌ فيه ٣٣٠ جهة وألف نقطة
+         تواصل كان يعني آلاف الطلبات، فيبطئ أو ينقطع في منتصفه. الآن:
+         قراءةٌ واحدة للموجود، ثم upsert على دفعات. */
+      const chunk = <X,>(a: X[], n: number) => {
+        const out: X[][] = [];
+        for (let i = 0; i < a.length; i += n) out.push(a.slice(i, i + n));
+        return out;
+      };
+      const { data: curE } = await s.from("perf_entities").select("id,name");
+      const idByName = new Map((curE || []).map((r: Record<string, unknown>) => [String(r.name), String(r.id)]));
+
+      const entRows: Record<string, unknown>[] = [];
+      const eidOf = new Map<string, string>();
       for (const E of ents) {
         const nm = String(E.name || "").trim();
-        if (!nm) continue;
-        const { data: cur } = await s.from("perf_entities").select("id").eq("name", nm).maybeSingle();
-        const eid = cur?.id ? String(cur.id) : "ent-" + newId();
-        const { error: e1 } = await s.from("perf_entities").upsert({
+        if (!nm || eidOf.has(nm)) continue;
+        const eid = idByName.get(nm) || "ent-" + newId();
+        eidOf.set(nm, eid);
+        entRows.push({
           id: eid, name: nm, kind: str(E.kind), sector: str(E.sector), note: str(E.note),
           extra: E.extra && typeof E.extra === "object" ? E.extra : {}, active: true,
         });
-        if (e1) return err("الرفع لمن يملك صلاحية «الجهات»", 403);
-        nE++;
+      }
+      for (const part of chunk(entRows, 400)) {
+        const { error } = await s.from("perf_entities").upsert(part);
+        if (error) return err("الرفع لمن يملك صلاحية «الجهات»", 403);
+      }
+
+      /* المفتاح (الجهة · الطرف · الدور): إعادة الرفع تُحدِّث الشخص
+         نفسه ولا تُكرّره، وتغييرُ الاسم تصحيحٌ لا إضافة */
+      const { data: curC } = await s.from("perf_contacts").select("id,entity_id,side,role");
+      const ckey = (e: string, side: string, role: string) => `${e}|${side}|${role}`;
+      const idByKey = new Map(
+        (curC || []).map((r: Record<string, unknown>) => [
+          ckey(String(r.entity_id), String(r.side), String(r.role)), String(r.id),
+        ]),
+      );
+      const conRows: Record<string, unknown>[] = [];
+      const seen = new Set<string>();
+      for (const E of ents) {
+        const eid = eidOf.get(String(E.name || "").trim());
+        if (!eid) continue;
         for (const c of E.contacts || []) {
           const side = c.side === "نحن" ? "نحن" : "الجهة";
-          const role = c.role === "بديل" ? "بديل" : "أساسي";
-          /* المفتاح (الجهة · الطرف · الدور): إعادة الرفع تُحدِّث
-             الشخص نفسه ولا تُكرّره، وتغييرُ الاسم تصحيحٌ لا إضافة */
-          const { data: dup } = await s.from("perf_contacts").select("id")
-            .eq("entity_id", eid).eq("side", side).eq("role", role).maybeSingle();
-          const { error: e2 } = await s.from("perf_contacts").upsert({
-            id: dup?.id ? String(dup.id) : "con-" + newId(),
+          const role = str(c.role) || "أساسي";
+          const k = ckey(eid, side, role);
+          if (seen.has(k)) continue;
+          seen.add(k);
+          conRows.push({
+            id: idByKey.get(k) || "con-" + newId(),
             entity_id: eid, side, role,
             name: str(c.name), job_title: str(c.jobTitle),
             email: str(c.email), phone: str(c.phone),
           });
-          if (!e2) nC++;
         }
       }
+      for (const part of chunk(conRows, 400)) {
+        const { error } = await s.from("perf_contacts").upsert(part);
+        if (error) return err("تعذّر حفظ نقاط التواصل — " + error.message, 403);
+      }
+      const nE = entRows.length, nC = conRows.length;
       const { data: link } = await s.rpc("perf_contacts_link");
       const L = Array.isArray(link) ? link[0] : link;
       return ok({ entities: nE, contacts: nC, linked: Number(L?.linked || 0), unmatched: Number(L?.unmatched || 0) });
