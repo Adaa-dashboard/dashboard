@@ -304,12 +304,8 @@ export default function Tasks({
       color: "#e0971a",
     },
     { key: "late", title: t("المتأخرة", "Overdue"), hint: t("تجاوزت موعدها", "Past due"), color: "#d34a4a" },
-    {
-      key: "hold",
-      title: t("المعلقة", "On hold"),
-      hint: t("موقوفة بانتظار غيرها", "Paused, waiting on others"),
-      color: STATE_COLOR.hold,
-    },
+    /* بلا سطر شرح — بطلب المستخدمة */
+    { key: "hold", title: t("المعلقة", "On hold"), hint: "", color: STATE_COLOR.hold },
     { key: "done", title: t("المكتملة", "Completed"), hint: t("أُغلقت", "Closed"), color: "#5aaba2" },
   ];
   // التكاليف ترد من جهة أعلى ومواعيدها معلومة، فعمود «هذا الأسبوع» زائد فيها
@@ -361,7 +357,8 @@ export default function Tasks({
                 {c.title}
                 <b className="cnt">{cols[c.key].length}</b>
               </div>
-              <div className="tcol-s">{c.hint}</div>
+              {/* مسافة بديلة للعمود بلا شرح، فتبقى رؤوس الأعمدة على سطر واحد */}
+              <div className="tcol-s">{c.hint || "\u00a0"}</div>
               {(limit && !showAll ? cols[c.key].slice(0, limit) : cols[c.key]).map((x) => {
                 const col0 = columnOf(x, !asg);
                 const late = col0 === "late";
