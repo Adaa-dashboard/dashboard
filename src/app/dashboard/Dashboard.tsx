@@ -517,6 +517,8 @@ export default function Dashboard({ me }: { me: Me }) {
             </button>
           </div>
           </div>
+          {/* شعار أداء باهتاً في أسفل الشريط — زينة لا تُنقر */}
+          <img className="rail-wm" src={asset("/adaa-logo.png")} alt="" aria-hidden="true" />
         </aside>
 
         <main className="main-area">
