@@ -108,11 +108,24 @@ function Num({
 }
 
 /** جهةٌ أنا نقطة تواصلها في السجلّ المركزي */
+type RegC = { id?: string; name?: string; role?: string; jobTitle?: string; email?: string; phone?: string };
 type Reg = {
   entityId: string; name: string; kind: string; sector: string;
   myContactId: string; myRole: string; addedByName?: string;
-  theirs: { id?: string; name?: string; role?: string; jobTitle?: string; email?: string; phone?: string }[];
+  /** نقاط التواصل من المركز لهذه الجهة — أنا وغيري */
+  ours?: RegC[];
+  theirs: RegC[];
 };
+
+/** دوري في الجهة: أساسي أم بديل — من السجلّ لا من كتابتي */
+function myKind(x: Reg): string {
+  const me = (x.ours || []).find((c) => c.id === x.myContactId);
+  return (me?.role || "أساسي").trim();
+}
+/** من يشاركني الجهة — الأساسي إن كنت بديلاً، والبديل إن كنت أساسياً */
+function partner(x: Reg): RegC | undefined {
+  return (x.ours || []).find((c) => c.id !== x.myContactId);
+}
 
 export default function MyEntities({
   rows,
@@ -252,7 +265,16 @@ export default function MyEntities({
         <div className="en-reg">
           <div className="en-reg-h">
             <b>{t("جهاتي من سجلّ المركز", "From the central registry")}</b>
-            <span>{t(`${reg.length} جهة أنت نقطة التواصل فيها`, `${reg.length} entities`)}</span>
+            <span>
+              {(() => {
+                const alt = reg.filter((x) => myKind(x) !== "أساسي").length;
+                return t(
+                  `${reg.length} جهة أنت نقطة التواصل فيها` +
+                    (alt ? ` — ${reg.length - alt} أساسي · ${alt} بديل` : ""),
+                  `${reg.length} entities`,
+                );
+              })()}
+            </span>
           </div>
           {regErr && <div className="alert alert-error">{regErr}</div>}
           <div className="en-reg-g">
@@ -260,9 +282,19 @@ export default function MyEntities({
               const c = x.theirs?.[0];
               return (
                 <div className="en-reg-c" key={x.entityId}>
-                  <b>{x.name}</b>
+                  <b>
+                    {myKind(x) !== "أساسي" && <span className="en-reg-b">{myKind(x)}</span>}
+                    {x.name}
+                  </b>
                   {(x.sector || x.kind) && (
                     <span className="en-reg-s">{[x.kind, x.sector].filter(Boolean).join(" · ")}</span>
+                  )}
+                  {partner(x) && (
+                    <span className="en-reg-s">
+                      {myKind(x) === "أساسي"
+                        ? t(`البديل: ${partner(x)?.name || "—"}`, `Alternate: ${partner(x)?.name || "—"}`)
+                        : t(`الأساسي: ${partner(x)?.name || "—"}`, `Primary: ${partner(x)?.name || "—"}`)}
+                    </span>
                   )}
                   <label className="en-reg-l">{t("دوري فيها", "My role")}</label>
                   <input

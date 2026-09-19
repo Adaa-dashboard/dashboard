@@ -10369,6 +10369,24 @@ input.cell-date {
 .en-reg-l { display: block; font-size: 10.5px; font-weight: 700; color: var(--muted); margin: 7px 0 3px; }
 /* قطاع الجهة ونوعها تحت اسمها، ومن زاد من نقاط تواصلها يُسرد بعدها */
 .en-reg-s { font-size: 10.5px; color: var(--muted); }
+/* دوري في الجهة: البديل يُعلَّم، والأساسي هو الأصل فلا يحتاج علامة */
+.en-reg-c .en-reg-b {
+  /* `.en-reg-c span` أقوى من صنفٍ مفرد وتجعل كل span كتلةً،
+     فالشارة تحتاج قاعدةً بصنفين لتبقى بجوار الاسم */
+  display: inline-block; margin-top: 0;
+  font-size: 9.5px; font-weight: 800; color: #8a6d1e; background: #fdf3e0;
+  border: 1px solid #f0e0b8; border-radius: 999px; padding: 1px 7px; margin-inline-end: 6px;
+}
+.erow2-h {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  padding: 10px 14px 4px; border-top: 1px solid var(--border);
+}
+.erow2-h b { font-size: 11.5px; color: var(--gt-900); }
+.erow2-h span { font-size: 10.5px; color: var(--muted); }
+.erow2-b {
+  font-style: normal; font-size: 9.5px; font-weight: 800; color: #8a6d1e; background: #fdf3e0;
+  border: 1px solid #f0e0b8; border-radius: 999px; padding: 1px 7px; margin-inline-end: 6px;
+}
 .en-reg-x { margin-top: 7px; border-top: 1px dashed var(--border); padding-top: 6px; }
 .en-reg-x span { display: block; font-size: 11px; color: var(--ink-2); margin-top: 3px; }
 .en-reg-x i {

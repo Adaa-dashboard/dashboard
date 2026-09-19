@@ -755,6 +755,9 @@ export async function apiFetch(path: string, init: Init = {}) {
           kind: String(r.kind || ""), sector: String(r.sector || ""),
           myContactId: String(r.my_contact_id || ""),
           myRole: String(r.my_role || ""), theirs: r.theirs || [],
+          /* كل نقاط التواصل من المركز لهذه الجهة — بها يُعرف دوري
+             فيها (أساسي أم بديل) ومن يشاركني إياها */
+          ours: r.mine || [],
           addedByName: String(r.added_by_name || ""),
         })),
       });
