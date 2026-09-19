@@ -33,9 +33,9 @@ import Tasks from "./Tasks";
 import {
   SectionPage,
   Sessions,
+  StatusBars,
   StrategyBox,
   Projects,
-  Outputs,
   CxBox,
   useCollapse,
   CollapseBtn,
@@ -1266,13 +1266,19 @@ function Overview({
       {/* ملخّصات الأقسام يراها كل من يفتح «نظرة عامة» — بطلب المستخدمة.
           وزرّ «المزيد من التفاصيل» وحده يُحجب عمّن لا يملك صلاحية القسم،
           فالصفحة التفصيلية تبقى لأصحابها. */}
-      <Sec
-        id="sessions"
-        title={t(SECTION_TITLE.sessions[0], SECTION_TITLE.sessions[1])}
-        extra={<MoreLink k="sessions" />}
-      >
-        <Sessions t={t} limit={4} />
-      </Sec>
+      {/* الجلسات والمخرجات جنب بعض: الحالات أشرطةً بنسبتها وعددها */}
+      <div className="sx-two" style={{ marginTop: 28 }}>
+        <StatusBars
+          section="sessions"
+          t={t}
+          onOpen={hasScope(me.scopes, "sessions") ? () => onOpenTab("sessions") : undefined}
+        />
+        <StatusBars
+          section="outputs"
+          t={t}
+          onOpen={hasScope(me.scopes, "outputs") ? () => onOpenTab("outputs") : undefined}
+        />
+      </div>
 
       {/* الاستراتيجيتان جنب بعض: معلومات عامة فقط، والأسماء
           والتفاصيل كلها في صفحة كل قسم */}
@@ -1295,16 +1301,13 @@ function Overview({
         <CxBox t={t} />
       </Sec>
 
-      {(["outputs", "projects"] as const).map((key) => (
-        <Sec
-          key={key}
-          id={key}
-          title={t(SECTION_TITLE[key][0], SECTION_TITLE[key][1])}
-          extra={<MoreLink k={key} />}
-        >
-          {key === "projects" ? <Projects t={t} canEdit={false} /> : <Outputs t={t} />}
-        </Sec>
-      ))}
+      <Sec
+        id="projects"
+        title={t(SECTION_TITLE.projects[0], SECTION_TITLE.projects[1])}
+        extra={<MoreLink k="projects" />}
+      >
+        <Projects t={t} canEdit={false} />
+      </Sec>
 
       {hasScope(me.scopes, "changes") && (
         <Sec id="changes" title={t("طلبات التغيير", "Change requests")}>

@@ -1129,6 +1129,88 @@ function GCell({ k, children }: { k: string; children: ReactNode }) {
   );
 }
 
+/* ============================================================
+   بطاقة «أشرطة الحالة» — الحالات الثلاث أشرطةً بنسبتها وعددها.
+   تقرأ من `weekSummary` نفسها التي يقرأ منها التقرير الأسبوعي،
+   فلا يختلف رقمٌ بين الصفحة والتقرير.
+   ============================================================ */
+const BAR_TONE = ["#1a7a48", "#e0971a", "#9aa8a4", "#2f7fd1", "#6b53c9"];
+/* عبارةٌ داخل الشريط تشرح الحالة — لا تكرّر عنوانها */
+const BAR_INNER: Record<string, string> = {
+  مكتملة: "اكتملت محاضرها",
+  "قيد التنفيذ": "قيد الإعداد",
+  "لم تبدأ": "لم تُجدول بعد",
+};
+
+export function StatusBars({
+  section,
+  t,
+  onOpen,
+}: {
+  section: SectionKey;
+  t: T;
+  onOpen?: () => void;
+}) {
+  const { items, loaded } = useItems(section);
+  const title = SECTION_TITLE[section];
+  const { open, toggle } = useCollapse(section);
+  const sum = useMemo(() => weekSummary(section, items), [section, items]);
+
+  const box = (body: ReactNode) => (
+    <div className={`sx-box ${open ? "" : "closed"}`}>
+      <div className="hd">
+        <CollapseBtn open={open} toggle={toggle} t={t} />
+        <h3>{t(title[0], title[1])}</h3>
+        {onOpen && (
+          <button className="lnk" onClick={onOpen}>
+            {t("التفاصيل", "Details")} ‹
+          </button>
+        )}
+      </div>
+      {open && <div className="bd">{body}</div>}
+    </div>
+  );
+
+  if (!loaded) return box(<div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>);
+  if (!items.length)
+    return box(
+      <div className="sx-none">{t("لا توجد بيانات بعد — تُضاف من صفحة القسم.", "No data yet.")}</div>,
+    );
+
+  const tot = sum.total || 1;
+  const quarter = txt(items[0]?.data?.quarter);
+  return box(
+    <div className="pbars">
+      <div className="pb-sub">
+        {`${AR(sum.total)} ${sum.totalLabel}`}
+        {quarter ? ` · ${quarter}` : ""}
+      </div>
+      {sum.breakdown.map((b, i) => {
+        const pct = Math.round((b.n / tot) * 100);
+        const inner = BAR_INNER[b.k] || b.k;
+        return (
+          <div className="pb-row" key={b.k}>
+            <div className="pb-h">
+              <b>{b.k}</b>
+              <span>{pct}%</span>
+              <i>{AR(b.n)}</i>
+            </div>
+            <div className="pb-t">
+              <span
+                className="pb-f"
+                style={{ width: `${Math.max(pct, 3)}%`, background: BAR_TONE[i % BAR_TONE.length] }}
+              >
+                {pct >= 26 && <em>{inner}</em>}
+                <u className="knob" />
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </div>,
+  );
+}
+
 export function StrategyBox({
   section,
   t,
