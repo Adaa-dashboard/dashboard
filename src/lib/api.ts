@@ -29,6 +29,8 @@ const num = (v: unknown): number | null => {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 };
+import { nrm } from "./commit";
+
 const str = (v: unknown): string => (v === null || v === undefined ? "" : String(v).trim());
 const newId = () =>
   Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
@@ -1166,7 +1168,8 @@ export async function apiFetch(path: string, init: Init = {}) {
         );
         return ok({ ok: true });
       }
-      const [ms, nt, tk, sec, ind, seen, tlog, its, sti, ntc, card, ents] = await Promise.all([
+      const [ms, nt, tk, sec, ind, seen, tlog, its, sti, ntc, card, ents, crs, myEnts] =
+        await Promise.all([
         s.from("perf_measurements").select("*").order("updated_at", { ascending: false }).limit(30),
         s.from("perf_notes").select("*").order("at", { ascending: false }).limit(20),
         s.from("perf_tasks").select("*").order("created_at", { ascending: false }).limit(20),
@@ -1180,6 +1183,12 @@ export async function apiFetch(path: string, init: Init = {}) {
         s.rpc("perf_me"),
         s.from("perf_entities").select("id,name,sector,at,added_by,added_by_name")
           .neq("added_by_name", "").order("at", { ascending: false }).limit(20),
+        /* طلبات التغيير المفتوحة + جهاتي — لتذكير الاستشاري بما
+           ورد على جهاته بعد رفع ملف منصة الرؤية اليومي */
+        s.from("perf_change_requests")
+          .select("code,owner_entity,item_name,sla_days,work_days,first_seen,updated_at")
+          .eq("status", "open").limit(600),
+        s.rpc("perf_my_entities"),
       ]);
       const myScopes: string[] = (() => {
         const c = Array.isArray(card.data) ? card.data[0] : card.data;
@@ -1255,6 +1264,51 @@ export async function apiFetch(path: string, init: Init = {}) {
           section: it.section,
         });
       }
+      /* تذكير طلبات التغيير: ما ورد على جهاتي — بندان لا بندٌ لكل
+         طلب، فالاستشاري قد تكون له عشرات الطلبات المفتوحة. ولا
+         يُطلب منه شيء في المنصة: يراجعها في منصة الرؤية، والحساب
+         هنا تلقائي. والبديل لا تُحتسب عليه جهات غيره. */
+      {
+        const mineNames = new Set<string>();
+        for (const e of (Array.isArray(myEnts.data) ? myEnts.data : []) as Record<string, unknown>[]) {
+          const mine = Array.isArray(e.mine) ? (e.mine as Record<string, unknown>[]) : [];
+          const meC = mine.find((c) => String(c.id) === String(e.my_contact_id));
+          if (String(meC?.role || "أساسي") === "أساسي") mineNames.add(nrm(e.name));
+        }
+        const rows = ((crs.data || []) as Record<string, unknown>[]).filter((c) =>
+          mineNames.has(nrm(c.owner_entity)),
+        );
+        const sinceDay = since ? String(since).slice(0, 10) : "";
+        const fresh = rows.filter((c) => !sinceDay || String(c.first_seen || "") >= sinceDay);
+        const late = rows.filter(
+          (c) => c.sla_days != null && c.work_days != null && Number(c.work_days) >= Number(c.sla_days),
+        );
+        const newest = (a: Record<string, unknown>[]) =>
+          a.reduce((t, c) => (String(c.updated_at) > t ? String(c.updated_at) : t), "");
+        const names = (a: Record<string, unknown>[]) =>
+          [...new Set(a.map((c) => String(c.owner_entity || "")))].slice(0, 3).join(" · ");
+        if (fresh.length)
+          items.push({
+            id: "cr-new",
+            kind: "change",
+            tone: "info",
+            title: `طلبات تغيير جديدة على جهاتك (${fresh.length})`,
+            sub: `${names(fresh)} — راجعها في منصة الرؤية`,
+            at: newest(fresh) || new Date().toISOString(),
+            unread: true,
+          });
+        if (late.length)
+          items.push({
+            id: "cr-late",
+            kind: "change",
+            tone: "bad",
+            title: `طلبات تغيير تجاوزت مدّتها (${late.length})`,
+            sub: `${names(late)} — راجعها في منصة الرؤية`,
+            at: newest(late) || new Date().toISOString(),
+            unread: !since || newest(late) > since,
+          });
+      }
+
       /* جهةٌ أضافها استشاري من محفظته — خبرُها لصاحب صلاحية «الجهات»
          ليراجعها، ولمن أضافها ليطمئنّ أنها وصلت السجلّ */
       for (const e of ents.data || []) {
