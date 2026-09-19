@@ -376,10 +376,13 @@ export default function Dashboard({ me }: { me: Me }) {
     { indicatorId: string; sectorId?: string; notes?: boolean } | null
   >(null);
   const [taskFocus, setTaskFocus] = useState<string | null>(null);
+  /* البند المقصود تكليفٌ أم مهمة — فتُفتح صفحتهما على تبويبه */
+  const [taskFocusKind, setTaskFocusKind] = useState<"task" | "assignment">("task");
 
   function goFromActivity(it: ActivityItem) {
     if (it.taskId) {
       setTaskFocus(it.taskId);
+      setTaskFocusKind(it.kind === "assignment" ? "assignment" : "task");
       setTab("tasks");
       return;
     }
@@ -674,13 +677,15 @@ export default function Dashboard({ me }: { me: Me }) {
                 />
               )}
               {tab === "tasks" && can("tasks") && (
-                <Tasks
+                <TasksPage
                   meId={me.id}
                   isAdmin={isAdmin}
                   indicators={refData.indicators.map((i) => ({ id: i.id, name: i.name }))}
                   t={t}
+                  canAsg={can("assignments")}
                   onlyMine={!can("tasks:all")}
                   focusId={taskFocus}
+                  focusKind={taskFocusKind}
                   onFocusDone={() => setTaskFocus(null)}
                 />
               )}
@@ -1231,7 +1236,17 @@ function Overview({
 
       {hasScope(me.scopes, "assignments") && (
         <div id="ov-asg">
-          <Sec id="assignments" title={t("التكاليف", "Assignments")}>
+          <Sec
+            id="assignments"
+            title={t("تكاليف هذا الشهر", "This month's assignments")}
+            extra={
+              hasScope(me.scopes, "tasks") ? (
+                <button className="sx-link" onClick={() => onOpenTab("tasks")}>
+                  {t("المزيد من التفاصيل", "More details")} ‹
+                </button>
+              ) : null
+            }
+          >
           <Tasks
             meId={me.id}
             isAdmin={me.role === "admin"}
@@ -1239,6 +1254,7 @@ function Overview({
             t={t}
             kind="assignment"
             limit={3}
+            monthOnly
             onlyMine={!hasScope(me.scopes, "tasks:all")}
             focusId={asgFocus}
             onFocusDone={() => setAsgFocus(null)}
@@ -1929,6 +1945,53 @@ function StatusBandsManager({ refData, reload }: { refData: RefData; reload: () 
         ))}
       </div>
     </div>
+  );
+}
+
+/* صفحة «التكاليف والمهام»: خياران على لوحة واحدة — والمحفوظ كله
+   هنا، بينما «نظرة عامة» تعرض بنود الشهر وحدها */
+function TasksPage({
+  meId, isAdmin, indicators, t, canAsg, onlyMine, focusId, focusKind, onFocusDone,
+}: {
+  meId: string;
+  isAdmin: boolean;
+  indicators: { id: string; name: string }[];
+  t: (ar: string, en: string) => string;
+  canAsg: boolean;
+  onlyMine: boolean;
+  focusId: string | null;
+  focusKind: "task" | "assignment";
+  onFocusDone: () => void;
+}) {
+  const [kind, setKind] = useState<"task" | "assignment">(canAsg ? "assignment" : "task");
+  /* فتحُ بندٍ بعينه من «آخر التحديثات» يفتح تبويبه لا التبويب الظاهر */
+  useEffect(() => {
+    if (focusId) setKind(focusKind);
+  }, [focusId, focusKind]);
+  return (
+    <>
+      {canAsg && (
+        <div className="segs" style={{ marginBottom: 14 }}>
+          <button className={`sg ${kind === "assignment" ? "on" : ""}`} onClick={() => setKind("assignment")}>
+            {t("التكاليف", "Assignments")}
+          </button>
+          <button className={`sg ${kind === "task" ? "on" : ""}`} onClick={() => setKind("task")}>
+            {t("المهام", "Tasks")}
+          </button>
+        </div>
+      )}
+      <Tasks
+        key={kind}
+        meId={meId}
+        isAdmin={isAdmin}
+        indicators={indicators}
+        t={t}
+        kind={kind}
+        onlyMine={onlyMine}
+        focusId={focusId && kind === focusKind ? focusId : null}
+        onFocusDone={onFocusDone}
+      />
+    </>
   );
 }
 
