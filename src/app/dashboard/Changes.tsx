@@ -58,6 +58,14 @@ function norm(s: string): string {
     .replace(/[\s/\\_-]+/g, " ")
     .trim();
 }
+/** صيغة العدد العربية: طلب واحد · طلبان · ٣-١٠ طلبات · ما زاد طلباً */
+function arReq(n: number): string {
+  if (n === 1) return "طلب واحد";
+  if (n === 2) return "طلبان";
+  if (n <= 10) return `${n} طلبات`;
+  return `${n} طلباً`;
+}
+
 function digits(s: string): string {
   return s.replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)));
 }
@@ -191,9 +199,13 @@ export default function Changes({
     };
   }, [items]);
 
-  /* الالتزام: نسبة طلباته التي لم تتجاوز مدة الخدمة — والأسرع
-     إغلاقاً يتقدّم عند التساوي. الطلب بلا مدة أو بلا أيام لا يُحتسب،
-     فلا يُظلم أحد بسبب صفٍّ ناقص في الملف. */
+  /* الالتزام: نسبة طلباته التي لم تتجاوز مدة الخدمة، **مرجَّحةً
+     بعددها**. فمن أنهى عشرة في موعدها أولى ممّن أنهى طلبين — ولو
+     تساوت نسبتهما الخام. والترجيح بإضافة عددٍ وسيط من الطلبات
+     بمتوسط الإدارة إلى رصيد كلٍّ منهما: قليلُ الطلبات يقترب من
+     المتوسط حتى يتراكم عنده عددٌ يدلّ عليه، وكثيرُها تدلّ نسبته
+     على نفسها. والطلب بلا مدة أو بلا أيام لا يُحتسب، فلا يُظلم
+     أحد بصفٍّ ناقص في الملف. */
   const tops = useMemo(() => {
     type Row = { name: string; photo: string; total: number; late: number; days: number };
     const by = new Map<string, Row>();
@@ -207,13 +219,24 @@ export default function Changes({
       if (c.workDays >= c.sla) r.late++;
       by.set(o.name, r);
     }
-    return [...by.values()]
-      .map((r) => ({
-        ...r,
-        pct: Math.round(((r.total - r.late) / r.total) * 100),
-        avg: r.total ? Math.round((r.days / r.total) * 10) / 10 : 0,
-      }))
-      .sort((a, b) => b.pct - a.pct || a.avg - b.avg || b.total - a.total);
+    const rows = [...by.values()];
+    const sumT = rows.reduce((n, r) => n + r.total, 0);
+    const sumOk = rows.reduce((n, r) => n + (r.total - r.late), 0);
+    const base = sumT ? sumOk / sumT : 0;            // متوسط الإدارة
+    const mids = rows.map((r) => r.total).sort((x, y) => x - y);
+    const m = Math.max(3, mids.length ? mids[Math.floor(mids.length / 2)] : 3); // وزن الترجيح
+    return rows
+      .map((r) => {
+        const ok = r.total - r.late;
+        return {
+          ...r,
+          ok,
+          raw: Math.round((ok / r.total) * 100),
+          pct: Math.round(((ok + m * base) / (r.total + m)) * 100),
+          avg: r.total ? Math.round((r.days / r.total) * 10) / 10 : 0,
+        };
+      })
+      .sort((a, b) => b.pct - a.pct || b.total - a.total || a.avg - b.avg);
   }, [items, ownerOf]);
 
   const shown = useMemo(() => {
@@ -374,7 +397,15 @@ export default function Changes({
           </div>
           <div className="cr-podium">
             {tops.slice(0, 5).map((x, i) => (
-              <div className="cr-p" key={x.name} style={{ ["--c" as string]: RANK[i].c }}>
+              <div
+                className="cr-p"
+                key={x.name}
+                style={{ ["--c" as string]: RANK[i].c }}
+                title={t(
+                  `${x.ok} من ${x.total} ضمن مدّتها (${x.raw}%) — والنسبة الظاهرة مرجَّحة بعدد الطلبات`,
+                  `${x.ok} of ${x.total} on time`,
+                )}
+              >
                 {/* شعار أداء شفافاً خلف البطاقة بدل الزخرفة */}
                 <img className="mark" src={asset("/adaa-mark.png")} alt="" aria-hidden />
                 <span className="av2">
@@ -382,8 +413,7 @@ export default function Changes({
                 </span>
                 <b>{x.name}</b>
                 <em>{x.pct}%</em>
-                <i>{t(`${x.total} طلباً · متوسط ${x.avg} يوم`, `${x.total} requests`)}</i>
-                <span className="rk">{t(RANK[i].label, RANK[i].en)}</span>
+                <span className="rk">{t(arReq(x.total), `${x.total} requests`)}</span>
               </div>
             ))}
           </div>
