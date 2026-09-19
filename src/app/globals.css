@@ -10433,13 +10433,18 @@ input.cell-date {
 .cr-p .av2 {
   width: 62px; height: 62px; border-radius: 50%; overflow: hidden; position: relative;
   display: grid; place-items: center; margin-bottom: 6px;
-  background: rgba(255, 255, 255, 0.9); color: var(--c);
+  background: #fff; color: #006f68;
   border: 3px solid rgba(255, 255, 255, 0.75);
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.16);
   font-family: "Noto Kufi Arabic", sans-serif; font-weight: 800; font-size: 22px;
 }
+/* البطاقات الفاتحة: حبرٌ داكن وإطارٌ أخضر خفيف بدل الأبيض */
+.cr-p.light { color: #1c1c1c; }
+.cr-p.light .av2 { border-color: rgba(1, 102, 94, 0.22); }
+.cr-p.light .rk { background: rgba(1, 102, 94, 0.14); }
+.cr-p.light .mark { filter: brightness(0); opacity: 0.07; }
 .cr-p .av2 img { width: 100%; height: 100%; object-fit: cover; }
-.cr-p b { position: relative; font-size: 12.5px; text-align: center; line-height: 1.6; }
+.cr-p b { position: relative; font-size: 13px; text-align: center; line-height: 1.6; }
 .cr-p em { position: relative; font-style: normal; font-size: 21px; font-weight: 800; }
 .cr-p i { position: relative; font-style: normal; font-size: 10px; opacity: 0.85; text-align: center; }
 /* شريط الترتيب أسفل البطاقة بعرضها — كما في المرجع */
