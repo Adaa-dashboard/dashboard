@@ -199,6 +199,14 @@ export default function Dashboard({ me }: { me: Me }) {
       can(k === "report" ? "weekly" : (k as Scope))
     ) || "overview";
   const [tab, setTabRaw] = useState<string>(firstTab);
+  /* المجموعة التي فيها الصفحة المفتوحة تُفتح وحدها، فلا يبحث
+     أحدٌ عن صفحته داخل عنوان مطويّ */
+  useEffect(() => {
+    const work: string[] = ["details", ...SECTION_NAV.map(([k]) => k as string)];
+    const more = ["users", "audit", "docs"];
+    setGrp((g) => (work.includes(tab) ? "work" : more.includes(tab) ? "more" : g));
+  }, [tab]);
+
   /* الرجوع داخل المنصة:
      الصفحات تبديل حالة لا انتقال روابط، فزر رجوع المتصفح كان يخرج من
      اللوحة كلها. الآن كل انتقال يضيف سجلاً في المتصفح، وسهم الرجوع
@@ -248,7 +256,9 @@ export default function Dashboard({ me }: { me: Me }) {
   const [lang, setLang] = useState<Lang>("ar");
   /* الوضع الداكن — محفوظ لكل شخص على متصفحه */
   const [dark, setDark] = useState(false);
-  const [setOpen, setSetOpen] = useState(false);
+  /* مجموعتا الشريط المنسدلتان — واحدة مفتوحة في كل مرة
+     حتى يبقى الشريط قصيراً */
+  const [grp, setGrp] = useState<"work" | "more" | null>(null);
   const t = useCallback((ar: string, en: string) => (lang === "en" ? en : ar), [lang]);
   const [pwOpen, setPwOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
@@ -452,40 +462,60 @@ export default function Dashboard({ me }: { me: Me }) {
           </div>
 
           {can("overview") && <NavItem id="overview" icon={<IconOverview />} label={["نظرة عامة", "Overview"]} />}
-          {can("details") && <NavItem id="details" icon={<IconKpi />} label={["المؤشرات التفصيلية", "KPI Details"]} />}
-
-          {/* الأقسام الخمسة — متفرّعة من المؤشرات التفصيلية */}
-          {SECTION_NAV.map(([key, Ic]) =>
-            can(key) ? (
-              <NavItem key={key} id={key} icon={<Ic size={16} />} label={SECTION_NAV_TITLE[key] ?? SECTION_TITLE[key]} small />
-            ) : null,
-          )}
-
-          {(can("tasks") || can("weekly")) && <div className="rail-sep" />}
           <NavItem id="mypage" icon={<IconFolder />} label={["محفظتي", "My portfolio"]} />
-          {/* صفحة «المهام» المستقلة لمن يُسند ويتابع: مدير الإدارة ومدير القطاع.
-              وبقية الموظفين يرون مهامهم داخل محفظتهم. */}
-          {can("tasks") && (isAdmin || me.isLead || can("tasks:all")) && (
-            <NavItem id="tasks" icon={<IconTask />} label={["المهام", "Tasks"]} />
+
+          {/* الأعمال الرئيسية — الأقسام التشغيلية كلها تحت عنوان واحد */}
+          {(can("details") || SECTION_NAV.some(([k]) => can(k))) && (
+            <>
+              <button
+                className={`nav-item ${grp === "work" ? "open" : ""}`}
+                onClick={() => setGrp(grp === "work" ? null : "work")}
+              >
+                <span className="ic">
+                  <IconKpi />
+                </span>{" "}
+                <span className="lb">{t("الأعمال الرئيسية", "Core work")}</span>{" "}
+                <span className="cv">▾</span>
+              </button>
+              <div className={`subnav ${grp === "work" ? "show" : ""}`}>
+                {SECTION_NAV.map(([key]) =>
+                  can(key) ? (
+                    <SubItem key={key} id={key} label={SECTION_NAV_TITLE[key] ?? SECTION_TITLE[key]} />
+                  ) : null,
+                )}
+                {can("details") && <SubItem id="details" label={["المؤشرات التفصيلية", "KPI Details"]} />}
+              </div>
+            </>
           )}
-          {can("weekly") && <NavItem id="report" icon={<IconWeek />} label={["الإنجاز الأسبوعي", "Weekly Achievement"]} />}
-          {can("docs") && <NavItem id="docs" icon={<IconFolder />} label={["منهجيات أداء", "Methodologies"]} />}
+
+          {/* التكاليف والمهام والإنجاز الأسبوعي: لمن يُسند ويتابع — مدير
+              الإدارة ومدير القطاع. وبقية الفريق يرون مهامهم في محفظتهم */}
+          {can("tasks") && (isAdmin || me.isLead || can("tasks:all")) && (
+            <NavItem id="tasks" icon={<IconTask />} label={["التكاليف والمهام", "Tasks"]} />
+          )}
+          {can("weekly") && (isAdmin || me.isLead) && (
+            <NavItem id="report" icon={<IconWeek />} label={["الإنجاز الأسبوعي", "Weekly Achievement"]} />
+          )}
+          {can("structure") && <NavItem id="structure" icon={<IconOrg />} label={["الهيكل التنظيمي", "Org chart"]} />}
           {can("entities") && <NavItem id="entities" icon={<IconOrg />} label={["الجهات ونقاط التواصل", "Entities"]} />}
 
           <div className="rail-gap" />
 
-          <button className={`nav-item ${setOpen ? "open" : ""}`} onClick={() => setSetOpen(!setOpen)}>
+          {/* المزيد — ما يُفتح مرةً في الشهر: الصلاحيات والسجل والمراجع
+              وتفضيلات الحساب */}
+          <button
+            className={`nav-item ${grp === "more" ? "open" : ""}`}
+            onClick={() => setGrp(grp === "more" ? null : "more")}
+          >
             <span className="ic">
               <IconSettings />
             </span>{" "}
-            <span className="lb">{t("الإعدادات", "Settings")}</span> <span className="cv">▾</span>
+            <span className="lb">{t("المزيد", "More")}</span> <span className="cv">▾</span>
           </button>
-          <div className={`subnav ${setOpen ? "show" : ""}`}>
-            {/* «محفظتي» لها بندها في القائمة أعلاه — تكرارها هنا
-                كان يجعل الصفحة الواحدة تظهر مرتين */}
+          <div className={`subnav ${grp === "more" ? "show" : ""}`}>
             {can("users") && <SubItem id="users" label={["المستخدمون والصلاحيات", "Users & Roles"]} />}
             {can("audit") && <SubItem id="audit" label={["سجل النشاط", "Activity log"]} />}
-            {can("structure") && <SubItem id="structure" label={["الهيكل التنظيمي", "Org chart"]} />}
+            {can("docs") && <SubItem id="docs" label={["منهجيات أداء", "Methodologies"]} />}
             <button className="sub-item" onClick={() => setBackupOpen(true)}>
               {t("نسخة احتياطية من البيانات", "Download backup")}
             </button>
@@ -496,11 +526,7 @@ export default function Dashboard({ me }: { me: Me }) {
               {t("اللغة", "Language")}
               <span className="lang-chip">{lang === "ar" ? "EN" : "AR"}</span>
             </button>
-            <button
-              className="sub-item"
-              onClick={() => setDark(!dark)}
-              aria-pressed={dark}
-            >
+            <button className="sub-item" onClick={() => setDark(!dark)} aria-pressed={dark}>
               {t("الوضع الداكن", "Dark mode")}
               <span className={`thm-sw ${dark ? "on" : ""}`}>
                 <i />
@@ -662,9 +688,13 @@ export default function Dashboard({ me }: { me: Me }) {
         {/* شريط التنقّل السفلي — يظهر على الجوال وحده بدل القائمة الجانبية */}
         <nav className="tabbar" aria-label={t("التنقل", "Navigation")}>
           {can("overview") && <TabBtn id="overview" icon="◱" label={["الرئيسية", "Home"]} />}
+          <TabBtn id="mypage" icon="🗂" label={["محفظتي", "Portfolio"]} />
           {can("details") && <TabBtn id="details" icon="◎" label={["مؤشرات", "KPIs"]} />}
-          {can("tasks") && <TabBtn id="tasks" icon="✓" label={["المهام", "Tasks"]} />}
-          {can("weekly") && <TabBtn id="report" icon="▤" label={["الأسبوعي", "Weekly"]} />}
+          {/* التكاليف والمهام لمن يُسند ويتابع — وبقيةُ الفريق يرون
+              مهامهم داخل محفظتهم، وبقية الصفحات في ورقة الإعدادات */}
+          {can("tasks") && (isAdmin || me.isLead || can("tasks:all")) && (
+            <TabBtn id="tasks" icon="✓" label={["التكاليف", "Tasks"]} />
+          )}
           <button
             className={`tab-btn ${sheet ? "active" : ""}`}
             onClick={() => setSheet(true)}
@@ -696,18 +726,23 @@ export default function Dashboard({ me }: { me: Me }) {
                 </div>
               </div>
             </div>
+            {/* الترتيب نفسه الذي في الشريط الجانبي، مسطَّحاً:
+                على الجوال ورقةٌ تُمرَّر، فالانسدال فيها عائق لا تنظيم */}
+            <SheetItem id="mypage" label={["محفظتي", "My portfolio"]} />
+            <div className="sheet-h">{t("الأعمال الرئيسية", "Core work")}</div>
             {SECTION_NAV.map(([key]) =>
               can(key) ? <SheetItem key={key} id={key} label={SECTION_NAV_TITLE[key] ?? SECTION_TITLE[key]} /> : null,
             )}
-            <SheetItem id="mypage" label={["محفظتي", "My portfolio"]} />
-            {/* الصفحات التي لا مكان لها في الشريط السفلي — بدونها كانت
-                تُرى على اللابتوب وحده */}
-            {can("weekly") && <SheetItem id="report" label={["الإنجاز الأسبوعي", "Weekly Achievement"]} />}
-            {can("docs") && <SheetItem id="docs" label={["منهجيات أداء", "Methodologies"]} />}
+            {can("details") && <SheetItem id="details" label={["المؤشرات التفصيلية", "KPI Details"]} />}
+            <div className="sheet-h">{t("المزيد", "More")}</div>
+            {can("weekly") && (isAdmin || me.isLead) && (
+              <SheetItem id="report" label={["الإنجاز الأسبوعي", "Weekly Achievement"]} />
+            )}
+            {can("structure") && <SheetItem id="structure" label={["الهيكل التنظيمي", "Org chart"]} />}
             {can("entities") && <SheetItem id="entities" label={["الجهات ونقاط التواصل", "Entities"]} />}
             {can("users") && <SheetItem id="users" label={["المستخدمون والصلاحيات", "Users & Roles"]} />}
             {can("audit") && <SheetItem id="audit" label={["سجل النشاط", "Activity log"]} />}
-            {can("structure") && <SheetItem id="structure" label={["الهيكل التنظيمي", "Org chart"]} />}
+            {can("docs") && <SheetItem id="docs" label={["منهجيات أداء", "Methodologies"]} />}
             <button
               className="sheet-item"
               onClick={() => {

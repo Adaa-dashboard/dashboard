@@ -2909,6 +2909,14 @@ table.matrix thead th {
     font-size: 11.5px;
     color: var(--muted);
   }
+  /* عنوان مجموعة داخل ورقة الجوال */
+  .sheet-h {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+    padding: 14px 12px 4px;
+  }
   .sheet-item {
     display: flex;
     align-items: center;
