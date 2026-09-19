@@ -20,7 +20,11 @@ type T = (ar: string, en: string) => string;
 type Contact = {
   id: string; side: string; role: string; name: string; jobTitle: string;
   email: string; phone: string; note: string; userId: string | null; userName: string;
+  /** قطاعات صاحب نقطة التواصل عندنا — للفلترة ولحقّ الاطّلاع */
+  sectorIds?: string[];
 };
+type Sector = { id: string; name: string };
+type MeLite = { id: string; sectorIds: string[]; scopes: string[] };
 /** ورقةٌ من الملف بعد قراءتها: عناوينها وصفوفها وخريطة أعمدتها */
 type Sheet = {
   name: string;
@@ -69,7 +73,9 @@ function Logo({ e }: { e: Entity }) {
   );
 }
 
-function Person({ c, t }: { c: Contact; t: T }) {
+/** البطاقة تعرض الأسماء، والتفاصيل (بريد وجوال) في نافذة البند
+    لمن يحقّ له — فلا تُنشر بيانات التواصل على الصفحة كلها */
+function Person({ c, t, full }: { c: Contact; t: T; full?: boolean }) {
   /* الملف قد يحمل أكثر من شخصين للطرف الواحد (قائد VRO · نقطة الاتصال
      · رضا المستفيد)، فالدور يُعرض كما هو لا «بديل» وحده */
   const tag = c.role && c.role !== "أساسي" ? c.role : "";
@@ -78,22 +84,92 @@ function Person({ c, t }: { c: Contact; t: T }) {
       {tag && <span className="en2-alt">{tag === "بديل" ? t("بديل", "Alternate") : tag}</span>}
       <b>{c.name || t("— بلا اسم —", "—")}</b>
       {c.jobTitle && <em>{c.jobTitle}</em>}
-      <span className="en2-w">
-        {c.email && <a href={`mailto:${c.email}`} dir="ltr">{c.email}</a>}
-        {c.phone && <a href={`tel:${c.phone}`} dir="ltr">{c.phone}</a>}
-      </span>
-      {c.note && <i>{c.note}</i>}
+      {full && (
+        <span className="en2-w">
+          {c.email && <a href={`mailto:${c.email}`} dir="ltr">{c.email}</a>}
+          {c.phone && <a href={`tel:${c.phone}`} dir="ltr">{c.phone}</a>}
+        </span>
+      )}
+      {full && c.note && <i>{c.note}</i>}
     </div>
   );
 }
 
-export default function Entities2({ t, canEdit }: { t: T; canEdit: boolean }) {
+/** تفاصيل الجهة — تُفتح بالضغط على بطاقتها */
+function EntityModal({
+  e, t, full, secNames, onClose,
+}: {
+  e: Entity; t: T; full: boolean; secNames: string[]; onClose: () => void;
+}) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" style={{ maxWidth: 620 }} onClick={(ev) => ev.stopPropagation()}>
+        <div className="m-h">
+          <h3>{e.name}</h3>
+          <button className="mx" onClick={onClose} aria-label="close">✕</button>
+        </div>
+        <div className="m-b">
+          <div className="en2-h" style={{ marginBottom: 14 }}>
+            <Logo e={e} />
+            {e.kind && <span className="en2-k">{e.kind}</span>}
+            {e.sector && <span className="en2-s">{e.sector}</span>}
+            {secNames.map((n) => (
+              <span key={n} className="en2-s">{n}</span>
+            ))}
+          </div>
+          {!full && (
+            <div className="alert alert-info" style={{ marginBottom: 12 }}>
+              {t(
+                "بيانات التواصل تظهر لمن يتولّى الجهة، أو لزملاء قطاعه، أو لصاحب صلاحية «الجهات».",
+                "Contact details are visible to the owner, their sector peers, or an entities admin.",
+              )}
+            </div>
+          )}
+          <div className="en2-two">
+            <div>
+              <div className="en2-t">{t("نقطة التواصل من المركز", "Our contact")}</div>
+              {e.ours.length
+                ? e.ours.map((c) => <Person key={c.id} c={c} t={t} full={full} />)
+                : <div className="en2-no">{t("لا يوجد — لم تُسند بعد", "None yet")}</div>}
+            </div>
+            <div>
+              <div className="en2-t">{t("نقطة التواصل من الجهة", "Their contact")}</div>
+              {e.theirs.length
+                ? e.theirs.map((c) => <Person key={c.id} c={c} t={t} full={full} />)
+                : <div className="en2-no">{t("لا يوجد", "None")}</div>}
+            </div>
+          </div>
+          {e.extra && Object.keys(e.extra).length > 0 && (
+            <div className="en2-ex" style={{ marginTop: 14 }}>
+              {Object.entries(e.extra).map(([k, v]) => (
+                <span key={k}><i>{k}</i>{v}</span>
+              ))}
+            </div>
+          )}
+          {e.note && <p className="en2-n">{e.note}</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function Entities2({
+  t,
+  canEdit,
+  me,
+}: {
+  t: T;
+  canEdit: boolean;
+  me: MeLite;
+}) {
   const [rows, setRows] = useState<Entity[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [q, setQ] = useState("");
   const [only, setOnly] = useState<"" | "ours" | "none" | "nothem">("");
   const [sector, setSector] = useState("");
   const [who, setWho] = useState("");
+  const [secs, setSecs] = useState<Sector[]>([]);
+  const [open, setOpen] = useState<Entity | null>(null);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
   const file = useRef<HTMLInputElement | null>(null);
@@ -114,6 +190,12 @@ export default function Entities2({ t, canEdit }: { t: T; canEdit: boolean }) {
     setLoaded(true);
   }, []);
   useEffect(() => { void load(); }, [load]);
+  /* قطاعات الإدارة الأربعة — لا قطاع الجهة في ملف الرفع */
+  useEffect(() => {
+    void apiFetch("/api/sectors").then((r) => r.json())
+      .then((d) => setSecs(Array.isArray(d.sectors) ? d.sectors : []))
+      .catch(() => setSecs([]));
+  }, []);
 
   const shown = useMemo(() => {
     const term = q.trim();
@@ -121,7 +203,7 @@ export default function Entities2({ t, canEdit }: { t: T; canEdit: boolean }) {
       if (only === "ours" && !e.ours.length) return false;
       if (only === "none" && e.ours.length) return false;
       if (only === "nothem" && e.theirs.length) return false;
-      if (sector && e.sector !== sector) return false;
+      if (sector && !e.ours.some((c) => (c.sectorIds || []).includes(sector))) return false;
       if (who && !e.ours.some((c) => c.name === who)) return false;
       if (!term) return true;
       const hay = [e.name, e.kind, e.sector, ...e.ours.map((c) => c.name + " " + c.jobTitle),
@@ -132,17 +214,26 @@ export default function Entities2({ t, canEdit }: { t: T; canEdit: boolean }) {
 
   const withOurs = rows.filter((e) => e.ours.length).length;
   const withTheirs = rows.filter((e) => e.theirs.length).length;
-  /* خيارات الفلترة من البيانات نفسها لا من قائمة ثابتة */
-  const sectors = useMemo(
-    () => [...new Set(rows.map((e) => e.sector).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ar")),
-    [rows],
-  );
+  /* خيارات الأسماء من البيانات نفسها لا من قائمة ثابتة */
   const whos = useMemo(
     () => [...new Set(rows.flatMap((e) => e.ours.map((c) => c.name)).filter(Boolean))]
       .sort((a, b) => a.localeCompare(b, "ar")),
     [rows],
   );
   const filtered = only !== "" || !!sector || !!who || !!q.trim();
+
+  /* بيانات التواصل لمن يتولّى الجهة، أو لزميلٍ في قطاعه، أو لصاحب
+     صلاحية «الجهات» — لا لكل من يفتح الصفحة */
+  const mySecs = new Set(me.sectorIds || []);
+  const canSee = (e: Entity) =>
+    canEdit ||
+    me.scopes.includes("users") ||
+    e.ours.some((c) => c.userId === me.id) ||
+    e.ours.some((c) => (c.sectorIds || []).some((x) => mySecs.has(x)));
+  const secNamesOf = (e: Entity) => {
+    const ids = new Set(e.ours.flatMap((c) => c.sectorIds || []));
+    return secs.filter((x) => ids.has(x.id)).map((x) => x.name);
+  };
 
   /* ما سيُحفظ — يُعاد بناؤه مع كل تعديل على الخريطة */
   const built = useMemo(() => (cur ? buildRows(cur.rowsIn, cur.map) : []), [cur]);
@@ -260,22 +351,30 @@ export default function Entities2({ t, canEdit }: { t: T; canEdit: boolean }) {
       </div>
 
       <div className="en2-bar">
-        <button className={`chip ${only === "" ? "on" : ""}`} onClick={() => setOnly("")}>
-          {t("الكل", "All")} · {rows.length}
-        </button>
-        <button className={`chip ${only === "ours" ? "on" : ""}`} onClick={() => setOnly("ours")}>
-          {t("لها نقطة تواصل عندنا", "We have a contact")} · {withOurs}
-        </button>
-        <button className={`chip ${only === "none" ? "on" : ""}`} onClick={() => setOnly("none")}>
-          {t("بلا نقطة من المركز", "No contact of ours")} · {rows.length - withOurs}
-        </button>
-        <button className={`chip ${only === "nothem" ? "on" : ""}`} onClick={() => setOnly("nothem")}>
-          {t("بلا نقطة من الجهة", "No contact of theirs")} · {rows.length - withTheirs}
-        </button>
+        {/* نقاط التواصل في قائمة واحدة: الحالات الثلاث لا تجتمع، فالشرائح
+            المتجاورة كانت توهم بأنها تتراكم */}
+        <select
+          className="en2-sel"
+          value={only}
+          onChange={(e) => setOnly(e.target.value as typeof only)}
+        >
+          <option value="">{t(`كل الجهات · ${rows.length}`, `All · ${rows.length}`)}</option>
+          <option value="ours">
+            {t(`جميع الجهات التي لديها نقطة تواصل · ${withOurs}`, `Has a contact · ${withOurs}`)}
+          </option>
+          <option value="none">
+            {t(`ليس لديها نقطة تواصل في المركز · ${rows.length - withOurs}`,
+               `No contact of ours · ${rows.length - withOurs}`)}
+          </option>
+          <option value="nothem">
+            {t(`ليس لها نقطة تواصل من الجهة · ${rows.length - withTheirs}`,
+               `No contact of theirs · ${rows.length - withTheirs}`)}
+          </option>
+        </select>
         <select className="en2-sel" value={sector} onChange={(e) => setSector(e.target.value)}>
           <option value="">{t("كل القطاعات", "All sectors")}</option>
-          {sectors.map((x) => (
-            <option key={x} value={x}>{x}</option>
+          {secs.map((x) => (
+            <option key={x.id} value={x.id}>{x.name}</option>
           ))}
         </select>
         <select className="en2-sel" value={who} onChange={(e) => setWho(e.target.value)}>
@@ -446,7 +545,13 @@ export default function Entities2({ t, canEdit }: { t: T; canEdit: boolean }) {
       ) : (
         <div className="en2-g">
           {shown.map((e) => (
-            <div className={`en2-c ${e.ours.length ? "" : "bare"}`} key={e.id}>
+            <button
+              type="button"
+              className={`en2-c ${e.ours.length ? "" : "bare"}`}
+              key={e.id}
+              onClick={() => setOpen(e)}
+              title={t("اضغط للتفاصيل", "Open details")}
+            >
               <div className="en2-h">
                 <Logo e={e} />
                 <b>{e.name}</b>
@@ -467,17 +572,21 @@ export default function Entities2({ t, canEdit }: { t: T; canEdit: boolean }) {
                     : <div className="en2-no">{t("لا يوجد", "None")}</div>}
                 </div>
               </div>
-              {e.extra && Object.keys(e.extra).length > 0 && (
-                <div className="en2-ex">
-                  {Object.entries(e.extra).map(([k, v]) => (
-                    <span key={k}><i>{k}</i>{v}</span>
-                  ))}
-                </div>
-              )}
               {e.note && <p className="en2-n">{e.note}</p>}
-            </div>
+              <span className="en2-more">{t("التفاصيل ←", "Details →")}</span>
+            </button>
           ))}
         </div>
+      )}
+
+      {open && (
+        <EntityModal
+          e={open}
+          t={t}
+          full={canSee(open)}
+          secNames={secNamesOf(open)}
+          onClose={() => setOpen(null)}
+        />
       )}
     </div>
   );
