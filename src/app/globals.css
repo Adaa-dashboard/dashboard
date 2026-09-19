@@ -1434,7 +1434,8 @@ table.matrix thead th {
   min-height: 0;
   width: 100%;
   box-sizing: border-box;
-  padding-top: 17px;
+  /* مكان القيمة فوق العمود، ومعها سُمك السطح العلوي المجسَّم */
+  padding-top: 25px;
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -1452,17 +1453,48 @@ table.matrix thead th {
   position: absolute;
   bottom: 100%;
   inset-inline: 0;
-  margin-bottom: 3px;
+  margin-bottom: 10px;
   text-align: center;
   font-size: 11.5px;
   font-weight: 800;
   color: var(--ink);
 }
+/* عمودٌ مجسَّم: الوجه الأمامي هو العمود، ويُضاف له سطحٌ علوي أفتح
+   وجانبٌ أغمق بميل ٤٥°. `background: inherit` تأخذ لون العمود نفسه
+   مهما تغيّر، و`filter` تفتحه وتغمقه — فلا لون ثالث يُدار يدوياً */
 .kb .bar {
+  position: relative;
   width: 100%;
   height: 100%;
-  border-radius: 9px 9px 3px 3px;
+  border-radius: 3px 3px 2px 2px;
   transition: filter 0.15s;
+}
+.kb .c:not(.na) .bar::before,
+.kb .c:not(.na) .bar::after {
+  content: "";
+  position: absolute;
+  background: inherit;
+  pointer-events: none;
+}
+/* السطح العلوي */
+.kb .c:not(.na) .bar::before {
+  inset-inline: 0;
+  top: -7px;
+  height: 7px;
+  transform: skewX(-45deg);
+  transform-origin: bottom left;
+  filter: brightness(1.24);
+  border-radius: 2px 2px 0 0;
+}
+/* الجانب الأيمن */
+.kb .c:not(.na) .bar::after {
+  width: 7px;
+  top: 0;
+  bottom: 0;
+  right: -7px;
+  transform: skewY(-45deg);
+  transform-origin: left top;
+  filter: brightness(0.76);
 }
 .kb .c:hover .bar {
   filter: brightness(1.08);
