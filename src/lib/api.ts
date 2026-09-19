@@ -595,12 +595,18 @@ export async function apiFetch(path: string, init: Init = {}) {
         };
         (String(c.side) === "نحن" ? by.get(k)!.ours : by.get(k)!.theirs).push(row);
       }
+      /* الأساسي أولاً ثم بقية الأدوار بترتيبها، والبديل في الآخر —
+         صفوف الجدول تأتي بلا ترتيب، فكان البديل يظهر فوق الأساسي */
+      const rank = (r: unknown) => (r === "أساسي" ? 0 : r === "بديل" ? 2 : 1);
+      const ordered = (a: Record<string, unknown>[]) =>
+        [...a].sort((x, y) => rank(x.role) - rank(y.role));
       return ok({
         entities: (ents.data || []).map((e: Record<string, unknown>) => ({
           id: String(e.id), name: String(e.name || ""), kind: String(e.kind || ""),
           sector: String(e.sector || ""), note: String(e.note || ""),
           extra: (e.extra || {}) as Record<string, string>,
-          ours: by.get(String(e.id))?.ours || [], theirs: by.get(String(e.id))?.theirs || [],
+          ours: ordered(by.get(String(e.id))?.ours || []),
+          theirs: ordered(by.get(String(e.id))?.theirs || []),
         })),
       });
     }
