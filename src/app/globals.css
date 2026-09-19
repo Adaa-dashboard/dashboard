@@ -10369,6 +10369,10 @@ input.cell-date {
 .en-reg-l { display: block; font-size: 10.5px; font-weight: 700; color: var(--muted); margin: 7px 0 3px; }
 /* قطاع الجهة ونوعها تحت اسمها، ومن زاد من نقاط تواصلها يُسرد بعدها */
 .en-reg-s { font-size: 10.5px; color: var(--muted); }
+/* «نظرة عامة» تعرض بنود الشهر — سطرٌ يقول كم بقي في الصفحة */
+.tb-scope {
+  font-size: 11.5px; color: var(--muted); margin: -4px 0 12px;
+}
 /* دوري في الجهة: البديل يُعلَّم، والأساسي هو الأصل فلا يحتاج علامة */
 .en-reg-c .en-reg-b {
   /* `.en-reg-c span` أقوى من صنفٍ مفرد وتجعل كل span كتلةً،

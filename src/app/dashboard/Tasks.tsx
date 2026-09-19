@@ -65,6 +65,14 @@ function columnOf(t: Task, withWeek = true): "done" | "hold" | "late" | "week" |
   return "main";
 }
 
+/** بند هذا الشهر: موعده في الشهر الجاري، أو مضى موعده ولم يُغلق —
+    فالمتأخر شأن اليوم لا شأن الشهر الماضي، ولا يختفي من «نظرة عامة» */
+function thisMonth(t: Task): boolean {
+  const d = String(t.dueDate || "");
+  if (d.slice(0, 7) === todayISO().slice(0, 7)) return true;
+  return t.state !== "done" && t.state !== "hold" && !!d && d < todayISO();
+}
+
 function leftText(t: Task): string {
   if (t.state === "done") return "اكتملت";
   if (t.state === "hold") return "معلَّقة";
@@ -83,6 +91,7 @@ export default function Tasks({
   t,
   kind = "task",
   limit = 0,
+  monthOnly = false,
   onlyMine = false,
   focusId,
   onFocusDone,
@@ -94,6 +103,8 @@ export default function Tasks({
   kind?: Kind;
   /** أعلى عدد بطاقات في كل عمود قبل «عرض الكل» — 0 = بلا حدّ */
   limit?: number;
+  /** «نظرة عامة»: هذا الشهر وحده — والبقية في صفحة التكاليف والمهام */
+  monthOnly?: boolean;
   /** يرى ما أُسند إليه أو ما أنشأه وحده — ما لم يُمنح «كل المهام» */
   onlyMine?: boolean;
   /** فتح بند بعينه مباشرة (قادم من زر «عرض» في آخر التحديثات) */
@@ -207,8 +218,12 @@ export default function Tasks({
     [people]
   );
 
+  /* «نظرة عامة» تعرض بنود الشهر، والصفحة تعرض كل شيء — والمحفوظ
+     واحد لا يُمسّ: الفرق في العرض لا في البيانات */
+  const scoped = useMemo(() => (monthOnly ? tasks.filter(thisMonth) : tasks), [tasks, monthOnly]);
+
   const cols = useMemo(() => {
-    const src = onlyDone ? tasks.filter((x) => x.state === "done") : tasks;
+    const src = onlyDone ? scoped.filter((x) => x.state === "done") : scoped;
     const g: Record<string, Task[]> = { main: [], week: [], late: [], hold: [], done: [] };
     for (const x of src) g[columnOf(x, !asg)].push(x);
     g.main.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
@@ -217,7 +232,7 @@ export default function Tasks({
     g.hold.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
     g.done.sort((a, b) => (b.completedAt || "").localeCompare(a.completedAt || ""));
     return g;
-  }, [tasks, onlyDone, asg]);
+  }, [scoped, onlyDone, asg]);
 
   async function saveReply(task: Task, updateId: string, text: string) {
     const r = await apiFetch(`/api/tasks/${task.id}`, {
@@ -316,10 +331,10 @@ export default function Tasks({
       <div className="toolbar">
         <div className="chips">
           <button className={`chip ${!onlyDone ? "on" : ""}`} onClick={() => setOnlyDone(false)}>
-            {t("الكل", "All")} · {tasks.length}
+            {t("الكل", "All")} · {scoped.length}
           </button>
           <button className={`chip ${onlyDone ? "on" : ""}`} onClick={() => setOnlyDone(true)}>
-            {t("المكتملة", "Completed")} · {tasks.filter((x) => x.state === "done").length}
+            {t("المكتملة", "Completed")} · {scoped.filter((x) => x.state === "done").length}
           </button>
         </div>
         <div style={{ flex: 1 }} />
@@ -341,12 +356,23 @@ export default function Tasks({
 
       {err && <div className="alert alert-error">{err}</div>}
 
+      {monthOnly && loaded && tasks.length > scoped.length && (
+        <div className="tb-scope">
+          {t(
+            `تُعرض بنود هذا الشهر — ${scoped.length} من ${tasks.length}. البقية في صفحة «التكاليف والمهام».`,
+            `Showing this month — ${scoped.length} of ${tasks.length}.`,
+          )}
+        </div>
+      )}
+
       {!loaded ? (
         <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>
-      ) : tasks.length === 0 ? (
+      ) : scoped.length === 0 ? (
         <div className="soon">
-          <b>{L.none}</b>
-          {L.hint}
+          <b>{monthOnly && tasks.length ? t("لا شيء في هذا الشهر", "Nothing this month") : L.none}</b>
+          {monthOnly && tasks.length
+            ? t(`${tasks.length} بنداً في صفحة «التكاليف والمهام».`, `${tasks.length} in the tasks page.`)
+            : L.hint}
         </div>
       ) : (
         <div className="tboard" style={{ ["--tcols" as string]: COLS.length }}>
@@ -402,7 +428,7 @@ export default function Tasks({
         </div>
       )}
 
-      {limit > 0 && tasks.length > 0 && (
+      {limit > 0 && scoped.length > 0 && (
         (() => {
           const hidden = (["main", "week", "late", "hold", "done"] as const)
             .filter((k) => COLS.some((c) => c.key === k))
