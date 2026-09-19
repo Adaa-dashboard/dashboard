@@ -60,8 +60,6 @@ import {
 } from "./icons";
 import WeeklyPanel from "./WeeklyPanel";
 import Details from "./Details";
-import { LineChart, Line as ChartLine, SECTOR_STYLES } from "./Charts";
-import { latestYear, quarterlySeries, sectorSeries, yearlySeries } from "@/lib/analytics";
 import { useRouter } from "next/navigation";
 import { evaluate, fmtValue, fmtNum, bandOf, tint, Band, DEFAULT_BANDS } from "@/lib/calc";
 
@@ -1024,30 +1022,9 @@ function Overview({
   }
 
   // ===== السلاسل الزمنية للأداء العام وللقطاعات =====
-  const year = useMemo(() => latestYear(measurements, refData.periods), [measurements, refData.periods]);
-  const [range, setRange] = useState<"quarter" | "year">("quarter");
   const targetOf = useCallback(
     (sectorId: string, indicatorId: string) => tgtAnnual(refData, tkey(sectorId, indicatorId)),
     [refData]
-  );
-
-  const overallSeries = useMemo(
-    () =>
-      range === "quarter"
-        ? quarterlySeries(measurements, refData.periods, year, targetOf)
-        : yearlySeries(measurements, refData.periods, targetOf),
-    [measurements, refData.periods, year, targetOf, range]
-  );
-
-  const sectorLines: ChartLine[] = useMemo(
-    () =>
-      sectors.map((s, i) => ({
-        name: s.name,
-        color: SECTOR_STYLES[i % SECTOR_STYLES.length].color,
-        dash: SECTOR_STYLES[i % SECTOR_STYLES.length].dash,
-        points: sectorSeries(measurements, refData.periods, s.id, range, year, targetOf),
-      })),
-    [sectors, measurements, refData.periods, range, year, targetOf]
   );
 
   /* عنوان قسم قابل للطيّ — السهم يخفي محتواه ويبقى العنوان.
@@ -1088,17 +1065,6 @@ function Overview({
       </>
     );
   }
-
-  const rangeTabs = (
-    <span className="vtabs">
-      <button className={`vtab ${range === "quarter" ? "on" : ""}`} onClick={() => setRange("quarter")}>
-        {year}
-      </button>
-      <button className={`vtab ${range === "year" ? "on" : ""}`} onClick={() => setRange("year")}>
-        {t("كل السنوات", "All years")}
-      </button>
-    </span>
-  );
 
   return (
     <div>
@@ -1289,15 +1255,8 @@ function Overview({
         </Sec>
       )}
 
-      <Sec id="sectors" title={t("الأداء العام للقطاعات", "Sector performance")} chips={rangeTabs}>
-        <div className="card" style={{ marginBottom: 22 }}>
-          <LineChart
-            lines={sectorLines}
-            labels={(sectorLines[0]?.points || []).map((p) => p.label)}
-            emptyText={t("لا توجد قياسات كافية لرسم مسارات القطاعات بعد.", "Not enough measurements yet.")}
-          />
-        </div>
-      </Sec>
+      {/* «الأداء العام» ومسارات القطاعات أُزيلت كلها — صفحة «نظرة عامة»
+          صارت تبدأ بحالة المؤشرات وتنتهي بملخّصات الأقسام */}
 
     </div>
   );
