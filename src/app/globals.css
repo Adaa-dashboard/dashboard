@@ -41,8 +41,10 @@
   --dgr-tx: #a83232;
   --on-rail: #ffffff;   /* البند المحدَّد داخل الشريط الجانبي */
   /* إطار اللوحة: خلفية داكنة يطفو فوقها الشريط ولوحة المحتوى */
-  --frame: #0d2c22;
-  --rail-bg: #15503d;
+  /* الإطار بلون الشريط نفسه، والشريط شريحة شفافة فوقه
+     فيبدوان أخضر واحداً بدرجتين */
+  --frame: #144a39;
+  --rail-bg: rgba(255, 255, 255, 0.055);
 
   /* الأخضر حين يكون نصاً لا خلفية — يفتحُ في الوضع الداكن وحده،
      بينما تبقى الخلفيات الخضراء داكنة في الوضعين */
@@ -87,8 +89,8 @@
   --dgr-bd: #5c2c2c;
   --dgr-tx: #f0a3a3;
   --on-rail: #d8ece7;
-  --frame: #060d0c;
-  --rail-bg: #12302a;
+  --frame: #0e2a24;
+  --rail-bg: rgba(255, 255, 255, 0.05);
 
   --shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
   --glow: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 10px 26px rgba(0, 0, 0, 0.45);
@@ -1070,14 +1072,14 @@ table.matrix thead th {
 .shell {
   display: flex;
   min-height: 100vh;
-  /* الشريط ولوحة المحتوى لوحتان مستديرتان تطفوان فوق إطار داكن */
+  /* لوحة المحتوى تملأ ارتفاع الإطار، والشريط وحده شريحة مُزاحة داخله */
   background: var(--frame);
-  padding: 14px;
+  padding: 0;
   gap: 0;
 }
 
 .rail {
-  flex: 0 0 250px;
+  flex: 0 0 214px;
   background: var(--rail-bg);
   padding: 26px 13px;
   display: flex;
@@ -1320,11 +1322,12 @@ table.matrix thead th {
   flex: 1;
   min-width: 0;
   background: var(--bg);
-  border-radius: 26px;
-  /* تندسّ تحت الشريط بمقدار انحناء زاويته فلا يظهر بينهما فاصل */
-  margin-inline-end: -26px;
+  /* مستديرة من جهة الشريط وحدها — وتبدأ من أعلى الإطار وتنتهي بأسفله.
+     ملاصقة للشريط بلا هامش سالب: الهامش السالب على جهة المحتوى كان
+     يُخرجها عن الشاشة فيظهر تمرير أفقي */
+  border-start-start-radius: 26px;
+  border-end-start-radius: 26px;
   padding: 24px 30px 40px;
-  padding-inline-end: 56px;
   /* مرجع الملاحظات اللاصقة: مواضعها نسبةٌ من هذه المساحة */
   position: relative;
 }
@@ -4671,13 +4674,16 @@ table.matrix thead th {
   transition: flex-basis 0.18s ease;
   /* الزوايا الداخلية مستديرة، والتمرير انتقل إلى .rail-in
      حتى لا يُقتطع زر الطيّ المعلَّق على الحافة */
-  border-radius: 26px;
+  border-radius: 24px;
   overflow: visible;
   padding: 0;
   z-index: 2;
-  top: 14px;
-  height: calc(100vh - 28px);
-  height: calc(100dvh - 28px);
+  top: 13px;
+  margin-block: 13px;
+  margin-inline-start: 13px;
+  margin-inline-end: 0;
+  height: calc(100vh - 26px);
+  height: calc(100dvh - 26px);
 }
 .rail-in {
   height: 100%;
