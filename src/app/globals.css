@@ -1400,6 +1400,7 @@ table.matrix thead th {
    ============================================================ */
 .kb {
   display: flex;
+  min-width: 0;
   align-items: flex-end;
   gap: 10px;
   flex: 1;
@@ -1487,6 +1488,9 @@ table.matrix thead th {
 .ov-top > .card {
   display: flex;
   flex-direction: column;
+  /* بدونها يتمدّد عنصر الشبكة بعرض محتواه فيدفع الصفحة كلها
+     أفقياً بدل أن تمرّر الأعمدة داخل بطاقتها */
+  min-width: 0;
 }
 .ov-top > .card > .chart-wrap {
   flex: 1;
@@ -2834,6 +2838,20 @@ table.matrix thead th {
   .rail {
     display: none;
   }
+  /* أعمدة المؤشرات تبقى أعمدةً على الجوال — بعرضٍ أدنى لكل عمود
+     وتمريرٍ أفقي، وإلا انضغطت أسماؤها إلى حرفين */
+  .kb {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+  }
+  .kb .c {
+    flex: 0 0 66px;
+  }
+  .kb .lb {
+    height: 52px;
+    font-size: 9.5px;
+  }
+
   .shell {
     display: block;
     /* لا شريط جانبي على الجوال ⇒ لا إطار حوله */
