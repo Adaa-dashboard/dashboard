@@ -72,6 +72,18 @@ export default function Activity({
     load();
   }, [load]);
 
+  /* «تختفي بعد ما أشوفها»: تُعلَّم مقروءةً بعد أربع ثوانٍ على الشاشة،
+     وتبقى ظاهرة في هذه الزيارة (اختفاؤها تحت عين قارئها مربك)،
+     فإذا عاد لم يجد إلا الجديد. والقديم يبقى خلف «التحديثات السابقة». */
+  useEffect(() => {
+    if (!loaded || unread === 0) return;
+    const id = setTimeout(() => {
+      void apiFetch("/api/activity", { method: "POST" }).catch(() => {});
+      setUnread(0);
+    }, 4000);
+    return () => clearTimeout(id);
+  }, [loaded, unread]);
+
   async function toggle() {
     const next = !open;
     setOpen(next);
@@ -82,8 +94,10 @@ export default function Activity({
   }
 
   const SHOW = 4;
-  const shown = open ? items : items.slice(0, SHOW);
-  const rest = Math.max(0, items.length - SHOW);
+  /* الافتراضي: الجديد وحده. والسابق يُفتح بزرٍّ صريح */
+  const fresh = items.filter((x) => x.unread);
+  const shown = open ? items : fresh.slice(0, SHOW);
+  const rest = Math.max(0, items.length - shown.length);
 
   return (
     <div className={`card upcard ${open ? "open" : ""}`}>
@@ -121,6 +135,15 @@ export default function Activity({
         <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>
       ) : items.length === 0 ? (
         <div className="empty">{t("لا توجد تحديثات بعد.", "No updates yet.")}</div>
+      ) : shown.length === 0 ? (
+        <>
+          <div className="empty">{t("لا جديد منذ آخر اطّلاعك.", "Nothing new since your last visit.")}</div>
+          {rest > 0 && (
+            <div className="up-more" onClick={toggle}>
+              {t("عرض التحديثات السابقة ▾", "Show earlier updates ▾")}
+            </div>
+          )}
+        </>
       ) : (
         <>
           <div className="feed">
@@ -152,10 +175,7 @@ export default function Activity({
           </div>
           {!open && rest > 0 && (
             <div className="up-more" onClick={toggle}>
-              {t(
-                rest === 1 ? "عرض تحديث آخر ▾" : rest === 2 ? "عرض تحديثين آخرين ▾" : `عرض ${rest} تحديثات أخرى ▾`,
-                `Show ${rest} more ▾`
-              )}
+              {t("عرض التحديثات السابقة ▾", "Show earlier updates ▾")}
             </div>
           )}
         </>
