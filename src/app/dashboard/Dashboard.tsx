@@ -453,7 +453,7 @@ export default function Dashboard({ me }: { me: Me }) {
           </button>
           {/* علامة أداء كبيرة باهتة أسفل الشريط — خلف البنود لا فوقها */}
           <div className="rail-wm-wrap" aria-hidden="true">
-            <img className="rail-wm" src={asset("/adaa-logo.png")} alt="" />
+            <img className="rail-wm" src={asset("/adaa-mark.png")} alt="" />
           </div>
           <div className="rail-in">
           <div className="rail-brand">
