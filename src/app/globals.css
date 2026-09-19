@@ -1395,6 +1395,88 @@ table.matrix thead th {
 /* ============================================================
    نظرة عامة — الرسوم وشرائح الحالة وآخر التحديثات
    ============================================================ */
+/* ============================================================
+   أعمدة حالة المؤشرات في «نظرة عامة»
+   ============================================================ */
+.kb {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex: 1;
+  min-height: 210px;
+  padding: 12px 2px 0;
+  border-bottom: 1px solid var(--border);
+}
+.kb .c {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  height: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+.kb .v {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.kb .bar {
+  width: 100%;
+  max-width: 52px;
+  border-radius: 9px 9px 3px 3px;
+  transition: filter 0.15s;
+}
+.kb .c:hover .bar {
+  filter: brightness(1.08);
+}
+.kb .lb {
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--muted);
+  text-align: center;
+  /* ارتفاع ثابت: الأسماء تختلف أطوالاً فتتفاوت قواعد الأعمدة بدونه */
+  height: 42px;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+/* المؤشر بلا قياس: عمود مخطَّط قصير، لا فراغ */
+.kb .c.na .v {
+  color: var(--muted);
+}
+.kb .c.na .bar {
+  height: 10px;
+  background: repeating-linear-gradient(45deg, var(--soft), var(--soft) 5px, var(--border) 5px, var(--border) 10px);
+}
+.kb-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 10px;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.kb-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.kb-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  display: inline-block;
+}
+.kb-legend i.na {
+  background: var(--border);
+}
+
 .ov-top {
   display: grid;
   grid-template-columns: 1fr 1fr;
