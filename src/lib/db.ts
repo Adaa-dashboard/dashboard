@@ -100,7 +100,7 @@ export interface Measurement {
 
 /* ===== المهام والتكليفات ===== */
 export type TaskPriority = "high" | "mid";
-export type TaskState = "ok" | "risk" | "done";
+export type TaskState = "ok" | "risk" | "hold" | "done";
 
 export interface TaskUpdate {
   id: string;
@@ -843,7 +843,12 @@ export async function updateTask(
   const db = await getDB();
   const task = db.tasks.find((t) => t.id === id);
   if (!task) return undefined;
-  if (patch.state === "ok" || patch.state === "risk" || patch.state === "done") {
+  if (
+    patch.state === "ok" ||
+    patch.state === "risk" ||
+    patch.state === "hold" ||
+    patch.state === "done"
+  ) {
     task.state = patch.state;
     task.completedAt = patch.state === "done" ? new Date().toISOString() : undefined;
   }

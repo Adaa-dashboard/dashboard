@@ -994,7 +994,11 @@ function answer(q0: string, c: Ctx): Ans {
       (x) => txt(x.createdById) === c.me.id && txt(x.assigneeId) !== c.me.id,
     );
     const outLate = mineOut
-      .filter((x) => x.state !== "done" && txt(x.dueDate) && daysTo(txt(x.dueDate)) < 0)
+      /* المعلَّقة موقوفة بانتظار غيرها، فمضيّ موعدها ليس تأخّراً من أحد */
+      .filter(
+        (x) =>
+          x.state !== "done" && x.state !== "hold" && txt(x.dueDate) && daysTo(txt(x.dueDate)) < 0,
+      )
       .sort((a, b) => daysTo(txt(a.dueDate)) - daysTo(txt(b.dueDate)));
 
     /* الاجتماعات الربعية — الأسوأ تغطيةً أولاً، فهو ما يحتاج تدخّلاً */

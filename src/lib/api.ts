@@ -385,7 +385,8 @@ export async function apiFetch(path: string, init: Init = {}) {
             due_date: x.dueDate,
             indicator_id: null,
             kind: x.kind === "assignment" ? "assignment" : "task",
-            state: x.state === "done" ? "done" : x.state === "risk" ? "risk" : "ok",
+            state:
+          x.state === "done" ? "done" : x.state === "risk" ? "risk" : x.state === "hold" ? "hold" : "ok",
             updates: Array.isArray(x.updates) ? x.updates : [],
             created_by_id: String(x.createdById || ""),
             completed_at: x.state === "done" ? new Date().toISOString() : null,
@@ -423,7 +424,8 @@ export async function apiFetch(path: string, init: Init = {}) {
         due_date: x.dueDate,
         indicator_id: x.indicatorId || null,
         kind: x.kind === "assignment" ? "assignment" : "task",
-        state: x.state === "done" ? "done" : x.state === "risk" ? "risk" : "ok",
+        state:
+          x.state === "done" ? "done" : x.state === "risk" ? "risk" : x.state === "hold" ? "hold" : "ok",
         updates: Array.isArray(x.updates) ? x.updates : [],
         created_by_id: String(x.createdById || ""),
         created_at: x.createdAt || new Date().toISOString(),
@@ -469,6 +471,9 @@ export async function apiFetch(path: string, init: Init = {}) {
         }
         const patch: Record<string, unknown> = { updates };
         if (body.state) {
+          // الحالات الأربع لا غيرها — قيد القاعدة يرفض ما عداها برسالة غامضة
+          if (!["ok", "risk", "hold", "done"].includes(String(body.state)))
+            return err("حالة غير معروفة", 400);
           patch.state = body.state;
           patch.completed_at = body.state === "done" ? new Date().toISOString() : null;
         }

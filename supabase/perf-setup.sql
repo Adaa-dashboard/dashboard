@@ -349,7 +349,7 @@ create table if not exists public.perf_tasks (
   assignee_id text not null,
   priority text not null default 'mid' check (priority in ('high','mid')),
   due_date date not null, indicator_id text,
-  state text not null default 'ok' check (state in ('ok','risk','done')),
+  state text not null default 'ok' check (state in ('ok','risk','hold','done')),
   updates jsonb not null default '[]'::jsonb,
   created_by_id text, created_at timestamptz not null default now(),
   completed_at timestamptz

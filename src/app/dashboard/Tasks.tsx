@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { IconReply } from "./icons";
 import { publishUndo } from "@/lib/undoBus";
 
-type State = "ok" | "risk" | "done";
+type State = "ok" | "risk" | "hold" | "done";
 type Priority = "high" | "mid";
 
 type Kind = "task" | "assignment";
@@ -33,6 +33,8 @@ type Indicator = { id: string; name: string };
 const STATE_COLOR: Record<State | "late", string> = {
   ok: "#1a9d5c",
   risk: "#e0971a",
+  /* المعلَّقة رصاصية: موقوفة بانتظار غيرها، فلا هي متأخرة ولا على المسار */
+  hold: "#8b96a0",
   done: "#8a9a95",
   late: "#d34a4a",
 };
@@ -50,11 +52,13 @@ function arDays(n: number) {
   return `${n} يومًا`;
 }
 
-/** العمود الذي يقع فيه البند: مكتمل · متأخر · هذا الأسبوع · البقية.
+/** العمود الذي يقع فيه البند: مكتمل · معلَّق · متأخر · هذا الأسبوع · البقية.
     التكاليف بلا عمود «هذا الأسبوع»، فما يقع فيه يذهب للعمود الأول
     وإلا اختفى من اللوحة تماماً. */
-function columnOf(t: Task, withWeek = true): "done" | "late" | "week" | "main" {
+function columnOf(t: Task, withWeek = true): "done" | "hold" | "late" | "week" | "main" {
   if (t.state === "done") return "done";
+  /* المعلَّق قبل حساب التأخير: موعده مضى لأنه موقوف، لا لأن أحداً تأخّر عنه */
+  if (t.state === "hold") return "hold";
   const d = daysBetween(t.dueDate, todayISO());
   if (d < 0) return "late";
   if (withWeek && d <= 7) return "week";
@@ -63,6 +67,7 @@ function columnOf(t: Task, withWeek = true): "done" | "late" | "week" | "main" {
 
 function leftText(t: Task): string {
   if (t.state === "done") return "اكتملت";
+  if (t.state === "hold") return "معلَّقة";
   const d = daysBetween(t.dueDate, todayISO());
   if (d < 0) return `متأخرة ${arDays(-d)}`;
   if (d === 0) return "تنتهي اليوم";
@@ -204,11 +209,12 @@ export default function Tasks({
 
   const cols = useMemo(() => {
     const src = onlyDone ? tasks.filter((x) => x.state === "done") : tasks;
-    const g: Record<string, Task[]> = { main: [], week: [], late: [], done: [] };
+    const g: Record<string, Task[]> = { main: [], week: [], late: [], hold: [], done: [] };
     for (const x of src) g[columnOf(x, !asg)].push(x);
     g.main.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     g.week.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
     g.late.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+    g.hold.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
     g.done.sort((a, b) => (b.completedAt || "").localeCompare(a.completedAt || ""));
     return g;
   }, [tasks, onlyDone, asg]);
@@ -284,7 +290,12 @@ export default function Tasks({
     load();
   }
 
-  const ALL_COLS: { key: "main" | "week" | "late" | "done"; title: string; hint: string; color: string }[] = [
+  const ALL_COLS: {
+    key: "main" | "week" | "late" | "hold" | "done";
+    title: string;
+    hint: string;
+    color: string;
+  }[] = [
     { key: "main", title: L.many, hint: t("الأحدث أولاً", "Newest first"), color: "#016b5f" },
     {
       key: "week",
@@ -293,6 +304,12 @@ export default function Tasks({
       color: "#e0971a",
     },
     { key: "late", title: t("المتأخرة", "Overdue"), hint: t("تجاوزت موعدها", "Past due"), color: "#d34a4a" },
+    {
+      key: "hold",
+      title: t("المعلقة", "On hold"),
+      hint: t("موقوفة بانتظار غيرها", "Paused, waiting on others"),
+      color: STATE_COLOR.hold,
+    },
     { key: "done", title: t("المكتملة", "Completed"), hint: t("أُغلقت", "Closed"), color: "#5aaba2" },
   ];
   // التكاليف ترد من جهة أعلى ومواعيدها معلومة، فعمود «هذا الأسبوع» زائد فيها
@@ -336,7 +353,7 @@ export default function Tasks({
           {L.hint}
         </div>
       ) : (
-        <div className="tboard">
+        <div className="tboard" style={{ ["--tcols" as string]: COLS.length }}>
           {COLS.map((c) => (
             <div className="tcol" key={c.key}>
               <div className="tcol-h">
@@ -346,7 +363,8 @@ export default function Tasks({
               </div>
               <div className="tcol-s">{c.hint}</div>
               {(limit && !showAll ? cols[c.key].slice(0, limit) : cols[c.key]).map((x) => {
-                const late = columnOf(x, !asg) === "late";
+                const col0 = columnOf(x, !asg);
+                const late = col0 === "late";
                 const col = late ? STATE_COLOR.late : STATE_COLOR[x.state];
                 return (
                   <button
@@ -372,9 +390,11 @@ export default function Tasks({
                           ? t("متأخرة", "Overdue")
                           : x.state === "done"
                             ? t("مكتملة", "Done")
-                            : x.state === "risk"
-                              ? t("فيها تحدٍ", "At risk")
-                              : t("على المسار", "On track")}
+                            : x.state === "hold"
+                              ? t("معلقة", "On hold")
+                              : x.state === "risk"
+                                ? t("فيها تحدٍ", "At risk")
+                                : t("على المسار", "On track")}
                       </span>
                     </span>
                   </button>
@@ -387,7 +407,7 @@ export default function Tasks({
 
       {limit > 0 && tasks.length > 0 && (
         (() => {
-          const hidden = (["main", "week", "late", "done"] as const)
+          const hidden = (["main", "week", "late", "hold", "done"] as const)
             .filter((k) => COLS.some((c) => c.key === k))
             .reduce((n, k) => n + Math.max(0, cols[k].length - limit), 0);
           if (!hidden && !showAll) return null;
@@ -493,9 +513,15 @@ function TaskDetail({
             <>
               <label>{t("الحالة", "Status")}</label>
               <div className="segs">
-                {(["ok", "risk", "done"] as State[]).map((s) => (
+                {(["ok", "risk", "hold", "done"] as State[]).map((s) => (
                   <button key={s} className={`sg ${state === s ? "on" : ""}`} onClick={() => setState(s)}>
-                    {s === "ok" ? t("على المسار", "On track") : s === "risk" ? t("فيها تحدٍ", "At risk") : t("مكتملة", "Done")}
+                    {s === "ok"
+                      ? t("على المسار", "On track")
+                      : s === "risk"
+                        ? t("فيها تحدٍ", "At risk")
+                        : s === "hold"
+                          ? t("معلقة", "On hold")
+                          : t("مكتملة", "Done")}
                   </button>
                 ))}
               </div>

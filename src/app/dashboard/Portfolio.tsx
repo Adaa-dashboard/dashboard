@@ -290,7 +290,7 @@ type Task = {
 };
 
 function dueTone(d: string, state: string) {
-  if (state === "done") return "";
+  if (state === "done" || state === "hold") return "";
   if (!d) return "";
   const days = Math.round((new Date(d).getTime() - Date.now()) / 86400000);
   return days < 0 ? "r" : days <= 2 ? "a" : "";
@@ -339,6 +339,8 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
      التقسيم بالحالة، والشرائح فوقه تقسّم بالمصدر — فلا يتكرر المعنى. */
   const colOf = (x: Task): "open" | "late" | "done" => {
     if (x.state === "done") return "done";
+    /* المعلَّقة ليست متأخرة: موعدها مضى لأنها موقوفة */
+    if (x.state === "hold") return "open";
     const d = x.dueDate
       ? Math.round((new Date(x.dueDate).getTime() - new Date(new Date().toISOString().slice(0, 10)).getTime()) / 86400000)
       : 99;
