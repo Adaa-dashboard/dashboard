@@ -1308,7 +1308,11 @@ function Overview({
 
       {hasScope(me.scopes, "changes") && (
         <Sec id="changes" title={t("طلبات التغيير", "Change requests")}>
-          <Changes t={t} canEdit={hasScope(me.scopes, "changes:upload")} />
+          <Changes
+            t={t}
+            canEdit={hasScope(me.scopes, "changes:upload")}
+            canLink={hasScope(me.scopes, "changes:upload") || hasScope(me.scopes, "entities:edit")}
+          />
         </Sec>
       )}
 
