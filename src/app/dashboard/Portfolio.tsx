@@ -1188,12 +1188,15 @@ function Tile({
 /* ---------------- نافذة جهاتي ---------------- */
 function EntitiesModal({
   rows,
+  reg,
   t,
   onClose,
   onSave,
   onDelete,
 }: {
   rows: Row[];
+  reg: { entityId: string; name: string; sector: string; myContactId: string;
+         ours?: { id?: string; name?: string; role?: string }[] }[];
   t: T;
   onClose: () => void;
   onSave: (id: string, data: Rec) => void;
@@ -1208,12 +1211,35 @@ function EntitiesModal({
         <div className="m-h">
           <h3>{t("جهاتي", "My entities")}</h3>
           <span className="cnt2">
-            {rows.length} {t("جهة", "entities")}
+            {new Set([
+              ...rows.map((r) => txt(r.data.name).trim()).filter(Boolean),
+              ...reg.map((x) => x.name.trim()).filter(Boolean),
+            ]).size}{" "}
+            {t("جهة", "entities")}
           </span>
           <button className="mx" onClick={onClose} aria-label="close">
             ✕
           </button>
         </div>
+        {reg.length > 0 && (
+          <div className="erow2-h">
+            <b>{t("من سجلّ المركز — مسندة إليك", "From the registry")}</b>
+            <span>{t("تُعدَّل من صفحة «الجهات ونقاط التواصل»", "Edited in the registry page")}</span>
+          </div>
+        )}
+        {reg.map((x) => {
+          const mineC = (x.ours || []).find((c) => c.id === x.myContactId);
+          const role = (mineC?.role || "أساسي").trim();
+          return (
+            <div className="erow2" key={x.entityId}>
+              <span className="n">
+                {role !== "أساسي" && <i className="erow2-b">{role}</i>}
+                {x.name}
+                <em>{x.sector}</em>
+              </span>
+            </div>
+          );
+        })}
         <div>
           {rows.map((r) => (
             <div className="erow2" key={r.id}>
@@ -1811,14 +1837,28 @@ export default function Portfolio({
   }, [prefs.custom, prefs.look]);
 
   const entities = pf.of("entities");
-  /* جهات السجلّ المسندة إليّ — البطاقة تعدّها مع جهات المحفظة،
-     فالعدد يوافق ما تراه داخل المربّع لا نصفه */
-  const [regNames, setRegNames] = useState<string[]>([]);
+  /* جهات السجلّ المسندة إليّ — تُعدّ مع جهات المحفظة في كل رقم
+     يظهر للمستخدم، فالعدد يوافق ما يراه داخل المربّع لا نصفه */
+  type RegRow = {
+    entityId: string; name: string; kind: string; sector: string;
+    myContactId: string; ours?: { id?: string; name?: string; role?: string }[];
+  };
+  const [reg, setReg] = useState<RegRow[]>([]);
   useEffect(() => {
     void apiFetch("/api/entities/mine").then((r) => r.json())
-      .then((d) => setRegNames(Array.isArray(d.mine) ? d.mine.map((x: Rec) => String(x.name || "")) : []))
-      .catch(() => setRegNames([]));
+      .then((d) => setReg(Array.isArray(d.mine) ? (d.mine as RegRow[]) : []))
+      .catch(() => setReg([]));
   }, []);
+  const regNames = useMemo(() => reg.map((x) => String(x.name || "")), [reg]);
+  /* العدّ الموحَّد: جهات السجلّ + جهات المحفظة بلا تكرار الاسم */
+  const entCount = useMemo(
+    () =>
+      new Set([
+        ...entities.map((r) => String(r.data.name || "").trim()).filter(Boolean),
+        ...regNames.map((x) => x.trim()).filter(Boolean),
+      ]).size,
+    [entities, regNames],
+  );
   const contrib = pf.of("contrib");
   const changes = pf.of("changes");
   const reverse = pf.of("reverse");
@@ -1864,13 +1904,9 @@ export default function Portfolio({
     switch (k) {
       case "strategies": {
         const tot = sumOf(entities.flatMap((r) => contribsOf(r.data)));
-        const all = new Set<string>([
-          ...entities.map((r) => String(r.data.name || "").trim()).filter(Boolean),
-          ...regNames.map((x) => x.trim()).filter(Boolean),
-        ]);
         return {
-          count: all.size,
-          pct: all.size ? 100 : 0,
+          count: entCount,
+          pct: entCount ? 100 : 0,
           sub: `${tot.kpis} ${t("مؤشراً", "KPIs")} · ${tot.goals} ${t("هدفاً", "goals")} · ${tot.inits} ${t("مبادرة", "initiatives")}`,
         };
       }
@@ -2213,7 +2249,7 @@ export default function Portfolio({
         </div>
         <div className="kp clickable" onClick={() => setEnts(true)}>
           <div className="k">{t("جهاتي", "My entities")}</div>
-          <div className="v">{entities.length}</div>
+          <div className="v">{entCount}</div>
           <div className="s">{t("اضغط لإدارة القائمة", "Manage list")}</div>
         </div>
         <div className="kp">
@@ -2313,6 +2349,7 @@ export default function Portfolio({
       {ents && (
         <EntitiesModal
           rows={entities}
+          reg={reg}
           t={t}
           onClose={() => setEnts(false)}
           onSave={(id, data) => void pf.save("entities", id, data, entities.length + 1)}
