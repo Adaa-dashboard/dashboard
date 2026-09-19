@@ -1168,34 +1168,9 @@ table.matrix thead th {
 .nav-item.active:hover {
   background: var(--bg);
 }
-.nav-item.active::before,
-.nav-item.active::after {
-  content: "";
-  position: absolute;
-  inset-inline-end: 0;
-  width: 22px;
-  height: 22px;
-  pointer-events: none;
-  /* مركز الدائرة عند الزاوية البعيدة عن المحتوى — يمين في العربية */
-  --cx: 22px;
-}
-[dir="ltr"] .nav-item.active::before,
-[dir="ltr"] .nav-item.active::after {
-  --cx: 0px;
-}
-[dir="ltr"] .rail-wm {
-  transform: translateX(-50%);
-}
-/* قرص الزاوية شفاف لا مرسوم بلون: خلفية الشريط نفسها صارت شفافة،
-   فرسمُها مرةً أخرى فوق نفسها يُفتِح المنحنى عن جواره */
-.nav-item.active::before {
-  top: -22px;
-  background: radial-gradient(circle at var(--cx) 0, transparent 0 22px, var(--bg) 22px);
-}
-.nav-item.active::after {
-  bottom: -22px;
-  background: radial-gradient(circle at var(--cx) 100%, transparent 0 22px, var(--bg) 22px);
-}
+/* لا زوايا مقعّرة حول اللسان: الحشوةُ البيضاء فوقه وتحته كانت تبدو
+   هالةً شفافة حول البند — بطلب صاحبة المنصة أُزيلت، فصار اللسان
+   شريحةً نظيفة تلتحم بلوحة المحتوى من طرفها وحده */
 
 /* شعار أداء كاملاً أسفل الشريط — بلون أفتح من الخلفية، بلا اقتطاع */
 .rail-wm {
