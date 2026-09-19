@@ -177,7 +177,6 @@ const STICKY_PAGES: Record<string, Scope> = {
   report: "weekly",
 };
 
-const GAUGE_TRACK = "#e9f1ef";
 
 /* الأقسام الخمسة في القائمة الجانبية — الترتيب هو ترتيب ظهورها */
 /** اسم مختصر تحت عمود المؤشر — أسماء المؤشرات جملٌ كاملة لا تسع
@@ -905,57 +904,6 @@ function lastUpdatedOf(measurements: Measurement[]): string {
   return max;
 }
 
-/* ============ عدّاد نصف دائري (Gauge) ============ */
-function polar(cx: number, cy: number, r: number, angleDeg: number): [number, number] {
-  const a = (angleDeg * Math.PI) / 180;
-  return [cx + r * Math.cos(a), cy - r * Math.sin(a)];
-}
-function arc(cx: number, cy: number, r: number, v0: number, v1: number, max: number) {
-  const a0 = 180 - (Math.min(v0, max) / max) * 180;
-  const a1 = 180 - (Math.min(v1, max) / max) * 180;
-  const [x0, y0] = polar(cx, cy, r, a0);
-  const [x1, y1] = polar(cx, cy, r, a1);
-  return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r} ${r} 0 0 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
-}
-
-function Gauge({
-  value,
-  bands,
-  max = 100,
-}: {
-  value: number | null;
-  bands: Band[];
-  max?: number;
-}) {
-  // قوس نصف دائري: مسار رمادي، وفوقه قوس بلون الحالة بمقدار الإنجاز
-  const cx = 100;
-  const cy = 95;
-  const r = 72;
-  const sw = 15;
-  const v = value == null ? 0 : Math.max(0, Math.min(value, max));
-  const color = bandOf(value, bands)?.color ?? "#8a9a95";
-
-  return (
-    <div style={{ position: "relative" }}>
-      <svg viewBox="0 0 200 118" width="100%" style={{ display: "block" }}>
-        <path d={arc(cx, cy, r, 0, max, max)} stroke={GAUGE_TRACK} strokeWidth={sw} fill="none" strokeLinecap="round" />
-        {value != null && v > 0 && (
-          <path d={arc(cx, cy, r, 0, v, max)} stroke={color} strokeWidth={sw} fill="none" strokeLinecap="round" />
-        )}
-        <text
-          x={cx}
-          y={cy - 4}
-          textAnchor="middle"
-          fill="var(--g-900)"
-          style={{ font: "800 30px 'Noto Kufi Arabic', sans-serif", direction: "ltr" }}
-        >
-          {value == null ? "—" : `${Math.round(value)}%`}
-        </text>
-      </svg>
-    </div>
-  );
-}
-
 /* ============ النظرة العامة ============ */
 const SCOPES: { key: string; label: string; en: string; q: number | null }[] = [
   { key: "year", label: "السنة كاملة", en: "Full Year", q: null },
@@ -1259,64 +1207,8 @@ function Overview({
         />
       </div>
 
-      <Sec
-        id="kpis"
-        title={t("تفاصيل المؤشرات", "KPI details")}
-        chips={
-        <span className="pills">
-          {bands.map((b) => (
-            <button
-              key={b.label}
-              className={`pill ${statusFilter === b.label ? "on" : ""}`}
-              style={{ ["--c" as string]: b.color }}
-              onClick={() => setStatusFilter(statusFilter === b.label ? null : b.label)}
-            >
-              <i />
-              {b.label}
-              <b>{bandCounts[b.label] || 0}</b>
-            </button>
-          ))}
-        </span>
-        }
-      >
-
-      {statusFilter && (
-        <div className="filter-note">
-          {t("عرض حالة:", "Showing status:")} <strong>{statusFilter}</strong> {t("فقط", "only")}
-          <button className="btn btn-ghost btn-sm" style={{ marginInlineStart: 10 }} onClick={() => setStatusFilter(null)}>
-            {t("إظهار الكل", "Show all")}
-          </button>
-        </div>
-      )}
-
-      {loading ? (
-        <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>
-      ) : shownInd.length === 0 ? (
-        <div className="empty">{t("لا توجد مؤشرات مطابقة.", "No matching KPIs.")}</div>
-      ) : (
-        <div className="gauge-grid">
-          {shownInd.map((ind) => (
-            <div
-              key={ind.id}
-              className="gauge-box clickable"
-              style={{ borderTopColor: ind.band?.color ?? "var(--border)" }}
-              onClick={() => setOpenIndicator(ind)}
-            >
-              <div className="gauge-head">
-                
-              </div>
-              <div className="gauge-name" title={ind.name}>
-                {ind.name}
-              </div>
-              <Gauge value={ind.value} bands={bands} />
-              <div className="gauge-status" style={{ color: ind.band?.color ?? "#8a9a95" }}>
-                {ind.bandLabel ?? "—"}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-      </Sec>
+      {/* قسم عدّادات المؤشرات أُزيل: الأعمدة أعلى الصفحة تغني عنه،
+          وبقاؤه يكرّر الأرقام نفسها مرتين — بطلب صاحبة المنصة */}
 
       {openIndicator && (
         <IndicatorModal
