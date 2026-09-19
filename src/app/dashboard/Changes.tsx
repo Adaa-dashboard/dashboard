@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { asset } from "@/lib/base";
+import { commitStats, ownerMap, nrm } from "@/lib/commit";
 import { readDelimited, readXlsx } from "@/lib/sheet";
 
 /* ============================================================
@@ -172,15 +173,8 @@ export default function Changes({
       ]);
       const photo = new Map<string, string>();
       for (const u of Array.isArray(ppl.people) ? ppl.people : [])
-        if (u?.name) photo.set(norm(String(u.name)), String(u.photoUrl || ""));
-      const m = new Map<string, { name: string; photo: string }>();
-      for (const e of Array.isArray(ents.entities) ? ents.entities : []) {
-        const ours = Array.isArray(e.ours) ? e.ours : [];
-        const c = ours.find((x: { role?: string }) => (x.role || "أساسي") === "أساسي") || ours[0];
-        const nm = String(c?.userName || c?.name || "").trim();
-        if (nm) m.set(norm(String(e.name || "")), { name: nm, photo: photo.get(norm(nm)) || "" });
-      }
-      setOwnerOf(m);
+        if (u?.name) photo.set(nrm(String(u.name)), String(u.photoUrl || ""));
+      setOwnerOf(ownerMap(Array.isArray(ents.entities) ? ents.entities : [], photo));
     })();
   }, []);
 
@@ -199,45 +193,9 @@ export default function Changes({
     };
   }, [items]);
 
-  /* الالتزام: نسبة طلباته التي لم تتجاوز مدة الخدمة، **مرجَّحةً
-     بعددها**. فمن أنهى عشرة في موعدها أولى ممّن أنهى طلبين — ولو
-     تساوت نسبتهما الخام. والترجيح بإضافة عددٍ وسيط من الطلبات
-     بمتوسط الإدارة إلى رصيد كلٍّ منهما: قليلُ الطلبات يقترب من
-     المتوسط حتى يتراكم عنده عددٌ يدلّ عليه، وكثيرُها تدلّ نسبته
-     على نفسها. والطلب بلا مدة أو بلا أيام لا يُحتسب، فلا يُظلم
-     أحد بصفٍّ ناقص في الملف. */
-  const tops = useMemo(() => {
-    type Row = { name: string; photo: string; total: number; late: number; days: number };
-    const by = new Map<string, Row>();
-    for (const c of items) {
-      if (c.sla == null || c.workDays == null) continue;
-      const o = ownerOf.get(norm(c.owner || ""));
-      if (!o?.name) continue;
-      const r = by.get(o.name) || { name: o.name, photo: o.photo, total: 0, late: 0, days: 0 };
-      r.total++;
-      r.days += c.workDays;
-      if (c.workDays >= c.sla) r.late++;
-      by.set(o.name, r);
-    }
-    const rows = [...by.values()];
-    const sumT = rows.reduce((n, r) => n + r.total, 0);
-    const sumOk = rows.reduce((n, r) => n + (r.total - r.late), 0);
-    const base = sumT ? sumOk / sumT : 0;            // متوسط الإدارة
-    const mids = rows.map((r) => r.total).sort((x, y) => x - y);
-    const m = Math.max(3, mids.length ? mids[Math.floor(mids.length / 2)] : 3); // وزن الترجيح
-    return rows
-      .map((r) => {
-        const ok = r.total - r.late;
-        return {
-          ...r,
-          ok,
-          raw: Math.round((ok / r.total) * 100),
-          pct: Math.round(((ok + m * base) / (r.total + m)) * 100),
-          avg: r.total ? Math.round((r.days / r.total) * 10) / 10 : 0,
-        };
-      })
-      .sort((a, b) => b.pct - a.pct || b.total - a.total || a.avg - b.avg);
-  }, [items, ownerOf]);
+  /* الحسبة في `lib/commit.ts` — يشترك فيها هذا الجدول ومحفظة
+     الموظف، فالرقم واحد في المكانين */
+  const tops = useMemo(() => commitStats(items, ownerOf), [items, ownerOf]);
 
   const shown = useMemo(() => {
     const open = items.filter((x) => x.status === "open");
