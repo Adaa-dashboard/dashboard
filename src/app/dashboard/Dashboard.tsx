@@ -441,6 +441,8 @@ export default function Dashboard({ me }: { me: Me }) {
               {railCol ? <path d="M15 5 8 12l7 7" /> : <path d="M9 5l7 7-7 7" />}
             </svg>
           </button>
+          {/* شعار أداء باهتاً في أسفل الشريط — خلف البنود لا فوقها */}
+          <img className="rail-wm" src={asset("/adaa-logo.png")} alt="" aria-hidden="true" />
           <div className="rail-in">
           <div className="rail-brand">
             <div className="nm">{t("إدارة عمليات الأداء", "Performance Operations")}</div>
@@ -517,8 +519,6 @@ export default function Dashboard({ me }: { me: Me }) {
             </button>
           </div>
           </div>
-          {/* شعار أداء باهتاً في أسفل الشريط — زينة لا تُنقر */}
-          <img className="rail-wm" src={asset("/adaa-logo.png")} alt="" aria-hidden="true" />
         </aside>
 
         <main className="main-area">
