@@ -1079,7 +1079,7 @@ table.matrix thead th {
 }
 
 .rail {
-  flex: 0 0 214px;
+  flex: 0 0 200px;
   background: var(--rail-bg);
   padding: 26px 13px;
   display: flex;
@@ -1114,17 +1114,19 @@ table.matrix thead th {
 .nav-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   width: 100%;
   text-align: start;
   background: transparent;
   border: none;
   color: rgba(255, 255, 255, 0.85);
   border-radius: 13px;
-  padding: 11px 12px;
+  padding: 11px 10px;
   font: inherit;
-  font-size: 13.5px;
+  /* مقاس يسع «الجهات ونقاط التواصل» في سطر داخل شريط ضيّق */
+  font-size: 12.8px;
   font-weight: 600;
+  line-height: 1.35;
   cursor: pointer;
 }
 .nav-item:hover {
@@ -1184,25 +1186,27 @@ table.matrix thead th {
 [dir="ltr"] .rail-wm {
   transform: translateX(-50%);
 }
+/* قرص الزاوية شفاف لا مرسوم بلون: خلفية الشريط نفسها صارت شفافة،
+   فرسمُها مرةً أخرى فوق نفسها يُفتِح المنحنى عن جواره */
 .nav-item.active::before {
   top: -22px;
-  background: radial-gradient(circle at var(--cx) 0, var(--rail-bg) 0 22px, var(--bg) 22px);
+  background: radial-gradient(circle at var(--cx) 0, transparent 0 22px, var(--bg) 22px);
 }
 .nav-item.active::after {
   bottom: -22px;
-  background: radial-gradient(circle at var(--cx) 100%, var(--rail-bg) 0 22px, var(--bg) 22px);
+  background: radial-gradient(circle at var(--cx) 100%, transparent 0 22px, var(--bg) 22px);
 }
 
-/* علامة أداء أسفل الشريط: كبيرة بلون أفتح من الخلفية، وتُقتطع
-   عند حافّتيه كما في هوية العروض — لا شعاراً صغيراً منسوخاً */
+/* شعار أداء كاملاً أسفل الشريط — بلون أفتح من الخلفية، بلا اقتطاع */
 .rail-wm {
   position: absolute;
-  inset-inline-start: -46px;
-  bottom: -54px;
-  width: 268px;
+  inset-inline-start: 50%;
+  transform: translateX(50%);
+  bottom: 96px;
+  width: calc(100% - 40px);
   max-width: none;
   height: auto;
-  opacity: 0.14;
+  opacity: 0.16;
   /* أبيض ثم شفافية ⇒ درجة أفتح من أخضر الشريط نفسه */
   filter: brightness(0) invert(1);
   pointer-events: none;
@@ -1285,8 +1289,8 @@ table.matrix thead th {
   padding-top: 15px;
 }
 .whoami .av {
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   flex: none;
   display: grid;
@@ -1298,8 +1302,9 @@ table.matrix thead th {
   font-family: "Noto Kufi Arabic", sans-serif;
 }
 .whoami .nm {
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 700;
+  line-height: 1.4;
 }
 .whoami .rl {
   font-size: 11px;
@@ -1322,11 +1327,9 @@ table.matrix thead th {
   flex: 1;
   min-width: 0;
   background: var(--bg);
-  /* مستديرة من جهة الشريط وحدها — وتبدأ من أعلى الإطار وتنتهي بأسفله.
-     ملاصقة للشريط بلا هامش سالب: الهامش السالب على جهة المحتوى كان
-     يُخرجها عن الشاشة فيظهر تمرير أفقي */
-  border-start-start-radius: 26px;
-  border-end-start-radius: 26px;
+  /* زوايا حادة، وملاصقة للشريط بلا هامش سالب: الهامش السالب على جهة
+     المحتوى كان يُخرجها عن الشاشة فيظهر تمرير أفقي */
+  border-radius: 0;
   padding: 24px 30px 40px;
   /* مرجع الملاحظات اللاصقة: مواضعها نسبةٌ من هذه المساحة */
   position: relative;
@@ -4674,7 +4677,8 @@ table.matrix thead th {
   transition: flex-basis 0.18s ease;
   /* الزوايا الداخلية مستديرة، والتمرير انتقل إلى .rail-in
      حتى لا يُقتطع زر الطيّ المعلَّق على الحافة */
-  border-radius: 24px;
+  /* زوايا حادة — بطلب صاحبة المنصة */
+  border-radius: 0;
   overflow: visible;
   padding: 0;
   z-index: 2;
