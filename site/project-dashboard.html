@@ -215,6 +215,10 @@ body.is-admin .det-legend{display:block;}
 .d-btn-undo:hover:not(:disabled){background:#4338ca;color:#fff;}
 .d-btn:disabled{opacity:.4;cursor:not-allowed;filter:grayscale(.5);}
 .d-btn-xl:hover{background:var(--g3);color:#fff;}
+.chk-wrap{display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.cell-check{width:17px;height:17px;cursor:pointer;accent-color:var(--g3);margin:0;}
+body.det-locked .cell-check,body.det-locked .chk-wrap{cursor:not-allowed;}
+.chk-raw{font-size:.55rem;color:var(--red);text-align:center;margin-top:2px;overflow-wrap:anywhere;}
 .detail-tbl-wrap{overflow-x:auto;overflow-y:hidden;border:1px solid var(--border);border-radius:10px;}
 .detail-tbl{width:100%;border-collapse:collapse;table-layout:fixed;min-width:900px;}
 .detail-tbl thead th{background:var(--g2);color:#fff;padding:0;white-space:normal;
@@ -1392,8 +1396,9 @@ async function loadFromCloud(){
     TRACKED.forEach(migrateStatusLast);
     // ترحيل «شهر الفوترة» بعد migrateStatusLast لأن الأخيرة تُزيح المواضع
     const billFixed = migrateBillAll();
+    const checkFixed = normalizeChecksAll();
     // توحيد صيغ التواريخ القديمة ثم الترتيب (أقدم أولاً)، وحفظ التصحيح مرة واحدة
-    const fixed = new Set([...billFixed, ...normalizeAllDates(), ...autoSortAll()]);
+    const fixed = new Set([...billFixed, ...checkFixed, ...normalizeAllDates(), ...autoSortAll()]);
     fixed.forEach(i=>{ if(can('edit:details:' + (i + 1))) saveDetailToCloud(i); });
     recalcStrategies();
     renderDash();
@@ -2394,6 +2399,41 @@ function migrateStatusLast(idx){
   });
   return true;
 }
+// ═══ أعمدة الاستلام (نموذج الحصر والتقرير) — مربع اختيار لا نص ═══
+// تُطابَق بـ«حصر» فتعمل مع «نموذج حصر» الافتراضي ومع «استلام نموذج حصر فقط»
+// و«استلام نموذج حصر +تقرير» كما سُمّيت في الجدول المحفوظ سحابياً.
+const isCheckCol = (idx, ci) => String((detCols[idx] || [])[ci] || '').includes('حصر');
+const CHECK_ON = '✅';
+const CHECK_YES = ['نعم','1','✅','✔','✓','☑','صح','y','yes','true','x'];
+const CHECK_NO  = ['','لا','0','—','-','–','n','no','false'];
+
+// 1 = مُستلَم · 0 = غير مُستلَم · -1 = قيمة أخرى **لا تُفسَّر ولا تُمسح**
+function checkState(v){
+  const t = String(v == null ? '' : v).trim().toLowerCase();
+  if(CHECK_YES.includes(t)) return 1;
+  if(CHECK_NO.includes(t))  return 0;
+  return -1;
+}
+
+// ترحيل القيم القديمة («نعم» · «1» …) إلى علامة موحّدة، والسالبة إلى فراغ.
+// القيمة غير المفهومة تبقى كما هي وتُعرض بجانب المربع فلا تختفي خلفه.
+function normalizeCheckCols(idx){
+  const cols = detCols[idx] || [];
+  const cs = cols.map((_, ci) => ci).filter(ci => isCheckCol(idx, ci));
+  if(!cs.length) return false;
+  let changed = false;
+  (detRows[idx] || []).forEach(r=>{
+    cs.forEach(ci=>{
+      const st = checkState(r[ci]);
+      if(st === -1) return;
+      const want = st === 1 ? CHECK_ON : '';
+      if(r[ci] !== want){ r[ci] = want; changed = true; }
+    });
+  });
+  return changed;
+}
+const normalizeChecksAll = () => [0,1,2,3].filter(normalizeCheckCols);
+
 // ═══ «شهر الفوترة» — ثالث عمود في م1 و م2، وأسماؤه موحّدة ═══
 // يُدرَج/يُنقَل بعد «النوع» مباشرة في المخرجين معاً — على نمط migrateStatusLast،
 // وبالاستدلال على «النوع» لا بفهرس ثابت لأن المواضع تتغيّر بترحيل «الحالة».
@@ -2780,6 +2820,14 @@ function renderDetTable(){
         const v=row[ci]||'', n=parseFloat(v);
         const cls = isNaN(n) ? '' : n>0 ? 'st-d-late' : n<0 ? 'st-d-early' : 'st-d-zero';
         return `<td><span class="st-days ${cls}">${esc(v)||'—'}</span></td>`;
+      }
+      // عمود استلام: مربع اختيار. القيمة المحفوظة ✅ أو فراغ.
+      if(isCheckCol(activeDetail, ci)){
+        const raw = row[ci] || '', st = checkState(raw);
+        return `<td><label class="chk-wrap" title="${st===1?'مُستلَم':'غير مُستلَم'}">
+            <input type="checkbox" class="cell-check" ${st===1?'checked':''}
+              onchange="cellEdit(${ri}, ${ci}, this.checked ? '${CHECK_ON}' : '')">
+          </label>${st===-1?`<div class="chk-raw" title="قيمة غير مفهومة — لم تُحوَّل">${esc(raw)}</div>`:''}</td>`;
       }
       // عمود تاريخ: الصيغة المعروضة هي المحفوظة نفسها (YYYY-MM-DD)،
       // وأي صيغة تُكتب تتحوّل إليها عند الخروج من الخلية.
@@ -3339,6 +3387,7 @@ const DEL_COL_W = 40;
 function colW(idx, ci){
   const c = String((detCols[idx] || [])[ci] || '');
   if(c.includes('العدد'))                         return 62;
+  if(c.includes('حصر'))                           return 78;
   if(c.includes('فوترة'))                         return 104;
   if(c.includes('أيام'))                          return 86;   // العنوان أطول من محتواه
   if(c.includes('حالة') || c.trim() === 'النوع')  return 84;
@@ -3576,6 +3625,7 @@ async function impRun(){
     ensureTrackedCols(idx);
     migrateStatusLast(idx);
     normalizeDetDates(idx);
+    normalizeCheckCols(idx);       // «نعم» القادمة من الملف تصير علامة
     detSort[idx] = undefined;      // الملف الجديد يأخذ الترتيب الافتراضي
     autoSort(idx);
     recalcTracked(idx);
@@ -3663,6 +3713,7 @@ async function impRun(){
   }
 
   normalizeDetDates(idx);
+  normalizeCheckCols(idx);
   autoSort(idx);                   // الصفوف الجديدة تأخذ مكانها الزمني الصحيح
   recalcTracked(idx);
   renderDetTable();
@@ -4210,6 +4261,7 @@ ${pagesHTML}
 TRACKED.forEach(ensureTrackedCols);
 TRACKED.forEach(migrateStatusLast);
 migrateBillAll();
+normalizeChecksAll();
 normalizeAllDates();
 autoSortAll();
 recalcStrategies();
