@@ -22,6 +22,9 @@ export type Note = {
   dueTime?: string;
   /** true = مأخوذ من النص، فيتغيّر معه. false = ضبطه المستخدم بنفسه */
   dueAuto?: boolean;
+  /** وقت التثبيت — المثبَّتة تتصدّر، وآخرُ ما ثُبِّت أعلاها.
+      فارغ = غير مثبَّتة. تبديل الدبوس نزعُه من واحدة ووضعُه في أخرى. */
+  pinnedAt?: string;
 };
 export type Folder = { id: string; name: string };
 export type NotesData = { folders: Folder[]; notes: Note[] };
@@ -108,10 +111,29 @@ export default function Notes({
     return data.notes
       .filter((n) => folder === ALL || n.folderId === folder)
       .filter((n) => !term || (n.title + " " + n.body).toLowerCase().includes(term))
-      .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+      .sort((a, b) => {
+        const pa = a.pinnedAt || "";
+        const pb = b.pinnedAt || "";
+        if (pa && pb) return pb.localeCompare(pa);
+        if (pa !== pb) return pa ? -1 : 1;
+        return (b.updatedAt || "").localeCompare(a.updatedAt || "");
+      });
   }, [data.notes, folder, q]);
 
   const open = data.notes.find((n) => n.id === openId) || null;
+
+  /* التثبيت لا يغيّر `updatedAt` — الدبوس ترتيبٌ لا تعديلُ محتوى */
+  function togglePin(id: string) {
+    change(
+      (d) => ({
+        ...d,
+        notes: d.notes.map((n) =>
+          n.id === id ? { ...n, pinnedAt: n.pinnedAt ? "" : new Date().toISOString() } : n,
+        ),
+      }),
+      true,
+    );
+  }
 
   function addNote() {
     const id = newId();
@@ -271,19 +293,28 @@ export default function Notes({
                   </div>
                 ) : (
                   shown.map((n) => (
-                    <button
-                      key={n.id}
-                      className={`nb-item ${openId === n.id ? "on" : ""}`}
-                      onClick={() => setOpenId(n.id)}
-                    >
-                      <b>{firstLine(n)}</b>
-                      <span className="s">
-                        {n.due && (
-                          <em className="due">{whenLabel({ date: n.due, time: n.dueTime })}</em>
-                        )}
-                        <i>{whenAr(n.updatedAt)}</i> {preview(n)}
-                      </span>
-                    </button>
+                    <div key={n.id} className={`nb-item ${openId === n.id ? "on" : ""} ${n.pinnedAt ? "pin" : ""}`}>
+                      <button className="nb-open" onClick={() => setOpenId(n.id)}>
+                        <b>{firstLine(n)}</b>
+                        <span className="s">
+                          {n.due && (
+                            <em className="due">{whenLabel({ date: n.due, time: n.dueTime })}</em>
+                          )}
+                          <i>{whenAr(n.updatedAt)}</i> {preview(n)}
+                        </span>
+                      </button>
+                      <button
+                        className={`nb-pin ${n.pinnedAt ? "on" : ""}`}
+                        title={n.pinnedAt ? t("إلغاء التثبيت", "Unpin") : t("تثبيت في الأعلى", "Pin to top")}
+                        aria-label={n.pinnedAt ? t("إلغاء التثبيت", "Unpin") : t("تثبيت", "Pin")}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          togglePin(n.id);
+                        }}
+                      >
+                        📌
+                      </button>
+                    </div>
                   ))
                 )}
               </div>

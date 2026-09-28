@@ -10779,3 +10779,48 @@ input.cell-date {
   .ncard .hd .sess-lg { width: 52px; height: 52px; }
   .ncard .hd .sess-lg i { font-size: 17px; }
 }
+
+/* ---------- تثبيت الملاحظة في الأعلى ---------- */
+/* الصف صار حاويةً: زرّ الفتح يملأ السطر، والدبوس بجانبه — فالضغط
+   على الدبوس لا يفتح الملاحظة ولا العكس */
+.nb-item { display: flex; align-items: flex-start; gap: 4px; padding: 0; }
+.nb-item .nb-open {
+  flex: 1;
+  min-width: 0;
+  display: block;
+  text-align: start;
+  background: transparent;
+  border: none;
+  border-radius: 11px;
+  padding: 9px 10px;
+  cursor: pointer;
+  font: inherit;
+}
+.nb-item .nb-pin {
+  flex: none;
+  align-self: center;
+  background: none;
+  border: none;
+  border-radius: 9px;
+  padding: 5px 6px;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  filter: grayscale(1);
+  transition: opacity .12s;
+}
+.nb-item:hover .nb-pin, .nb-item .nb-pin:focus-visible { opacity: .55; }
+.nb-item .nb-pin.on { opacity: 1; filter: none; }
+.nb-item .nb-pin:hover { opacity: 1; background: var(--soft); }
+/* المثبَّتة تُميَّز بخطٍّ على حافتها، فتُعرف قبل قراءة عنوانها */
+.nb-item.pin { position: relative; }
+.nb-item.pin::before {
+  content: "";
+  position: absolute;
+  inset-block: 7px;
+  inset-inline-start: 0;
+  width: 3px;
+  border-radius: 99px;
+  background: var(--gold, #c9a020);
+}
