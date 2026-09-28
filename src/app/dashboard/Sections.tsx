@@ -655,7 +655,8 @@ function Toolbar({
   setQ: (v: string) => void;
   filter: string;
   setFilter: (v: string) => void;
-  options: string[];
+  /** نصّاً، أو {v: القيمة, l: النص المعروض} حين يُعرض معه عدد */
+  options: (string | { v: string; l: string })[];
   onExport: () => void;
   /** نص الخيار الأول — «كل الحالات» ما لم يُمرَّر غيره */
   allLabel?: string;
@@ -671,11 +672,15 @@ function Toolbar({
       />
       <select value={filter} onChange={(e) => setFilter(e.target.value)}>
         <option value="">{allLabel || t("كل الحالات", "All statuses")}</option>
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
-        ))}
+        {options.map((o) => {
+          const v = typeof o === "string" ? o : o.v;
+          const l = typeof o === "string" ? o : o.l;
+          return (
+            <option key={v} value={v}>
+              {l}
+            </option>
+          );
+        })}
       </select>
       <button className="btn btn-ghost btn-sm" onClick={onExport}>
         ⬇ Excel
@@ -1148,15 +1153,33 @@ function SessionsPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
   const [f, setF] = useState("");
   const logos = useLogos();
 
-  const OPTS = useMemo(
-    () => [
-      ...SESS_SHORT.map((n) => `المرحلة: ${n}`),
-      "مكتملة",
-      ...ESC_LEVELS.map((l) => `تصعيد: ${l.name}`),
-      "تحتاج تصعيداً",
-    ],
-    [],
-  );
+  const OPTS = useMemo(() => {
+    const stage = new Array(SESS_STAGES.length).fill(0);
+    const esc = new Array(ESC_LEVELS.length + 1).fill(0);
+    let done = 0;
+    for (const it of items) {
+      const at = sessOf(it.data).at;
+      if (at < 0) done++;
+      else stage[Math.min(at, SESS_STAGES.length - 1)]++;
+      esc[escOf(it.data)]++;
+    }
+    const escN = esc.slice(1).reduce((a: number, b: number) => a + b, 0);
+    const out: { v: string; l: string }[] = [];
+    SESS_SHORT.forEach((n, i) => {
+      if (stage[i]) out.push({ v: `المرحلة: ${n}`, l: `${n} (${AR(stage[i])})` });
+    });
+    if (done) out.push({ v: "مكتملة", l: `مكتملة (${AR(done)})` });
+    if (escN) {
+      out.push({ v: "تحتاج تصعيداً", l: `تحتاج تصعيداً (${AR(escN)})` });
+      for (const l of ESC_LEVELS)
+        if (esc[l.n]) out.push({ v: `تصعيد: ${l.name}`, l: `— ${l.name} (${AR(esc[l.n])})` });
+    }
+    return out;
+  }, [items]);
+
+  useEffect(() => {
+    if (f && !OPTS.some((o) => o.v === f)) setF("");
+  }, [OPTS, f]);
 
   const rows = useMemo(() => {
     const byQ = items.filter((it) => {
