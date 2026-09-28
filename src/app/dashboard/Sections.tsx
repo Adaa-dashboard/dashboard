@@ -1134,7 +1134,7 @@ function NatImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => vo
   return (
     <span className="seedb">
       <button className="btn btn-sm" onClick={() => ref.current?.click()}>
-        {t("رفع ملف Excel أو بوربوينت", "Upload Excel or PowerPoint")}
+        {t("رفع ملف البيانات", "Upload data file")}
       </button>
       <input ref={ref} type="file" accept=".xlsx,.pptx" hidden onChange={pick} />
       {msg && <em>{msg}</em>}

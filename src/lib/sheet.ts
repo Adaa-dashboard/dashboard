@@ -233,6 +233,61 @@ export function readDelimited(text: string): string[][] {
    ============================================================ */
 export type SheetOut = { name: string; rows: (string | number | null | undefined)[][] };
 
+export type ZipEntry = { name: string; data: Uint8Array };
+
+/** يبني أرشيف zip مخزَّناً بلا ضغط — يشترك فيه ملف الجدول وملف العرض */
+export function zipStored(files: ZipEntry[], type: string): Blob {
+  const enc = new TextEncoder();
+  const locals: Uint8Array[] = [];
+  const centrals: Uint8Array[] = [];
+  let offset = 0;
+
+  for (const f of files) {
+    const nameBytes = enc.encode(f.name);
+    const crc = crc32(f.data);
+    const lh = new Uint8Array(30 + nameBytes.length);
+    const lv = new DataView(lh.buffer);
+    lv.setUint32(0, 0x04034b50, true);
+    lv.setUint16(4, 20, true); // النسخة المطلوبة
+    lv.setUint16(6, 0x0800, true); // أسماء الملفات UTF-8
+    lv.setUint16(8, 0, true); // بلا ضغط
+    lv.setUint32(14, crc, true);
+    lv.setUint32(18, f.data.length, true);
+    lv.setUint32(22, f.data.length, true);
+    lv.setUint16(26, nameBytes.length, true);
+    lh.set(nameBytes, 30);
+    locals.push(lh, f.data);
+
+    const ch = new Uint8Array(46 + nameBytes.length);
+    const cv = new DataView(ch.buffer);
+    cv.setUint32(0, 0x02014b50, true);
+    cv.setUint16(4, 20, true);
+    cv.setUint16(6, 20, true);
+    cv.setUint16(8, 0x0800, true);
+    cv.setUint16(10, 0, true);
+    cv.setUint32(16, crc, true);
+    cv.setUint32(20, f.data.length, true);
+    cv.setUint32(24, f.data.length, true);
+    cv.setUint16(28, nameBytes.length, true);
+    cv.setUint32(42, offset, true);
+    ch.set(nameBytes, 46);
+    centrals.push(ch);
+
+    offset += lh.length + f.data.length;
+  }
+
+  const cdSize = centrals.reduce((n, c) => n + c.length, 0);
+  const eocd = new Uint8Array(22);
+  const ev = new DataView(eocd.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(8, files.length, true);
+  ev.setUint16(10, files.length, true);
+  ev.setUint32(12, cdSize, true);
+  ev.setUint32(16, offset, true);
+
+  return new Blob([...locals, ...centrals, eocd] as BlobPart[], { type });
+}
+
 const CRC_TABLE = (() => {
   const t = new Uint32Array(256);
   for (let i = 0; i < 256; i++) {
@@ -363,57 +418,7 @@ export function writeXlsx(sheets: SheetOut[]): Blob {
   push("xl/styles.xml", STYLES_XML);
   sheets.forEach((s, i) => push(`xl/worksheets/sheet${i + 1}.xml`, sheetXml(s.rows)));
 
-  // ---- بناء أرشيف zip بلا ضغط ----
-  const locals: Uint8Array[] = [];
-  const centrals: Uint8Array[] = [];
-  let offset = 0;
-
-  for (const f of files) {
-    const nameBytes = enc.encode(f.name);
-    const crc = crc32(f.data);
-    const lh = new Uint8Array(30 + nameBytes.length);
-    const lv = new DataView(lh.buffer);
-    lv.setUint32(0, 0x04034b50, true);
-    lv.setUint16(4, 20, true); // النسخة المطلوبة
-    lv.setUint16(6, 0x0800, true); // أسماء الملفات UTF-8
-    lv.setUint16(8, 0, true); // بلا ضغط
-    lv.setUint32(14, crc, true);
-    lv.setUint32(18, f.data.length, true);
-    lv.setUint32(22, f.data.length, true);
-    lv.setUint16(26, nameBytes.length, true);
-    lh.set(nameBytes, 30);
-    locals.push(lh, f.data);
-
-    const ch = new Uint8Array(46 + nameBytes.length);
-    const cv = new DataView(ch.buffer);
-    cv.setUint32(0, 0x02014b50, true);
-    cv.setUint16(4, 20, true);
-    cv.setUint16(6, 20, true);
-    cv.setUint16(8, 0x0800, true);
-    cv.setUint16(10, 0, true);
-    cv.setUint32(16, crc, true);
-    cv.setUint32(20, f.data.length, true);
-    cv.setUint32(24, f.data.length, true);
-    cv.setUint16(28, nameBytes.length, true);
-    cv.setUint32(42, offset, true);
-    ch.set(nameBytes, 46);
-    centrals.push(ch);
-
-    offset += lh.length + f.data.length;
-  }
-
-  const cdSize = centrals.reduce((n, c) => n + c.length, 0);
-  const eocd = new Uint8Array(22);
-  const ev = new DataView(eocd.buffer);
-  ev.setUint32(0, 0x06054b50, true);
-  ev.setUint16(8, files.length, true);
-  ev.setUint16(10, files.length, true);
-  ev.setUint32(12, cdSize, true);
-  ev.setUint32(16, offset, true);
-
-  return new Blob([...locals, ...centrals, eocd] as BlobPart[], {
-    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  });
+  return zipStored(files, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 }
 
 /* ============================================================
