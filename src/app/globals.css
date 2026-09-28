@@ -10442,8 +10442,27 @@ input.cell-date {
 }
 .pf-cr-r .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
 .pf-cr-r .o { color: var(--muted); font-size: 10.5px; max-width: 34%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-cr-r .s { flex: none; font-size: 10px; font-weight: 700; color: var(--muted); }
 .pf-cr-r .d { flex: none; font-weight: 700; color: var(--gt-700); font-size: 10.5px; }
-.pf-cr-r.late .d { color: var(--dgr-tx); }
+.pf-cr-r.late .d, .pf-cr-r.late .s { color: var(--dgr-tx); }
+.pf-cr-r .n em {
+  font-style: normal;
+  font-size: 9.5px;
+  color: var(--muted);
+  margin-inline-start: 7px;
+}
+/* السنة كلها معروضة، والقائمة تمرّر داخلها بدل أن تُقتطع عند ستة */
+.cr-list { max-height: 340px; overflow-y: auto; }
+.pf-cr-h .cr-yr {
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+}
 
 /* أشرطة الحالة: النسبة والعدد فوق الشريط، والعبارة داخله ومِقبضٌ
    عند طرفه — على نمط المرجع الذي اختارته المستخدمة */

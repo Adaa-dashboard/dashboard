@@ -1840,6 +1840,88 @@ function Quarterly({ rows, t, onToggle }: { rows: Row[]; t: T; onToggle: (r: Row
   );
 }
 
+/* ============================================================
+   طلبات جهاتي — من الجدول المركزي لا من المحفظة
+   ------------------------------------------------------------
+   مصدرها ملف طلبات التغيير اليومي الذي يُرفع في «نظرة عامة»،
+   فتظهر عند كل استشاري في جهاته من نفسها. **لا تُحرَّر هنا**:
+   تواريخُها ومددُها من الملف، وأي تعديل في المحفظة يضيع مع أول
+   رفعٍ تالٍ — فالعرض قراءةٌ صريحة لا حقولَ إدخال.
+
+   كانت تُعرض ستةَ صفوف فقط بلا مدى زمني. الآن السنة كلها بفلترٍ
+   عليها، والقائمة تمرّر داخلها بدل أن تُقتطع.
+   ============================================================ */
+type CrRow = {
+  code: string; owner: string; itemName: string; program?: string; category?: string;
+  sla: number | null; workDays: number | null; status: string; firstSeen?: string; closedAt?: string;
+};
+const crLate = (c: CrRow) => c.sla != null && c.workDays != null && c.workDays >= c.sla;
+const crYear = (c: CrRow) => txt(c.firstSeen).slice(0, 4);
+
+function CrBox({
+  rows, yr, setYr, t,
+}: {
+  rows: CrRow[];
+  yr: string;
+  setYr: (v: string) => void;
+  t: T;
+}) {
+  const years = useMemo(() => {
+    const set = new Set(rows.map(crYear).filter(Boolean));
+    set.add(String(YR_NOW));
+    return [...set].sort().reverse();
+  }, [rows]);
+  const list = useMemo(
+    () =>
+      rows
+        .filter((c) => yr === "*" || crYear(c) === yr)
+        .sort((a, b) => Number(crLate(b)) - Number(crLate(a)) || (b.workDays ?? 0) - (a.workDays ?? 0)),
+    [rows, yr],
+  );
+  const late = list.filter(crLate).length;
+
+  return (
+    <div className="pf-cr">
+      <div className="pf-cr-h">
+        <b>{t("طلبات جهاتي", "My entities' requests")}</b>
+        <select className="cr-yr" value={yr} onChange={(e) => setYr(e.target.value)}>
+          {years.map((y) => (
+            <option key={y} value={y}>
+              {y}
+            </option>
+          ))}
+          <option value="*">{t("كل السنوات", "All years")}</option>
+        </select>
+        <span>
+          {t(
+            `${list.length} طلباً${late ? ` · ${late} متأخراً` : ""} — من ملف طلبات التغيير اليومي، لا تُعدَّل هنا`,
+            `${list.length} requests — from the daily file, read-only`,
+          )}
+        </span>
+      </div>
+      {!list.length ? (
+        <div className="pf-none sm">{t("لا توجد طلبات لجهاتك في هذه السنة.", "No requests this year.")}</div>
+      ) : (
+        <div className="cr-list">
+          {list.map((c) => (
+            <div className={`pf-cr-r ${crLate(c) ? "late" : ""}`} key={c.code}>
+              <span className="n">
+                {c.itemName || c.code}
+                {c.category && <em>{c.category}</em>}
+              </span>
+              <span className="o">{c.owner}</span>
+              <span className="s">{c.status}</span>
+              <span className="d">
+                {c.workDays ?? "—"}/{c.sla ?? "—"} {t("يوم", "d")}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---------------- المساهمات: ثلاثة أعمدة ---------------- */
 const KINDS = ["مؤشر", "مبادرة", "مكاسب سريعة"];
 function Contrib({ rows, t }: { rows: Row[]; t: T }) {
@@ -3009,7 +3091,10 @@ export default function Portfolio({
   /* التزامي محسوبٌ من طلبات جهاتي في الجدول المركزي — بنفس حسبة
      «أعلى الاستشاريين التزاماً»، فالرقم واحد في المكانين. والبديل
      لا تُحتسب عليه طلبات الجهة */
-  type MyChange = { code: string; owner: string; itemName: string; sla: number | null; workDays: number | null; status: string };
+  type MyChange = {
+    code: string; owner: string; itemName: string; program?: string; category?: string;
+    sla: number | null; workDays: number | null; status: string; firstSeen?: string; closedAt?: string;
+  };
   const [myCommit, setMyCommit] = useState<CommitRow | null>(null);
   const [myChanges, setMyChanges] = useState<MyChange[]>([]);
   useEffect(() => {
@@ -3025,6 +3110,8 @@ export default function Portfolio({
       setMyChanges(list.filter((c) => nrm(owners.get(nrm(c.owner))?.name || "") === nrm(me.name)));
     })();
   }, [me.name]);
+  /* سنةُ طلبات جهاتي المعروضة — الجارية افتراضاً، و«الكل» متاحة */
+  const [crYr, setCrYr] = useState(String(YR_NOW));
   const reverse = pf.of("reverse");
   const workflow = pf.of("workflow");
   const projects = pf.of("projects");
@@ -3191,37 +3278,8 @@ export default function Portfolio({
     const base = k.startsWith("cw-") ? "custom" : sec;
     return (
       <>
-        {k === "changes" && myChanges.length > 0 && (
-          <div className="pf-cr">
-            <div className="pf-cr-h">
-              <b>{t("طلبات جهاتي", "My entities' requests")}</b>
-              <span>
-                {t(
-                  `${myChanges.length} طلباً · من صفحة «طلبات التغيير» — تُحدَّث مع رفع ملف المنصة`,
-                  `${myChanges.length} from the central page`,
-                )}
-              </span>
-            </div>
-            {[...myChanges]
-              .sort((a, b) => {
-                const la = a.sla != null && a.workDays != null && a.workDays >= a.sla ? 0 : 1;
-                const lb = b.sla != null && b.workDays != null && b.workDays >= b.sla ? 0 : 1;
-                return la - lb || (b.workDays ?? 0) - (a.workDays ?? 0);
-              })
-              .slice(0, 6)
-              .map((c) => {
-                const late = c.sla != null && c.workDays != null && c.workDays >= c.sla;
-                return (
-                  <div className={`pf-cr-r ${late ? "late" : ""}`} key={c.code}>
-                    <span className="n">{c.itemName || c.code}</span>
-                    <span className="o">{c.owner}</span>
-                    <span className="d">
-                      {c.workDays ?? "—"}/{c.sla ?? "—"} {t("يوم", "d")}
-                    </span>
-                  </div>
-                );
-              })}
-          </div>
+        {k === "changes" && (
+          <CrBox rows={myChanges} yr={crYr} setYr={setCrYr} t={t} />
         )}
         <SectionTable
         section={base}
