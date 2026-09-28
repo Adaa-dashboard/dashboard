@@ -65,6 +65,43 @@ const SESS_SHORT = [
    موضع الجهة في المسار */
 const SESS_LEGACY = ["تحديد الجهة", "جمع البيانات", "إعداد التقرير", "انعقاد الجلسة", "محضر وتوصيات", "الإغلاق"];
 
+/* مراحل التصعيد الأربع كما في الآلية — تُفعَّل حين يتأخّر استكمال
+   الإجراء التصحيحي عن تاريخ تنفيذه. المدّة في الثالثة والرابعة
+   تُحتسب من تاريخ الاستحقاق لا من تاريخ الجلسة. */
+const ESC_LEVELS: { n: number; name: string; owner: string; note: string; hex: string }[] = [
+  {
+    n: 1,
+    name: "التصعيد إلى إدارة الخدمات الاستشارية",
+    owner: "المركز الوطني لقياس أداء الأجهزة العامة",
+    note: "يتابع فريق المركز الإجراءات التصحيحية دورياً مع منسوبي الجهة، ويُرفع الأمر إلى مدير الخدمات الاستشارية إن قرب موعد اكتمال الإجراء ولم يتجاوب استشاري الجهة.",
+    hex: "#0f8a8a",
+  },
+  {
+    n: 2,
+    name: "التصعيد إلى الإدارة التنفيذية",
+    owner: "المركز الوطني لقياس أداء الأجهزة العامة",
+    note: "يُصعِّد فريق جلسات مراجعة الأداء إلى الإدارة التنفيذية للمركز الإجراءاتِ التصحيحية التي تخطّت تاريخ استحقاقها.",
+    hex: "#e0971a",
+  },
+  {
+    n: 3,
+    name: "التصعيد إلى مجلس الإدارة",
+    owner: "مجلس إدارة المركز",
+    note: "تُصعَّد الإجراءات التصحيحية التي تخطّت تاريخ تنفيذها مدةً تزيد على ٣ أشهر إلى مجلس إدارة المركز.",
+    hex: "#c0392b",
+  },
+  {
+    n: 4,
+    name: "التصعيد إلى مركز الحكومة",
+    owner: "مركز الحكومة",
+    note: "تُصعَّد الإجراءات التصحيحية التي تخطّت تاريخ تنفيذها مدةً تزيد على ٦ أشهر إلى مركز الحكومة لطلب الدعم.",
+    hex: "#7a1f2b",
+  },
+];
+/** مرحلة التصعيد المسجَّلة للبند · 0 = لا تصعيد */
+const escOf = (d: Rec) => Math.max(0, Math.min(ESC_LEVELS.length, numOf(d.esc)));
+const escAt = (n: number) => ESC_LEVELS.find((x) => x.n === n);
+
 /* نطاقات الأداء العام كما في الآلية: ≥٩٠٪ على المسار الصحيح ·
    ٧٠–٨٩٪ على المسار بشكل جزئي · أقل من ٧٠٪ متعثر */
 const PERF_BANDS: { min: number; label: string; tone: "hi" | "mid" | "low"; hex: string }[] = [
@@ -777,6 +814,7 @@ function SessCard({ it, t }: { it: Item; t: T }) {
   const bad = sessBad(d);
   const perf = numOf(d.perf);
   const band = perfBand(perf);
+  const esc = escAt(escOf(d));
   const cur = s.at < 0 ? t("مكتملة", "Done") : s.names[s.at] || "";
 
   return (
@@ -790,6 +828,14 @@ function SessCard({ it, t }: { it: Item; t: T }) {
       <div className="own">
         {txt(d.quarter) || "—"} · {cur}
       </div>
+
+      {esc && (
+        <div className="esc-row" style={{ ["--c" as string]: esc.hex }} title={esc.note}>
+          <b>{`المرحلة ${["الأولى", "الثانية", "الثالثة", "الرابعة"][esc.n - 1]}`}</b>
+          <span>{esc.name}</span>
+          <em>{esc.owner}</em>
+        </div>
+      )}
 
       <div className="bd">
         <Ring pct={perf} size={104} tone={band.tone} />
@@ -832,6 +878,8 @@ function SessionsPage({ t }: { t: T }) {
   const [q, setQ] = useState("");
   /* -1 = كل الجهات · 0..5 = مرحلة · 9 = مكتملة */
   const [tab, setTab] = useState(-1);
+  /* 0 = بلا فلتر تصعيد · 1..4 = مرحلة التصعيد */
+  const [esc, setEsc] = useState(0);
 
   const found = useMemo(
     () =>
@@ -841,37 +889,41 @@ function SessionsPage({ t }: { t: T }) {
       }),
     [items, q],
   );
-  const rows = q
-    ? found
-    : tab < 0
-      ? found
-      : found.filter((it) => {
-          const at = sessOf(it.data).at;
-          return tab === 9 ? at < 0 : at === tab;
-        });
+  const rows = (q ? found : found.filter((it) => {
+    if (tab >= 0) {
+      const at = sessOf(it.data).at;
+      if (tab === 9 ? at >= 0 : at !== tab) return false;
+    }
+    return true;
+  })).filter((it) => !esc || escOf(it.data) === esc);
 
   const sum = useMemo(() => {
     let kpi = 0, kpiOf = 0, ini = 0, iniOf = 0, doneN = 0;
     const at = new Array(SESS_STAGES.length).fill(0);
+    const esc = new Array(ESC_LEVELS.length + 1).fill(0);
     for (const it of items) {
       const b = sessBad(it.data);
       kpi += b.kpi; kpiOf += b.kpiOf; ini += b.ini; iniOf += b.iniOf;
       const st = sessOf(it.data).at;
       if (st < 0) doneN++;
       else at[Math.min(st, SESS_STAGES.length - 1)]++;
+      esc[escOf(it.data)]++;
     }
-    return { kpi, kpiOf, ini, iniOf, at, doneN };
+    return { kpi, kpiOf, ini, iniOf, at, doneN, esc };
   }, [items]);
 
   function exportXl() {
     const head = ["الجهة", "الربع", "المرحلة الحالية", "المراحل المكتملة", "نسبة الأداء العام ٪",
-      "المؤشرات المتعثرة", "إجمالي المؤشرات", "المبادرات المتعثرة", "إجمالي المبادرات", "أبرز التحديات"];
+      "المؤشرات المتعثرة", "إجمالي المؤشرات", "المبادرات المتعثرة", "إجمالي المبادرات",
+      "مرحلة التصعيد", "جهة التصعيد", "أبرز التحديات"];
     const body = items.map((it) => {
       const d = it.data;
       const s = sessOf(d);
       const b = sessBad(d);
+      const e = escAt(escOf(d));
       return [txt(d.entity), txt(d.quarter), s.at < 0 ? "مكتملة" : s.names[s.at] || "", s.done,
-        numOf(d.perf), b.kpi, b.kpiOf, b.ini, b.iniOf, txt(d.note)];
+        numOf(d.perf), b.kpi, b.kpiOf, b.ini, b.iniOf,
+        e ? e.name : "لا تصعيد", e ? e.owner : "", txt(d.note)];
     });
     download("جلسات-مراجعة-الأداء.xlsx", writeXlsx([{ name: "الجلسات", rows: [head, ...body] }]));
   }
@@ -913,6 +965,31 @@ function SessionsPage({ t }: { t: T }) {
         )}
       </div>
 
+      {/* مراحل التصعيد — تظهر متى وُجدت جهةٌ مُصعَّدة، فلا تزاحم
+          الشاشة حين لا تصعيد */}
+      {sum.esc.slice(1).some((n) => n > 0) && (
+        <div className="stabs esc-tabs">
+          <span className="esc-ttl">{t("مراحل التصعيد", "Escalation")}</span>
+          {ESC_LEVELS.map((l) => (
+            <button
+              key={l.n}
+              className={`stab ${esc === l.n ? "on" : ""}`}
+              style={{ ["--c" as string]: l.hex }}
+              title={`${l.note} — ${l.owner}`}
+              onClick={() => setEsc(esc === l.n ? 0 : l.n)}
+            >
+              <span className="l">{l.name}</span>
+              <b>{AR(sum.esc[l.n])}</b>
+            </button>
+          ))}
+          {esc > 0 && (
+            <button className="stab" onClick={() => setEsc(0)}>
+              <span className="l">{t("مسح الفلتر", "Clear")}</span>
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="stab-doing">
         {`${t("العناصر التي تحتاج جلسات مراجعة أداء", "Elements needing review sessions")}: `}
         {`${AR(sum.kpi)} ${t("مؤشراً متعثراً من", "off-track KPIs of")} ${AR(sum.kpiOf)}`}
@@ -926,7 +1003,7 @@ function SessionsPage({ t }: { t: T }) {
           ))}
         </div>
       ) : (
-        <div className="pf-none">{t("لا توجد جهات في هذه المرحلة", "Nothing here")}</div>
+        <div className="pf-none">{t("لا توجد جهات مطابقة", "Nothing here")}</div>
       )}
     </>
   );
@@ -3023,6 +3100,7 @@ const FIELDS: Record<Exclude<SectionKey, "outputs">, Field[]> = {
     { k: "kpiTot", label: "إجمالي المؤشرات", kind: "num" },
     { k: "initBad", label: "المبادرات المتعثرة", kind: "num" },
     { k: "initTot", label: "إجمالي المبادرات", kind: "num" },
+    { k: "esc", label: "مرحلة التصعيد (0 بلا تصعيد · 1 الخدمات الاستشارية · 2 الإدارة التنفيذية · 3 مجلس الإدارة · 4 مركز الحكومة)", kind: "num" },
     { k: "note", label: "أبرز التحديات", kind: "area" },
   ],
   natstrat: [
