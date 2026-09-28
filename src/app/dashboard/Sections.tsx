@@ -725,6 +725,26 @@ function sessOf(d: Rec) {
   return { names, dates, done, full: names.length, at };
 }
 
+/** الحالات الثلاث: لم تبدأ · قيد التنفيذ · مكتملة */
+function sessStates(rows: Rec[]) {
+  let none = 0, live = 0, done = 0;
+  for (const d of rows) {
+    const s = sessOf(d);
+    if (s.full > 0 && s.done >= s.full) done++;
+    else if (s.done === 0) none++;
+    else live++;
+  }
+  return { none, live, done };
+}
+
+/** صيغة «جهة» بالعربية: جهة · جهتان · ٣ جهات · ١٥ جهة */
+function arEnt(n: number) {
+  if (n === 1) return "جهة واحدة";
+  if (n === 2) return "جهتان";
+  if (n <= 10) return `${AR(n)} جهات`;
+  return `${AR(n)} جهة`;
+}
+
 /** العناصر المتعثرة في بند جلسة — مؤشراتها ومبادراتها */
 function sessBad(d: Rec) {
   const kpi = numOf(d.kpiBad);
@@ -1836,19 +1856,10 @@ export function SessionsBox({ t, onOpen }: { t: T; onOpen?: () => void }) {
   const { open, toggle } = useCollapse("sessions");
 
   const sum = useMemo(() => {
-    const at = new Array(SESS_STAGES.length).fill(0);
-    const esc = new Array(ESC_LEVELS.length + 1).fill(0);
-    let live = 0;
-    for (const it of items) {
-      const st = sessOf(it.data).at;
-      if (st >= 0) {
-        at[Math.min(st, SESS_STAGES.length - 1)]++;
-        live++;
-      }
-      esc[escOf(it.data)]++;
-    }
-    const escN = esc.slice(1).reduce((a: number, b: number) => a + b, 0);
-    return { at, esc, escN, live };
+    const c = sessStates(items.map((it) => it.data));
+    let esc = 0;
+    for (const it of items) if (escOf(it.data) > 0) esc++;
+    return { ...c, esc };
   }, [items]);
 
   const box = (body: ReactNode) => (
@@ -1872,37 +1883,44 @@ export function SessionsBox({ t, onOpen }: { t: T; onOpen?: () => void }) {
       <div className="sx-none">{t("لا توجد بيانات بعد — تُضاف من صفحة القسم.", "No data yet.")}</div>,
     );
 
+  const tot = items.length || 1;
   const quarter = txt(items[0]?.data?.quarter);
+  /* ترتيب المسار: لم تبدأ ← قيد التنفيذ ← مكتملة — بطلب المستخدمة */
+  const ROWS: { k: string; n: number; inner: string; c: string }[] = [
+    { k: "لم تبدأ", n: sum.none, inner: "لم تُجدول بعد", c: "#9aa8a4" },
+    { k: "قيد التنفيذ", n: sum.live, inner: "قيد الإعداد", c: "#e0971a" },
+    { k: "مكتملة", n: sum.done, inner: "اكتملت مراحلها", c: "#1a7a48" },
+  ];
 
   return box(
-    <div className="ssb">
-      <div className="ssb-top">
-        <b>{AR(sum.live)}</b>
-        <span>
-          {t("جهة تحتاج جلسة مراجعة أداء", "entities need a review session")}
-          {quarter ? ` · ${quarter}` : ""}
-        </span>
+    <div className="pbars">
+      <div className="pb-sub">
+        {arEnt(items.length)}
+        {quarter ? ` · ${quarter}` : ""}
       </div>
-
-      <div className="ssb-grid">
-        {SESS_SHORT.map((n, i) => (
-          <div className="ssb-c" key={n} style={{ ["--c" as string]: BAR_TONE[i % BAR_TONE.length] }}>
-            <b>{AR(sum.at[i])}</b>
-            <span>{n}</span>
+      {ROWS.map((b) => {
+        const pct = Math.round((b.n / tot) * 100);
+        return (
+          <div className="pb-row" key={b.k}>
+            <div className="pb-h">
+              <b>{b.k}</b>
+              <span>{pct}%</span>
+              <i>{AR(b.n)}</i>
+            </div>
+            <div className="pb-t">
+              <span className="pb-f" style={{ width: `${Math.max(pct, 3)}%`, background: b.c }}>
+                {pct >= 26 && <em>{b.inner}</em>}
+                <u className="knob" />
+              </span>
+            </div>
           </div>
-        ))}
-      </div>
+        );
+      })}
 
-      <div className={`ssb-esc ${sum.escN ? "on" : ""}`}>
-        <b>{AR(sum.escN)}</b>
+      {/* الجهات التي تحتاج تصعيداً — بخط أحمر تحت الأعمدة */}
+      <div className={`ss-esc ${sum.esc ? "on" : ""}`}>
+        <b>{AR(sum.esc)}</b>
         <span>{t("جهة تحتاج تصعيداً", "entities need escalation")}</span>
-        {sum.escN > 0 && (
-          <em>
-            {ESC_LEVELS.filter((l) => sum.esc[l.n] > 0)
-              .map((l) => `${l.owner}: ${AR(sum.esc[l.n])}`)
-              .join(" · ")}
-          </em>
-        )}
       </div>
     </div>,
   );
@@ -3475,18 +3493,16 @@ export function weekSummary(section: SectionKey, items: Item[]): WeekSum {
     /* كم جهة في كل مرحلة من مراحل الآلية الست — بطلب المستخدمة.
        الجهة تقع في المرحلة التي تليها ما أنجزته، ومن أتمّ الست
        يُعدّ «مكتملة» ولا يُحسب في أي مرحلة. */
-    const at = new Array(SESS_STAGES.length).fill(0);
-    let done = 0;
-    for (const it of items) {
-      const s = sessOf(d(it));
-      if (s.at < 0) done++;
-      else at[Math.min(s.at, SESS_STAGES.length - 1)]++;
-    }
+    const c = sessStates(items.map(d));
     return {
       total: items.length,
       totalLabel: "جهة",
-      breakdown: SESS_SHORT.map((k, i) => ({ k, n: at[i] })),
-      prog: items.length ? { done, of: items.length } : null,
+      breakdown: [
+        { k: "لم تبدأ", n: c.none },
+        { k: "قيد التنفيذ", n: c.live },
+        { k: "مكتملة", n: c.done },
+      ],
+      prog: items.length ? { done: c.done, of: items.length } : null,
     };
   }
 
