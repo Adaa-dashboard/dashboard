@@ -34,6 +34,7 @@ import {
   SectionPage,
   Sessions,
   StatusBars,
+  SessionsBox,
   StrategyBox,
   Projects,
   CxBox,
@@ -1327,8 +1328,7 @@ function Overview({
           فالصفحة التفصيلية تبقى لأصحابها. */}
       {/* الجلسات والمخرجات جنب بعض: الحالات أشرطةً بنسبتها وعددها */}
       <div className="sx-two" style={{ marginTop: 28 }}>
-        <StatusBars
-          section="sessions"
+        <SessionsBox
           t={t}
           onOpen={hasScope(me.scopes, "sessions") ? () => onOpenTab("sessions") : undefined}
         />

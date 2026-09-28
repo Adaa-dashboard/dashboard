@@ -65,6 +65,20 @@ const SESS_SHORT = [
    موضع الجهة في المسار */
 const SESS_LEGACY = ["تحديد الجهة", "جمع البيانات", "إعداد التقرير", "انعقاد الجلسة", "محضر وتوصيات", "الإغلاق"];
 
+/* ملاحظاتٌ جاهزة تُختار بضغطة — أكثر ما يتكرّر في متابعة الجلسات.
+   تُحفظ في `tags`، والكتابة الحرة تبقى في `note` إلى جانبها، فلا
+   يضيق المتابع بقائمةٍ لا تسع حالته. */
+const SESS_NOTE_OPTS = [
+  "بانتظار تجاوب الجهة",
+  "بانتظار الوثائق الداعمة",
+  "تم تحديد موعد الجلسة",
+  "الإجراءات التصحيحية متأخرة",
+  "الجهة متجاوبة",
+  "يحتاج تصعيداً",
+  "بانتظار اعتماد رئيس الجهاز",
+  "أُغلقت الإجراءات",
+];
+
 /* مراحل التصعيد الأربع كما في الآلية — تُفعَّل حين يتأخّر استكمال
    الإجراء التصحيحي عن تاريخ تنفيذه. المدّة في الثالثة والرابعة
    تُحتسب من تاريخ الاستحقاق لا من تاريخ الجلسة. */
@@ -808,7 +822,14 @@ export function Sessions({ limit, t }: { limit?: number; t: T }) {
 /* ---------- بطاقة جهة في جلسات مراجعة الأداء ----------
    على نمط بطاقة الاستراتيجية الوطنية: حلقةُ الأداء العام أولاً،
    ثم العناصر المتعثرة التي استوجبت الجلسة، ثم مسار المراحل الست. */
-function SessCard({ it, t }: { it: Item; t: T }) {
+function SessCard({
+  it, t, canEdit, save,
+}: {
+  it: Item;
+  t: T;
+  canEdit?: boolean;
+  save?: (id: string, data: Rec, ord: number) => Promise<string | null>;
+}) {
   const d = it.data;
   const s = sessOf(d);
   const bad = sessBad(d);
@@ -816,6 +837,27 @@ function SessCard({ it, t }: { it: Item; t: T }) {
   const band = perfBand(perf);
   const esc = escAt(escOf(d));
   const cur = s.at < 0 ? t("مكتملة", "Done") : s.names[s.at] || "";
+  const tags: string[] = Array.isArray(d.tags) ? (d.tags as string[]).map(txt) : [];
+  /* الكتابة الحرة تُحفظ بعد سكوتٍ قصير، فلا يُرسَل طلبٌ بكل حرف */
+  const [draft, setDraft] = useState<string | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  async function put(next: Rec) {
+    if (!canEdit || !save) return;
+    await save(it.id, { ...d, ...next, demo: false }, it.ord);
+  }
+  function toggleTag(x: string) {
+    const has = tags.includes(x);
+    void put({ tags: has ? tags.filter((y) => y !== x) : [...tags, x] });
+  }
+  function typeNote(v: string) {
+    setDraft(v);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      void put({ note: v });
+      setDraft(null);
+    }, 900);
+  }
 
   return (
     <div className="ncard">
@@ -868,13 +910,54 @@ function SessCard({ it, t }: { it: Item; t: T }) {
       </div>
 
       <Flow stages={s.names} done={s.done} dates={s.dates} />
-      <div className="note">{txt(d.note) || t("لا توجد تحديات مسجّلة", "No challenges recorded")}</div>
+
+      <div className="sn">
+        <div className="sn-h">{t("الملاحظات", "Notes")}</div>
+        {canEdit ? (
+          <>
+            <div className="sn-opts">
+              {SESS_NOTE_OPTS.map((x) => (
+                <button
+                  key={x}
+                  type="button"
+                  className={`sn-op ${tags.includes(x) ? "on" : ""}`}
+                  onClick={() => toggleTag(x)}
+                >
+                  {x}
+                </button>
+              ))}
+            </div>
+            <textarea
+              rows={2}
+              className="sn-txt"
+              value={draft ?? txt(d.note)}
+              placeholder={t("اكتب ملاحظتك…", "Write a note…")}
+              onChange={(e) => typeNote(e.target.value)}
+            />
+          </>
+        ) : (
+          <>
+            {tags.length > 0 && (
+              <div className="sn-opts">
+                {tags.map((x) => (
+                  <span key={x} className="sn-op on">
+                    {x}
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="note">
+              {txt(d.note) || t("لا توجد ملاحظات مسجّلة", "No notes recorded")}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
 
-function SessionsPage({ t }: { t: T }) {
-  const { items, loaded } = useItems("sessions");
+function SessionsPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
+  const { items, loaded, save } = useItems("sessions");
   const [q, setQ] = useState("");
   /* -1 = كل الجهات · 0..5 = مرحلة · 9 = مكتملة */
   const [tab, setTab] = useState(-1);
@@ -915,7 +998,7 @@ function SessionsPage({ t }: { t: T }) {
   function exportXl() {
     const head = ["الجهة", "الربع", "المرحلة الحالية", "المراحل المكتملة", "نسبة الأداء العام ٪",
       "المؤشرات المتعثرة", "إجمالي المؤشرات", "المبادرات المتعثرة", "إجمالي المبادرات",
-      "مرحلة التصعيد", "جهة التصعيد", "أبرز التحديات"];
+      "مرحلة التصعيد", "جهة التصعيد", "الملاحظات الجاهزة", "أبرز التحديات"];
     const body = items.map((it) => {
       const d = it.data;
       const s = sessOf(d);
@@ -923,7 +1006,8 @@ function SessionsPage({ t }: { t: T }) {
       const e = escAt(escOf(d));
       return [txt(d.entity), txt(d.quarter), s.at < 0 ? "مكتملة" : s.names[s.at] || "", s.done,
         numOf(d.perf), b.kpi, b.kpiOf, b.ini, b.iniOf,
-        e ? e.name : "لا تصعيد", e ? e.owner : "", txt(d.note)];
+        e ? e.name : "لا تصعيد", e ? e.owner : "",
+        (Array.isArray(d.tags) ? (d.tags as string[]) : []).join(" · "), txt(d.note)];
     });
     download("جلسات-مراجعة-الأداء.xlsx", writeXlsx([{ name: "الجلسات", rows: [head, ...body] }]));
   }
@@ -999,7 +1083,7 @@ function SessionsPage({ t }: { t: T }) {
       {rows.length ? (
         <div className="ncards">
           {rows.map((it) => (
-            <SessCard key={it.id} it={it} t={t} />
+            <SessCard key={it.id} it={it} t={t} canEdit={canEdit} save={save} />
           ))}
         </div>
       ) : (
@@ -1735,6 +1819,91 @@ export function StatusBars({
           </div>
         );
       })}
+    </div>,
+  );
+}
+
+/* ============================================================
+   جلسات مراجعة الأداء في «نظرة عامة» — مختصرة
+   ------------------------------------------------------------
+   كانت سبعة أشرطة طويلة تملأ الصندوق ولا تُقرأ بنظرة. صارت:
+   رقمٌ واحد كبير (كم جهة تحتاج جلسة هذا الربع) · شبكةُ المراحل
+   الست بعددها · وسطرُ التصعيد. و«مكتملة» أُزيلت بطلب المستخدمة.
+   ============================================================ */
+export function SessionsBox({ t, onOpen }: { t: T; onOpen?: () => void }) {
+  const { items, loaded } = useItems("sessions");
+  const title = SECTION_TITLE.sessions;
+  const { open, toggle } = useCollapse("sessions");
+
+  const sum = useMemo(() => {
+    const at = new Array(SESS_STAGES.length).fill(0);
+    const esc = new Array(ESC_LEVELS.length + 1).fill(0);
+    let live = 0;
+    for (const it of items) {
+      const st = sessOf(it.data).at;
+      if (st >= 0) {
+        at[Math.min(st, SESS_STAGES.length - 1)]++;
+        live++;
+      }
+      esc[escOf(it.data)]++;
+    }
+    const escN = esc.slice(1).reduce((a: number, b: number) => a + b, 0);
+    return { at, esc, escN, live };
+  }, [items]);
+
+  const box = (body: ReactNode) => (
+    <div className={`sx-box ${open ? "" : "closed"}`}>
+      <div className="hd">
+        <CollapseBtn open={open} toggle={toggle} t={t} />
+        <h3>{t(title[0], title[1])}</h3>
+        {onOpen && (
+          <button className="lnk" onClick={onOpen}>
+            {t("التفاصيل", "Details")} ‹
+          </button>
+        )}
+      </div>
+      {open && <div className="bd">{body}</div>}
+    </div>
+  );
+
+  if (!loaded) return box(<div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>);
+  if (!items.length)
+    return box(
+      <div className="sx-none">{t("لا توجد بيانات بعد — تُضاف من صفحة القسم.", "No data yet.")}</div>,
+    );
+
+  const quarter = txt(items[0]?.data?.quarter);
+
+  return box(
+    <div className="ssb">
+      <div className="ssb-top">
+        <b>{AR(sum.live)}</b>
+        <span>
+          {t("جهة تحتاج جلسة مراجعة أداء", "entities need a review session")}
+          {quarter ? ` · ${quarter}` : ""}
+        </span>
+      </div>
+
+      <div className="ssb-grid">
+        {SESS_SHORT.map((n, i) => (
+          <div className="ssb-c" key={n} style={{ ["--c" as string]: BAR_TONE[i % BAR_TONE.length] }}>
+            <b>{AR(sum.at[i])}</b>
+            <span>{n}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className={`ssb-esc ${sum.escN ? "on" : ""}`}>
+        <b>{AR(sum.escN)}</b>
+        <span>{t("جهة تحتاج تصعيداً", "entities need escalation")}</span>
+        {sum.escN > 0 && (
+          <em>
+            {ESC_LEVELS.filter((l) => sum.esc[l.n] > 0)
+              .map((l) => `${l.owner}: ${AR(sum.esc[l.n])}`)
+              .join(" · ")}
+          </em>
+        )}
+      </div>
     </div>,
   );
 }
@@ -3061,7 +3230,7 @@ export function SectionPage({
           {gearBtn}
         </div>
       )}
-      {section === "sessions" && <SessionsPage t={t} />}
+      {section === "sessions" && <SessionsPage t={t} canEdit={canEdit} />}
       {section === "natstrat" && <NationalPage t={t} canEdit={canEdit} />}
       {section === "inststrat" && <InstPage t={t} canEdit={canEdit} />}
       {section === "cx" && <CxPage t={t} canEdit={canEdit} />}
@@ -3313,12 +3482,10 @@ export function weekSummary(section: SectionKey, items: Item[]): WeekSum {
       if (s.at < 0) done++;
       else at[Math.min(s.at, SESS_STAGES.length - 1)]++;
     }
-    const bd = SESS_SHORT.map((k, i) => ({ k, n: at[i] }));
-    if (done) bd.push({ k: "مكتملة", n: done });
     return {
       total: items.length,
       totalLabel: "جهة",
-      breakdown: bd,
+      breakdown: SESS_SHORT.map((k, i) => ({ k, n: at[i] })),
       prog: items.length ? { done, of: items.length } : null,
     };
   }
