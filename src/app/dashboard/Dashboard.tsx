@@ -35,6 +35,8 @@ import {
   Sessions,
   StatusBars,
   SessionsBox,
+  useSectionKpis,
+  type SecKpi,
   StrategyBox,
   Projects,
   CxBox,
@@ -184,6 +186,18 @@ const TAB_SCOPE: Record<string, Scope> = {
   cx: "cx",
   projects: "projects",
 };
+
+/* المؤشر الذي له صفحة تحسبه — يُقرأ منها بدل الإدخال اليدوي.
+   المطابقة بكلمةٍ من نصّ المؤشر نفسه لا بمعرّفه، فلا يتعطّل إن
+   أُعيدت تسميته أو أُضيف مؤشر بنفس المعنى. */
+const IND_SECTION: { has: string[]; section: SectionKey; page: string }[] = [
+  { has: ["خدمات"], section: "cx", page: "أعمال قياس تجربة المستفيد" },
+  { has: ["منخفض"], section: "sessions", page: "جلسات مراجعة الأداء" },
+  { has: ["وزراء"], section: "natstrat", page: "الاستراتيجيات الوطنية" },
+  { has: ["مؤسسي"], section: "inststrat", page: "الاستراتيجيات المؤسسية" },
+];
+const indSection = (name: string) =>
+  IND_SECTION.find((x) => x.has.every((w) => String(name || "").includes(w)));
 
 const STICKY_PAGES: Record<string, Scope> = {
   overview: "overview",
@@ -1065,17 +1079,45 @@ function Overview({
     [latest, refData.targets, refData.targetMode, scopeQ]
   );
 
+  /* المؤشر الذي له صفحة يأخذ رقمها؛ وما سواه يبقى على القياسات
+     المُدخَلة يدوياً كما كان. والعدد (لا النسبة) يُقسَم على مستهدفه. */
+  const secKpi = useSectionKpis();
   const indData = useMemo(
     () =>
       indicators.map((ind, i) => {
-        const vals = sectors.map((s) => achOf(s.id, ind.id)).filter((v): v is number => v != null);
-        const a = avg(vals);
-        const value = a == null ? null : Math.round(a);
-        const band = bandOf(a, bands);
-        return { ...ind, num: i + 1, value, band, bandLabel: band?.label ?? null };
+        const link = indSection(ind.name);
+        const k: SecKpi | undefined = link ? secKpi[link.section] : undefined;
+        let value: number | null = null;
+        let src = "";
+        if (k && (k.pct != null || k.count != null)) {
+          if (k.pct != null) value = Math.round(k.pct);
+          else {
+            /* «عدد» لا «نسبة»: الإنجاز = المحقَّق ÷ المستهدف */
+            const tgts = sectors
+              .map((s) => tgtForScope(refData, tkey(s.id, ind.id), scopeQ))
+              .filter((x): x is number => !!x && x > 0);
+            const tgt = tgts.length ? Math.max(...tgts) : 0;
+            value = tgt > 0 ? Math.round(((k.count as number) / tgt) * 100) : null;
+          }
+          src = link ? link.page : "";
+        } else {
+          const vals = sectors.map((s) => achOf(s.id, ind.id)).filter((v): v is number => v != null);
+          const a = avg(vals);
+          value = a == null ? null : Math.round(a);
+        }
+        const band = bandOf(value, bands);
+        return {
+          ...ind,
+          num: i + 1,
+          value,
+          band,
+          bandLabel: band?.label ?? null,
+          src,
+          note: src ? k?.note || "" : "",
+        };
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [indicators, sectors, achOf, bands]
+    [indicators, sectors, achOf, bands, secKpi, refData.targets, refData.targetMode, scopeQ]
   );
 
   const bandCounts = useMemo(() => {
@@ -1217,7 +1259,11 @@ function Overview({
                     <button
                       key={ind.id}
                       className={`c ${ind.value == null ? "na" : ""}`}
-                      title={ind.name}
+                      title={
+                        ind.src
+                          ? `${ind.name}\n\n${t("يُقرأ آلياً من صفحة", "Read automatically from")} «${ind.src}»${ind.note ? `\n${ind.note}` : ""}`
+                          : ind.name
+                      }
                       onClick={() => setOpenIndicator(ind)}
                     >
                       {/* العمود داخل مساره وحده: ارتفاعه نسبةٌ مما تبقّى بعد
