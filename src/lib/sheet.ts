@@ -415,3 +415,83 @@ export function writeXlsx(sheets: SheetOut[]): Blob {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
 }
+
+/* ============================================================
+   قراءة ملف بوربوينت (.pptx)
+   ------------------------------------------------------------
+   ملف العرض أرشيف zip كملف الجدول تماماً، وشرائحه في
+   `ppt/slides/slideN.xml`. فلا مكتبة جديدة ولا تحميل من الشبكة —
+   نفس `unzip` أعلاه ونفس فكّ الرموز.
+
+   من كل شريحة نأخذ شيئين:
+     · `tables` — كل جدول فيها صفوفاً وخلايا، فيُقرأ كما تُقرأ
+       ورقة إكسل ويمرّ على نفس منطق المطابقة.
+     · `texts`  — نصّ كل شكل على حدة، لشرائح الكلام لا الجداول.
+   ============================================================ */
+
+export type Slide = { name: string; tables: string[][][]; texts: string[] };
+
+/** نصّ خلية أو شكل: كل فقرة سطر، والسطور الفارغة تُطوى */
+function pptText(xml: string): string {
+  return xml
+    .replace(/<a:br\s*\/?>/g, "\n")
+    .split(/<\/a:p>/)
+    .map((para) => {
+      let out = "";
+      /* لا بدّ من `>` أو مسافة بعد الاسم، وإلا التقط `<a:txBody>` كذلك */
+      const re = /<a:t(?:\s[^>]*)?>([\s\S]*?)<\/a:t>/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(para))) out += unesc(m[1]);
+      return out.trim();
+    })
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+}
+
+function pptTables(xml: string): string[][][] {
+  const out: string[][][] = [];
+  const tbl = /<a:tbl>([\s\S]*?)<\/a:tbl>/g;
+  let m: RegExpExecArray | null;
+  while ((m = tbl.exec(xml))) {
+    const rows: string[][] = [];
+    const tr = /<a:tr[^>]*>([\s\S]*?)<\/a:tr>/g;
+    let r: RegExpExecArray | null;
+    while ((r = tr.exec(m[1]))) {
+      const cells: string[] = [];
+      /* الخلية المدموجة تُبقى فارغة ولا تُحذف، فلا تنزاح الأعمدة */
+      const tc = /<a:tc(\s[^>]*)?>([\s\S]*?)<\/a:tc>/g;
+      let c: RegExpExecArray | null;
+      while ((c = tc.exec(r[1]))) cells.push(pptText(c[2]));
+      if (cells.length) rows.push(cells);
+    }
+    if (rows.length) out.push(rows);
+  }
+  return out;
+}
+
+export async function readPptxSlides(buf: ArrayBuffer): Promise<Slide[]> {
+  const files = await unzip(buf);
+  const dec = new TextDecoder("utf-8");
+
+  const names = [...files.keys()]
+    .filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n))
+    .sort((a, b) => {
+      const n = (s: string) => Number((s.match(/slide(\d+)\.xml$/) || [])[1] || 0);
+      return n(a) - n(b);
+    });
+
+  return names.map((n, i) => {
+    const xml = dec.decode(files.get(n)!);
+    /* نصوص الأشكال وحدها: الجداول تُقرأ على حدة فلا تُكرَّر هنا */
+    const noTbl = xml.replace(/<a:tbl>[\s\S]*?<\/a:tbl>/g, "");
+    const texts: string[] = [];
+    const sp = /<p:(sp|txBody)[\s>][\s\S]*?<\/p:\1>/g;
+    let m: RegExpExecArray | null;
+    while ((m = sp.exec(noTbl))) {
+      const s = pptText(m[0]);
+      if (s) texts.push(s);
+    }
+    return { name: `شريحة ${i + 1}`, tables: pptTables(xml), texts };
+  });
+}
