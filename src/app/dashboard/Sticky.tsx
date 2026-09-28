@@ -11,7 +11,7 @@
    والرؤية والكتابة يحرسهما RLS على الصفحة نفسها.
    ============================================================ */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 
 type T = (ar: string, en: string) => string;
@@ -28,7 +28,62 @@ export type StickyRow = {
   pinnedUntil: string | null;
   /** عنوان البطاقة التي وُضعت عندها — يُردّها لمكانها في أي تخطيط */
   anchor?: string;
+  /** من يراها: all للجميع · leads لمدراء القطاعات · users للمذكورين */
+  audience?: string;
+  mentionIds?: string[];
 };
+
+export type Person = { id: string; name: string; username: string; isLead?: boolean };
+
+/* ------------------------------------------------------------
+   المنشن — من يرى الملاحظة
+   ------------------------------------------------------------
+   الجمهور يُقرأ من نصّ الملاحظة نفسه لا من حالةٍ جانبية: ما يراه
+   الكاتب هو ما يُحفظ، وحذفُ المنشن من النص يُلغيه فعلاً.
+   الأولوية: @all ثم @sector managers ثم الأسماء.
+   ------------------------------------------------------------ */
+const MEN_ALL = ["@all", "@الكل"];
+const MEN_LEADS = ["@sector managers", "@sectormanagers", "@مدراء القطاعات", "@مدراء القطاع"];
+
+const menNorm = (v: string) =>
+  v.replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي").replace(/\s+/g, " ").trim().toLowerCase();
+
+export function readAudience(body: string, people: Person[]): { audience: string; ids: string[] } {
+  const b = menNorm(body);
+  if (MEN_ALL.some((x) => b.includes(menNorm(x)))) return { audience: "all", ids: [] };
+  if (MEN_LEADS.some((x) => b.includes(menNorm(x)))) return { audience: "leads", ids: [] };
+
+  /* الأطول أولاً: «عمر العتيق» قبل «عمر»، وما طوبق يُزال من النص
+     حتى لا يُحسب الاسم القصير داخل الطويل فتتّسع الدائرة بالخطأ */
+  let rest = b;
+  const ids: string[] = [];
+  const sorted = [...people].sort((a, b2) => b2.name.length - a.name.length);
+  for (const pr of sorted) {
+    const tok = menNorm("@" + pr.name);
+    const usr = pr.username ? menNorm("@" + pr.username) : "";
+    if (tok.length > 1 && rest.includes(tok)) {
+      ids.push(pr.id);
+      rest = rest.split(tok).join(" ");
+    } else if (usr.length > 1 && rest.includes(usr)) {
+      ids.push(pr.id);
+      rest = rest.split(usr).join(" ");
+    }
+  }
+  return ids.length ? { audience: "users", ids } : { audience: "all", ids: [] };
+}
+
+/** عبارةٌ تقول من يرى الملاحظة */
+function audienceText(n: StickyRow, people: Person[], t: T): string {
+  const a = n.audience || "all";
+  if (a === "leads") return t("مدراء القطاعات", "Sector managers");
+  if (a === "users") {
+    const names = (n.mentionIds || [])
+      .map((id) => people.find((p) => p.id === id)?.name || "")
+      .filter(Boolean);
+    return names.length ? names.join(" · ") : t("المذكورون", "Mentioned");
+  }
+  return "";
+}
 
 /* ------------------------------------------------------------
    الرسوّ على بند بعينه
@@ -144,6 +199,7 @@ function Note({
   onSave,
   onDone,
   onDelete,
+  people,
 }: {
   n: StickyRow;
   mine: boolean;
@@ -154,10 +210,57 @@ function Note({
   onSave: (id: string, body: string, until: string | null) => void;
   onDone: (id: string) => void;
   onDelete: (id: string) => void;
+  people: Person[];
 }) {
   const [open, setOpen] = useState(!n.body);
   const [edit, setEdit] = useState(!n.body);
   const [text, setText] = useState(n.body);
+  /* قائمة المنشن: تُفتح عند كتابة @ وتُغلق بالاختيار أو بمسافة */
+  const [men, setMen] = useState<{ at: number; q: string } | null>(null);
+  const ta = useRef<HTMLTextAreaElement | null>(null);
+
+  const opts = useMemo(() => {
+    const base = [
+      { id: "", token: "@all", label: "all", note: t("الكل", "Everyone") },
+      { id: "", token: "@sector managers", label: "sector managers", note: t("مدراء القطاعات", "Sector managers") },
+    ];
+    const list = people.map((pr) => ({
+      id: pr.id,
+      token: "@" + pr.name,
+      label: pr.name,
+      note: pr.username || "",
+    }));
+    const q = menNorm(men?.q || "");
+    const all = [...base, ...list];
+    if (!q) return all.slice(0, 8);
+    return all
+      .filter((o) => menNorm(o.label).includes(q) || menNorm(o.note).includes(q))
+      .slice(0, 8);
+  }, [people, men, t]);
+
+  function typed(v: string, pos: number) {
+    setText(v);
+    const m = /@([^\s@]{0,30})$/.exec(v.slice(0, pos));
+    setMen(m ? { at: pos - m[0].length, q: m[1] } : null);
+  }
+
+  function choose(token: string) {
+    if (!men) return;
+    const before = text.slice(0, men.at);
+    const after = text.slice(men.at + 1 + men.q.length);
+    const next = `${before}${token} ${after.replace(/^\s/, "")}`;
+    setText(next);
+    setMen(null);
+    requestAnimationFrame(() => {
+      const el = ta.current;
+      if (!el) return;
+      el.focus();
+      const at = before.length + token.length + 1;
+      el.setSelectionRange(at, at);
+    });
+  }
+
+  const aud = readAudience(text, people);
   const [until, setUntil] = useState<string>(n.pinnedUntil || "");
   const drag = useRef<{ dx: number; dy: number } | null>(null);
   const dragged = useRef(false);
@@ -230,13 +333,37 @@ function Note({
 
           {edit ? (
             <>
-              <textarea
-                autoFocus
-                rows={4}
-                value={text}
-                placeholder={t("اكتب الملاحظة أو السؤال…", "Write the note…")}
-                onChange={(e) => setText(e.target.value)}
-              />
+              <div className="stk-ta">
+                <textarea
+                  autoFocus
+                  ref={ta}
+                  rows={4}
+                  value={text}
+                  placeholder={t("اكتب الملاحظة… واكتب @ لتخصّها بأحد", "Write the note… type @ to mention")}
+                  onChange={(e) => typed(e.target.value, e.target.selectionStart ?? e.target.value.length)}
+                  onKeyDown={(e) => { if (e.key === "Escape" && men) { e.stopPropagation(); setMen(null); } }}
+                />
+                {men && opts.length > 0 && (
+                  <div className="stk-men">
+                    {opts.map((o) => (
+                      <button key={o.token} type="button" onMouseDown={(e) => { e.preventDefault(); choose(o.token); }}>
+                        <b>{o.label}</b>
+                        {o.note && <em>{o.note}</em>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="stk-aud">
+                {aud.audience === "all"
+                  ? t("يراها كل من يفتح الصفحة", "Everyone on this page will see it")
+                  : aud.audience === "leads"
+                    ? t("يراها مدراء القطاعات وحدهم", "Only sector managers will see it")
+                    : `${t("يراها", "Seen only by")}: ${aud.ids
+                        .map((id) => people.find((p2) => p2.id === id)?.name || "")
+                        .filter(Boolean)
+                        .join(" · ")}`}
+              </div>
               <div className="stk-dur">
                 {DURS.map(([v, lb]) => (
                   <button key={lb} className={until === v ? "on" : ""} onClick={() => setUntil(v)}>
@@ -263,6 +390,9 @@ function Note({
           ) : (
             <>
               <p>{n.body}</p>
+              {(n.audience || "all") !== "all" && (
+                <div className="stk-only">🔒 {audienceText(n, people, t)}</div>
+              )}
               <div className="stk-f">
                 <span className="stk-u">📌 {untilText(n.pinnedUntil)}</span>
                 {mine && (
@@ -302,10 +432,21 @@ export default function StickyLayer({
   t: T;
 }) {
   const [rows, setRows] = useState<StickyRow[]>([]);
+  const [people, setPeople] = useState<Person[]>([]);
   const [meId, setMeId] = useState("");
   const [placing, setPlacing] = useState(false);
   const [err, setErr] = useState("");
   const host = useRef<HTMLDivElement | null>(null);
+
+  /* الأسماء تُجلب مرة واحدة — يحتاجها المنشن ويُعرض بها من تعنيه */
+  useEffect(() => {
+    let live = true;
+    apiFetch("/api/people")
+      .then((r) => r.json())
+      .then((d) => { if (live) setPeople(Array.isArray(d.people) ? d.people : []); })
+      .catch(() => setPeople([]));
+    return () => { live = false; };
+  }, []);
 
   const load = useCallback(async () => {
     const r = await apiFetch(`/api/stickies?page=${page}`).then((x) => x.json()).catch(() => ({}));
@@ -437,11 +578,16 @@ export default function StickyLayer({
   }, []);
 
   async function save(id: string, body: string, until: string | null) {
+    /* الجمهور يُقرأ من النص عند الحفظ، فما يراه الكاتب هو ما يُحفظ */
+    const aud = readAudience(body, people);
     const cur = rows.find((r) => r.id === id);
     await apiFetch("/api/stickies", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, body, pinnedUntil: until, x: cur?.x, y: cur?.y, anchor: cur?.anchor ?? "" }),
+      body: JSON.stringify({
+        id, body, pinnedUntil: until, x: cur?.x, y: cur?.y, anchor: cur?.anchor ?? "",
+        audience: aud.audience, mentionIds: aud.ids,
+      }),
     });
     setRows((v) => v.map((r) => (r.id === id ? { ...r, body, pinnedUntil: until } : r)));
   }
@@ -484,6 +630,7 @@ export default function StickyLayer({
             onSave={save}
             onDone={done}
             onDelete={del}
+            people={people}
           />
         ))}
       </div>

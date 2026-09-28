@@ -124,7 +124,8 @@ async function people() {
   // بخلاف perf_list_users المحصورة بصلاحية «المستخدمون والصلاحيات»
   const { data } = await sb().rpc("perf_people");
   return (data || []).map((u: Record<string, unknown>) => ({
-    id: String(u.id), name: u.name, role: u.role, sectorIds: u.sector_ids || [],
+    id: String(u.id), name: u.name, username: String(u.username || ""),
+    role: u.role, sectorIds: u.sector_ids || [],
     isLead: u.is_lead === true, jobTitle: u.job_title || "",
     photoUrl: String(u.photo_url || ""),
   }));
@@ -1533,6 +1534,8 @@ export async function apiFetch(path: string, init: Init = {}) {
             body: r.body ?? "", byId: String(r.by_id ?? ""), byName: r.by_name ?? "",
             at: r.at, pinnedUntil: r.pinned_until ?? null,
             anchor: r.anchor ?? "",
+            audience: String(r.audience || "all"),
+            mentionIds: (r.mention_ids || []).map((x: unknown) => String(x)),
           })),
         meId: me.id,
       });
@@ -1546,6 +1549,12 @@ export async function apiFetch(path: string, init: Init = {}) {
       if (body.y !== undefined) patch.y = num(body.y) ?? 30;
       if (body.body !== undefined) patch.body = str(body.body);
       if (body.anchor !== undefined) patch.anchor = str(body.anchor).slice(0, 120);
+      if (body.audience !== undefined)
+        patch.audience = ["all", "leads", "users"].includes(str(body.audience))
+          ? str(body.audience) : "all";
+      if (body.mentionIds !== undefined)
+        patch.mention_ids = (Array.isArray(body.mentionIds) ? body.mentionIds : [])
+          .map((x: unknown) => Number(x)).filter((x: number) => Number.isFinite(x));
       if (body.pinnedUntil !== undefined)
         patch.pinned_until = /^\d{4}-\d{2}-\d{2}$/.test(str(body.pinnedUntil)) ? str(body.pinnedUntil) : null;
       if (body.done === true) {
@@ -1568,6 +1577,8 @@ export async function apiFetch(path: string, init: Init = {}) {
         pinned_until: patch.pinned_until ?? null,
         /* البند الذي وُضعت عنده — فتعود إليه مهما تغيّر التخطيط */
         anchor: str(body.anchor).slice(0, 120),
+        audience: patch.audience ?? "all",
+        mention_ids: patch.mention_ids ?? [],
       });
       if (error) return err(error.message, 403);
       return ok({ ok: true, id });
