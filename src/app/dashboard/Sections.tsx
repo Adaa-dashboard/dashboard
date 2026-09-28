@@ -3642,6 +3642,98 @@ function ItemForm({
 }
 
 /* ============================================================
+   مؤشرات «نظرة عامة» تُقرأ من صفحات الأقسام
+   ------------------------------------------------------------
+   كان كل مؤشر يُدخَل يدوياً في «القياسات» وإن كانت صفحته تحسبه
+   أصلاً — فيختلف الرقمان. الآن المؤشر الذي له صفحة يأخذ رقمها،
+   وصيغةُ كلٍّ من نصّ المؤشر نفسه لا من قاعدة عامة:
+
+     · قياس خدمات الأجهزة   ⇐ الأجهزة التي صدر لها تقرير ÷ المستهدف
+     · الأداء المنخفض        ⇐ الجهات التي عُقدت لها الجلسة النهائية ÷ الكل
+     · الاستراتيجيات الوطنية ⇐ المؤشرات الممثَّلة ÷ إجماليها، للمعتمدة
+                               من مجلس الوزراء وحدها
+     · الاستراتيجيات المؤسسية ⇐ عدد الجهات التي فُعِّل قياسها (عدد لا
+                               نسبة، فيُقسَم على مستهدفه في نظرة عامة)
+
+   وما لا صفحة له — أو صفحته بلا حقول معتمدة كالمخرجات الوطنية —
+   يبقى على الإدخال اليدوي كما كان.
+   ============================================================ */
+export type SecKpi = { pct: number | null; count: number | null; note: string };
+
+export function sectionKpi(section: SectionKey, items: Item[]): SecKpi {
+  const none: SecKpi = { pct: null, count: null, note: "" };
+  if (!items.length) return none;
+
+  if (section === "cx") {
+    const st = cxStats(items);
+    return {
+      pct: st.pct,
+      count: st.doneAgencies,
+      note: `${AR(st.doneAgencies)} جهازاً صدر له تقرير${st.target > 0 ? ` من ${AR(st.target)}` : ""}`,
+    };
+  }
+
+  if (section === "sessions") {
+    /* «عُقدت لها جلسة» = أتمّت مرحلة «عقد جلسة مراجعة الأداء النهائية» */
+    const HELD = 4;
+    const held = items.filter((it) => sessOf(it.data).done >= HELD).length;
+    return {
+      pct: Math.round((held / items.length) * 100),
+      count: held,
+      note: `${AR(held)} جهة عُقدت لها الجلسة النهائية من ${AR(items.length)}`,
+    };
+  }
+
+  if (section === "natstrat") {
+    const appr = items.filter((it) => natStage(it.data) === NAT_STEPS.length);
+    const rep = appr.reduce((a, x) => a + numOf(x.data.kpisRep), 0);
+    const all = appr.reduce((a, x) => a + numOf(x.data.kpisTot), 0);
+    if (!all) return none;
+    return {
+      pct: Math.round((rep / all) * 100),
+      count: null,
+      note: `${AR(rep)} مؤشراً ممثَّلاً من ${AR(all)} في ${AR(appr.length)} استراتيجية معتمدة من مجلس الوزراء`,
+    };
+  }
+
+  if (section === "inststrat") {
+    const live = items.filter((it) => txt(it.data.live) === "مفعل").length;
+    return { pct: null, count: live, note: `${AR(live)} جهة فُعِّل قياس استراتيجيتها` };
+  }
+
+  return none;
+}
+
+/** الأقسام التي تُغذّي مؤشرات «نظرة عامة» */
+export const KPI_SECTIONS: SectionKey[] = ["cx", "sessions", "natstrat", "inststrat"];
+
+/** يقرأ الأقسام الأربعة مرّةً ويُرجع رقم كلٍّ — لصفحة «نظرة عامة» */
+export function useSectionKpis() {
+  const [map, setMap] = useState<Partial<Record<SectionKey, SecKpi>>>({});
+  useEffect(() => {
+    let live = true;
+    void Promise.all(
+      KPI_SECTIONS.map(async (k) => {
+        const r = await apiFetch(`/api/items?section=${k}`);
+        const d = await r.json().catch(() => ({}));
+        return [k, sectionKpi(k, Array.isArray(d.items) ? d.items : [])] as const;
+      }),
+    )
+      .then((pairs) => {
+        if (!live) return;
+        const m: Partial<Record<SectionKey, SecKpi>> = {};
+        for (const [k, v] of pairs) m[k] = v;
+        setMap(m);
+      })
+      .catch(() => setMap({}));
+    return () => {
+      live = false;
+    };
+  }, []);
+  return map;
+}
+
+/* ============================================================
    ملخّص أسبوعي لقسم واحد — يستعمله «التقرير الأسبوعي».
    يُبنى من نفس الدوال والثوابت التي ترسم القسم في نظرة عامة،
    فلا يختلف رقمٌ بين الصفحة والتقرير.
