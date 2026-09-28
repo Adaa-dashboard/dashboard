@@ -43,7 +43,6 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [loading, setLoading] = useState(false);
-  const [magic, setMagic] = useState(""); // "busy" أثناء استهلاك رابط الدخول المؤقت
 
   async function signIn(e: React.FormEvent) {
     e.preventDefault();
@@ -85,35 +84,6 @@ export default function LoginPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const q = new URLSearchParams(window.location.search);
-
-    /* `?k=<رمز>` رابط دخول مؤقت: يُستهلك مرة واحدة على الخادم،
-       ثم يُمسح من شريط العنوان فلا يبقى في السجل ولا يُعاد إرساله */
-    const k = (q.get("k") || "").trim();
-    if (k) {
-      setMagic("busy");
-      history.replaceState(null, "", window.location.pathname);
-      apiFetch("/api/auth/magic", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: k }),
-      })
-        .then(async (r) => {
-          const d = await r.json();
-          if (!r.ok) {
-            setMagic("");
-            setError(d.error || t("تعذّر الدخول بالرابط", "This link did not work"));
-            return;
-          }
-          router.push("/dashboard");
-          router.refresh();
-        })
-        .catch(() => {
-          setMagic("");
-          setError(t("تعذّر الاتصال بالخادم", "Could not reach the server"));
-        });
-      return;
-    }
-
     const u = (q.get("u") || q.get("user") || "").trim();
     if (!u) return;
     setUsername(u);
@@ -171,17 +141,6 @@ export default function LoginPage() {
       setLoading(false);
     }
   }
-
-  if (magic === "busy")
-    return (
-      <div className="auth-wrap">
-        <div className="card auth-card" style={{ textAlign: "center" }}>
-          <p style={{ fontSize: "1.05rem", fontWeight: 700 }}>
-            {t("جارٍ الدخول…", "Signing you in…")}
-          </p>
-        </div>
-      </div>
-    );
 
   return (
     <div className="auth-wrap">
