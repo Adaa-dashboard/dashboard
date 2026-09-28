@@ -65,8 +65,15 @@ declare
   k     text;
   allowed text[] := case p_section
     when 'natstrat'  then array['stage','kpisRep','kpisTot','initRep','initTot','meas','note']
-    when 'inststrat' then array['meet','docs','live','note']
-    when 'cx'        then array['meet','survey','counted','note']
+    when 'inststrat' then array['rep','meet','meetAt','docs','docsState','target','live','phase','note']
+    -- تجربة المستفيد: حقول الملف الجوهرية وحقول الأرباع الخمسة،
+    -- فمرحلة الجهة في صفحتها محسوبة منها ولا تُختار اختياراً
+    when 'cx'        then array['meet','survey','card','l1','freq','servTot','servPlan',
+                                'counted','countedQ2','note',
+                                'q0Share','q1Share','q2Share','q3Share','q4Share',
+                                'q0Issue','q1Issue','q2Issue','q3Issue','q4Issue',
+                                'q0Svc','q1Svc','q2Svc','q3Svc','q4Svc',
+                                'q0Sat','q1Sat','q2Sat','q3Sat','q4Sat']
     when 'sessions'  then array['done','perf','kpiBad','kpiTot','initBad','initTot','esc','note','quarter']
     else array[]::text[]
   end;

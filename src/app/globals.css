@@ -11063,6 +11063,21 @@ input.cell-date {
   color: var(--text);
 }
 
+/* مرحلة الجهة في صفحة تجربة المستفيد — محسوبة، فتُعرض ولا تُختار */
+.mw-stg { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 7px; }
+.mw-stg .k { font-size: 9.5px; font-weight: 700; color: var(--muted); }
+.mw-stg i {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--c);
+  background: color-mix(in srgb, var(--c) 13%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c) 30%, transparent);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.mw-stg em { font-style: normal; font-size: 10px; color: var(--muted); }
+
 /* تقييم التعثّر بمعايير الآلية */
 .mw-crit {
   margin-top: 8px;

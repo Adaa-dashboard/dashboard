@@ -127,11 +127,11 @@ const INST_STAGES = ["وصلت المركز", "قيد المراجعة", "معا
 
 /* أعمدة متابعة الاستراتيجيات المؤسسية — هي أعمدة ملف المتابعة نفسه
    حتى لا يُنقل بين الإكسل واللوحة. كل خلية تُحرَّر في مكانها. */
-type ICol = { k: string; label: string; opts?: string[]; w: number };
+export type ICol = { k: string; label: string; opts?: string[]; w: number };
 const INST_SECTORS = ["المالي والاقتصادي", "البنية التحتية", "الخدمات الاجتماعية", "الشؤون الحكومية"];
 /* العرض بالبكسل لأن الجدول يمرّر أفقياً — والقيم مقاسة على أطول
    نص فعلي في كل عمود، فلا يُقتطع اسم جهة ولا بريد */
-const INST_COLS: ICol[] = [
+export const INST_COLS: ICol[] = [
   { k: "sector", label: "القطاع", opts: ["", ...INST_SECTORS], w: 140 },
   { k: "owner", label: "الجهة", w: 250 },
   { k: "consultant", label: "الاستشاري", w: 150 },
@@ -168,7 +168,7 @@ const CX_NONE = "لم يتم الاستلام";
 const cxProg = (v: string) => v !== "" && v !== CX_OK && v !== CX_NONE;
 
 /** الأرباع الخمسة كما في الملف: الأخير من ٢٠٢٥ ثم أرباع ٢٠٢٦ */
-const CX_QS = [
+export const CX_QS = [
   { k: "q0", label: "Q4 — 2025م" },
   { k: "q1", label: "Q1 — 2026م" },
   { k: "q2", label: "Q2 — 2026م" },
@@ -176,9 +176,9 @@ const CX_QS = [
   { k: "q4", label: "Q4 — 2026م" },
 ];
 
-type CxCol = { k: string; label: string; w: number; opts?: string[]; core?: boolean };
+export type CxCol = { k: string; label: string; w: number; opts?: string[]; core?: boolean };
 /** ترتيب الأعمدة هو ترتيب الملف نفسه، فالفهرس هو أداة المطابقة عند الرفع */
-const CX_COLS: CxCol[] = [
+export const CX_COLS: CxCol[] = [
   { k: "name", label: "اسم الجهاز", w: 240, core: true },
   { k: "sector", label: "القطاع", w: 150, opts: ["", ...INST_SECTORS], core: true },
   { k: "kind", label: "تصنيف الجهة", w: 110, core: true },
@@ -248,6 +248,12 @@ const CX_STAGES: { k: string; ar: string; en: string; c: string; test: (d: Rec) 
     test: (d) => txt(d.meet) === "لم يبدأ",
   },
 ];
+/** مراحل ملف تجربة المستفيد التي ينطبق عليها البند.
+    متداخلة لا متتابعة، فقد ينطبق أكثر من واحدة — تُعرض كلها. */
+export function cxStagesOf(d: Rec): { k: string; ar: string; c: string }[] {
+  return CX_STAGES.filter((s) => s.test(d)).map((s) => ({ k: s.k, ar: s.ar, c: s.c }));
+}
+
 /* تلوين الخلايا التي لها معنى حالة */
 function instTone(k: string, v: string): string {
   if (!v) return "";
