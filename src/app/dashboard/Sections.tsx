@@ -908,18 +908,6 @@ function SessCard({
               {AR(bad.ini)} <em>{`${t("من", "of")} ${AR(bad.iniOf)}`}</em>
             </div>
           </div>
-          <div className="n">
-            <div className="k">{t("العناصر التي استوجبت الجلسة", "Elements triggering the session")}</div>
-            <div className="v">
-              {AR(bad.all)} <em>{t("عنصراً متعثراً", "off-track")}</em>
-            </div>
-          </div>
-          <div className="n">
-            <div className="k">{t("الأداء العام", "Overall performance")}</div>
-            <div className="v">
-              {AR(perf)}٪ <em>{band.label}</em>
-            </div>
-          </div>
         </div>
       </div>
 
