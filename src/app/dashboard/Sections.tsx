@@ -1498,8 +1498,13 @@ export function StrategyBox({
       else band.low++;
     }
     const tech = items.filter((x) => x.data.tech).length;
-    const rep = items.reduce((a, x) => a + numOf(x.data.kpisRep), 0);
-    const all = items.reduce((a, x) => a + numOf(x.data.kpisTot), 0);
+    /* نسبة القياس على **المعتمدة من مجلس الوزراء وحدها**: ما لم
+       يُعتمد بعدُ فقائمة مؤشراته غير نهائية، فإدخاله في النسبة
+       يخفضها بما لم يحن دوره — بطلب المستخدمة. */
+    const appr = items.filter((x) => natStage(x.data) === NAT_STEPS.length);
+    const rep = appr.reduce((a, x) => a + numOf(x.data.kpisRep), 0);
+    const all = appr.reduce((a, x) => a + numOf(x.data.kpisTot), 0);
+    const repPct = all ? Math.round((rep / all) * 100) : 0;
     return box(
       <>
         <div className="head-row">
@@ -1530,8 +1535,15 @@ export function StrategyBox({
           <GCell k={t("مقبولة فنياً", "Technically accepted")}>
             {AR(tech)} <em>{`${t("من", "of")} ${AR(tot)}`}</em>
           </GCell>
-          <GCell k={t("المؤشرات الممثَّلة", "Represented KPIs")}>
-            {AR(rep)} <em>{`${t("من", "of")} ${AR(all)}`}</em>
+          <GCell k={t("نسبة قياس المعتمدة من مجلس الوزراء", "Measured — CoM approved")}>
+            {all ? (
+              <>
+                {AR(repPct)}٪{" "}
+                <em>{`${AR(rep)} ${t("من", "of")} ${AR(all)} ${t("مؤشراً", "KPIs")}`}</em>
+              </>
+            ) : (
+              <em>{t("لا توجد معتمدة بعد", "None approved yet")}</em>
+            )}
           </GCell>
           <GCell k={t("آخر تحديث", "Last update")}>
             <span className="dt">{last}</span>
