@@ -10756,3 +10756,53 @@ input.cell-date {
   color: var(--text);
   resize: vertical;
 }
+
+/* ---------- المنشن في الملاحظات اللاصقة ---------- */
+.stk-ta { position: relative; }
+.stk-men {
+  position: absolute;
+  inset-inline: 0;
+  top: 100%;
+  z-index: 5;
+  max-height: 196px;
+  overflow: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, .16);
+  padding: 4px;
+}
+.stk-men button {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  text-align: start;
+  font: inherit;
+  background: none;
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+.stk-men button:hover { background: var(--soft); }
+.stk-men b { font-size: 12px; font-weight: 700; color: var(--text); }
+.stk-men em { font-style: normal; font-size: 10.5px; color: var(--muted); direction: ltr; }
+
+.stk-aud {
+  font-size: 10.5px;
+  color: var(--muted);
+  margin: 5px 2px 0;
+  overflow-wrap: anywhere;
+}
+.stk-only {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #8a5a00;
+  background: rgba(224, 151, 26, .14);
+  border: 1px solid rgba(224, 151, 26, .3);
+  border-radius: 8px;
+  padding: 3px 8px;
+  margin: 6px 0 2px;
+  overflow-wrap: anywhere;
+}
