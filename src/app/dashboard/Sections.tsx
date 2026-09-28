@@ -65,20 +65,6 @@ const SESS_SHORT = [
    موضع الجهة في المسار */
 const SESS_LEGACY = ["تحديد الجهة", "جمع البيانات", "إعداد التقرير", "انعقاد الجلسة", "محضر وتوصيات", "الإغلاق"];
 
-/* ملاحظاتٌ جاهزة تُختار بضغطة — أكثر ما يتكرّر في متابعة الجلسات.
-   تُحفظ في `tags`، والكتابة الحرة تبقى في `note` إلى جانبها، فلا
-   يضيق المتابع بقائمةٍ لا تسع حالته. */
-const SESS_NOTE_OPTS = [
-  "بانتظار تجاوب الجهة",
-  "بانتظار الوثائق الداعمة",
-  "تم تحديد موعد الجلسة",
-  "الإجراءات التصحيحية متأخرة",
-  "الجهة متجاوبة",
-  "يحتاج تصعيداً",
-  "بانتظار اعتماد رئيس الجهاز",
-  "أُغلقت الإجراءات",
-];
-
 /* مراحل التصعيد الأربع كما في الآلية — تُفعَّل حين يتأخّر استكمال
    الإجراء التصحيحي عن تاريخ تنفيذه. المدّة في الثالثة والرابعة
    تُحتسب من تاريخ الاستحقاق لا من تاريخ الجلسة. */
@@ -662,6 +648,7 @@ function Toolbar({
   setFilter,
   options,
   onExport,
+  allLabel,
   t,
 }: {
   q: string;
@@ -670,6 +657,8 @@ function Toolbar({
   setFilter: (v: string) => void;
   options: string[];
   onExport: () => void;
+  /** نص الخيار الأول — «كل الحالات» ما لم يُمرَّر غيره */
+  allLabel?: string;
   t: T;
 }) {
   return (
@@ -681,7 +670,7 @@ function Toolbar({
         placeholder={t("بحث بالاسم أو الجهة…", "Search…")}
       />
       <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-        <option value="">{t("كل الحالات", "All statuses")}</option>
+        <option value="">{allLabel || t("كل الحالات", "All statuses")}</option>
         {options.map((o) => (
           <option key={o} value={o}>
             {o}
@@ -843,12 +832,13 @@ export function Sessions({ limit, t }: { limit?: number; t: T }) {
    على نمط بطاقة الاستراتيجية الوطنية: حلقةُ الأداء العام أولاً،
    ثم العناصر المتعثرة التي استوجبت الجلسة، ثم مسار المراحل الست. */
 function SessCard({
-  it, t, canEdit, save,
+  it, t, canEdit, save, logo,
 }: {
   it: Item;
   t: T;
   canEdit?: boolean;
   save?: (id: string, data: Rec, ord: number) => Promise<string | null>;
+  logo?: string;
 }) {
   const d = it.data;
   const s = sessOf(d);
@@ -857,7 +847,6 @@ function SessCard({
   const band = perfBand(perf);
   const esc = escAt(escOf(d));
   const cur = s.at < 0 ? t("مكتملة", "Done") : s.names[s.at] || "";
-  const tags: string[] = Array.isArray(d.tags) ? (d.tags as string[]).map(txt) : [];
   /* الكتابة الحرة تُحفظ بعد سكوتٍ قصير، فلا يُرسَل طلبٌ بكل حرف */
   const [draft, setDraft] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -865,10 +854,6 @@ function SessCard({
   async function put(next: Rec) {
     if (!canEdit || !save) return;
     await save(it.id, { ...d, ...next, demo: false }, it.ord);
-  }
-  function toggleTag(x: string) {
-    const has = tags.includes(x);
-    void put({ tags: has ? tags.filter((y) => y !== x) : [...tags, x] });
   }
   function typeNote(v: string) {
     setDraft(v);
@@ -882,6 +867,10 @@ function SessCard({
   return (
     <div className="ncard">
       <div className="hd">
+        {logo && (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img className="lg" src={asset(`/logos/${logo}`)} alt="" loading="lazy" />
+        )}
         <b>{txt(d.entity) || "—"}</b>
         <span className="tg" style={{ background: band.hex, color: "#fff" }}>
           {band.label}
@@ -934,100 +923,270 @@ function SessCard({
       <div className="sn">
         <div className="sn-h">{t("الملاحظات", "Notes")}</div>
         {canEdit ? (
-          <>
-            <div className="sn-opts">
-              {SESS_NOTE_OPTS.map((x) => (
-                <button
-                  key={x}
-                  type="button"
-                  className={`sn-op ${tags.includes(x) ? "on" : ""}`}
-                  onClick={() => toggleTag(x)}
-                >
-                  {x}
-                </button>
-              ))}
-            </div>
-            <textarea
-              rows={2}
-              className="sn-txt"
-              value={draft ?? txt(d.note)}
-              placeholder={t("اكتب ملاحظتك…", "Write a note…")}
-              onChange={(e) => typeNote(e.target.value)}
-            />
-          </>
+          <textarea
+            rows={2}
+            className="sn-txt"
+            value={draft ?? txt(d.note)}
+            placeholder={t("اكتب ملاحظتك…", "Write a note…")}
+            onChange={(e) => typeNote(e.target.value)}
+          />
         ) : (
-          <>
-            {tags.length > 0 && (
-              <div className="sn-opts">
-                {tags.map((x) => (
-                  <span key={x} className="sn-op on">
-                    {x}
-                  </span>
-                ))}
-              </div>
-            )}
-            <div className="note">
-              {txt(d.note) || t("لا توجد ملاحظات مسجّلة", "No notes recorded")}
-            </div>
-          </>
+          <div className="note">
+            {txt(d.note) || t("لا توجد ملاحظات مسجّلة", "No notes recorded")}
+          </div>
         )}
       </div>
     </div>
   );
 }
 
-function SessionsPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
-  const { items, loaded, save } = useItems("sessions");
-  const [q, setQ] = useState("");
-  /* -1 = كل الجهات · 0..5 = مرحلة · 9 = مكتملة */
-  const [tab, setTab] = useState(-1);
-  /* 0 = بلا فلتر تصعيد · 1..4 = مرحلة التصعيد */
-  const [esc, setEsc] = useState(0);
+/* ---------- رفع ملف بيانات جلسات مراجعة الأداء ----------
+   نفس منطق رفع الاستراتيجيات الوطنية: إكسل أو بوربوينت، المطابقة
+   بعنوان العمود لا بموضعه، والصف باسم الجهة — فيُحدَّث بندها ولا
+   يتكرّر، والخانة الفارغة تُبقي القيمة الحالية، ولا يُحذف بند. */
+function sessKeyOf(head: string): string {
+  const h = natNorm(head);
+  if (!h) return "";
+  const has = (...w: string[]) => w.every((x) => h.includes(x));
+  if (has("مؤشر", "متعثر")) return "kpiBad";
+  if (h.includes("مؤشر")) return "kpiTot";
+  if (has("مبادر", "متعثر")) return "initBad";
+  if (h.includes("مبادر")) return "initTot";
+  if (h.includes("اداء") && (h.includes("نسبه") || h.includes("عام"))) return "perf";
+  if (h.includes("تصعيد")) return "esc";
+  if (h.includes("مرحل") || h.includes("مكتمل")) return "done";
+  if (h.includes("ربع")) return "quarter";
+  if (h.includes("ملاحظ") || h.includes("تحدي")) return "note";
+  if (h.includes("جهه") || h.includes("جهاز") || h.includes("اسم")) return "entity";
+  return "";
+}
 
-  const found = useMemo(
-    () =>
-      items.filter((it) => {
-        const d = it.data;
-        return !q || `${txt(d.entity)} ${txt(d.quarter)}`.includes(q);
-      }),
-    [items, q],
+const SESS_NUM_KEYS = new Set(["perf", "kpiBad", "kpiTot", "initBad", "initTot", "done", "esc"]);
+
+function sessVal(k: string, raw: string): unknown {
+  const v = String(raw ?? "").trim();
+  if (!v) return undefined;
+  if (k === "done") {
+    /* قد يأتي اسم المرحلة بدل رقمها */
+    const n = Number(v);
+    if (Number.isFinite(n)) return Math.max(0, Math.min(SESS_STAGES.length, n));
+    const h = natNorm(v);
+    const i = SESS_STAGES.findIndex((x) => natNorm(x) === h);
+    const j = i >= 0 ? i : SESS_SHORT.findIndex((x) => natNorm(x) === h);
+    return j >= 0 ? j : undefined;
+  }
+  if (k === "esc") {
+    const n = Number(v);
+    if (Number.isFinite(n)) return Math.max(0, Math.min(ESC_LEVELS.length, n));
+    const h = natNorm(v);
+    const l = ESC_LEVELS.find((x) => natNorm(x.name).includes(h) || natNorm(x.owner).includes(h));
+    return l ? l.n : undefined;
+  }
+  if (SESS_NUM_KEYS.has(k)) {
+    const n = Number(v.replace(/[٪%,\s]/g, ""));
+    return Number.isFinite(n) ? n : undefined;
+  }
+  return v;
+}
+
+function sessNewId(name: string): string {
+  const k = natNorm(name).replace(/\s/g, "");
+  let h = 5381;
+  for (let i = 0; i < k.length; i++) h = ((h * 33) ^ k.charCodeAt(i)) >>> 0;
+  return "sess-" + h.toString(36);
+}
+
+function SessImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => void }) {
+  const [msg, setMsg] = useState("");
+  const ref = useRef<HTMLInputElement>(null);
+
+  async function pick(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    setMsg(t("جارٍ القراءة...", "Reading..."));
+    try {
+      const buf = await f.arrayBuffer();
+      const isPpt = /\.pptx$/i.test(f.name);
+      const sheets: { name: string; rows: string[][] }[] = isPpt
+        ? (await readPptxSlides(buf)).flatMap((sl) =>
+            sl.tables.map((rows, ti) => ({
+              name: `${sl.name}${sl.tables.length > 1 ? ` · جدول ${ti + 1}` : ""}`,
+              rows,
+            })),
+          )
+        : await readXlsxSheets(buf);
+
+      const found: { rows: string[][]; hi: number; map: Record<number, string> }[] = [];
+      for (const sh of sheets) {
+        const rs = sh.rows || [];
+        for (let i = 0; i < Math.min(rs.length, 8); i++) {
+          const m: Record<number, string> = {};
+          (rs[i] || []).forEach((c, ci) => {
+            const k = sessKeyOf(txt(c));
+            if (k && !Object.values(m).includes(k)) m[ci] = k;
+          });
+          if (Object.values(m).includes("entity") && Object.keys(m).length >= 2) {
+            found.push({ rows: rs, hi: i, map: m });
+            break;
+          }
+        }
+        if (found.length && !isPpt) break;
+      }
+      if (!found.length) {
+        setMsg(
+          t(
+            "لم أجد صف العناوين — لا بدّ من عمود «الجهة» ومعه عمود معروف آخر. نزّلي ملف Excel من الزر المجاور وعدّلي عليه ثم ارفعيه.",
+            "Could not find a header row with an entity column.",
+          ),
+        );
+        return;
+      }
+
+      const byName = new Map<string, Item>();
+      for (const it of items) byName.set(natNorm(txt(it.data.entity)), it);
+      const today = new Date().toISOString().slice(0, 10);
+      const upd = new Map<string, { id: string; ord: number; data: Rec }>();
+      const add = new Map<string, { id: string; ord: number; data: Rec }>();
+      const fresh: string[] = [];
+      let maxOrd = items.reduce((a, b) => Math.max(a, b.ord || 0), 0);
+
+      for (const src of found) {
+        const nameCol = Number(Object.keys(src.map).find((c) => src.map[Number(c)] === "entity"));
+        for (const r of src.rows.slice(src.hi + 1)) {
+          const nm = txt(r[nameCol]).trim();
+          if (!nm) continue;
+          const patch: Rec = {};
+          for (const [ci, k] of Object.entries(src.map)) {
+            if (k === "entity") continue;
+            const v = sessVal(k, txt(r[Number(ci)]));
+            if (v !== undefined) patch[k] = v;
+          }
+          const key = natNorm(nm);
+          const cur = byName.get(key);
+          if (cur) {
+            if (!Object.keys(patch).length) continue;
+            const prev = upd.get(key);
+            upd.set(key, {
+              id: cur.id,
+              ord: cur.ord,
+              data: { ...(prev?.data ?? cur.data), ...patch, updated: today },
+            });
+          } else {
+            const prev = add.get(key);
+            if (!prev) fresh.push(nm);
+            add.set(key, {
+              id: sessNewId(nm),
+              ord: prev?.ord ?? ++maxOrd,
+              data: { done: 0, ...(prev?.data ?? {}), ...patch, entity: nm, updated: today },
+            });
+          }
+        }
+      }
+
+      if (!upd.size && !add.size) {
+        setMsg(t("لم يتغيّر شيء — الملف مطابق لما في المنصة", "Nothing changed"));
+        return;
+      }
+      const extra = fresh.length
+        ? `\n\nوستُضاف ${fresh.length} جهة ليست في المنصة:\n• ${fresh
+            .slice(0, 6)
+            .join("\n• ")}${fresh.length > 6 ? "\n• …" : ""}`
+        : "";
+      if (
+        !confirm(
+          t(
+            `سيُحدَّث ${upd.size} جهة من الملف.\nلا يُحذف شيء، والخانة الفارغة تُبقي القيمة الحالية كما هي.${extra}\n\nمتابعة؟`,
+            `Update ${upd.size} entities?`,
+          ),
+        )
+      ) {
+        setMsg("");
+        return;
+      }
+
+      const all = [...upd.values(), ...add.values()];
+      for (let i = 0; i < all.length; i += 40) {
+        const res = await apiFetch("/api/items", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ section: "sessions", items: all.slice(i, i + 40) }),
+        });
+        if (!res.ok) {
+          const dd = await res.json().catch(() => ({}));
+          setMsg(dd.error || t("تعذّر الحفظ", "Save failed"));
+          return;
+        }
+      }
+      setMsg(
+        t(
+          `تم تحديث ${upd.size} جهة${add.size ? ` · وأُضيفت ${add.size}` : ""}`,
+          `Updated ${upd.size}`,
+        ),
+      );
+      onDone();
+    } catch {
+      setMsg(t("تعذّرت قراءة الملف — يُقبل xlsx أو pptx", "Could not read the file"));
+    }
+  }
+
+  return (
+    <span className="seedb">
+      <button className="btn btn-sm" onClick={() => ref.current?.click()}>
+        {t("رفع ملف البيانات", "Upload data file")}
+      </button>
+      <input ref={ref} type="file" accept=".xlsx,.pptx" hidden onChange={pick} />
+      {msg && <em>{msg}</em>}
+    </span>
   );
-  const rows = (q ? found : found.filter((it) => {
-    if (tab >= 0) {
-      const at = sessOf(it.data).at;
-      if (tab === 9 ? at >= 0 : at !== tab) return false;
-    }
-    return true;
-  })).filter((it) => !esc || escOf(it.data) === esc);
+}
 
-  const sum = useMemo(() => {
-    let kpi = 0, kpiOf = 0, ini = 0, iniOf = 0, doneN = 0;
-    const at = new Array(SESS_STAGES.length).fill(0);
-    const esc = new Array(ESC_LEVELS.length + 1).fill(0);
-    for (const it of items) {
-      const b = sessBad(it.data);
-      kpi += b.kpi; kpiOf += b.kpiOf; ini += b.ini; iniOf += b.iniOf;
-      const st = sessOf(it.data).at;
-      if (st < 0) doneN++;
-      else at[Math.min(st, SESS_STAGES.length - 1)]++;
-      esc[escOf(it.data)]++;
-    }
-    return { kpi, kpiOf, ini, iniOf, at, doneN, esc };
-  }, [items]);
+function SessionsPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
+  const { items, loaded, save, reload } = useItems("sessions");
+  const [q, setQ] = useState("");
+  /* فلتر واحد يجمع الحالة والمرحلة والتصعيد — بدل المربعات فوق */
+  const [f, setF] = useState("");
+  const logos = useLogos();
+
+  const OPTS = useMemo(
+    () => [
+      ...SESS_SHORT.map((n) => `المرحلة: ${n}`),
+      "مكتملة",
+      ...ESC_LEVELS.map((l) => `تصعيد: ${l.name}`),
+      "تحتاج تصعيداً",
+    ],
+    [],
+  );
+
+  const rows = useMemo(() => {
+    const byQ = items.filter((it) => {
+      const d = it.data;
+      return !q || `${txt(d.entity)} ${txt(d.quarter)}`.includes(q);
+    });
+    if (!f) return byQ;
+    return byQ.filter((it) => {
+      const at = sessOf(it.data).at;
+      const e = escOf(it.data);
+      if (f === "مكتملة") return at < 0;
+      if (f === "تحتاج تصعيداً") return e > 0;
+      if (f.startsWith("المرحلة: ")) return at >= 0 && SESS_SHORT[at] === f.slice(9);
+      if (f.startsWith("تصعيد: ")) return escAt(e)?.name === f.slice(7);
+      return true;
+    });
+  }, [items, q, f]);
 
   function exportXl() {
     const head = ["الجهة", "الربع", "المرحلة الحالية", "المراحل المكتملة", "نسبة الأداء العام ٪",
       "المؤشرات المتعثرة", "إجمالي المؤشرات", "المبادرات المتعثرة", "إجمالي المبادرات",
-      "مرحلة التصعيد", "جهة التصعيد", "الملاحظات الجاهزة", "أبرز التحديات"];
+      "مرحلة التصعيد", "جهة التصعيد", "أبرز التحديات"];
     const body = items.map((it) => {
       const d = it.data;
-      const s = sessOf(d);
-      const b = sessBad(d);
+      const sx = sessOf(d);
+      const bd = sessBad(d);
       const e = escAt(escOf(d));
-      return [txt(d.entity), txt(d.quarter), s.at < 0 ? "مكتملة" : s.names[s.at] || "", s.done,
-        numOf(d.perf), b.kpi, b.kpiOf, b.ini, b.iniOf,
-        e ? e.name : "لا تصعيد", e ? e.owner : "",
-        (Array.isArray(d.tags) ? (d.tags as string[]) : []).join(" · "), txt(d.note)];
+      return [txt(d.entity), txt(d.quarter), sx.at < 0 ? "مكتملة" : sx.names[sx.at] || "", sx.done,
+        numOf(d.perf), bd.kpi, bd.kpiOf, bd.ini, bd.iniOf,
+        e ? e.name : "لا تصعيد", e ? e.owner : "", txt(d.note)];
     });
     download("جلسات-مراجعة-الأداء.xlsx", writeXlsx([{ name: "الجلسات", rows: [head, ...body] }]));
   }
@@ -1035,75 +1194,53 @@ function SessionsPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
   if (!loaded) return <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>;
   if (!items.length)
     return (
-      <Empty
-        title={t("لا توجد جلسات بعد", "No sessions yet")}
-        note={t("تُضاف الجهات ومراحل جلساتها من زر «إضافة».", "Add entities and their session stages.")}
-      />
+      <>
+        {canEdit && (
+          <div className="sx-tools">
+            <SessImport items={items} t={t} onDone={() => void reload()} />
+          </div>
+        )}
+        <Empty
+          title={t("لا توجد جلسات بعد", "No sessions yet")}
+          note={t("ارفعي ملف البيانات، أو أضيفي الجهات من زر «إضافة».", "Upload the data file or add entities.")}
+        />
+      </>
     );
 
   return (
     <>
-      <Toolbar q={q} setQ={setQ} filter="" setFilter={() => {}} options={[]} onExport={exportXl} t={t} />
-
-      {/* العناصر التي استوجبت الجلسات — مجموعة الجهات كلها */}
-      <div className="stabs">
-        <button className={`stab ${!q && tab === -1 ? "on" : ""}`} style={{ ["--c" as string]: "#016b5f" }}
-          onClick={() => { setQ(""); setTab(-1); }}>
-          <span className="l">{t("كل الجهات", "All entities")}</span>
-          <b>{AR(items.length)}</b>
-        </button>
-        {SESS_SHORT.map((n, i) => (
-          <button key={n} className={`stab ${!q && tab === i ? "on" : ""}`}
-            style={{ ["--c" as string]: BAR_TONE[i % BAR_TONE.length] }}
-            onClick={() => { setQ(""); setTab(i); }}>
-            <span className="l">{n}</span>
-            <b>{AR(sum.at[i])}</b>
-          </button>
-        ))}
-        {sum.doneN > 0 && (
-          <button className={`stab ${!q && tab === 9 ? "on" : ""}`} style={{ ["--c" as string]: "#1a7a48" }}
-            onClick={() => { setQ(""); setTab(9); }}>
-            <span className="l">{t("مكتملة", "Done")}</span>
-            <b>{AR(sum.doneN)}</b>
-          </button>
-        )}
-      </div>
-
-      {/* مراحل التصعيد — تظهر متى وُجدت جهةٌ مُصعَّدة، فلا تزاحم
-          الشاشة حين لا تصعيد */}
-      {sum.esc.slice(1).some((n) => n > 0) && (
-        <div className="stabs esc-tabs">
-          <span className="esc-ttl">{t("مراحل التصعيد", "Escalation")}</span>
-          {ESC_LEVELS.map((l) => (
-            <button
-              key={l.n}
-              className={`stab ${esc === l.n ? "on" : ""}`}
-              style={{ ["--c" as string]: l.hex }}
-              title={`${l.note} — ${l.owner}`}
-              onClick={() => setEsc(esc === l.n ? 0 : l.n)}
-            >
-              <span className="l">{l.name}</span>
-              <b>{AR(sum.esc[l.n])}</b>
-            </button>
-          ))}
-          {esc > 0 && (
-            <button className="stab" onClick={() => setEsc(0)}>
-              <span className="l">{t("مسح الفلتر", "Clear")}</span>
-            </button>
-          )}
+      {canEdit && (
+        <div className="sx-tools">
+          <SessImport items={items} t={t} onDone={() => void reload()} />
         </div>
       )}
 
+      <Toolbar
+        q={q}
+        setQ={setQ}
+        filter={f}
+        setFilter={setF}
+        options={OPTS}
+        allLabel={t("الكل", "All")}
+        onExport={exportXl}
+        t={t}
+      />
+
       <div className="stab-doing">
-        {`${t("العناصر التي تحتاج جلسات مراجعة أداء", "Elements needing review sessions")}: `}
-        {`${AR(sum.kpi)} ${t("مؤشراً متعثراً من", "off-track KPIs of")} ${AR(sum.kpiOf)}`}
-        {` · ${AR(sum.ini)} ${t("مبادرة متعثرة من", "off-track initiatives of")} ${AR(sum.iniOf)}`}
+        {`${t("عرض", "Showing")} ${AR(rows.length)} ${t("من", "of")} ${AR(items.length)} ${t("جهة", "entities")}`}
       </div>
 
       {rows.length ? (
         <div className="ncards">
           {rows.map((it) => (
-            <SessCard key={it.id} it={it} t={t} canEdit={canEdit} save={save} />
+            <SessCard
+              key={it.id}
+              it={it}
+              t={t}
+              canEdit={canEdit}
+              save={save}
+              logo={logos[logoKey(txt(it.data.entity))]}
+            />
           ))}
         </div>
       ) : (
