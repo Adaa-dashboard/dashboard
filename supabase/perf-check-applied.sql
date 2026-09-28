@@ -31,7 +31,14 @@ with checks(ord, "الملف", "العنصر", ok) as (values
   (9, 'perf-sticky-mentions.sql',   'سياسة perf_stickies_read',
       exists (select 1 from pg_policies
                where schemaname = 'public' and tablename = 'perf_stickies'
-                 and policyname = 'perf_stickies_read'))
+                 and policyname = 'perf_stickies_read')),
+  -- وجودُ الدالة لا يكفي: قائمة الحقول المسموحة داخلها توسّعت،
+  -- ونسخةٌ قديمة تتجاهل الحقول الجديدة **بصمت** فلا يظهر خطأ
+  (10, 'perf-portfolio-main.sql',   'perf_item_mine_save بالحقول الموسَّعة',
+      exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+               where n.nspname = 'public' and p.proname = 'perf_item_mine_save'
+                 and pg_get_functiondef(p.oid) like '%q4Sat%'
+                 and pg_get_functiondef(p.oid) like '%docsState%'))
 )
 select "الملف", "العنصر",
        case when ok then '✅ موجود' else '❌ ناقص — شغِّل الملف' end as "الحالة"
