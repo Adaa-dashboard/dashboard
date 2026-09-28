@@ -1785,8 +1785,128 @@ function EntFace({ name, logo }: { name: string; logo?: string }) {
   );
 }
 
-/** سطر نقطة تواصل — الاسم ودورُه، وتحته البريد والجوال قابلَين للنقر */
-function ContactLine({ c }: { c: Contact }) {
+/* ============================================================
+   نقاط التواصل — تُحرَّر من «جهاتي» مباشرةً
+   ------------------------------------------------------------
+   كانت البطاقة عرضاً فقط تحيل إلى صفحة «الجهات ونقاط التواصل»،
+   والاستشاري يفتح محفظته ليجد رقماً قديماً فلا يملك تصحيحه.
+   الآن يحرّر نقاط **جهته** من مكانها.
+
+   الحارس RLS لا الواجهة: `perf_contacts` تسمح لمن يتولّى الجهة
+   أو لصاحب صلاحية «الجهات»، فالخادم يردّ 403 لغيرهما ويُعرض ردّه.
+   ونقاط المركز (side = نحن) تبقى عرضاً: إسنادُ زميلٍ لجهة قرارٌ
+   يُدار في صفحة السجلّ لا من محفظة فرد.
+   ============================================================ */
+function ContactRow({
+  c, entityId, editable, start, t, onDone, onCancel,
+}: {
+  c: Contact;
+  entityId: string;
+  editable: boolean;
+  /** سطرٌ جديد يُفتح محرَّراً من أوّله */
+  start?: boolean;
+  t: T;
+  onDone: () => void;
+  onCancel?: () => void;
+}) {
+  const [ed, setEd] = useState<Contact | null>(start ? { ...c } : null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  async function put() {
+    const d = ed || {};
+    if (!txt(d.name).trim()) {
+      setErr(t("الاسم مطلوب", "Name is required"));
+      return;
+    }
+    setBusy(true);
+    setErr("");
+    const r = await apiFetch("/api/entities/contact", {
+      method: c.id ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: c.id || "",
+        entityId,
+        side: "الجهة",
+        name: txt(d.name).trim(),
+        jobTitle: txt(d.jobTitle).trim(),
+        email: txt(d.email).trim(),
+        phone: txt(d.phone).trim(),
+      }),
+    });
+    setBusy(false);
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      setErr(txt(j.error) || t("تعذّر الحفظ", "Save failed"));
+      return;
+    }
+    setEd(null);
+    onDone();
+  }
+
+  async function del() {
+    if (!c.id) return;
+    if (!confirm(t("حذف نقطة التواصل هذه؟", "Delete this contact?"))) return;
+    setBusy(true);
+    setErr("");
+    const r = await apiFetch(`/api/entities/contact/${c.id}`, { method: "DELETE" });
+    setBusy(false);
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      setErr(txt(j.error) || t("تعذّر الحذف", "Delete failed"));
+      return;
+    }
+    onDone();
+  }
+
+  if (ed)
+    return (
+      <div className="ct-ed">
+        <input
+          value={txt(ed.name)}
+          placeholder={t("الاسم", "Name")}
+          onChange={(e) => setEd({ ...ed, name: e.target.value })}
+        />
+        <input
+          value={txt(ed.jobTitle)}
+          placeholder={t("المسمّى الوظيفي", "Job title")}
+          onChange={(e) => setEd({ ...ed, jobTitle: e.target.value })}
+        />
+        <input
+          dir="ltr"
+          value={txt(ed.email)}
+          placeholder="name@entity.gov.sa"
+          onChange={(e) => setEd({ ...ed, email: e.target.value })}
+        />
+        <input
+          dir="ltr"
+          value={txt(ed.phone)}
+          placeholder="05XXXXXXXX"
+          onChange={(e) => setEd({ ...ed, phone: e.target.value })}
+        />
+        <div className="ct-act">
+          <button className="ok" disabled={busy} onClick={() => void put()}>
+            {t("حفظ", "Save")}
+          </button>
+          <button
+            onClick={() => {
+              setEd(null);
+              setErr("");
+              onCancel?.();
+            }}
+          >
+            {t("إلغاء", "Cancel")}
+          </button>
+          {c.id && (
+            <button className="del" disabled={busy} onClick={() => void del()}>
+              {t("حذف", "Delete")}
+            </button>
+          )}
+        </div>
+        {err && <div className="ct-err">{err}</div>}
+      </div>
+    );
+
   const role = (c.role || "").trim();
   return (
     <div className="ct-line">
@@ -1799,6 +1919,78 @@ function ContactLine({ c }: { c: Contact }) {
         {c.email && <a href={`mailto:${c.email}`}>{c.email}</a>}
         {c.phone && <a href={`tel:${c.phone}`}>{c.phone}</a>}
       </span>
+      {editable && (
+        <button className="ct-pen" title={t("تعديل", "Edit")} onClick={() => setEd({ ...c })}>
+          ✎
+        </button>
+      )}
+      {err && <div className="ct-err">{err}</div>}
+    </div>
+  );
+}
+
+/** بطاقة جهة من سجلّ المركز — شعارها وقطاعها ونقاط تواصلها */
+function EntCard({
+  x, logo, t, onDone,
+}: {
+  x: RegRow;
+  logo?: string;
+  t: T;
+  onDone: () => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const mineC = (x.ours || []).find((c) => c.id === x.myContactId);
+  const role = (mineC?.role || "أساسي").trim();
+  const ours = (x.ours || []).filter((c) => c.id !== x.myContactId);
+  const theirs = x.theirs || [];
+  return (
+    <div className="ecard">
+      <div className="ec-h">
+        <EntFace name={x.name} logo={logo} />
+        <span className="ec-n">
+          <b>{x.name}</b>
+          {x.sector && <em>{x.sector}</em>}
+        </span>
+        {role !== "أساسي" && <i className="ec-b">{role}</i>}
+      </div>
+
+      <div className="ct-grp">
+        <b>
+          {t("نقطة التواصل من الجهة", "Their contact")}
+          <button className="ct-add" onClick={() => setAdding(true)}>
+            + {t("إضافة", "Add")}
+          </button>
+        </b>
+        {theirs.map((c, i) => (
+          <ContactRow key={c.id || i} c={c} entityId={x.entityId} editable t={t} onDone={onDone} />
+        ))}
+        {adding && (
+          <ContactRow
+            c={{}}
+            entityId={x.entityId}
+            editable
+            start
+            t={t}
+            onDone={() => {
+              setAdding(false);
+              onDone();
+            }}
+            onCancel={() => setAdding(false)}
+          />
+        )}
+        {!theirs.length && !adding && (
+          <div className="ct-none">{t("لا توجد نقطة تواصل مسجّلة", "No contact yet")}</div>
+        )}
+      </div>
+
+      {ours.length > 0 && (
+        <div className="ct-grp">
+          <b>{t("من المركز معك", "Ours, with you")}</b>
+          {ours.map((c, i) => (
+            <ContactRow key={c.id || i} c={c} entityId={x.entityId} editable={false} t={t} onDone={onDone} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1810,14 +2002,16 @@ function EntitiesModal({
   onClose,
   onSave,
   onDelete,
+  onReload,
 }: {
   rows: Row[];
-  reg: { entityId: string; name: string; sector: string; myContactId: string;
-         ours?: Contact[]; theirs?: Contact[] }[];
+  reg: RegRow[];
   t: T;
   onClose: () => void;
   onSave: (id: string, data: Rec) => void;
   onDelete: (id: string) => void;
+  /** إعادة قراءة سجلّ جهاتي بعد تعديل نقطة تواصل */
+  onReload: () => void;
 }) {
   const [name, setName] = useState("");
   const [type, setType] = useState("مؤسسية");
@@ -1842,43 +2036,18 @@ function EntitiesModal({
         {reg.length > 0 && (
           <div className="erow2-h">
             <b>{t("من سجلّ المركز — مسندة إليك", "From the registry")}</b>
-            <span>{t("تُعدَّل من صفحة «الجهات ونقاط التواصل»", "Edited in the registry page")}</span>
+            <span>
+              {t(
+                "نقاط تواصل الجهة تُحرَّر من هنا · إسناد زملاء المركز من صفحة «الجهات ونقاط التواصل»",
+                "Their contacts are editable here",
+              )}
+            </span>
           </div>
         )}
         <div className="ecards">
-          {reg.map((x) => {
-            const mineC = (x.ours || []).find((c) => c.id === x.myContactId);
-            const role = (mineC?.role || "أساسي").trim();
-            const ours = (x.ours || []).filter((c) => c.id !== x.myContactId);
-            return (
-              <div className="ecard" key={x.entityId}>
-                <div className="ec-h">
-                  <EntFace name={x.name} logo={logos[logoKey(x.name)]} />
-                  <span className="ec-n">
-                    <b>{x.name}</b>
-                    {x.sector && <em>{x.sector}</em>}
-                  </span>
-                  {role !== "أساسي" && <i className="ec-b">{role}</i>}
-                </div>
-                {(x.theirs || []).length > 0 && (
-                  <div className="ct-grp">
-                    <b>{t("نقطة التواصل من الجهة", "Their contact")}</b>
-                    {(x.theirs || []).map((c, i) => (
-                      <ContactLine key={c.id || i} c={c} />
-                    ))}
-                  </div>
-                )}
-                {ours.length > 0 && (
-                  <div className="ct-grp">
-                    <b>{t("من المركز معك", "Ours, with you")}</b>
-                    {ours.map((c, i) => (
-                      <ContactLine key={c.id || i} c={c} />
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {reg.map((x) => (
+            <EntCard key={x.entityId} x={x} logo={logos[logoKey(x.name)]} t={t} onDone={onReload} />
+          ))}
         </div>
         <div>
           {rows.map((r) => (
@@ -2527,11 +2696,12 @@ export default function Portfolio({
   /* جهات السجلّ المسندة إليّ — تُعدّ مع جهات المحفظة في كل رقم
      يظهر للمستخدم، فالعدد يوافق ما يراه داخل المربّع لا نصفه */
   const [reg, setReg] = useState<RegRow[]>([]);
-  useEffect(() => {
+  const loadReg = useCallback(() => {
     void apiFetch("/api/entities/mine").then((r) => r.json())
       .then((d) => setReg(Array.isArray(d.mine) ? (d.mine as RegRow[]) : []))
       .catch(() => setReg([]));
   }, []);
+  useEffect(() => loadReg(), [loadReg]);
   const regNames = useMemo(() => reg.map((x) => String(x.name || "")), [reg]);
   const mw = useMineWork(reg, me.name || "");
   /* بيانات المحفظة الإضافية للأعمال الرئيسية — المفتاح `القسم:معرّف البند` */
@@ -3160,6 +3330,7 @@ export default function Portfolio({
           rows={entities}
           reg={reg}
           t={t}
+          onReload={loadReg}
           onClose={() => setEnts(false)}
           onSave={(id, data) => void pf.save("entities", id, data, entities.length + 1)}
           onDelete={(id) => {
