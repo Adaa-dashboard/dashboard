@@ -12,7 +12,7 @@ import { PIcon, IconPicker } from "./pickicons";
 import { IconGear } from "./icons";
 import MyEntities, { contribsOf, sumOf } from "./Entities";
 import { publishUndo } from "@/lib/undoBus";
-import { useLogos, logoKey, SESS_SHORT } from "./Sections";
+import { useLogos, logoKey, SESS_SHORT, INST_COLS, CX_COLS, CX_QS, cxStagesOf } from "./Sections";
 import { initials, toneOf } from "@/lib/entlogo";
 import { asset } from "@/lib/base";
 
@@ -1207,15 +1207,111 @@ function mainChips(sec: MainSec, rows: MineRow[]): { k: string; v: number }[] {
 
 
 
-const MAIN_STAGE: Record<MainSec, { k: string; opts: string[]; label: string }> = {
-  natstrat: {
-    k: "stage",
-    label: "حالة الاعتماد",
-    opts: ["طور الإعداد/التحديث", "قيد المراجعة", "معتمدة من اللجنة", "معتمدة من مجلس الوزراء"],
-  },
-  inststrat: { k: "live", label: "القياس", opts: ["", "مفعل"] },
-  cx: { k: "meet", label: "الاجتماع التعريفي", opts: ["", "تم", "لم يبدأ"] },
+const NAT_STAGE = ["طور الإعداد/التحديث", "قيد المراجعة", "معتمدة من اللجنة", "معتمدة من مجلس الوزراء"];
+
+/* ============================================================
+   حقول كل قسم في بطاقة المحفظة
+   ------------------------------------------------------------
+   كان لكل قسم حقلٌ واحد («الاجتماع التعريفي» في تجربة المستفيد
+   مثلاً)، فالاستشاري لا يحرّك جهته في مراحل الصفحة من محفظته.
+   الآن تُعرض حقول القسم الجوهرية كلها.
+
+   العناوين والخيارات **مستوردة من `Sections.tsx`** لا منسوخة:
+   خيارٌ يُضاف هناك يظهر هنا من نفسه ولا تفترق القائمتان.
+   ============================================================ */
+type Fld = { k: string; label: string; opts?: string[]; kind?: "num" | "bool" | "text"; wide?: boolean };
+/** حقول رقمية أو ثنائية لا يكفيها نصٌّ حرّ */
+const FLD_NUM = new Set(["servTot", "servPlan", "kpisRep", "kpisTot", "initRep", "initTot", "meas"]);
+const FLD_BOOL = new Set(["counted", "countedQ2"]);
+function fldOf(cols: { k: string; label: string; opts?: string[] }[], keys: string[]): Fld[] {
+  return keys
+    .map((k) => cols.find((c) => c.k === k))
+    .filter((c): c is { k: string; label: string; opts?: string[] } => !!c)
+    .map((c) => ({
+      k: c.k,
+      label: c.label,
+      opts: c.opts,
+      kind: c.opts ? undefined : FLD_BOOL.has(c.k) ? "bool" : FLD_NUM.has(c.k) ? "num" : "text",
+    }));
+}
+const MAIN_FIELDS: Record<MainSec, Fld[]> = {
+  natstrat: [
+    { k: "meas", label: "قابلية القياس ٪", kind: "num" },
+    { k: "kpisRep", label: "مؤشرات ممثَّلة", kind: "num" },
+    { k: "kpisTot", label: "إجمالي المؤشرات", kind: "num" },
+    { k: "initRep", label: "مبادرات ممثَّلة", kind: "num" },
+    { k: "initTot", label: "إجمالي المبادرات", kind: "num" },
+  ],
+  inststrat: fldOf(INST_COLS, ["rep", "meet", "meetAt", "docs", "docsState", "target", "live", "phase"]),
+  cx: fldOf(CX_COLS, ["meet", "survey", "card", "l1", "freq", "servTot", "servPlan", "counted", "countedQ2"]),
 };
+/** حقول الربع في تجربة المستفيد — تُعرض لربعٍ واحد مختار، وإلا صارت عشرين حقلاً */
+const CX_QF: Fld[] = [
+  { k: "Share", label: "مشاركة النتائج" },
+  { k: "Issue", label: "إصدار التقرير" },
+  { k: "Svc", label: "خدمات بمؤشر رضا", kind: "num" },
+  { k: "Sat", label: "مؤشر الرضا", kind: "num" },
+];
+
+/** حقل نصّي حرّ يحفظ عند الخروج منه */
+function TextBox({ value, onSave }: { value: string; onSave: (v: string) => void }) {
+  const [v, setV] = useState(value);
+  useEffect(() => setV(value), [value]);
+  return (
+    <input
+      value={v}
+      onChange={(e) => setV(e.target.value)}
+      onBlur={() => v !== value && onSave(v)}
+    />
+  );
+}
+
+/** خانة حقلٍ واحد — قائمةً أو رقماً أو نعم/لا أو نصّاً */
+function FldBox({ f, v, onPut }: { f: Fld; v: unknown; onPut: (v: unknown) => void }) {
+  const cls = f.wide ? "wide" : undefined;
+  if (f.opts)
+    return (
+      <label className={cls}>
+        <span>{f.label}</span>
+        <select value={txt(v)} onChange={(e) => onPut(e.target.value)}>
+          {f.opts.map((o) => (
+            <option key={o} value={o}>
+              {o || "—"}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
+  if (f.kind === "bool")
+    return (
+      <label className={cls}>
+        <span>{f.label}</span>
+        <select
+          value={num(v) === 1 ? "نعم" : txt(v) ? "لا" : ""}
+          onChange={(e) => onPut(e.target.value === "نعم" ? 1 : e.target.value === "لا" ? 0 : "")}
+        >
+          {["", "نعم", "لا"].map((o) => (
+            <option key={o} value={o}>
+              {o || "—"}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
+  if (f.kind === "num")
+    return (
+      <label className={cls}>
+        <span>{f.label}</span>
+        <input type="number" value={num(v) || ""} onChange={(e) => onPut(Number(e.target.value) || 0)} />
+      </label>
+    );
+  return (
+    <label className={cls}>
+      <span>{f.label}</span>
+      <TextBox value={txt(v)} onSave={onPut} />
+    </label>
+  );
+}
 /** الحقل الذي يحمل اسم جهة البند في كل قسم */
 const MAIN_ENT: Record<MainSec, string> = { natstrat: "owner", inststrat: "name", cx: "name" };
 /** عنوان الصف: الاستراتيجية في الوطنية، والجهة في البقية */
@@ -1305,6 +1401,8 @@ function MainWork({
 }) {
   const [msg, setMsg] = useState("");
   const [yr, setYr] = useState(YR_NOW);
+  /* ربعُ تجربة المستفيد المعروض — آخر أرباع الملف افتراضاً */
+  const [cxq, setCxq] = useState(CX_QS[CX_QS.length - 1].k);
   const logos = useLogos();
 
   /* بطاقة الجلسة لكل جهة — بها تُعرض أرقام التعثّر وتُحرَّر */
@@ -1368,7 +1466,6 @@ function MainWork({
       </div>
     );
 
-  const st = MAIN_STAGE[sec];
   const shown = full ? rows : rows.slice(0, 3);
 
   return (
@@ -1427,48 +1524,64 @@ function MainWork({
             </div>
 
             <div className="mw-f">
-              <label>
-                <span>{st.label}</span>
-                <select
-                  value={
-                    sec === "natstrat"
-                      ? st.opts[Math.max(0, Math.min(3, num(it.data.stage, 1) - 1))]
-                      : txt(it.data[st.k])
-                  }
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    void put(it.id, sec === "natstrat" ? { stage: st.opts.indexOf(v) + 1 } : { [st.k]: v });
-                  }}
-                >
-                  {st.opts.map((o) => (
-                    <option key={o} value={o}>
-                      {o || "—"}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              {sec !== "cx" && (
-                <>
-                  <label>
-                    <span>{t("المؤشرات", "KPIs")}</span>
-                    <input
-                      type="number"
-                      value={num(it.data.kpisTot) || ""}
-                      onChange={(e) => void put(it.id, { kpisTot: Number(e.target.value) || 0 })}
-                    />
-                  </label>
-                  <label>
-                    <span>{t("المبادرات", "Initiatives")}</span>
-                    <input
-                      type="number"
-                      value={num(it.data.initTot) || ""}
-                      onChange={(e) => void put(it.id, { initTot: Number(e.target.value) || 0 })}
-                    />
-                  </label>
-                </>
+              {sec === "natstrat" && (
+                <label className="wide">
+                  <span>{t("حالة الاعتماد", "Approval")}</span>
+                  <select
+                    value={NAT_STAGE[Math.max(0, Math.min(3, num(it.data.stage, 1) - 1))]}
+                    onChange={(e) => void put(it.id, { stage: NAT_STAGE.indexOf(e.target.value) + 1 })}
+                  >
+                    {NAT_STAGE.map((o) => (
+                      <option key={o} value={o}>
+                        {o}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               )}
+              {MAIN_FIELDS[sec].map((f) => (
+                <FldBox key={f.k} f={f} v={it.data[f.k]} onPut={(v) => void put(it.id, { [f.k]: v })} />
+              ))}
             </div>
+
+            {/* تجربة المستفيد: مرحلةُ الجهة **محسوبة** من هذه الحقول
+                كما في ورقة Dashboard، فلا تُختار اختياراً — تُعرض
+                لتُرى نتيجةُ ما غُيّر فوراً، وحقول الربع تحتها */}
+            {sec === "cx" && (
+              <>
+                <div className="mw-stg">
+                  <span className="k">{t("المرحلة في صفحة تجربة المستفيد", "Stage on the BEX page")}</span>
+                  {cxStagesOf(it.data).map((g) => (
+                    <i key={g.k} style={{ ["--c" as string]: g.c }}>
+                      {g.ar}
+                    </i>
+                  ))}
+                  {!cxStagesOf(it.data).length && <em>{t("لم تُصنَّف بعد", "Unclassified")}</em>}
+                </div>
+                <div className="mw-f">
+                  <label>
+                    <span>{t("الربع", "Quarter")}</span>
+                    <select value={cxq} onChange={(e) => setCxq(e.target.value)}>
+                      {CX_QS.map((q) => (
+                        <option key={q.k} value={q.k}>
+                          {q.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {CX_QF.map((f) => (
+                    <FldBox
+                      key={f.k}
+                      /* الخيارات من عمود الملف نفسه، والعنوان مختصرٌ هنا
+                         لأن الربع مكتوبٌ في القائمة المجاورة */
+                      f={{ ...f, opts: CX_COLS.find((c) => c.k === cxq + f.k)?.opts }}
+                      v={it.data[cxq + f.k]}
+                      onPut={(v) => void put(it.id, { [cxq + f.k]: v })}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
 
             {/* الاجتماعات الربعية — بيانات محفظة، لا تظهر في صفحة القسم */}
             <div className="mw-q">
