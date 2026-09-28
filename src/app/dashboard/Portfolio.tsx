@@ -1117,6 +1117,88 @@ type RegRow = {
    تبقى هنا ولا تظهر في صفحة القسم، كما طلبت المستخدمة.
    ============================================================ */
 type MainSec = "natstrat" | "inststrat" | "cx";
+export type MineRow = { id: string; ord: number; data: Rec };
+
+/** بنود جهاتي في الأقسام الثلاثة — تُقرأ مرّةً للصفحة كلها، فتشترك
+    فيها البطاقةُ وعدّادُها والشرائحُ الصغيرة ولا تتكرّر الطلبات */
+function useMineWork(reg: RegRow[], meName: string) {
+  const [all, setAll] = useState<Record<MainSec, MineRow[]>>({ natstrat: [], inststrat: [], cx: [] });
+  const [loaded, setLoaded] = useState(false);
+  const [nonce, setNonce] = useState(0);
+
+  useEffect(() => {
+    let live = true;
+    void Promise.all(
+      (["natstrat", "inststrat", "cx"] as MainSec[]).map(async (k) => {
+        const r = await apiFetch(`/api/items?section=${k}`);
+        const d = await r.json().catch(() => ({}));
+        return [k, Array.isArray(d.items) ? (d.items as MineRow[]) : []] as const;
+      }),
+    )
+      .then((pairs) => {
+        if (!live) return;
+        const m = { natstrat: [], inststrat: [], cx: [] } as Record<MainSec, MineRow[]>;
+        for (const [k, v] of pairs) m[k] = v;
+        setAll(m);
+      })
+      .catch(() => {})
+      .finally(() => live && setLoaded(true));
+    return () => {
+      live = false;
+    };
+  }, [nonce]);
+
+  /* جهاتي: ما أنا نقطة تواصلها الأساسية — البديل لا يملك التحرير */
+  const mineNames = useMemo(() => {
+    const out = new Set<string>();
+    for (const x of reg) {
+      const meC = (x.ours || []).find((c: Contact) => c.id === x.myContactId);
+      if ((meC?.role || "أساسي").trim() === "أساسي") out.add(nrm(x.name));
+    }
+    return out;
+  }, [reg]);
+
+  const mine = useMemo(() => {
+    const pick = (k: MainSec) =>
+      all[k].filter((it) => {
+        const c = txt(it.data.consultant).trim();
+        if (c && nrm(c) === nrm(meName)) return true;
+        return mineNames.has(nrm(txt(it.data[MAIN_ENT[k]])));
+      });
+    return { natstrat: pick("natstrat"), inststrat: pick("inststrat"), cx: pick("cx") } as Record<MainSec, MineRow[]>;
+  }, [all, mineNames, meName]);
+
+  const patch = useCallback((k: MainSec, id: string, p: Rec) => {
+    setAll((v) => ({ ...v, [k]: v[k].map((x) => (x.id === id ? { ...x, data: { ...x.data, ...p } } : x)) }));
+  }, []);
+
+  return { mine, loaded, patch, reload: () => setNonce((n) => n + 1) };
+}
+
+/** شرائح صغيرة تحت رقم البطاقة — أهمّ ما في القسم بلا فتحه */
+function mainChips(sec: MainSec, rows: MineRow[]): { k: string; v: number }[] {
+  const n = (f: (d: Rec) => boolean) => rows.filter((r) => f(r.data)).length;
+  if (sec === "natstrat")
+    return [
+      { k: "معتمدة من مجلس الوزراء", v: n((d) => num(d.stage, 1) === 4) },
+      { k: "قيد المراجعة والاعتماد", v: n((d) => [2, 3].includes(num(d.stage, 1))) },
+      { k: "في طور الإعداد", v: n((d) => num(d.stage, 1) === 1) },
+      { k: "قابلية قياسها ١٠٠٪", v: n((d) => num(d.meas) >= 100) },
+    ];
+  if (sec === "inststrat")
+    return [
+      { k: "جارٍ قياسها", v: n((d) => txt(d.live) === "مفعل") },
+      { k: "الوثائق مستلمة", v: n((d) => txt(d.docs) === "✓") },
+      { k: "عُقد الاجتماع التعريفي", v: n((d) => txt(d.meet) === "تم") },
+    ];
+  return [
+    { k: "صدر لها تقرير", v: n((d) => Object.keys(d).some((x) => x.endsWith("Issue") && txt(d[x]) === "✅")) },
+    { k: "احتُسبت في المؤشر", v: n((d) => num(d.counted) === 1) },
+    { k: "عُقد الاجتماع التعريفي", v: n((d) => txt(d.meet) === "تم") },
+  ];
+}
+
+
 
 const MAIN_STAGE: Record<MainSec, { k: string; opts: string[]; label: string }> = {
   natstrat: {
@@ -1135,54 +1217,26 @@ const MAIN_TITLE: Record<MainSec, string> = { natstrat: "name", inststrat: "name
 const QLABS = ["الربع الأول", "الربع الثاني", "الربع الثالث", "الربع الرابع"];
 
 function MainWork({
-  sec, meName, reg, extras, t, onExtra, full,
+  sec, rows, loaded, extras, t, onExtra, onPatch, onReload, full,
 }: {
   sec: MainSec;
-  meName: string;
-  reg: RegRow[];
+  /** بنود جهاتي في هذا القسم — تُقرأ مرّةً في الصفحة وتُمرَّر هنا */
+  rows: MineRow[];
+  loaded: boolean;
   /** بيانات المحفظة الإضافية — المفتاح `sec:itemId` */
   extras: Record<string, Rec>;
   t: T;
   onExtra: (key: string, data: Rec) => void;
+  onPatch: (sec: MainSec, id: string, patch: Rec) => void;
+  onReload: () => void;
   /** داخل النافذة: الجدول كاملاً. وفي البطاقة: أول ثلاثة صفوف */
   full?: boolean;
 }) {
-  const [items, setItems] = useState<{ id: string; ord: number; data: Rec }[]>([]);
-  const [loaded, setLoaded] = useState(false);
   const [msg, setMsg] = useState("");
-
-  const load = useCallback(() => {
-    apiFetch(`/api/items?section=${sec}`)
-      .then((r) => r.json())
-      .then((d) => setItems(Array.isArray(d.items) ? d.items : []))
-      .catch(() => setItems([]))
-      .finally(() => setLoaded(true));
-  }, [sec]);
-  useEffect(() => load(), [load]);
-
-  /* جهاتي: ما أنا نقطة تواصلها الأساسية — البديل لا يملك التحرير */
-  const mineNames = useMemo(() => {
-    const out = new Set<string>();
-    for (const x of reg) {
-      const meC = (x.ours || []).find((c: Contact) => c.id === x.myContactId);
-      if ((meC?.role || "أساسي").trim() === "أساسي") out.add(nrm(x.name));
-    }
-    return out;
-  }, [reg]);
-
-  const rows = useMemo(
-    () =>
-      items.filter((it) => {
-        const c = txt(it.data.consultant).trim();
-        if (c && nrm(c) === nrm(meName)) return true;
-        return mineNames.has(nrm(txt(it.data[MAIN_ENT[sec]])));
-      }),
-    [items, mineNames, meName, sec],
-  );
 
   async function put(id: string, patch: Rec) {
     /* تفاؤلياً في الشاشة، ثم يُحفظ — والفشل يُعيد القراءة */
-    setItems((v) => v.map((x) => (x.id === id ? { ...x, data: { ...x.data, ...patch } } : x)));
+    onPatch(sec, id, patch);
     const r = await apiFetch("/api/items/mine", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1191,7 +1245,7 @@ function MainWork({
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
       setMsg(d.error || t("تعذّر الحفظ", "Save failed"));
-      load();
+      onReload();
     } else setMsg("");
   }
 
@@ -1393,6 +1447,7 @@ function Tile({
   sub,
   pct,
   warn,
+  chips,
   onOpen,
   onHide,
   onEdit,
@@ -1403,13 +1458,13 @@ function Tile({
   sub: string;
   pct: number;
   warn?: string;
+  /** مربعات صغيرة تفصّل الرقم — تحلّ محلّ شريط النسبة حين تُمرَّر */
+  chips?: { k: string; v: number }[];
   onOpen: () => void;
   onHide: () => void;
   onEdit: () => void;
   dragProps: Rec;
 }) {
-  const r = 18;
-  const c = 2 * Math.PI * r;
   return (
     <div className="tile" onClick={onOpen} {...dragProps}>
       <span className="grip" title="اسحب" onClick={(e) => e.stopPropagation()}>
@@ -1435,24 +1490,8 @@ function Tile({
       >
         ✕
       </span>
-      <div className="num">
-        <svg width="46" height="46" viewBox="0 0 46 46">
-          <circle cx="23" cy="23" r={r} fill="none" stroke="#eef2f1" strokeWidth="5" />
-          <circle
-            cx="23"
-            cy="23"
-            r={r}
-            fill="none"
-            stroke={w.color}
-            strokeWidth="5"
-            strokeLinecap="round"
-            strokeDasharray={`${(c * pct) / 100} ${c}`}
-            transform="rotate(-90 23 23)"
-          />
-          <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" className="tnum" fill={w.color}>
-            {count}
-          </text>
-        </svg>
+      <div className="num2" style={{ color: w.color }}>
+        {count}
       </div>
       {warn ? <span className="warn">{warn}</span> : null}
       <div className="ic3" style={{ background: w.color }}>
@@ -1460,14 +1499,25 @@ function Tile({
       </div>
       <h4>{w.label}</h4>
       <div className="sb2">{sub}</div>
-      <div className="ft2">
-        <span className="bar4">
-          <i style={{ width: `${pct}%`, background: w.color }} />
-        </span>
-        <span className="pc" style={{ color: w.color }}>
-          {pct}%
-        </span>
-      </div>
+      {chips && chips.length > 0 ? (
+        <div className="chips3">
+          {chips.map((c) => (
+            <span className="ch3" key={c.k} style={{ ["--c" as string]: w.color }}>
+              <b>{c.v}</b>
+              {c.k}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <div className="ft2">
+          <span className="bar4">
+            <i style={{ width: `${pct}%`, background: w.color }} />
+          </span>
+          <span className="pc" style={{ color: w.color }}>
+            {pct}%
+          </span>
+        </div>
+      )}
       <span className="go">↩ اضغط للتفاصيل</span>
     </div>
   );
@@ -2218,6 +2268,7 @@ export default function Portfolio({
       .catch(() => setReg([]));
   }, []);
   const regNames = useMemo(() => reg.map((x) => String(x.name || "")), [reg]);
+  const mw = useMineWork(reg, me.name || "");
   /* بيانات المحفظة الإضافية للأعمال الرئيسية — المفتاح `القسم:معرّف البند` */
   const mainx = useMemo(() => {
     const m: Record<string, Rec> = {};
@@ -2292,8 +2343,20 @@ export default function Portfolio({
     return !q[curQ - 1];
   }).length;
 
-  function stat(k: WKey): { count: number; pct: number; sub: string; warn?: string } {
+  function stat(k: WKey): { count: number; pct: number; sub: string; warn?: string; chips?: { k: string; v: number }[] } {
     const rows = dataOf(k);
+    /* الأعمال الرئيسية تُقرأ من صفحات الأقسام لا من بنود المحفظة */
+    if (k === "natstrat" || k === "inststrat" || k === "cx") {
+      const mr = mw.mine[k];
+      const chips = mainChips(k, mr);
+      const done = chips[0]?.v || 0;
+      return {
+        count: mr.length,
+        pct: mr.length ? Math.round((done / mr.length) * 100) : 0,
+        sub: k === "natstrat" ? t("استراتيجية", "strategies") : t("جهة", "entities"),
+        chips,
+      };
+    }
     switch (k) {
       case "strategies": {
         const tot = sumOf(entities.flatMap((r) => contribsOf(r.data)));
@@ -2365,12 +2428,14 @@ export default function Portfolio({
       return (
         <MainWork
           sec={k}
-          meName={me.name || ""}
-          reg={reg}
+          rows={mw.mine[k]}
+          loaded={mw.loaded}
           extras={mainx}
           t={t}
           full={prefs.mode === "table" || open === k}
           onExtra={(key, data) => void pf.save("mainx", key, data, 1)}
+          onPatch={mw.patch}
+          onReload={mw.reload}
         />
       );
     if (k === "tasks") return <TasksWidget me={me} t={t} onCount={setTaskCount} />;
@@ -2542,6 +2607,7 @@ export default function Portfolio({
               sub={st.sub}
               pct={st.pct}
               warn={st.warn}
+              chips={st.chips}
               onOpen={() => setOpen(k)}
               onHide={() => patch({ hidden: [...prefs.hidden, k] })}
               onEdit={() => setEditLook(k)}
