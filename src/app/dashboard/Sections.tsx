@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import { writeXlsx, readXlsxSheets } from "@/lib/sheet";
+import { writeXlsx, readXlsxSheets, readPptxSlides } from "@/lib/sheet";
 import { asset } from "@/lib/base";
 import { publishUndo } from "@/lib/undoBus";
 import { IconGear } from "./icons";
@@ -994,12 +994,24 @@ function NatImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => vo
     if (!f) return;
     setMsg(t("جارٍ القراءة...", "Reading..."));
     try {
-      const sheets = await readXlsxSheets(await f.arrayBuffer());
+      const buf = await f.arrayBuffer();
+      /* بوربوينت أو إكسل: كلاهما أرشيف zip، وجدول الشريحة يُقرأ
+         صفوفاً وخلايا كورقة إكسل تماماً — فبقية المنطق واحدة */
+      const isPpt = /\.pptx$/i.test(f.name);
+      const sheets: { name: string; rows: string[][] }[] = isPpt
+        ? (await readPptxSlides(buf)).flatMap((sl) =>
+            sl.tables.map((rows, ti) => ({
+              name: `${sl.name}${sl.tables.length > 1 ? ` · جدول ${ti + 1}` : ""}`,
+              rows,
+            })),
+          )
+        : await readXlsxSheets(buf);
 
-      /* صف العناوين قد لا يكون الأول — نبحث عنه في أوائل صفوف كل ورقة */
-      let map: Record<number, string> = {};
-      let rows: string[][] = [];
-      let hi = -1;
+      /* صف العناوين قد لا يكون الأول — نبحث عنه في أوائل صفوف كل ورقة.
+         في العرض تُؤخذ **كل** الجداول المطابقة، لأن الجدول الواحد
+         يُقسَّم على شرائح. وفي الجدول تُؤخذ أول ورقة مطابقة وحدها،
+         فالمصنّف قد يحمل نسخة قديمة في ورقة أخرى. */
+      const found: { rows: string[][]; hi: number; map: Record<number, string> }[] = [];
       for (const sh of sheets) {
         const rs = sh.rows || [];
         for (let i = 0; i < Math.min(rs.length, 8); i++) {
@@ -1009,58 +1021,71 @@ function NatImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => vo
             if (k && !Object.values(m).includes(k)) m[ci] = k;
           });
           if (Object.values(m).includes("name") && Object.keys(m).length >= 3) {
-            map = m;
-            rows = rs;
-            hi = i;
+            found.push({ rows: rs, hi: i, map: m });
             break;
           }
         }
-        if (hi >= 0) break;
+        if (found.length && !isPpt) break;
       }
-      if (hi < 0) {
+      if (!found.length) {
         setMsg(
-          t(
-            "لم أجد صف العناوين في الملف — لا بدّ من عمود «الاستراتيجية». نزّلي ملف Excel من الزر المجاور، عدّلي عليه، ثم ارفعيه.",
-            "Could not find a header row with a strategy column.",
-          ),
+          isPpt
+            ? t(
+                "لم أجد في العرض جدولاً عنوانه «الاستراتيجية» ومعه عمودان معروفان على الأقل. إن كانت كل شريحة استراتيجيةً في مربعات نصّ لا جدولاً، أرسلي لي الملف لأقرأه على شكله.",
+                "No table with a strategy column was found in the deck.",
+              )
+            : t(
+                "لم أجد صف العناوين في الملف — لا بدّ من عمود «الاستراتيجية». نزّلي ملف Excel من الزر المجاور، عدّلي عليه، ثم ارفعيه.",
+                "Could not find a header row with a strategy column.",
+              ),
         );
         return;
       }
 
-      const nameCol = Number(Object.keys(map).find((c) => map[Number(c)] === "name"));
       const byName = new Map<string, Item>();
       for (const it of items) byName.set(natNorm(txt(it.data.name)), it);
 
       const today = new Date().toISOString().slice(0, 10);
-      const upd: { id: string; ord: number; data: Rec }[] = [];
-      const add: { id: string; ord: number; data: Rec }[] = [];
+      const upd = new Map<string, { id: string; ord: number; data: Rec }>();
+      const add = new Map<string, { id: string; ord: number; data: Rec }>();
       const fresh: string[] = [];
       let maxOrd = items.reduce((a, b) => Math.max(a, b.ord || 0), 0);
 
-      for (const r of rows.slice(hi + 1)) {
-        const nm = txt(r[nameCol]).trim();
-        if (!nm) continue;
-        const patch: Rec = {};
-        for (const [ci, k] of Object.entries(map)) {
-          if (k === "name") continue;
-          const v = natVal(k, txt(r[Number(ci)]));
-          if (v !== undefined) patch[k] = v;
-        }
-        const cur = byName.get(natNorm(nm));
-        if (cur) {
-          if (!Object.keys(patch).length) continue;
-          upd.push({ id: cur.id, ord: cur.ord, data: { ...cur.data, ...patch, updated: today } });
-        } else {
-          fresh.push(nm);
-          add.push({
-            id: natNewId(nm),
-            ord: ++maxOrd,
-            data: { stage: 1, ...patch, name: nm, updated: today },
-          });
+      for (const src of found) {
+        const nameCol = Number(Object.keys(src.map).find((c) => src.map[Number(c)] === "name"));
+        for (const r of src.rows.slice(src.hi + 1)) {
+          const nm = txt(r[nameCol]).trim();
+          if (!nm) continue;
+          const patch: Rec = {};
+          for (const [ci, k] of Object.entries(src.map)) {
+            if (k === "name") continue;
+            const v = natVal(k, txt(r[Number(ci)]));
+            if (v !== undefined) patch[k] = v;
+          }
+          const key = natNorm(nm);
+          const cur = byName.get(key);
+          if (cur) {
+            if (!Object.keys(patch).length) continue;
+            /* الاسم قد يتكرّر على أكثر من شريحة بأعمدة مختلفة، فتُجمَّع */
+            const prev = upd.get(key);
+            upd.set(key, {
+              id: cur.id,
+              ord: cur.ord,
+              data: { ...(prev?.data ?? cur.data), ...patch, updated: today },
+            });
+          } else {
+            const prev = add.get(key);
+            if (!prev) fresh.push(nm);
+            add.set(key, {
+              id: natNewId(nm),
+              ord: prev?.ord ?? ++maxOrd,
+              data: { stage: 1, ...(prev?.data ?? {}), ...patch, name: nm, updated: today },
+            });
+          }
         }
       }
 
-      if (!upd.length && !add.length) {
+      if (!upd.size && !add.size) {
         setMsg(t("لم يتغيّر شيء — الملف مطابق لما في المنصة", "Nothing changed"));
         return;
       }
@@ -1072,8 +1097,8 @@ function NatImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => vo
       if (
         !confirm(
           t(
-            `سيُحدَّث ${upd.length} استراتيجية من الملف.\nلا يُحذف شيء، والخانة الفارغة تُبقي القيمة الحالية كما هي.${extra}\n\nمتابعة؟`,
-            `Update ${upd.length} strategies?`,
+            `سيُحدَّث ${upd.size} استراتيجية من الملف.\nلا يُحذف شيء، والخانة الفارغة تُبقي القيمة الحالية كما هي.${extra}\n\nمتابعة؟`,
+            `Update ${upd.size} strategies?`,
           ),
         )
       ) {
@@ -1081,7 +1106,7 @@ function NatImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => vo
         return;
       }
 
-      const all = [...upd, ...add];
+      const all = [...upd.values(), ...add.values()];
       for (let i = 0; i < all.length; i += 40) {
         const res = await apiFetch("/api/items", {
           method: "POST",
@@ -1096,22 +1121,22 @@ function NatImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => vo
       }
       setMsg(
         t(
-          `تم تحديث ${upd.length} استراتيجية${add.length ? ` · وأُضيفت ${add.length}` : ""}`,
-          `Updated ${upd.length}`,
+          `تم تحديث ${upd.size} استراتيجية${add.size ? ` · وأُضيفت ${add.size}` : ""}`,
+          `Updated ${upd.size}`,
         ),
       );
       onDone();
     } catch {
-      setMsg(t("تعذّرت قراءة الملف — تأكّدي أنه xlsx", "Could not read the file"));
+      setMsg(t("تعذّرت قراءة الملف — يُقبل xlsx أو pptx", "Could not read the file"));
     }
   }
 
   return (
     <span className="seedb">
       <button className="btn btn-sm" onClick={() => ref.current?.click()}>
-        {t("رفع ملف Excel", "Upload Excel")}
+        {t("رفع ملف Excel أو بوربوينت", "Upload Excel or PowerPoint")}
       </button>
-      <input ref={ref} type="file" accept=".xlsx" hidden onChange={pick} />
+      <input ref={ref} type="file" accept=".xlsx,.pptx" hidden onChange={pick} />
       {msg && <em>{msg}</em>}
     </span>
   );
