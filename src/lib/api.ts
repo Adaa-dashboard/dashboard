@@ -146,6 +146,19 @@ export async function apiFetch(path: string, init: Init = {}) {
       return ok({ ok: true, role: data.role });
     }
 
+    /* رابط الدخول المؤقت: يُستهلك مرة واحدة ثم يبطل.
+       الرمز لا يُخزَّن — في الجدول تجزئته وحدها. */
+    if (p === "/api/auth/magic" && method === "POST") {
+      await ensureAnon();
+      const { data, error } = await s.rpc("perf_magic_use", { p_token: body.token });
+      if (error) return err(error.message, 500);
+      if (data?.error === "bad") return err("الرابط غير صحيح", 401);
+      if (data?.error === "used") return err("هذا الرابط استُعمل من قبل — اطلب رابطاً جديداً", 410);
+      if (data?.error === "expired") return err("انتهت مدّة الرابط — اطلب رابطاً جديداً", 410);
+      if (data?.error === "no_user") return err("الحساب غير موجود أو موقوف", 403);
+      return ok({ ok: true, role: data?.role, name: data?.name });
+    }
+
     if (p === "/api/auth/logout" && method === "POST") {
       await s.auth.signOut();
       return ok({ ok: true });
@@ -333,6 +346,17 @@ export async function apiFetch(path: string, init: Init = {}) {
       if (data?.error === "no_username") return err("اسم المستخدم مطلوب", 400);
       return ok({ ok: true, user: { id: data.id, name: body.name || body.username } });
     }
+    /* إنشاء رابط دخول مؤقت لحسابٍ ما — لصاحب صلاحية «المستخدمون».
+       يُعرض الرمز مرة واحدة هنا ولا يمكن استرجاعه بعدها. */
+    if (p === "/api/users/magic-link" && method === "POST") {
+      const { data, error } = await s.rpc("perf_magic_make", {
+        p_user: body.username, p_minutes: Number(body.minutes) || 60,
+      });
+      if (error) return err(error.message, 403);
+      if (data?.error === "no_user") return err("الحساب غير موجود أو موقوف", 404);
+      return ok({ token: data.token, minutes: data.minutes, user: data.user });
+    }
+
     if (p.startsWith("/api/users/")) {
       const id = p.split("/")[3];
       if (method === "DELETE") {
