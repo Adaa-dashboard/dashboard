@@ -9428,7 +9428,7 @@ input.cell-date {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 7px;
-  align-content: start;
+  align-content: center;
 }
 .ncard .n {
   background: var(--soft);
