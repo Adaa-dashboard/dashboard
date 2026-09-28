@@ -7655,9 +7655,13 @@ input.cell-date {
 .modal.wide {
   max-width: 900px;
 }
-/* الأعمال الرئيسية: بطاقتا جهةٍ جنباً إلى جنب، فالعرضُ أوسع */
+/* الأعمال الرئيسية: بطاقتا جهةٍ جنباً إلى جنب، فالعرضُ أوسع.
+   وطولٌ ثابت كذلك — النافذة تتقلّص على جهتين فتبدو ضيّقة، ثم
+   تقفز حين تكثر الجهات. */
 .modal.xwide {
   max-width: 1280px;
+  min-height: min(86vh, 820px);
+  max-height: 92vh;
 }
 .pf-map {
   display: grid;
@@ -10916,7 +10920,6 @@ input.cell-date {
   font-weight: 700;
   color: var(--muted);
 }
-.mw-bar > span { white-space: nowrap; }
 .mw-bar select {
   flex: none;
   width: auto;
@@ -10968,7 +10971,7 @@ input.cell-date {
 .mw-f input[type="number"] { width: 72px; }
 
 .mw-q { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
-.mw-q .k { font-size: 9.5px; font-weight: 700; color: var(--muted); }
+.mw-q .k { font-size: 10px; font-weight: 800; color: var(--muted); }
 .mw-q .k i { font-style: normal; font-weight: 800; color: var(--gt-700); }
 .mw-q .qb {
   width: 24px;
@@ -10995,8 +10998,29 @@ input.cell-date {
   color: var(--text);
 }
 
-.mw-ns { display: flex; align-items: center; gap: 6px; margin-top: 7px; font-size: 11px; cursor: pointer; }
+/* تقييم التعثّر بمعايير الآلية */
+.mw-crit {
+  margin-top: 8px;
+  padding: 8px 9px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: var(--soft);
+}
+.mw-crit .mw-f { margin-bottom: 6px; }
+.mw-crit .mw-f label { flex: 1; min-width: 0; }
+.mw-crit .mw-f input[type="number"] { width: 100%; }
+.mw-ck { display: flex; align-items: center; gap: 6px; font-size: 10.5px; cursor: pointer; padding: 2px 0; }
+.mw-ck input { width: auto; flex: none; }
+
+.mw-ns { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 11px; cursor: pointer; }
 .mw-ns input { width: auto; }
+/* العلامة لا تُفتح قبل انطباق معيار — رمادية مقفلة، ثم حمراء تُختار */
+.mw-ns.off { color: var(--muted); cursor: not-allowed; }
+.mw-ns.off input { cursor: not-allowed; }
+.mw-ns.hot { color: #c0392b; font-weight: 800; }
+.mw-ns.hot input { accent-color: #c0392b; }
+.mw-why { margin-top: 3px; font-size: 9.5px; color: var(--muted); line-height: 1.5; }
+.mw-why.on { color: #c0392b; font-weight: 700; }
 .mw-more { font-size: 10.5px; color: var(--muted); text-align: center; }
 
 /* ملاحظاتٌ حرّة — تُحفظ عند الخروج من الحقل لا مع كل حرف */

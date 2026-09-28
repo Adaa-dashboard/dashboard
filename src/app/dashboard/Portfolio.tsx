@@ -1241,6 +1241,34 @@ function qSet(ex: Rec, yr: number, v: number[]): Rec {
   return { ...ex, qy: { ...qMap(ex), [String(yr)]: v }, ...(yr === YR_NOW ? { q: v } : {}) };
 }
 
+/* ============================================================
+   معايير تحديد الجهات ذات الأداء المنخفض
+   ------------------------------------------------------------
+   من «آلية عمل جلسة مراجعة الأداء للأجهزة العامة» — المركز
+   الوطني لقياس أداء الأجهزة العامة، أكتوبر ٢٠٢٥ (الشريحتان ٦ و٧).
+   تكفي **أيٌّ** منها لعدّ الجهة ذات أداء منخفض:
+     ١. عنصران متعثّران فأكثر، تكرّر تعثّرهما على مدى فترتَي قياس
+        متتاليتين، **و** أداء الجهاز العام ≤ ٧٠٪
+     ٢. عدد العناصر المتعثرة ٥ عناصر أو أكثر
+     ٣. تعثّر مبادرة ميزانيتها مليار ريال أو أكثر
+   ولذلك لا تُفتح علامة «تحتاج جلسة مراجعة أداء» قبل انطباق أحدها:
+   الجلسة تُعقد بمعيار لا برأي. ============================================================ */
+type CritVals = { perf: number; kpiBad: number; initBad: number; rep2: number; bigInit: number };
+const CRIT_TEXT = [
+  "عنصران متعثّران فأكثر تكرّر تعثّرهما فترتَي قياس متتاليتين، والأداء العام ٧٠٪ فأقل",
+  "خمسة عناصر متعثّرة أو أكثر",
+  "تعثّر مبادرة ميزانيتها مليار ريال أو أكثر",
+];
+function lowPerf(v: CritVals): { ok: boolean; hit: string[] } {
+  const bad = v.kpiBad + v.initBad;
+  const hit: string[] = [];
+  /* الأداء العام غير المُدخَل (صفر) لا يُعدّ ≤ ٧٠٪ — وإلا انطبق المعيار على كل جهة لم تُقيَّم */
+  if (bad >= 2 && v.rep2 === 1 && v.perf > 0 && v.perf <= 70) hit.push(CRIT_TEXT[0]);
+  if (bad >= 5) hit.push(CRIT_TEXT[1]);
+  if (v.bigInit === 1) hit.push(CRIT_TEXT[2]);
+  return { ok: hit.length > 0, hit };
+}
+
 /** حقل نصّي يحفظ عند الخروج منه لا مع كل حرف */
 function NoteBox({ value, ph, rows, onSave }: { value: string; ph: string; rows?: number; onSave: (v: string) => void }) {
   const [v, setV] = useState(value);
@@ -1348,7 +1376,6 @@ function MainWork({
       {msg && <div className="mw-msg">{msg}</div>}
       {full && (
         <div className="mw-bar">
-          <span>{t("الاجتماعات الربعية لسنة", "Quarterly meetings of")}</span>
           <select value={yr} onChange={(e) => setYr(Number(e.target.value))}>
             {MW_YEARS.map((y) => (
               <option key={y} value={y}>
@@ -1371,6 +1398,24 @@ function MainWork({
         const need = ex.needSess === undefined ? !!sr : num(ex.needSess) === 1;
         const sd = sr?.data || {};
         const sAt = Math.max(0, Math.min(SESS_SHORT.length, num(sd.done)));
+        /* أرقام التقييم: من بطاقة الجلسة متى وُجدت — فهي مصدرُها في
+           صفحة الجلسات — وإلا من المحفظة قبل أن تُفتح البطاقة */
+        const cv: CritVals = {
+          perf: num(sr ? sd.perf : ex.perf),
+          kpiBad: num(sr ? sd.kpiBad : ex.kpiBad),
+          initBad: num(sr ? sd.initBad : ex.initBad),
+          rep2: num(ex.rep2),
+          bigInit: num(ex.bigInit),
+        };
+        const lp = lowPerf(cv);
+        /* الحقل الواحد يكتب في المحفظة، ويُمرَّر لبطاقة الجلسة إن فُتحت */
+        const setEx = (patch: Rec) => {
+          onExtra(key, { ...ex, ...patch });
+          if (!sr) return;
+          const mir: Rec = {};
+          for (const f of ["perf", "kpiBad", "initBad"]) if (f in patch) mir[f] = patch[f];
+          if (Object.keys(mir).length) void put(sr.id, mir, "sessions");
+        };
         return (
           <div className="mw-row" key={it.id}>
             <div className="mw-h">
@@ -1428,7 +1473,7 @@ function MainWork({
             {/* الاجتماعات الربعية — بيانات محفظة، لا تظهر في صفحة القسم */}
             <div className="mw-q">
               <span className="k">
-                {t("الاجتماعات الربعية", "Quarterly")} <i>{yr}</i>
+                <i>{yr}</i>
               </span>
               {QLABS.map((lb, i) => (
                 <button
@@ -1461,21 +1506,87 @@ function MainWork({
 
             {sec !== "cx" && (
               <>
-                <label className="mw-ns">
+                {/* تقييم التعثّر بمعايير الآلية — قبل العلامة لا بعدها،
+                    فالعلامة نتيجةُ المعايير لا مدخلاً مستقلاً عنها */}
+                <div className="mw-crit">
+                  <div className="mw-f">
+                    <label>
+                      <span>{t("الأداء العام ٪", "Overall %")}</span>
+                      <input
+                        type="number"
+                        value={cv.perf || ""}
+                        onChange={(e) => setEx({ perf: Number(e.target.value) || 0 })}
+                      />
+                    </label>
+                    <label>
+                      <span>{t("مؤشرات متعثّرة", "KPIs at risk")}</span>
+                      <input
+                        type="number"
+                        value={cv.kpiBad || ""}
+                        onChange={(e) => setEx({ kpiBad: Number(e.target.value) || 0 })}
+                      />
+                    </label>
+                    <label>
+                      <span>{t("مبادرات متعثّرة", "Initiatives at risk")}</span>
+                      <input
+                        type="number"
+                        value={cv.initBad || ""}
+                        onChange={(e) => setEx({ initBad: Number(e.target.value) || 0 })}
+                      />
+                    </label>
+                  </div>
+                  <label className="mw-ck">
+                    <input
+                      type="checkbox"
+                      checked={cv.rep2 === 1}
+                      onChange={(e) => setEx({ rep2: e.target.checked ? 1 : 0 })}
+                    />
+                    <span>{t("تكرّر التعثّر فترتَي قياس متتاليتين", "Repeated two periods")}</span>
+                  </label>
+                  <label className="mw-ck">
+                    <input
+                      type="checkbox"
+                      checked={cv.bigInit === 1}
+                      onChange={(e) => setEx({ bigInit: e.target.checked ? 1 : 0 })}
+                    />
+                    <span>{t("تعثّر مبادرة ميزانيتها مليار ريال أو أكثر", "A ≥1bn initiative at risk")}</span>
+                  </label>
+                </div>
+
+                <label
+                  className={`mw-ns ${lp.ok ? "hot" : "off"}`}
+                  title={
+                    lp.ok
+                      ? t(`ينطبق: ${lp.hit.join(" · ")}`, lp.hit.join(" · "))
+                      : t(
+                          `لا تنطبق معايير الآلية بعد — تكفي إحداها: ${CRIT_TEXT.join(" · ")}`,
+                          "No criterion met yet",
+                        )
+                  }
+                >
                   <input
                     type="checkbox"
                     checked={need}
+                    disabled={!lp.ok && !need}
                     onChange={(e) =>
                       void flagSession(entN, e.target.checked, key, ex, {
                         kpiTot: num(it.data.kpisTot),
                         initTot: num(it.data.initTot),
+                        kpiBad: cv.kpiBad,
+                        initBad: cv.initBad,
+                        perf: cv.perf,
                       })
                     }
                   />
                   <span>{t("متعثّرة — تحتاج جلسة مراجعة أداء", "Needs a performance review session")}</span>
                 </label>
+                <div className={`mw-why ${lp.ok ? "on" : ""}`}>
+                  {lp.ok
+                    ? t(`ينطبق: ${lp.hit[0]}`, lp.hit[0])
+                    : t("لا تنطبق معايير التعثّر بعد", "No low-performance criterion met")}
+                </div>
 
-                {/* تفاصيل التعثّر — تُكتب في بطاقة الجهة بصفحة الجلسات
+                {/* تفاصيل الجلسة — تُكتب في بطاقة الجهة بصفحة الجلسات
                     نفسها، فما يُدخَل هنا هو ما يُقرأ هناك */}
                 {need &&
                   (sr ? (
@@ -1491,22 +1602,6 @@ function MainWork({
                             ))}
                             <option value={SESS_SHORT.length}>{t("اكتملت الجلسة", "Completed")}</option>
                           </select>
-                        </label>
-                        <label>
-                          <span>{t("مؤشرات متعثّرة", "KPIs at risk")}</span>
-                          <input
-                            type="number"
-                            value={num(sd.kpiBad) || ""}
-                            onChange={(e) => void put(sr.id, { kpiBad: Number(e.target.value) || 0 }, "sessions")}
-                          />
-                        </label>
-                        <label>
-                          <span>{t("مبادرات متعثّرة", "Initiatives at risk")}</span>
-                          <input
-                            type="number"
-                            value={num(sd.initBad) || ""}
-                            onChange={(e) => void put(sr.id, { initBad: Number(e.target.value) || 0 }, "sessions")}
-                          />
                         </label>
                       </div>
                       <NoteBox
