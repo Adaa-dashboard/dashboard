@@ -852,8 +852,12 @@ function SessCard({
   const band = perfBand(perf);
   const esc = escAt(escOf(d));
   const cur = s.at < 0 ? t("مكتملة", "Done") : s.names[s.at] || "";
+  const hasNote = !!txt(d.note).trim();
   /* الكتابة الحرة تُحفظ بعد سكوتٍ قصير، فلا يُرسَل طلبٌ بكل حرف */
   const [draft, setDraft] = useState<string | null>(null);
+  /* الخانة لا تُفتح إلا إن كانت فيها ملاحظة أو طلبها الاستشاري —
+     البطاقة بلا ملاحظة لا تحمل حقلاً فارغاً */
+  const [wantNote, setWantNote] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function put(next: Rec) {
@@ -913,22 +917,29 @@ function SessCard({
 
       <Flow stages={s.names} done={s.done} dates={s.dates} />
 
-      <div className="sn">
-        <div className="sn-h">{t("الملاحظات", "Notes")}</div>
-        {canEdit ? (
-          <textarea
-            rows={2}
-            className="sn-txt"
-            value={draft ?? txt(d.note)}
-            placeholder={t("اكتب ملاحظتك…", "Write a note…")}
-            onChange={(e) => typeNote(e.target.value)}
-          />
-        ) : (
-          <div className="note">
-            {txt(d.note) || t("لا توجد ملاحظات مسجّلة", "No notes recorded")}
-          </div>
-        )}
-      </div>
+      {hasNote || (canEdit && wantNote) ? (
+        <div className="sn">
+          <div className="sn-h">{t("الملاحظات", "Notes")}</div>
+          {canEdit ? (
+            <textarea
+              rows={2}
+              className="sn-txt"
+              autoFocus={wantNote && !hasNote}
+              value={draft ?? txt(d.note)}
+              placeholder={t("ملاحظة…", "Note…")}
+              onChange={(e) => typeNote(e.target.value)}
+            />
+          ) : (
+            <div className="note">{txt(d.note)}</div>
+          )}
+        </div>
+      ) : canEdit ? (
+        <button type="button" className="sn-add" onClick={() => setWantNote(true)}>
+          + {t("ملاحظة", "Note")}
+        </button>
+      ) : (
+        <div className="sn-gap" />
+      )}
     </div>
   );
 }
@@ -1242,7 +1253,7 @@ function SessionsPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
       </div>
 
       {rows.length ? (
-        <div className="ncards">
+        <div className="ncards eq">
           {rows.map((it) => (
             <SessCard
               key={it.id}

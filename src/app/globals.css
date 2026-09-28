@@ -10739,3 +10739,29 @@ input.cell-date {
   margin: 6px 0 2px;
   overflow-wrap: anywhere;
 }
+
+/* ---------- بطاقات متساوية الارتفاع + خانة ملاحظة اختيارية ----------
+   البطاقة بلا ملاحظة كانت أقصر من جارتها، فيتعرّج الصف. الآن
+   البطاقات تتمدّد لأطولها، وكتلةُ الملاحظة تُدفع لأسفلها فتستوي
+   حوافّها السفلى مهما اختلف ما فوقها. */
+.ncards.eq { align-items: stretch; }
+.ncards.eq .ncard { display: flex; flex-direction: column; }
+.ncards.eq .ncard .sn,
+.ncards.eq .ncard .sn-add,
+.ncards.eq .ncard .sn-gap { margin-top: auto; }
+
+.ncard .sn-add {
+  align-self: flex-start;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 9px;
+  padding: 5px 11px;
+  margin-top: 11px;
+  cursor: pointer;
+}
+.ncard .sn-add:hover { color: var(--gt-700); border-color: var(--gt-600); }
+.ncard .sn-gap { min-height: 1px; }
