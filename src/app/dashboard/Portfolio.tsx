@@ -498,7 +498,7 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
     const rows = [
       { id: "tsk-demo-p1", title: "إعداد ملخّص تنفيذي لجاهزية الاستراتيجيات الوطنية قبل جلسة المجلس",
         createdById: bossId, dueDate: day(4), state: "ok", priority: "high",
-        updates: [{ id: "d1", text: "الملخّص يُرفع بصيغة عرض من ٥ شرائح.", byId: bossId, byName: bossName, at: new Date(Date.now() - 2 * 86400000).toISOString() }] },
+        updates: [{ id: "d1", text: "الملخّص يُرفع بصيغة عرض من 5 شرائح.", byId: bossId, byName: bossName, at: new Date(Date.now() - 2 * 86400000).toISOString() }] },
       { id: "tsk-demo-p2", title: "مراجعة الجهات ذات قابلية القياس المنخفضة ورفع التوصيات",
         createdById: bossId, dueDate: day(-3), state: "ok", priority: "high", updates: [] },
       { id: "tsk-demo-p3", title: "تحديث بيانات الاستراتيجيات المؤسسية لقطاع الشؤون الاقتصادية",
@@ -705,8 +705,8 @@ function NotesWidget({ t, onOpen }: { t: T; onOpen: () => void }) {
         <div className="nt-tip">
           <b>اكتب التاريخ داخل الملاحظة</b>
           <span>
-«بكرة الساعة ٩ اجتماع الديوان» — يُقرأ الموعد ويظهر في التقويم.
-            وتُفهم: اليوم · بكرة · الأحد · الأربعاء ٢:٣٠ · بعد أسبوع · ١٥ سبتمبر.
+«بكرة الساعة 9 اجتماع الديوان» — يُقرأ الموعد ويظهر في التقويم.
+            وتُفهم: اليوم · بكرة · الأحد · الأربعاء 2:30 · بعد أسبوع · 15 سبتمبر.
           </span>
         </div>
       )}
@@ -1190,7 +1190,7 @@ function mainChips(sec: MainSec, rows: MineRow[]): { k: string; v: number }[] {
       { k: "معتمدة من مجلس الوزراء", v: n((d) => num(d.stage, 1) === 4) },
       { k: "قيد المراجعة والاعتماد", v: n((d) => [2, 3].includes(num(d.stage, 1))) },
       { k: "في طور الإعداد", v: n((d) => num(d.stage, 1) === 1) },
-      { k: "قابلية قياسها ١٠٠٪", v: n((d) => num(d.meas) >= 100) },
+      { k: "قابلية قياسها 100٪", v: n((d) => num(d.meas) >= 100) },
     ];
   if (sec === "inststrat")
     return [
@@ -1255,8 +1255,8 @@ function qSet(ex: Rec, yr: number, v: number[]): Rec {
    الجلسة تُعقد بمعيار لا برأي. ============================================================ */
 type CritVals = { perf: number; kpiBad: number; initBad: number; rep2: number; bigInit: number };
 const CRIT_TEXT = [
-  "عنصران متعثّران فأكثر تكرّر تعثّرهما فترتَي قياس متتاليتين، والأداء العام ٧٠٪ فأقل",
-  "خمسة عناصر متعثّرة أو أكثر",
+  "عنصران متعثّران فأكثر تكرّر تعثّرهما فترتَي قياس متتاليتين، والأداء العام 70٪ فأقل",
+  "5 عناصر متعثّرة أو أكثر",
   "تعثّر مبادرة ميزانيتها مليار ريال أو أكثر",
 ];
 function lowPerf(v: CritVals): { ok: boolean; hit: string[] } {
@@ -1486,7 +1486,7 @@ function MainWork({
                     onExtra(key, qSet(ex, yr, n));
                   }}
                 >
-                  {["١", "٢", "٣", "٤"][i]}
+                  {i + 1}
                 </button>
               ))}
               <input
