@@ -10874,12 +10874,26 @@ input.cell-date {
 
 .ct-grp { margin: 7px 0 0; padding-inline-start: 10px; border-inline-start: 2px solid var(--border); }
 .ct-grp > b {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 10px;
   font-weight: 800;
   color: var(--muted);
   margin-bottom: 3px;
 }
+.ct-add {
+  font: inherit;
+  font-size: 9.5px;
+  font-weight: 800;
+  color: var(--gt-700);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.ct-add:hover { text-decoration: underline; }
+.ct-none { font-size: 10.5px; color: var(--muted); padding: 2px 0; }
 .ct-line {
   display: flex;
   align-items: baseline;
@@ -10902,6 +10916,57 @@ input.cell-date {
 .ct-line .ct-c { display: flex; gap: 10px; flex-wrap: wrap; margin-inline-start: auto; }
 .ct-line .ct-c a { font-size: 10.5px; color: var(--gt-700); text-decoration: none; }
 .ct-line .ct-c a:hover { text-decoration: underline; }
+/* قلمُ التحرير — باهتٌ دائماً لا مخفيّ: الإخفاء حتى المرور يعني
+   أن من على جهازٍ لمسيّ لا يعرف أن السطر قابلٌ للتعديل أصلاً */
+.ct-pen {
+  font: inherit;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  padding: 1px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: .45;
+  transition: opacity .12s;
+}
+.ct-line:hover .ct-pen, .ct-pen:focus-visible { opacity: 1; }
+.ct-pen:hover { color: var(--gt-700); background: var(--soft); }
+
+/* تحرير نقطة التواصل — أربعة حقول وسطرُ أزرار */
+.ct-ed {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  padding: 6px 0;
+}
+.ct-ed input {
+  font: inherit;
+  font-size: 11px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  min-width: 0;
+}
+.ct-act { grid-column: 1 / -1; display: flex; gap: 6px; }
+.ct-act button {
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 4px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+}
+.ct-act .ok { background: var(--gt-700); border-color: var(--gt-700); color: #fff; }
+.ct-act .del { margin-inline-start: auto; color: #c0392b; border-color: color-mix(in srgb, #c0392b 34%, var(--border)); }
+.ct-act button:disabled { opacity: .5; cursor: default; }
+.ct-err { grid-column: 1 / -1; width: 100%; font-size: 10px; font-weight: 700; color: #c0392b; }
 
 /* ---------- الأعمال الرئيسية في محفظتي ---------- */
 .mw { display: flex; flex-direction: column; gap: 9px; }
