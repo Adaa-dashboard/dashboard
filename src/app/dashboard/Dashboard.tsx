@@ -1105,8 +1105,12 @@ function Overview({
     <div>
       <div className="toolbar">
         <div>
-          <label style={{ marginBottom: 4 }}>{t("النطاق", "Scope")}</label>
-          <select value={scope} onChange={(e) => setScope(e.target.value)}>
+          {/* بلا عنوان «النطاق»: الخيار يشرح نفسه — بطلب المستخدمة */}
+          <select
+            value={scope}
+            aria-label={t("النطاق", "Scope")}
+            onChange={(e) => setScope(e.target.value)}
+          >
             {SCOPES.map((s) => (
               <option key={s.key} value={s.key}>
                 {t(s.label, s.en)}
