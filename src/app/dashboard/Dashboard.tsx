@@ -960,7 +960,7 @@ function Overview({
   const sectors = visibleSectors(me, refData);
   const indicators = activeIndicators(refData);
   const bands = refData.statuses;
-  const [scope, setScope] = useState("year");
+  const scope = "year";
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [loading, setLoading] = useState(true);
   const [asgFocus, setAsgFocus] = useState<string | null>(null);
@@ -1104,20 +1104,8 @@ function Overview({
   return (
     <div>
       <div className="toolbar">
-        <div>
-          {/* بلا عنوان «النطاق»: الخيار يشرح نفسه — بطلب المستخدمة */}
-          <select
-            value={scope}
-            aria-label={t("النطاق", "Scope")}
-            onChange={(e) => setScope(e.target.value)}
-          >
-            {SCOPES.map((s) => (
-              <option key={s.key} value={s.key}>
-                {t(s.label, s.en)}
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* اختيار النطاق أُزيل بطلب المستخدمة — الصفحة على السنة
+            كاملة، والأرباع في صفحة «المؤشرات التفصيلية» */}
         <div style={{ flex: 1 }} />
         <button className="btn btn-ghost btn-sm" onClick={load}>
           {t("تحديث", "Refresh")}
