@@ -1390,10 +1390,23 @@ async function loadFromCloud(){
     }
     // تحميل التفاصيل - الصفوف
     const drows = await sbFetch('detail_rows?select=*&order=output_idx,row_order');
+    const dupLoad = [0, 0, 0, 0];
     if(drows && drows.length>0){
-      detRows=[[[],[],[],[]]].map(()=>[]); // reset
       detRows=[[],[],[],[]];
-      drows.forEach(r=>{ detRows[r.output_idx].push(r.row_data||[]); });
+      const seen = [new Set(), new Set(), new Set(), new Set()];
+      drows.forEach(r=>{
+        const i = r.output_idx;
+        if(!(i >= 0 && i <= 3)) return;
+        const row = r.row_data || [];
+        // صفّان بنفس row_order ونفس المحتوى حرفياً ليسا صفّين أدخلهما المستخدم:
+        // row_order فريد داخل أي حفظ واحد، فهذه نسخة خلّفها حفظان متداخلان.
+        // إسقاطها لا يفقد شيئاً لأن الباقي مطابق حرفياً — والمكرر المختلف
+        // المحتوى يبقى كما هو ليظهر أحمر ويُدمج من ⚙️ «حذف الصفوف المكررة».
+        const k = r.row_order + '\u0000' + JSON.stringify(row);
+        if(seen[i].has(k)){ dupLoad[i]++; return; }
+        seen[i].add(k);
+        detRows[i].push(row);
+      });
       // للمخرجات التي لا صفوف فيها - ابق الافتراضي
       DEFAULT_ROWS.forEach((d,i)=>{ if(detRows[i].length===0) detRows[i]=d.map(r=>[...r]); });
     }
@@ -1404,7 +1417,10 @@ async function loadFromCloud(){
     const checkFixed = normalizeChecksAll();
     // توحيد صيغ التواريخ القديمة ثم الترتيب (أقدم أولاً)، وحفظ التصحيح مرة واحدة
     const fixed = new Set([...billFixed, ...checkFixed, ...normalizeAllDates(), ...autoSortAll()]);
+    dupLoad.forEach((n, i)=>{ if(n) fixed.add(i); });   // إسقاط النسخ المكرّرة يُحفظ أيضاً
     fixed.forEach(i=>{ if(can('edit:details:' + (i + 1))) saveDetailToCloud(i); });
+    const dupTotal = dupLoad.reduce((a, b)=>a + b, 0);
+    if(dupTotal) console.warn('أُسقِط ' + dupTotal + ' صفاً مكرراً حرفياً من السحابة', dupLoad);
     recalcStrategies();
     renderDash();
     // لو كان المستخدم في صفحة التفاصيل لحظة اكتمال التزامن، أعِد رسمها
@@ -1425,11 +1441,36 @@ async function loadFromCloud(){
 // الإدراجان معاً وحُذف القديم مرة واحدة ⇒ **الجدول كله يتضاعف**.
 // والتداخل واقعٌ فعلاً: saveDetSoon تؤجّل 1.2 ث بينما addRow/delRow/impRun
 // و dedupeRows و loadFromCloud تحفظ فوراً.
+// **الطابور يُرتّب حفظ هذه الصفحة وحدها** — تبويبان أو جهازان يحفظان معاً
+// يتضاعف عندهما الجدول كما حدث فعلاً (32 استراتيجية ⇒ 64). ولهذا صار الحفظ
+// يُنظّف نفسه بعده (cleanCloudDupes)، وloadFromCloud يُسقط النسخ المتطابقة
+// حرفياً عند القراءة.
 const detSaveQ = [null, null, null, null];
 function saveDetailToCloud(idx){
   const next = () => saveDetailNow(idx);
   detSaveQ[idx] = (detSaveQ[idx] || Promise.resolve()).then(next, next);
   return detSaveQ[idx];
+}
+
+// يحذف من السحابة النسخ المتطابقة حرفياً (نفس row_order ونفس row_data).
+// آمنة بطبعها: الباقي يحمل نفس المحتوى تماماً فلا معلومة تُفقَد.
+// المسح مرتَّب بالمعرّف وتُبقى أول نسخة، فكل جهاز يُبقي النسخة نفسها
+// ولا يحذف أحدهم ما أبقاه الآخر.
+async function cleanCloudDupes(idx){
+  const sb = getSB();
+  if(!sb) return {removed: 0, left: -1};
+  const {data, error} = await sb.from('detail_rows')
+    .select('id,row_order,row_data').eq('output_idx', idx).order('id');
+  if(error || !data){ if(error) console.error(error); return {removed: 0, left: -1}; }
+  const seen = new Set(), extra = [];
+  data.forEach(r=>{
+    const k = r.row_order + '\u0000' + JSON.stringify(r.row_data || []);
+    if(seen.has(k)) extra.push(r.id); else seen.add(k);
+  });
+  if(!extra.length) return {removed: 0, left: data.length};
+  const {error: dErr} = await sb.from('detail_rows').delete().in('id', extra);
+  if(dErr){ console.error(dErr); return {removed: 0, left: data.length}; }
+  return {removed: extra.length, left: data.length - extra.length};
 }
 
 async function saveDetailNow(idx){
@@ -1450,26 +1491,37 @@ async function saveDetailNow(idx){
       .select('id').eq('output_idx', idx);
     if(gErr) throw gErr;
 
-    if(detRows[idx].length){
-      const payload = detRows[idx].map((row, ri)=>({output_idx: idx, row_data: row, row_order: ri}));
+    const payload = detRows[idx].map((row, ri)=>({output_idx: idx, row_data: row, row_order: ri}));
+    if(payload.length){
       const {error: iErr} = await sb.from('detail_rows').insert(payload);
       if(iErr) throw iErr;                    // فشل الإدراج ⇒ لم يُحذف شيء
     }
 
     // الحذف يأتي بعد الإدراج، فلو فشل بقي القديم والجديد معاً ⇒ تكرار.
-    // نعيد المحاولة مرة، ثم نُبلّغ برسالة تقول ما العمل بدل خطأ غامض —
-    // فالبيانات الجديدة محفوظة فعلاً والناقص حذف القديم وحده.
+    // نعيد المحاولة مرة، ثم نُكمل إلى التنظيف بدل الخروج بخطأ غامض.
+    let delOk = true;
     if(oldRows && oldRows.length){
       const ids = oldRows.map(r=>r.id);
       let dErr = (await sb.from('detail_rows').delete().in('id', ids)).error;
       if(dErr) dErr = (await sb.from('detail_rows').delete().in('id', ids)).error;
-      if(dErr){
-        console.error(dErr);
-        showSyncStatus('⚠️ حُفظ الجديد ولم يُحذف القديم — أعِد التحميل ثم ⚙️ «حذف الصفوف المكررة»');
-        return;
-      }
+      if(dErr){ console.error(dErr); delOk = false; }
     }
-    showSyncStatus('✅ تم حفظ تفاصيل ' + ON_S[idx]);
+
+    // تنظيف ما بعد الحفظ: يزيل نسخ حفظٍ متداخل من تبويب أو جهاز آخر
+    // (الطابور detSaveQ يُرتّب حفظ هذه الصفحة وحدها) وبقايا حذفٍ فاشل.
+    const {removed, left} = await cleanCloudDupes(idx);
+
+    // شبكة أمان: تداخلٌ نادر قد يحذف صفوفنا كلها ⇒ نعيد إدراجها
+    if(left === 0 && payload.length){
+      const {error: rErr} = await sb.from('detail_rows').insert(payload);
+      if(rErr) console.error(rErr);
+    }
+
+    if(!delOk && !removed){
+      showSyncStatus('⚠️ حُفظ الجديد ولم يُحذف القديم — أعِد التحميل ثم ⚙️ «حذف الصفوف المكررة»');
+      return;
+    }
+    showSyncStatus('✅ تم حفظ تفاصيل ' + ON_S[idx] + (removed ? ' (أُزيل ' + removed + ' صفاً مكرراً)' : ''));
   }catch(e){ sbErr(e); }
 }
 
