@@ -10825,9 +10825,45 @@ input.cell-date {
   background: var(--gold, #c9a020);
 }
 
-/* ---------- نقاط التواصل داخل مربع «الجهات» في محفظتي ---------- */
-.erow2.col { display: block; }
-.erow2.col .n { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
+/* ---------- بطاقة الجهة في «جهاتي» بمحفظتي ---------- */
+/* كانت صفوفاً متلاصقة تختلط فيها الجهة بجارتها. صارت بطاقةً لكلٍّ:
+   شعارها ثم اسمها وقطاعها، وتحتهما نقاط التواصل مجموعةً مجموعة. */
+.ecards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+@media (max-width: 760px) { .ecards { grid-template-columns: 1fr; } }
+.ecard {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  padding: 11px 13px;
+}
+.ec-h { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+.ec-lg {
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.ec-lg i { font-style: normal; font-weight: 800; font-size: 15px; }
+.ec-lg img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #fff; padding: 4px; }
+.ec-n { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.ec-n b { font-size: 12.5px; font-weight: 800; color: var(--gt-900); overflow-wrap: anywhere; }
+.ec-n em { font-style: normal; font-size: 10.5px; color: var(--muted); }
+.ec-b {
+  flex: none;
+  font-style: normal;
+  font-size: 9.5px;
+  font-weight: 800;
+  color: #8a5a00;
+  background: rgba(224, 151, 26, .16);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
 .ct-grp { margin: 7px 0 0; padding-inline-start: 10px; border-inline-start: 2px solid var(--border); }
 .ct-grp > b {
   display: block;
