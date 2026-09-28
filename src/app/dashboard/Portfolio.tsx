@@ -12,6 +12,9 @@ import { PIcon, IconPicker } from "./pickicons";
 import { IconGear } from "./icons";
 import MyEntities, { contribsOf, sumOf } from "./Entities";
 import { publishUndo } from "@/lib/undoBus";
+import { useLogos, logoKey } from "./Sections";
+import { initials, toneOf } from "@/lib/entlogo";
+import { asset } from "@/lib/base";
 
 /* ============================================================
    محفظتي — الصفحة الشخصية لكل موظف.
@@ -1526,6 +1529,20 @@ function Tile({
 /* ---------------- نافذة جهاتي ---------------- */
 type Contact = { id?: string; name?: string; role?: string; jobTitle?: string; email?: string; phone?: string };
 
+/** وجه الجهة — شعارها إن وُجد، وإلا حرفان بلونٍ من اسمها */
+function EntFace({ name, logo }: { name: string; logo?: string }) {
+  const c = toneOf(name);
+  return (
+    <span className="ec-lg" style={{ background: c + "1f", color: c }}>
+      <i>{initials(name)}</i>
+      {logo && (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img src={asset(`/logos/${logo}`)} alt="" loading="lazy" />
+      )}
+    </span>
+  );
+}
+
 /** سطر نقطة تواصل — الاسم ودورُه، وتحته البريد والجوال قابلَين للنقر */
 function ContactLine({ c }: { c: Contact }) {
   const role = (c.role || "").trim();
@@ -1563,9 +1580,10 @@ function EntitiesModal({
   const [name, setName] = useState("");
   const [type, setType] = useState("مؤسسية");
   const [edit, setEdit] = useState<Row | null>(null);
+  const logos = useLogos();
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal wide" onClick={(e) => e.stopPropagation()}>
         <div className="m-h">
           <h3>{t("جهاتي", "My entities")}</h3>
           <span className="cnt2">
@@ -1585,36 +1603,41 @@ function EntitiesModal({
             <span>{t("تُعدَّل من صفحة «الجهات ونقاط التواصل»", "Edited in the registry page")}</span>
           </div>
         )}
-        {reg.map((x) => {
-          const mineC = (x.ours || []).find((c) => c.id === x.myContactId);
-          const role = (mineC?.role || "أساسي").trim();
-          const ours = (x.ours || []).filter((c) => c.id !== x.myContactId);
-          return (
-            <div className="erow2 col" key={x.entityId}>
-              <span className="n">
-                {role !== "أساسي" && <i className="erow2-b">{role}</i>}
-                {x.name}
-                <em>{x.sector}</em>
-              </span>
-              {(x.theirs || []).length > 0 && (
-                <div className="ct-grp">
-                  <b>{t("نقطة التواصل من الجهة", "Their contact")}</b>
-                  {(x.theirs || []).map((c, i) => (
-                    <ContactLine key={c.id || i} c={c} />
-                  ))}
+        <div className="ecards">
+          {reg.map((x) => {
+            const mineC = (x.ours || []).find((c) => c.id === x.myContactId);
+            const role = (mineC?.role || "أساسي").trim();
+            const ours = (x.ours || []).filter((c) => c.id !== x.myContactId);
+            return (
+              <div className="ecard" key={x.entityId}>
+                <div className="ec-h">
+                  <EntFace name={x.name} logo={logos[logoKey(x.name)]} />
+                  <span className="ec-n">
+                    <b>{x.name}</b>
+                    {x.sector && <em>{x.sector}</em>}
+                  </span>
+                  {role !== "أساسي" && <i className="ec-b">{role}</i>}
                 </div>
-              )}
-              {ours.length > 0 && (
-                <div className="ct-grp">
-                  <b>{t("من المركز معك", "Ours, with you")}</b>
-                  {ours.map((c, i) => (
-                    <ContactLine key={c.id || i} c={c} />
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
+                {(x.theirs || []).length > 0 && (
+                  <div className="ct-grp">
+                    <b>{t("نقطة التواصل من الجهة", "Their contact")}</b>
+                    {(x.theirs || []).map((c, i) => (
+                      <ContactLine key={c.id || i} c={c} />
+                    ))}
+                  </div>
+                )}
+                {ours.length > 0 && (
+                  <div className="ct-grp">
+                    <b>{t("من المركز معك", "Ours, with you")}</b>
+                    {ours.map((c, i) => (
+                      <ContactLine key={c.id || i} c={c} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
         <div>
           {rows.map((r) => (
             <div className="erow2" key={r.id}>

@@ -1362,10 +1362,10 @@ const NAT_TAB: Record<number, string> = {
 
 /* شعارات الجهات المستخرَجة من عرض الإدارة.
    المطابقة بالاسم لا بحقل محفوظ، فتعمل على البنود المحمَّلة سابقاً. */
-const logoKey = (s: string) =>
+export const logoKey = (s: string) =>
   s.replace(/\s+/g, "").replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي");
 
-function useLogos() {
+export function useLogos() {
   const [map, setMap] = useState<Record<string, string>>({});
   useEffect(() => {
     let live = true;
