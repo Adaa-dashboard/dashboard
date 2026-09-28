@@ -753,9 +753,12 @@ export async function apiFetch(path: string, init: Init = {}) {
       if (!me) return err("غير مصرّح", 401);
       const id = str(body.id);
       const patch: Record<string, unknown> = {};
+      /* `role` و`side` قابلان للتعديل كذلك: نقطةُ تواصلٍ سُجّلت
+         «الجهة» قد تكون من مكتب تحقيق الرؤية، وتُنقل من مكانها */
       for (const [k, col] of [["name", "name"], ["jobTitle", "job_title"],
-                              ["email", "email"], ["phone", "phone"], ["note", "note"]] as const)
-        if (body[k] !== undefined) patch[col] = str(body[k]);
+                              ["email", "email"], ["phone", "phone"], ["note", "note"],
+                              ["role", "role"], ["side", "side"]] as const)
+        if (body[k] !== undefined && str(body[k]) !== "") patch[col] = str(body[k]);
       if (id) {
         const { data, error } = await s.from("perf_contacts").update(patch).eq("id", id).select("id");
         if (error) return err(error.message, 403);
@@ -847,6 +850,7 @@ export async function apiFetch(path: string, init: Init = {}) {
           kind: String(r.kind || ""), sector: String(r.sector || ""),
           myContactId: String(r.my_contact_id || ""),
           myRole: String(r.my_role || ""), theirs: r.theirs || [],
+          /* `side` يأتي مع كل نقطة فتُفرز الواجهة الأطراف الثلاثة */
           /* كل نقاط التواصل من المركز لهذه الجهة — بها يُعرف دوري
              فيها (أساسي أم بديل) ومن يشاركني إياها */
           ours: r.mine || [],

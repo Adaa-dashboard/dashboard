@@ -101,9 +101,11 @@ export const WIDGETS: WDef[] = [
 
   /* الأعمال الرئيسية — ما يقوم به الاستشاري على جهاته، وكلٌّ منها
      مربوط بصفحة قسمه في المنصة */
-  { key: "natstrat", label: "الاستراتيجيات الوطنية", group: "main", icon: "map", color: "#016b5f", section: "natstrat" },
-  { key: "inststrat", label: "الاستراتيجيات المؤسسية", group: "main", icon: "building", color: "#1a9d5c", section: "inststrat" },
-  { key: "cx", label: "قياس تجربة المستفيد", group: "main", icon: "user-check", color: "#2f7fd1", section: "cx" },
+  /* درجات أخضر أداء الثلاث — الأعمال الرئيسية عائلةٌ واحدة تُقرأ
+     كذلك بلمحة، لا ألواناً متفرّقة بلا معنى */
+  { key: "natstrat", label: "الاستراتيجيات الوطنية", group: "main", icon: "map", color: "#00584c", section: "natstrat" },
+  { key: "inststrat", label: "الاستراتيجيات المؤسسية", group: "main", icon: "building", color: "#016b5f", section: "inststrat" },
+  { key: "cx", label: "قياس تجربة المستفيد", group: "main", icon: "user-check", color: "#008b84", section: "cx" },
 
   { key: "projects", label: "المشاريع الاستراتيجية", group: "projects", icon: "rocket", color: "#0f8a8a", section: "projects" },
 
@@ -1254,12 +1256,21 @@ const CX_QF: Fld[] = [
 ];
 
 /** حقل نصّي حرّ يحفظ عند الخروج منه */
-function TextBox({ value, onSave }: { value: string; onSave: (v: string) => void }) {
+function TextBox({
+  value, ph, ltr, onSave,
+}: {
+  value: string;
+  ph?: string;
+  ltr?: boolean;
+  onSave: (v: string) => void;
+}) {
   const [v, setV] = useState(value);
   useEffect(() => setV(value), [value]);
   return (
     <input
       value={v}
+      placeholder={ph}
+      dir={ltr ? "ltr" : undefined}
       onChange={(e) => setV(e.target.value)}
       onBlur={() => v !== value && onSave(v)}
     />
@@ -1337,6 +1348,36 @@ function qSet(ex: Rec, yr: number, v: number[]): Rec {
   return { ...ex, qy: { ...qMap(ex), [String(yr)]: v }, ...(yr === YR_NOW ? { q: v } : {}) };
 }
 
+/* روابط كل ربع على حدة: العرض والمحضر (أو التقرير في تجربة
+   المستفيد). كان رابطاً واحداً لكل الأرباع، فمحضرُ الربع الثاني
+   يكتب فوق الأول ولا يُعرف أيُّهما. */
+type QLink = { deck?: string; min?: string };
+const qlMap = (ex: Rec): Record<string, QLink[]> =>
+  ex.ql && typeof ex.ql === "object" ? (ex.ql as Record<string, QLink[]>) : {};
+function qlOf(ex: Rec, yr: number, i: number): QLink {
+  const a = qlMap(ex)[String(yr)];
+  return (Array.isArray(a) && a[i]) || {};
+}
+function qlSet(ex: Rec, yr: number, i: number, v: QLink): Rec {
+  const m = qlMap(ex);
+  const a = Array.isArray(m[String(yr)]) ? [...m[String(yr)]] : [{}, {}, {}, {}];
+  while (a.length < 4) a.push({});
+  a[i] = { ...a[i], ...v };
+  return { ...ex, ql: { ...m, [String(yr)]: a } };
+}
+/** عنوان المجموعة الربعية — تجربة المستفيد تقاريرُ لا اجتماعات */
+const Q_TITLE: Record<MainSec, [string, string]> = {
+  natstrat: ["عقد الاجتماعات الربعية للجهة لعام", "Quarterly meetings held in"],
+  inststrat: ["عقد الاجتماعات الربعية للجهة لعام", "Quarterly meetings held in"],
+  cx: ["التقارير الربعية للجهة لعام", "Quarterly reports in"],
+};
+/** تسمية حقلَي الرابط — عرضٌ ومحضر للاجتماع، وتقريرٌ لتجربة المستفيد */
+const Q_LINKS: Record<MainSec, [string, string][]> = {
+  natstrat: [["deck", "رابط العرض"], ["min", "رابط المحضر"]],
+  inststrat: [["deck", "رابط العرض"], ["min", "رابط المحضر"]],
+  cx: [["deck", "رابط التقرير"], ["min", "رابط المرفقات"]],
+};
+
 /* ============================================================
    معايير تحديد الجهات ذات الأداء المنخفض
    ------------------------------------------------------------
@@ -1403,6 +1444,10 @@ function MainWork({
   const [yr, setYr] = useState(YR_NOW);
   /* ربعُ تجربة المستفيد المعروض — آخر أرباع الملف افتراضاً */
   const [cxq, setCxq] = useState(CX_QS[CX_QS.length - 1].k);
+  /* تجربة المستفيد تُفتح قائمةَ أسماءٍ بشعاراتها: حقولها كثيرة،
+     فعرضُها كلها لكل جهة يجعل النافذة جداراً من الصناديق. الجهة
+     تُفتح بالضغط على اسمها. */
+  const [shown2, setShown2] = useState<Record<string, boolean>>({});
   const logos = useLogos();
 
   /* بطاقة الجلسة لكل جهة — بها تُعرض أرقام التعثّر وتُحرَّر */
@@ -1513,15 +1558,24 @@ function MainWork({
           for (const f of ["perf", "kpiBad", "initBad"]) if (f in patch) mir[f] = patch[f];
           if (Object.keys(mir).length) void put(sr.id, mir, "sessions");
         };
+        /* الطيّ لتجربة المستفيد وحدها وداخل النافذة فقط */
+        const foldable = sec === "cx" && !!full;
+        const open2 = !foldable || !!shown2[it.id];
         return (
-          <div className="mw-row" key={it.id}>
-            <div className="mw-h">
+          <div className={`mw-row ${foldable ? "fold" : ""} ${open2 ? "on" : ""}`} key={it.id}>
+            <div
+              className="mw-h"
+              onClick={foldable ? () => setShown2((v) => ({ ...v, [it.id]: !v[it.id] })) : undefined}
+            >
               <EntFace name={entN} logo={logos[logoKey(entN)]} />
               <span className="mw-t">
                 <b>{txt(it.data[MAIN_TITLE[sec]]) || "—"}</b>
                 {sec === "natstrat" && ent && <em>{ent}</em>}
               </span>
+              {foldable && <i className="fold-a">{open2 ? "▴" : "▾"}</i>}
             </div>
+            {open2 && (
+              <>
 
             <div className="mw-f">
               {sec === "natstrat" && (
@@ -1583,32 +1637,46 @@ function MainWork({
               </>
             )}
 
-            {/* الاجتماعات الربعية — بيانات محفظة، لا تظهر في صفحة القسم */}
-            <div className="mw-q">
-              <span className="k">
-                <i>{yr}</i>
+            {/* الاجتماعات (أو التقارير) الربعية — بيانات محفظة، لا
+                تظهر في صفحة القسم. الأرقام وحدها كانت لا تدلّ على
+                شيء، فصار لها عنوانٌ وأسماء أرباع صريحة. */}
+            <div className="mw-qs">
+              <span className="qh">
+                {t(Q_TITLE[sec][0], Q_TITLE[sec][1])} <i>{yr}</i>
               </span>
-              {QLABS.map((lb, i) => (
-                <button
-                  key={lb}
-                  className={`qb ${q[i] ? "on" : ""}`}
-                  title={`${lb} ${yr}`}
-                  onClick={() => {
-                    const n = [...q];
-                    n[i] = n[i] ? 0 : 1;
-                    onExtra(key, qSet(ex, yr, n));
-                  }}
-                >
-                  {i + 1}
-                </button>
-              ))}
-              <input
-                className="mw-lnk"
-                dir="ltr"
-                value={txt(ex.minutes)}
-                placeholder={t("رابط المحضر في الشير فولدر…", "Minutes link…")}
-                onChange={(e) => onExtra(key, { ...ex, minutes: e.target.value })}
-              />
+              <div className="qrow">
+                {QLABS.map((lb, i) => (
+                  <button
+                    key={lb}
+                    className={`qb ${q[i] ? "on" : ""}`}
+                    title={`${lb} ${yr}`}
+                    onClick={() => {
+                      const n = [...q];
+                      n[i] = n[i] ? 0 : 1;
+                      onExtra(key, qSet(ex, yr, n));
+                    }}
+                  >
+                    Q{i + 1}
+                  </button>
+                ))}
+              </div>
+              {/* روابط الربع تظهر بتعليمه: كلٌّ في خانته الخاصة */}
+              {QLABS.map((lb, i) =>
+                q[i] ? (
+                  <div className="qlk" key={lb}>
+                    <b>Q{i + 1}</b>
+                    {Q_LINKS[sec].map(([f, ph]) => (
+                      <TextBox
+                        key={f}
+                        value={txt(qlOf(ex, yr, i)[f as keyof QLink])}
+                        ph={t(`${ph} في الشير فولدر…`, ph)}
+                        ltr
+                        onSave={(v) => onExtra(key, qlSet(ex, yr, i, { [f]: v }))}
+                      />
+                    ))}
+                  </div>
+                ) : null,
+              )}
             </div>
 
             <NoteBox
@@ -1730,6 +1798,8 @@ function MainWork({
                   ))}
               </>
             )}
+              </>
+            )}
           </div>
         );
       })}
@@ -1824,7 +1894,7 @@ function Tile({
   dragProps: Rec;
 }) {
   return (
-    <div className="tile" onClick={onOpen} {...dragProps}>
+    <div className="tile" style={{ ["--c" as string]: w.color }} onClick={onOpen} {...dragProps}>
       <span className="grip" title="اسحب" onClick={(e) => e.stopPropagation()}>
         ⋮⋮
       </span>
@@ -1848,19 +1918,17 @@ function Tile({
       >
         ✕
       </span>
-      <div className="num2" style={{ color: w.color }}>
-        {count}
-      </div>
+      <div className="num2">{count}</div>
       {warn ? <span className="warn">{warn}</span> : null}
-      <div className="ic3" style={{ background: w.color }}>
-        <PIcon id={w.icon} size={19} />
-      </div>
+      {/* الأيقونة أُزيلت من وجه البطاقة بطلب المستخدمة — تُختار لاحقاً،
+          وتبقى محفوظة وتظهر في رأس النافذة */}
       <h4>{w.label}</h4>
+      <span className="rule" />
       <div className="sb2">{sub}</div>
       {chips && chips.length > 0 ? (
         <div className="chips3">
           {chips.map((c) => (
-            <span className="ch3" key={c.k} style={{ ["--c" as string]: w.color }}>
+            <span className="ch3" key={c.k}>
               <b>{c.v}</b>
               {c.k}
             </span>
@@ -1882,7 +1950,33 @@ function Tile({
 }
 
 /* ---------------- نافذة جهاتي ---------------- */
-type Contact = { id?: string; name?: string; role?: string; jobTitle?: string; email?: string; phone?: string };
+type Contact = {
+  id?: string; name?: string; role?: string; jobTitle?: string;
+  email?: string; phone?: string;
+  /** الطرف: «نحن» (المركز) · «الجهة» · «VRO» (مكتب تحقيق الرؤية) */
+  side?: string;
+};
+
+/* ============================================================
+   أطراف التواصل الثلاثة
+   ------------------------------------------------------------
+   كان الطرفان اثنين، ومنسوب مكتب تحقيق الرؤية يُسجَّل ضمن «الجهة»
+   فيختلط بنقطة اتصالها — وهو من المنظومة لا من الجهاز.
+
+   الصفوف القديمة كلها `side = 'الجهة'`، فتُستدَلّ VRO من مسمّى
+   الوظيفة («مكتب تحقيق الرؤية» أو VRO) حتى تُنقل يدوياً. الاستدلال
+   عرضٌ فقط: لا يكتب شيئاً في القاعدة.
+   ============================================================ */
+const SIDE_US = "نحن";
+const SIDE_VRO = "VRO";
+const isVro = (c: Contact) =>
+  txt(c.side) === SIDE_VRO ||
+  /vro|تحقيق الرؤية|تحقيق الرويه|تحقيق الرؤيه/i.test(`${txt(c.jobTitle)} ${txt(c.role)}`);
+const CT_ROLES = ["أساسي", "بديل"];
+const CT_SIDES: { v: string; l: string }[] = [
+  { v: "الجهة", l: "من الجهة" },
+  { v: SIDE_VRO, l: "من مكتب تحقيق الرؤية (VRO)" },
+];
 
 /** وجه الجهة — شعارها إن وُجد، وإلا حرفان بلونٍ من اسمها */
 function EntFace({ name, logo }: { name: string; logo?: string }) {
@@ -1911,13 +2005,17 @@ function EntFace({ name, logo }: { name: string; logo?: string }) {
    يُدار في صفحة السجلّ لا من محفظة فرد.
    ============================================================ */
 function ContactRow({
-  c, entityId, editable, start, t, onDone, onCancel,
+  c, entityId, editable, start, me, sides, t, onDone, onCancel,
 }: {
   c: Contact;
   entityId: string;
   editable: boolean;
   /** سطرٌ جديد يُفتح محرَّراً من أوّله */
   start?: boolean;
+  /** هذه النقطة هي أنا — تُعلَّم فيعرف صاحبها أن بياناته هي المعروضة */
+  me?: boolean;
+  /** الأطراف التي يمكن نقل النقطة بينها — فارغة لنقاط المركز */
+  sides?: { v: string; l: string }[];
   t: T;
   onDone: () => void;
   onCancel?: () => void;
@@ -1940,7 +2038,8 @@ function ContactRow({
       body: JSON.stringify({
         id: c.id || "",
         entityId,
-        side: "الجهة",
+        side: txt(d.side) || (sides ? sides[0].v : "الجهة"),
+        role: txt(d.role) || "أساسي",
         name: txt(d.name).trim(),
         jobTitle: txt(d.jobTitle).trim(),
         email: txt(d.email).trim(),
@@ -1997,6 +2096,25 @@ function ContactRow({
           placeholder="05XXXXXXXX"
           onChange={(e) => setEd({ ...ed, phone: e.target.value })}
         />
+        <select value={txt(ed.role) || "أساسي"} onChange={(e) => setEd({ ...ed, role: e.target.value })}>
+          {CT_ROLES.map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
+        </select>
+        {sides && (
+          <select
+            value={isVro(ed) ? SIDE_VRO : "الجهة"}
+            onChange={(e) => setEd({ ...ed, side: e.target.value })}
+          >
+            {sides.map((x) => (
+              <option key={x.v} value={x.v}>
+                {x.l}
+              </option>
+            ))}
+          </select>
+        )}
         <div className="ct-act">
           <button className="ok" disabled={busy} onClick={() => void put()}>
             {t("حفظ", "Save")}
@@ -2020,12 +2138,13 @@ function ContactRow({
       </div>
     );
 
-  const role = (c.role || "").trim();
+  const role = (c.role || "أساسي").trim();
   return (
     <div className="ct-line">
       <span className="ct-n">
         {c.name || "—"}
-        {role && role !== "أساسي" && <i>{role}</i>}
+        <i className={role === "أساسي" ? "pri" : ""}>{role}</i>
+        {me && <i className="mine">{t("أنت", "You")}</i>}
         {c.jobTitle && <em>{c.jobTitle}</em>}
       </span>
       <span className="ct-c" dir="ltr">
@@ -2042,7 +2161,70 @@ function ContactRow({
   );
 }
 
-/** بطاقة جهة من سجلّ المركز — شعارها وقطاعها ونقاط تواصلها */
+/** مجموعة نقاط تواصل — عنوانها وسطورها وزرّ إضافةٍ إليها */
+function CtGroup({
+  title, list, entityId, editable, sides, newSide, myId, t, onDone,
+}: {
+  title: string;
+  list: Contact[];
+  entityId: string;
+  editable: boolean;
+  sides?: { v: string; l: string }[];
+  /** الطرف الذي تُنشأ عليه النقطة الجديدة */
+  newSide?: string;
+  myId?: string;
+  t: T;
+  onDone: () => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  return (
+    <div className="ct-grp">
+      <b>
+        {title}
+        {editable && (
+          <button className="ct-add" onClick={() => setAdding(true)}>
+            + {t("إضافة", "Add")}
+          </button>
+        )}
+      </b>
+      {list.map((c, i) => (
+        <ContactRow
+          key={c.id || i}
+          c={c}
+          entityId={entityId}
+          editable={editable}
+          me={!!myId && c.id === myId}
+          sides={sides}
+          t={t}
+          onDone={onDone}
+        />
+      ))}
+      {adding && (
+        <ContactRow
+          c={{ side: newSide, role: list.some((x) => (x.role || "أساسي") === "أساسي") ? "بديل" : "أساسي" }}
+          entityId={entityId}
+          editable
+          start
+          sides={sides}
+          t={t}
+          onDone={() => {
+            setAdding(false);
+            onDone();
+          }}
+          onCancel={() => setAdding(false)}
+        />
+      )}
+      {!list.length && !adding && (
+        <div className="ct-none">{t("لا توجد نقطة تواصل مسجّلة", "No contact yet")}</div>
+      )}
+    </div>
+  );
+}
+
+/* بطاقة جهة من سجلّ المركز — شعارها وقطاعها وأطرافها الثلاثة.
+   كانت تُخفي نقطةَ صاحب المحفظة نفسه («البديل وحده يظهر»)، فيفتح
+   الاستشاري جهاته ولا يرى اسمه ولا بريده ولا جواله. الآن تُعرض
+   نقاط المركز كلها بأدوارها، ونقطتُه معلَّمةً «أنت». */
 function EntCard({
   x, logo, t, onDone,
 }: {
@@ -2051,11 +2233,9 @@ function EntCard({
   t: T;
   onDone: () => void;
 }) {
-  const [adding, setAdding] = useState(false);
-  const mineC = (x.ours || []).find((c) => c.id === x.myContactId);
-  const role = (mineC?.role || "أساسي").trim();
-  const ours = (x.ours || []).filter((c) => c.id !== x.myContactId);
-  const theirs = x.theirs || [];
+  const ours = x.ours || [];
+  const theirs = (x.theirs || []).filter((c) => !isVro(c));
+  const vro = (x.theirs || []).filter(isVro);
   return (
     <div className="ecard">
       <div className="ec-h">
@@ -2064,46 +2244,38 @@ function EntCard({
           <b>{x.name}</b>
           {x.sector && <em>{x.sector}</em>}
         </span>
-        {role !== "أساسي" && <i className="ec-b">{role}</i>}
       </div>
 
-      <div className="ct-grp">
-        <b>
-          {t("نقطة التواصل من الجهة", "Their contact")}
-          <button className="ct-add" onClick={() => setAdding(true)}>
-            + {t("إضافة", "Add")}
-          </button>
-        </b>
-        {theirs.map((c, i) => (
-          <ContactRow key={c.id || i} c={c} entityId={x.entityId} editable t={t} onDone={onDone} />
-        ))}
-        {adding && (
-          <ContactRow
-            c={{}}
-            entityId={x.entityId}
-            editable
-            start
-            t={t}
-            onDone={() => {
-              setAdding(false);
-              onDone();
-            }}
-            onCancel={() => setAdding(false)}
-          />
-        )}
-        {!theirs.length && !adding && (
-          <div className="ct-none">{t("لا توجد نقطة تواصل مسجّلة", "No contact yet")}</div>
-        )}
-      </div>
-
-      {ours.length > 0 && (
-        <div className="ct-grp">
-          <b>{t("من المركز معك", "Ours, with you")}</b>
-          {ours.map((c, i) => (
-            <ContactRow key={c.id || i} c={c} entityId={x.entityId} editable={false} t={t} onDone={onDone} />
-          ))}
-        </div>
-      )}
+      {/* نقاط المركز إسنادٌ يُدار في صفحة السجلّ، فتُعرض ولا تُحرَّر */}
+      <CtGroup
+        title={t("من مركز أداء", "From Adaa")}
+        list={ours}
+        entityId={x.entityId}
+        editable={false}
+        myId={x.myContactId}
+        t={t}
+        onDone={onDone}
+      />
+      <CtGroup
+        title={t("من الجهة", "From the entity")}
+        list={theirs}
+        entityId={x.entityId}
+        editable
+        sides={CT_SIDES}
+        newSide="الجهة"
+        t={t}
+        onDone={onDone}
+      />
+      <CtGroup
+        title={t("من مكتب تحقيق الرؤية (VRO)", "From the VRO")}
+        list={vro}
+        entityId={x.entityId}
+        editable
+        sides={CT_SIDES}
+        newSide={SIDE_VRO}
+        t={t}
+        onDone={onDone}
+      />
     </div>
   );
 }
@@ -2151,8 +2323,8 @@ function EntitiesModal({
             <b>{t("من سجلّ المركز — مسندة إليك", "From the registry")}</b>
             <span>
               {t(
-                "نقاط تواصل الجهة تُحرَّر من هنا · إسناد زملاء المركز من صفحة «الجهات ونقاط التواصل»",
-                "Their contacts are editable here",
+                "نقاط الجهة ومكتب تحقيق الرؤية تُحرَّر من هنا · نقاط المركز تُسنَد من صفحة «الجهات ونقاط التواصل»",
+                "Entity and VRO contacts are editable here",
               )}
             </span>
           </div>

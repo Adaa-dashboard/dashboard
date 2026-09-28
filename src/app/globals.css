@@ -6672,20 +6672,23 @@ table.matrix thead th {
   grid-template-columns: 2fr 1fr;
 }
 .pf .tile {
+  --c: var(--g-700);
   border: 1px solid var(--border);
   border-radius: 16px;
   background: var(--panel);
-  padding: 13px 14px;
+  padding: 15px 15px 13px;
   cursor: pointer;
   position: relative;
   box-shadow: 0 6px 18px rgba(0, 40, 35, 0.06);
-  transition: transform 0.12s;
+  transition: transform .12s, box-shadow .12s, border-color .12s;
   display: flex;
   flex-direction: column;
-  min-height: 172px;
+  min-height: 160px;
 }
 .pf .tile:hover {
   transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--c) 34%, var(--border));
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--c) 14%, transparent);
 }
 .pf .tile .grip {
   position: absolute;
@@ -6719,15 +6722,16 @@ table.matrix thead th {
   border-radius: 6px;
   padding: 1px 7px;
 }
-.pf .tile .ic3 {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-  color: #fff;
-  font-size: 16px;
-  margin-bottom: 26px;
+/* الأيقونة أُزيلت من وجه البطاقة — يبقى تنسيقها لرأس النافذة */
+.pf .tile .ic3 { display: none; }
+/* خيطٌ بلون البند تحت عنوانه: يعطي البطاقة هويةً بلا أيقونة */
+.pf .tile .rule {
+  display: block;
+  width: 26px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--c, var(--g-700));
+  margin: 0 0 8px;
 }
 .pf .tile h4 {
   margin: 0 0 3px;
@@ -6845,9 +6849,9 @@ table.matrix thead th {
   font-weight: 700;
 }
 .pf .tile .go {
-  font-size: 10.5px;
+  font-size: 10px;
   color: var(--muted);
-  margin-top: 8px;
+  margin-top: 7px;
   display: block;
 }
 
@@ -10912,6 +10916,20 @@ input.cell-date {
   padding: 1px 6px;
   margin-inline-start: 5px;
 }
+/* الأساسي أخضرُ هادئ والبديل ذهبي، فيُفرَّق بينهما بلمحة */
+.ct-line .ct-n i.pri { color: var(--gt-700); background: color-mix(in srgb, var(--gt-700) 12%, transparent); }
+.ct-line .ct-n i.mine { color: #fff; background: var(--gt-700); }
+/* أربعة حقول ثم الدور والطرف */
+.ct-ed select {
+  font: inherit;
+  font-size: 11px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  min-width: 0;
+}
 .ct-line .ct-n em { font-style: normal; font-size: 10.5px; color: var(--muted); margin-inline-start: 6px; }
 .ct-line .ct-c { display: flex; gap: 10px; flex-wrap: wrap; margin-inline-start: auto; }
 .ct-line .ct-c a { font-size: 10.5px; color: var(--gt-700); text-decoration: none; }
@@ -11013,13 +11031,32 @@ input.cell-date {
   background: var(--panel);
 }
 .mw-h { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; }
+/* صفٌّ مطويّ: اسم الجهة وشعارها وحدهما حتى يُضغط */
+.mw-row.fold > .mw-h { cursor: pointer; margin-bottom: 0; }
+.mw-row.fold.on > .mw-h { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.mw-h .fold-a { font-style: normal; flex: none; color: var(--muted); font-size: 11px; }
 .mw-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .mw-h b { font-size: 12.5px; font-weight: 800; color: var(--gt-900); overflow-wrap: anywhere; }
 .mw-h em { font-style: normal; font-size: 10.5px; color: var(--muted); }
 
-.mw-f { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 7px; }
-.mw-f label { display: flex; flex-direction: column; gap: 2px; }
-.mw-f label > span { font-size: 9.5px; font-weight: 700; color: var(--muted); }
+/* شبكةٌ متساوية الأعمدة لا صفٌّ مرن: الصفّ المرن كان يعطي كل حقل
+   عرضاً بحسب محتواه، فتبدو الصناديق مستطيلاتٍ بأحجام مختلفة. */
+.mw-f {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: end;
+}
+.mw-f label { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.mw-f label > span {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .mw-f select, .mw-f input {
   font: inherit;
   font-size: 11px;
@@ -11031,13 +11068,50 @@ input.cell-date {
   width: auto;
   min-width: 68px;
 }
-.mw-f label:first-child, .mw-f label.wide { flex: 1; min-width: 180px; }
-.mw-f select { width: 100%; max-width: 100%; }
-.mw-f input[type="number"] { width: 72px; }
+.mw-f label.wide { grid-column: span 2; }
+.mw-f select, .mw-f input { width: 100%; max-width: 100%; }
 
 .mw-q { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
 .mw-q .k { font-size: 10px; font-weight: 800; color: var(--muted); }
 .mw-q .k i { font-style: normal; font-weight: 800; color: var(--gt-700); }
+
+/* الأرباع: عنوانٌ صريح ثم Q1..Q4، وروابطُ كل ربعٍ معلَّم تحته */
+.mw-qs {
+  margin-top: 8px;
+  padding: 8px 9px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--soft);
+}
+.mw-qs .qh { display: block; font-size: 10px; font-weight: 800; color: var(--muted); margin-bottom: 6px; }
+.mw-qs .qh i { font-style: normal; color: var(--g-700); }
+.mw-qs .qrow { display: flex; gap: 6px; flex-wrap: wrap; }
+.mw-qs .qb {
+  min-width: 40px;
+  height: 26px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.mw-qs .qb.on { background: var(--g-700); border-color: var(--g-700); color: #fff; }
+.mw-qs .qlk { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.mw-qs .qlk > b { flex: none; width: 30px; font-size: 10px; font-weight: 800; color: var(--g-700); }
+.mw-qs .qlk input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 10.5px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+}
 .mw-q .qb {
   width: 24px;
   height: 24px;
@@ -11135,34 +11209,39 @@ input.cell-date {
    لا تقول شيئاً عن التوزيع. الرقم وحده أوضح، والتفصيل في شرائح. */
 .pf .tile .num2 {
   position: absolute;
-  inset-block-start: 10px;
-  inset-inline-end: 14px;
+  inset-block-start: 12px;
+  inset-inline-end: 15px;
   font-family: "Noto Kufi Arabic", sans-serif;
-  font-size: 30px;
+  font-size: 32px;
   font-weight: 800;
   line-height: 1;
+  color: var(--c);
 }
+/* الشرائح في أسفل البطاقة دائماً، فتصطفّ بين البطاقات مهما اختلفت
+   أطوال العناوين — وإلا بدت كل بطاقة بارتفاعٍ مختلف */
 .pf .tile .chips3 {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 8px;
+  gap: 5px;
+  margin-top: auto;
+  padding-top: 8px;
 }
 .pf .tile .ch3 {
   display: inline-flex;
   align-items: center;
   gap: 5px;
   font-size: 10px;
-  font-weight: 600;
-  color: var(--muted);
-  background: color-mix(in srgb, var(--c) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--c) 22%, transparent);
-  border-radius: 999px;
-  padding: 2px 8px;
+  font-weight: 700;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--c) 62%, var(--ink-2));
+  background: color-mix(in srgb, var(--c) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c) 20%, transparent);
+  border-radius: 9px;
+  padding: 3px 9px;
 }
 .pf .tile .ch3 b {
   font-family: "Noto Kufi Arabic", sans-serif;
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 800;
   color: var(--c);
 }
