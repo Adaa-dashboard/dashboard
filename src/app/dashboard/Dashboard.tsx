@@ -2615,6 +2615,9 @@ function EditUserModal({
   const [scopes, setScopes] = useState<string[]>(user.scopes || []);
   const [isLead, setIsLead] = useState(user.isLead === true);
   const [jobTitle, setJobTitle] = useState(user.jobTitle || "");
+  /* الجوال كان يُكتب عند إنشاء الحساب وحده، فمن نسي كلمته ولا جوال
+     له تعذّرت استعادته ولا سبيل لتصحيحه من الواجهة */
+  const [phone, setPhone] = useState(user.phone || "");
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -2654,6 +2657,7 @@ function EditUserModal({
         scopes,
         isLead,
         jobTitle,
+        phone,
         password: pw || undefined,
       },
       t("حُفظ ✓", "Saved ✓")
@@ -2753,6 +2757,29 @@ function EditUserModal({
             <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
             {t("نشط (يستطيع الدخول)", "Active (can sign in)")}
           </label>
+
+          <label style={{ marginTop: 14 }}>
+            {t("رقم الجوال", "Phone")}{" "}
+            <span className="opt">
+              {t("(به تُستعاد كلمة المرور — آخر أربعة أرقام)", "(used for password recovery)")}
+            </span>
+          </label>
+          <input
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="05xxxxxxxx"
+            dir="ltr"
+            style={{ textAlign: "left" }}
+            inputMode="tel"
+          />
+          {!phone.trim() && (
+            <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>
+              {t(
+                "بلا جوال مسجَّل لا تعمل «نسيت كلمة المرور» لهذا الحساب.",
+                "Without a phone, password recovery will not work for this account.",
+              )}
+            </div>
+          )}
 
           <label style={{ marginTop: 14 }}>
             {t("كلمة المرور", "Password")}{" "}
