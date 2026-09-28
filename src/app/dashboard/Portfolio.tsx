@@ -2517,8 +2517,12 @@ const SHARE_OPTS: { k: string; label: string }[] = [
   { k: "contrib", label: "المساهمات في الخطة التشغيلية" },
   { k: "changes", label: "طلبات التغيير" },
   { k: "reverse", label: "طلبات العكس" },
-  { k: "workflow", label: "طلبات تحديث سير العمل" },
+  { k: "workflow", label: "توثيق قيم المؤشرات/المبادرات" },
 ];
+/* أقسامٌ لا تُعرض جدولاً في محفظةٍ مُطَّلَعٍ عليها: `mainx` بياناتٌ
+   مساعدة مفاتيحها «القسم:معرّف البند»، فجدولُها صفوفُ رموز بلا
+   معنى — تُعرض داخل «الأعمال الرئيسية» في مكانها الصحيح */
+const SH_SKIP = new Set(["mainx"]);
 
 function GrantsBox({ prefs, meId, t }: { prefs: Prefs; meId: string; t: T }) {
   const [grants, setGrants] = useState<Grant[]>([]);
@@ -2650,12 +2654,121 @@ function GrantsBox({ prefs, meId, t }: { prefs: Prefs; meId: string; t: T }) {
   );
 }
 
+/* ============================================================
+   الأعمال الرئيسية في محفظةٍ مُطَّلَعٍ عليها
+   ------------------------------------------------------------
+   بنودُها ليست في `perf_portfolio` بل في `perf_items`، تُنتقى
+   بجهات صاحبها. فكان المدير يفتح محفظة استشاريٍّ فلا يرى **أهمّ**
+   ما فيها: استراتيجياته وجهاته — يرى طلباته ومهامه فقط.
+
+   جهاتُ صاحب المحفظة تُستنتج من سجلّ الجهات: نقطةُ تواصلٍ من
+   المركز مسندةٌ إليه بدور «أساسي». بلا دالةٍ جديدة في القاعدة.
+   ============================================================ */
+function SharedMain({
+  ownerId, ownerName, extras, t,
+}: {
+  ownerId: string;
+  ownerName: string;
+  /** بيانات المحفظة المساعدة لصاحبها — الأرباع والملاحظات */
+  extras: Record<string, Rec>;
+  t: T;
+}) {
+  const [items, setItems] = useState<Record<MainSec, MineRow[]>>({ natstrat: [], inststrat: [], cx: [] });
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      const [en, ...secs] = await Promise.all([
+        apiFetch("/api/entities").then((r) => r.json()).catch(() => ({})),
+        ...(["natstrat", "inststrat", "cx"] as MainSec[]).map((k) =>
+          apiFetch(`/api/items?section=${k}`).then((r) => r.json()).catch(() => ({})),
+        ),
+      ]);
+      if (!live) return;
+      const names = new Set<string>();
+      for (const e of (Array.isArray(en.entities) ? en.entities : []) as Rec[]) {
+        const ours = (Array.isArray(e.ours) ? e.ours : []) as Rec[];
+        if (ours.some((c) => String(c.userId || "") === ownerId && txt(c.role || "أساسي") === "أساسي"))
+          names.add(nrm(txt(e.name)));
+      }
+      const out = { natstrat: [], inststrat: [], cx: [] } as Record<MainSec, MineRow[]>;
+      (["natstrat", "inststrat", "cx"] as MainSec[]).forEach((k, i) => {
+        const all = (Array.isArray(secs[i]?.items) ? secs[i].items : []) as MineRow[];
+        out[k] = all.filter((it) => {
+          const c = txt(it.data.consultant).trim();
+          if (c && nrm(c) === nrm(ownerName)) return true;
+          return names.has(nrm(txt(it.data[MAIN_ENT[k]])));
+        });
+      });
+      setItems(out);
+      setLoaded(true);
+    })();
+    return () => {
+      live = false;
+    };
+  }, [ownerId, ownerName]);
+
+  if (!loaded) return null;
+  const any = (["natstrat", "inststrat", "cx"] as MainSec[]).some((k) => items[k].length);
+  if (!any) return null;
+
+  return (
+    <>
+      {(["natstrat", "inststrat", "cx"] as MainSec[]).map((k) =>
+        items[k].length ? (
+          <div className="sh-sec" key={k}>
+            <h3>
+              {t(WIDGETS.find((w) => w.key === k)?.label || k, k)} <b>{items[k].length}</b>
+            </h3>
+            <div className="tblwrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>{t("البند", "Item")}</th>
+                    {MAIN_FIELDS[k].slice(0, 4).map((f) => (
+                      <th key={f.k}>{f.label}</th>
+                    ))}
+                    <th>{t("الأرباع", "Quarters")}</th>
+                    <th>{t("ملاحظات", "Notes")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items[k].map((it) => {
+                    const ex = extras[`${k}:${it.id}`] || {};
+                    const q = qOf(ex, YR_NOW);
+                    return (
+                      <tr key={it.id}>
+                        <td>{txt(it.data[MAIN_TITLE[k]]) || txt(it.data[MAIN_ENT[k]]) || "—"}</td>
+                        {MAIN_FIELDS[k].slice(0, 4).map((f) => (
+                          <td key={f.k}>{txt(it.data[f.k]) || "—"}</td>
+                        ))}
+                        <td>{q.some(Boolean) ? q.map((v, i) => (v ? `Q${i + 1}` : null)).filter(Boolean).join(" · ") : "—"}</td>
+                        <td>{txt(ex.note) || "—"}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : null,
+      )}
+    </>
+  );
+}
+
 /* ---------------- محفظة شورِكت معي (اطّلاع فقط) ---------------- */
 function SharedView({ owner, t, onBack }: { owner: Grant; t: T; onBack: () => void }) {
   const pf = usePortfolio(owner.userId);
   const bySection = useMemo(() => {
     const m: Record<string, Row[]> = {};
-    for (const r of pf.rows) (m[r.section] = m[r.section] || []).push(r);
+    for (const r of pf.rows) if (!SH_SKIP.has(r.section)) (m[r.section] = m[r.section] || []).push(r);
+    return m;
+  }, [pf.rows]);
+  const extras = useMemo(() => {
+    const m: Record<string, Rec> = {};
+    for (const r of pf.rows) if (r.section === "mainx") m[r.id] = r.data;
     return m;
   }, [pf.rows]);
 
@@ -2674,10 +2787,12 @@ function SharedView({ owner, t, onBack }: { owner: Grant; t: T; onBack: () => vo
         <span className="sh-tag">{t("اطّلاع فقط", "Read only")}</span>
       </div>
 
+      <SharedMain ownerId={owner.userId} ownerName={owner.name} extras={extras} t={t} />
+
       {!pf.loaded ? (
         <div className="pf-none">{t("جارٍ التحميل...", "Loading...")}</div>
       ) : !Object.keys(bySection).length ? (
-        <div className="pf-none">{t("لا يوجد ما يُعرض في الأقسام المشتركة معك.", "Nothing shared yet.")}</div>
+        <div className="pf-none">{t("لا توجد بنودٌ أضافها في الأقسام المشتركة معك.", "Nothing shared yet.")}</div>
       ) : (
         Object.entries(bySection).map(([sec, rows]) => {
           const cols = COLS[sec] || [{ k: "name", label: "البند" }];
