@@ -68,7 +68,8 @@ $$;
 -- ------------------------------------------------------------
 create or replace function public.perf_users_audit()
 returns trigger language plpgsql security definer set search_path = public as $$
-declare v_who text := public.perf_audit_who(); ch text[] := '{}'; v_add text[]; v_rem text[];
+declare v_who text := public.perf_audit_who(); ch text[] := '{}';
+        v_add text[]; v_rem text[]; v_first_pw boolean := false;
 begin
   if TG_OP = 'INSERT' then
     insert into public.perf_audit(who, kind, what, place)
@@ -99,6 +100,7 @@ begin
   if new.photo_url is distinct from old.photo_url then ch := ch || 'الصورة'; end if;
 
   if coalesce(new.pass_hash,'') is distinct from coalesce(old.pass_hash,'') then
+    v_first_pw := coalesce(old.pass_hash,'') = '' and coalesce(new.pass_hash,'') <> '';
     ch := ch || (case
       when coalesce(old.pass_hash,'') = '' then 'ضُبطت كلمة المرور لأول مرة'
       when coalesce(new.pass_hash,'') = '' then 'أُعيد الحساب إلى «بانتظار التفعيل»'
@@ -119,8 +121,10 @@ begin
   -- لم يتغيّر إلا وقت الدخول ⇒ لا يُسجَّل
   if coalesce(array_length(ch,1),0) = 0 then return new; end if;
 
-  /* من فعّل حسابه بنفسه لا جلسة له بعدُ لحظةَ التعديل، فيُنسب إليه */
-  if v_who = '— خارج المنصة' and coalesce(old.pass_hash,'') = '' then
+  /* من فعّل حسابه بنفسه لا جلسة له بعدُ لحظةَ التعديل، فيُنسب إليه —
+     وذلك حين تُضبط كلمة المرور أول مرة وحدها، لا في كل تعديل يقع
+     على حسابٍ غير مفعَّل */
+  if v_who = '— خارج المنصة' and v_first_pw then
     v_who := new.display_name;
   end if;
 

@@ -24,6 +24,42 @@ function err(message: string, status = 400) {
   return ok({ error: message }, status);
 }
 
+/* ============================================================
+   تجميع ما كُتب دفعةً واحدة في «آخر التحديثات»
+   ------------------------------------------------------------
+   رفع ملفٍ واحد يكتب عشرات البنود في ثوانٍ، فتملأ كلها الأسطر
+   الستة المعروضة وتدفن ما سواها — وهو ما شكت منه المستخدمة.
+   الصفوف تأتي مرتّبةً تنازلياً بالوقت، فيُضمّ الصف إلى سابقه إن
+   اتّفق مفتاحه ولم يبعد عنه أكثر من `gapMin` دقيقة. والتعديل
+   المفرد يبقى سطراً كما كان، فلا يضيع في زحمةٍ ليست له.
+   ============================================================ */
+function clump<T>(rows: T[], keyOf: (r: T) => string, atOf: (r: T) => string, gapMin = 5): T[][] {
+  const out: T[][] = [];
+  for (const r of rows) {
+    const last = out[out.length - 1];
+    const prev = last ? last[last.length - 1] : undefined;
+    const a = prev ? Date.parse(atOf(prev)) : NaN;
+    const b = Date.parse(atOf(r));
+    const near =
+      !!prev &&
+      keyOf(prev) === keyOf(r) &&
+      Number.isFinite(a) &&
+      Number.isFinite(b) &&
+      Math.abs(a - b) <= gapMin * 60000;
+    if (near && last) last.push(r);
+    else out.push([r]);
+  }
+  return out;
+}
+
+/** صيغة العدد بالعربية: بندان · ٣ بنود · ١٥ بنداً */
+function arCount(n: number, one: string, two: string, few: string, many: string): string {
+  if (n === 1) return one;
+  if (n === 2) return two;
+  if (n <= 10) return `${n} ${few}`;
+  return `${n} ${many}`;
+}
+
 const num = (v: unknown): number | null => {
   if (v === "" || v === null || v === undefined) return null;
   const n = Number(v);
@@ -1225,15 +1261,28 @@ export async function apiFetch(path: string, init: Init = {}) {
         sectorId?: string; indicatorId?: string; taskId?: string; section?: string;
       };
       const items: Item[] = [];
-      for (const m of ms.data || []) {
-        if (m.actual === null) continue;
-        items.push({
-          id: "m" + m.id, kind: "measurement", tone: "info",
-          title: `تحديث ${indName.get(m.indicator_id) || ""}`,
-          sub: `${secName.get(m.sector_id) || ""} · ${m.actual}`,
-          at: m.updated_at, unread: !since || m.updated_at > since,
-          sectorId: m.sector_id, indicatorId: m.indicator_id,
-        });
+      {
+        const rows = (ms.data || []).filter((m) => m.actual !== null);
+        const groups = clump(
+          rows,
+          (r) => `${r.updated_by || ""}|${r.sector_id}`,
+          (r) => String(r.updated_at || ""),
+        );
+        for (const g of groups) {
+          const m = g[0];
+          const n = g.length;
+          items.push({
+            id: "m" + m.id, kind: "measurement", tone: "info",
+            title: n > 1
+              ? `${m.updated_by ? `${m.updated_by} حدّث` : "تحديث"} ${arCount(n, "قياساً", "قياسين", "قياسات", "قياساً")}`
+              : `تحديث ${indName.get(m.indicator_id) || ""}`,
+            sub: n > 1
+              ? `${secName.get(m.sector_id) || ""} · دفعة واحدة`
+              : `${secName.get(m.sector_id) || ""} · ${m.actual}`,
+            at: m.updated_at, unread: !since || m.updated_at > since,
+            sectorId: m.sector_id, indicatorId: m.indicator_id,
+          });
+        }
       }
       /* التعليق على مؤشر خاصٌّ بأصحابه: كاتبه ومن ذُكر فيه.
          وما يعني الجميع هو تحديث البنود لا تعليقات الأفراد. */
@@ -1271,19 +1320,30 @@ export async function apiFetch(path: string, init: Init = {}) {
         }
         return "";
       };
-      for (const it of its.data || []) {
-        if (!myScopes.includes(it.section)) continue;
-        const nm = itemName(it.data);
-        items.push({
-          id: "i" + it.section + it.id,
-          kind: "section",
-          tone: "info",
-          title: `${it.updated_by ? `${it.updated_by} حدّث` : "تحديث"} ${SEC_AR[it.section] || it.section}`,
-          sub: nm || "بند",
-          at: it.updated_at,
-          unread: !since || it.updated_at > since,
-          section: it.section,
-        });
+      {
+        const rows = (its.data || []).filter((it) => myScopes.includes(it.section));
+        const groups = clump(
+          rows,
+          (r) => `${r.section}|${r.updated_by || ""}`,
+          (r) => String(r.updated_at || ""),
+        );
+        for (const g of groups) {
+          const head = g[0];
+          const n = g.length;
+          const who = head.updated_by ? `${head.updated_by} حدّث` : "تحديث";
+          const sect = SEC_AR[head.section] || head.section;
+          const nm = itemName(head.data);
+          items.push({
+            id: "i" + head.section + head.id,
+            kind: "section",
+            tone: "info",
+            title: n > 1 ? `${who} ${sect} — ${arCount(n, "بند", "بندان", "بنود", "بنداً")}` : `${who} ${sect}`,
+            sub: n > 1 ? (nm ? `${nm} و${n - 1} غيره` : "دفعة واحدة") : nm || "بند",
+            at: head.updated_at,
+            unread: !since || head.updated_at > since,
+            section: head.section,
+          });
+        }
       }
       /* تذكير طلبات التغيير: ما ورد على جهاتي — بندان لا بندٌ لكل
          طلب، فالاستشاري قد تكون له عشرات الطلبات المفتوحة. ولا
@@ -1332,21 +1392,32 @@ export async function apiFetch(path: string, init: Init = {}) {
 
       /* جهةٌ أضافها استشاري من محفظته — خبرُها لصاحب صلاحية «الجهات»
          ليراجعها، ولمن أضافها ليطمئنّ أنها وصلت السجلّ */
-      for (const e of ents.data || []) {
-        const mineAdd = String(e.added_by || "") === String(me.id);
-        if (!mineAdd && !myScopes.includes("entities:edit")) continue;
-        items.push({
-          id: "e" + e.id,
-          kind: "entity",
-          tone: "info",
-          title: mineAdd
-            ? `أضفتَ جهة: ${e.name}`
-            : `${e.added_by_name} أضاف جهة: ${e.name}`,
-          sub: String(e.sector || "") || "الجهات ونقاط التواصل",
-          at: e.at,
-          unread: !since || String(e.at) > since,
-          section: "entities",
-        });
+      {
+        const rows = (ents.data || []).filter(
+          (e) =>
+            String(e.added_by || "") === String(me.id) || myScopes.includes("entities:edit"),
+        );
+        const groups = clump(rows, (r) => String(r.added_by || ""), (r) => String(r.at || ""));
+        for (const g of groups) {
+          const e = g[0];
+          const n = g.length;
+          const mineAdd = String(e.added_by || "") === String(me.id);
+          items.push({
+            id: "e" + e.id,
+            kind: "entity",
+            tone: "info",
+            title:
+              n > 1
+                ? `${mineAdd ? "أضفتَ" : `${e.added_by_name} أضاف`} ${arCount(n, "جهة", "جهتين", "جهات", "جهة")}`
+                : mineAdd
+                  ? `أضفتَ جهة: ${e.name}`
+                  : `${e.added_by_name} أضاف جهة: ${e.name}`,
+            sub: n > 1 ? `${e.name} و${n - 1} غيرها` : String(e.sector || "") || "الجهات ونقاط التواصل",
+            at: e.at,
+            unread: !since || String(e.at) > since,
+            section: "entities",
+          });
+        }
       }
       for (const t of tk.data || []) {
         const done = t.state === "done";
