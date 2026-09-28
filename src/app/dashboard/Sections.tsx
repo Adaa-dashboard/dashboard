@@ -6,6 +6,7 @@ import { apiFetch } from "@/lib/api";
 import { writeXlsx, readXlsxSheets, readPptxSlides } from "@/lib/sheet";
 import { asset } from "@/lib/base";
 import { publishUndo } from "@/lib/undoBus";
+import { initials, toneOf } from "@/lib/entlogo";
 import { IconGear } from "./icons";
 import SectionSettings from "./SectionSettings";
 
@@ -876,10 +877,16 @@ function SessCard({
   return (
     <div className="ncard">
       <div className="hd">
-        {logo && (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img className="lg" src={asset(`/logos/${logo}`)} alt="" loading="lazy" />
-        )}
+        <span
+          className="en2-lg sess-lg"
+          style={{ background: toneOf(txt(d.entity)) + "1f", color: toneOf(txt(d.entity)) }}
+        >
+          <i>{initials(txt(d.entity))}</i>
+          {logo && (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={asset(`/logos/${logo}`)} alt="" loading="lazy" />
+          )}
+        </span>
         <b>{txt(d.entity) || "—"}</b>
         <span className="tg" style={{ background: band.hex, color: "#fff" }}>
           {band.label}
@@ -926,7 +933,10 @@ function SessCard({
               className="sn-txt"
               autoFocus={wantNote && !hasNote}
               value={draft ?? txt(d.note)}
-              placeholder={t("ملاحظة…", "Note…")}
+              placeholder={t(
+                "مثال: الجهة طلبت تأجيل الجلسة أسبوعين لحين اكتمال بيانات الربع، ونُسّق مع مكتب الوكيل.",
+                "e.g. the entity asked to postpone the session by two weeks…",
+              )}
               onChange={(e) => typeNote(e.target.value)}
             />
           ) : (

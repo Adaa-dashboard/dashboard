@@ -10765,3 +10765,17 @@ input.cell-date {
 }
 .ncard .sn-add:hover { color: var(--gt-700); border-color: var(--gt-600); }
 .ncard .sn-gap { min-height: 1px; }
+
+/* وجه الجهة في بطاقة جلسة مراجعة الأداء — بحجم شعار الاستراتيجية */
+.ncard .hd .sess-lg {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+.ncard .hd .sess-lg i { font-size: 21px; }
+.ncard .hd .sess-lg img { padding: 5px; }
+@media (max-width: 520px) {
+  .ncard .hd .sess-lg { width: 52px; height: 52px; }
+  .ncard .hd .sess-lg i { font-size: 17px; }
+}

@@ -14,6 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { readXlsxSheets } from "@/lib/sheet";
 import { mapHeaders, buildRows, type MapResult, type Mapped, type Field } from "@/lib/entimport";
+import { initials, toneOf } from "@/lib/entlogo";
 
 type T = (ar: string, en: string) => string;
 
@@ -48,20 +49,6 @@ function logoOf(e: Entity): string {
   }
   return "";
 }
-const LOGO_SKIP = new Set(["ال", "في", "من", "على", "و", "عن", "مع"]);
-function initials(name: string): string {
-  const w = String(name || "").replace(/[«»"'()]/g, " ").split(/\s+/).filter((x) => x && !LOGO_SKIP.has(x));
-  const head = (x: string) => (x.startsWith("ال") && x.length > 2 ? x[2] : x[0]);
-  if (!w.length) return "؟";
-  return w.length === 1 ? head(w[0]) : head(w[0]) + head(w[1]);
-}
-const LOGO_TONES = ["#016b5f", "#1a9d5c", "#2f7fd1", "#7a5cd1", "#c9a020", "#d34a4a", "#e0971a", "#5aaba2"];
-function toneOf(s: string): string {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  return LOGO_TONES[h % LOGO_TONES.length];
-}
-
 function Logo({ e }: { e: Entity }) {
   const src = logoOf(e);
   const c = toneOf(e.name);
