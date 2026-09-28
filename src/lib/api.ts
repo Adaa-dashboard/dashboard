@@ -810,6 +810,33 @@ export async function apiFetch(path: string, init: Init = {}) {
     }
 
     /* جهاتي — ما أنا نقطة التواصل فيه، تُقرأ في محفظتي بلا تعبئة */
+    /* حفظ الاستشاري لبندٍ من جهاته في أقسام «الأعمال الرئيسية».
+       الحارس في القاعدة: الدالة تتحقّق أن البند من جهاته وتقتصر
+       على حقولٍ مسموحة — فلا تُفتح سياسة الجدول لأحد. */
+    if (p === "/api/items/mine" && method === "POST") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const { data, error } = await s.rpc("perf_item_mine_save", {
+        p_section: str(body.section),
+        p_id: str(body.id),
+        p_patch: body.patch ?? {},
+      });
+      if (error) return err(error.message, 403);
+      return ok({ ok: data === true });
+    }
+
+    /* «تحتاج جلسة مراجعة أداء» ⇒ تُفتح للجهة بطاقة في صفحة الجلسات */
+    if (p === "/api/items/session-flag" && method === "POST") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const { data, error } = await s.rpc("perf_session_flag", {
+        p_entity: str(body.entity),
+        p_quarter: str(body.quarter || ""),
+      });
+      if (error) return err(error.message, 403);
+      return ok({ ok: true, id: String(data || "") });
+    }
+
     if (p === "/api/entities/mine" && method === "GET") {
       const me = await whoAmI();
       if (!me) return err("غير مصرّح", 401);

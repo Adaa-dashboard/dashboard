@@ -10858,3 +10858,72 @@ input.cell-date {
 .ct-line .ct-c { display: flex; gap: 10px; flex-wrap: wrap; margin-inline-start: auto; }
 .ct-line .ct-c a { font-size: 10.5px; color: var(--gt-700); text-decoration: none; }
 .ct-line .ct-c a:hover { text-decoration: underline; }
+
+/* ---------- الأعمال الرئيسية في محفظتي ---------- */
+.mw { display: flex; flex-direction: column; gap: 9px; }
+.mw-msg {
+  font-size: 11px;
+  color: var(--gt-700);
+  background: var(--soft);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 5px 9px;
+}
+.mw-row {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 9px 11px;
+  background: var(--panel);
+}
+.mw-h { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 7px; }
+.mw-h b { font-size: 12.5px; font-weight: 800; color: var(--gt-900); overflow-wrap: anywhere; }
+.mw-h em { font-style: normal; font-size: 10.5px; color: var(--muted); }
+
+.mw-f { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 7px; }
+.mw-f label { display: flex; flex-direction: column; gap: 2px; }
+.mw-f label > span { font-size: 9.5px; font-weight: 700; color: var(--muted); }
+.mw-f select, .mw-f input {
+  font: inherit;
+  font-size: 11px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  width: auto;
+  min-width: 68px;
+}
+.mw-f label:first-child { flex: 1; min-width: 180px; }
+.mw-f select { width: 100%; max-width: 100%; }
+.mw-f input[type="number"] { width: 72px; }
+
+.mw-q { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.mw-q .k { font-size: 9.5px; font-weight: 700; color: var(--muted); }
+.mw-q .qb {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--soft);
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.mw-q .qb.on { background: var(--gt-700); border-color: var(--gt-700); color: #fff; }
+.mw-lnk {
+  flex: 1;
+  min-width: 130px;
+  font: inherit;
+  font-size: 10.5px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+}
+
+.mw-ns { display: flex; align-items: center; gap: 6px; margin-top: 7px; font-size: 11px; cursor: pointer; }
+.mw-ns input { width: auto; }
+.mw-more { font-size: 10.5px; color: var(--muted); text-align: center; }
