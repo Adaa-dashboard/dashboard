@@ -12,7 +12,7 @@ import { PIcon, IconPicker } from "./pickicons";
 import { IconGear } from "./icons";
 import MyEntities, { contribsOf, sumOf } from "./Entities";
 import { publishUndo } from "@/lib/undoBus";
-import { useLogos, logoKey } from "./Sections";
+import { useLogos, logoKey, SESS_SHORT } from "./Sections";
 import { initials, toneOf } from "@/lib/entlogo";
 import { asset } from "@/lib/base";
 
@@ -1120,19 +1120,23 @@ type RegRow = {
    تبقى هنا ولا تظهر في صفحة القسم، كما طلبت المستخدمة.
    ============================================================ */
 type MainSec = "natstrat" | "inststrat" | "cx";
+/** الأقسام التي تُقرأ هنا — الثلاثة الرئيسية وجلسات المراجعة معها،
+    فبطاقة «متعثّرة» تعرض أرقام الجلسة وتكتبها في بندها نفسه */
+type ReadSec = MainSec | "sessions";
+const READ_SECS: ReadSec[] = ["natstrat", "inststrat", "cx", "sessions"];
 export type MineRow = { id: string; ord: number; data: Rec };
 
 /** بنود جهاتي في الأقسام الثلاثة — تُقرأ مرّةً للصفحة كلها، فتشترك
     فيها البطاقةُ وعدّادُها والشرائحُ الصغيرة ولا تتكرّر الطلبات */
 function useMineWork(reg: RegRow[], meName: string) {
-  const [all, setAll] = useState<Record<MainSec, MineRow[]>>({ natstrat: [], inststrat: [], cx: [] });
+  const [all, setAll] = useState<Record<ReadSec, MineRow[]>>({ natstrat: [], inststrat: [], cx: [], sessions: [] });
   const [loaded, setLoaded] = useState(false);
   const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
     let live = true;
     void Promise.all(
-      (["natstrat", "inststrat", "cx"] as MainSec[]).map(async (k) => {
+      READ_SECS.map(async (k) => {
         const r = await apiFetch(`/api/items?section=${k}`);
         const d = await r.json().catch(() => ({}));
         return [k, Array.isArray(d.items) ? (d.items as MineRow[]) : []] as const;
@@ -1140,7 +1144,7 @@ function useMineWork(reg: RegRow[], meName: string) {
     )
       .then((pairs) => {
         if (!live) return;
-        const m = { natstrat: [], inststrat: [], cx: [] } as Record<MainSec, MineRow[]>;
+        const m = { natstrat: [], inststrat: [], cx: [], sessions: [] } as Record<ReadSec, MineRow[]>;
         for (const [k, v] of pairs) m[k] = v;
         setAll(m);
       })
@@ -1171,11 +1175,11 @@ function useMineWork(reg: RegRow[], meName: string) {
     return { natstrat: pick("natstrat"), inststrat: pick("inststrat"), cx: pick("cx") } as Record<MainSec, MineRow[]>;
   }, [all, mineNames, meName]);
 
-  const patch = useCallback((k: MainSec, id: string, p: Rec) => {
+  const patch = useCallback((k: ReadSec, id: string, p: Rec) => {
     setAll((v) => ({ ...v, [k]: v[k].map((x) => (x.id === id ? { ...x, data: { ...x.data, ...p } } : x)) }));
   }, []);
 
-  return { mine, loaded, patch, reload: () => setNonce((n) => n + 1) };
+  return { mine, sess: all.sessions, loaded, patch, reload: () => setNonce((n) => n + 1) };
 }
 
 /** شرائح صغيرة تحت رقم البطاقة — أهمّ ما في القسم بلا فتحه */
@@ -1218,32 +1222,80 @@ const MAIN_ENT: Record<MainSec, string> = { natstrat: "owner", inststrat: "name"
 const MAIN_TITLE: Record<MainSec, string> = { natstrat: "name", inststrat: "name", cx: "name" };
 
 const QLABS = ["الربع الأول", "الربع الثاني", "الربع الثالث", "الربع الرابع"];
+const YR_NOW = new Date().getFullYear();
+/** سنواتُ الاجتماعات المعروضة — الجارية وما قبلها وما بعدها */
+const MW_YEARS = [YR_NOW - 1, YR_NOW, YR_NOW + 1];
+
+/* الاجتماعات الربعية تُحفظ **بالسنة**: `qy = {"2026":[0,0,0,0]}`.
+   كانت مصفوفةً واحدة بلا سنة، فاجتماعاتُ ٢٠٢٧ تكتب فوق ٢٠٢٦ ولا
+   يُعرف أيُّ ربعٍ من أيّ سنة. القديم يُقرأ للسنة الجارية فلا يضيع. */
+const qMap = (ex: Rec): Record<string, number[]> =>
+  ex.qy && typeof ex.qy === "object" ? (ex.qy as Record<string, number[]>) : {};
+function qOf(ex: Rec, yr: number): number[] {
+  const m = qMap(ex)[String(yr)];
+  if (Array.isArray(m)) return m;
+  if (yr === YR_NOW && Array.isArray(ex.q)) return ex.q as number[];
+  return [0, 0, 0, 0];
+}
+function qSet(ex: Rec, yr: number, v: number[]): Rec {
+  return { ...ex, qy: { ...qMap(ex), [String(yr)]: v }, ...(yr === YR_NOW ? { q: v } : {}) };
+}
+
+/** حقل نصّي يحفظ عند الخروج منه لا مع كل حرف */
+function NoteBox({ value, ph, rows, onSave }: { value: string; ph: string; rows?: number; onSave: (v: string) => void }) {
+  const [v, setV] = useState(value);
+  useEffect(() => setV(value), [value]);
+  return (
+    <textarea
+      className="mw-note"
+      rows={rows || 2}
+      value={v}
+      placeholder={ph}
+      onChange={(e) => setV(e.target.value)}
+      onBlur={() => v !== value && onSave(v)}
+    />
+  );
+}
 
 function MainWork({
-  sec, rows, loaded, extras, t, onExtra, onPatch, onReload, full,
+  sec, rows, sess, loaded, extras, t, onExtra, onPatch, onReload, full,
 }: {
   sec: MainSec;
   /** بنود جهاتي في هذا القسم — تُقرأ مرّةً في الصفحة وتُمرَّر هنا */
   rows: MineRow[];
+  /** بنود صفحة جلسات مراجعة الأداء — تُطابَق بالجهة */
+  sess: MineRow[];
   loaded: boolean;
   /** بيانات المحفظة الإضافية — المفتاح `sec:itemId` */
   extras: Record<string, Rec>;
   t: T;
   onExtra: (key: string, data: Rec) => void;
-  onPatch: (sec: MainSec, id: string, patch: Rec) => void;
+  onPatch: (sec: MainSec | "sessions", id: string, patch: Rec) => void;
   onReload: () => void;
   /** داخل النافذة: الجدول كاملاً. وفي البطاقة: أول ثلاثة صفوف */
   full?: boolean;
 }) {
   const [msg, setMsg] = useState("");
+  const [yr, setYr] = useState(YR_NOW);
+  const logos = useLogos();
 
-  async function put(id: string, patch: Rec) {
+  /* بطاقة الجلسة لكل جهة — بها تُعرض أرقام التعثّر وتُحرَّر */
+  const sessBy = useMemo(() => {
+    const m = new Map<string, MineRow>();
+    for (const r of sess) {
+      const k = nrm(txt(r.data.entity));
+      if (k && !m.has(k)) m.set(k, r);
+    }
+    return m;
+  }, [sess]);
+
+  async function put(id: string, patch: Rec, section: MainSec | "sessions" = sec) {
     /* تفاؤلياً في الشاشة، ثم يُحفظ — والفشل يُعيد القراءة */
-    onPatch(sec, id, patch);
+    onPatch(section, id, patch);
     const r = await apiFetch("/api/items/mine", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ section: sec, id, patch }),
+      body: JSON.stringify({ section, id, patch }),
     });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
@@ -1252,18 +1304,29 @@ function MainWork({
     } else setMsg("");
   }
 
-  async function flagSession(entity: string, on: boolean, key: string, ex: Rec) {
+  async function flagSession(entity: string, on: boolean, key: string, ex: Rec, seed: Rec) {
     onExtra(key, { ...ex, needSess: on ? 1 : 0 });
     if (!on) return;
     const r = await apiFetch("/api/items/session-flag", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ entity, quarter: `${QLABS[Math.floor(new Date().getMonth() / 3)]} ${new Date().getFullYear()}` }),
+      body: JSON.stringify({ entity, quarter: `${QLABS[Math.floor(new Date().getMonth() / 3)]} ${YR_NOW}` }),
     });
     if (!r.ok) {
       const d = await r.json().catch(() => ({}));
       setMsg(d.error || t("تعذّر فتح بطاقة الجلسة", "Could not open a session card"));
-    } else setMsg(t("فُتحت بطاقة في صفحة جلسات مراجعة الأداء", "A session card was opened"));
+      return;
+    }
+    const d = await r.json().catch(() => ({}));
+    /* إجماليّا المؤشرات والمبادرات معروفان هنا، فيُنقلان للبطاقة
+       حتى تُقرأ «٣ من ١٥» في صفحة الجلسات بلا إدخالٍ ثانٍ.
+       وللبطاقة الجديدة وحدها: بطاقةٌ قائمة قد تحمل أرقاماً أدقّ. */
+    const id = txt(d.id);
+    const seed0: Rec = {};
+    for (const [k, v] of Object.entries(seed)) if (num(v) > 0) seed0[k] = v;
+    if (id && !sessBy.has(nrm(entity)) && Object.keys(seed0).length) await put(id, seed0, "sessions");
+    setMsg(t("فُتحت بطاقة في صفحة جلسات مراجعة الأداء", "A session card was opened"));
+    onReload();
   }
 
   if (!loaded) return <div className="pf-none">{t("جارٍ التحميل…", "Loading…")}</div>;
@@ -1281,18 +1344,41 @@ function MainWork({
   const shown = full ? rows : rows.slice(0, 3);
 
   return (
-    <div className="mw">
+    <div className={`mw ${full ? "grid" : ""}`}>
       {msg && <div className="mw-msg">{msg}</div>}
+      {full && (
+        <div className="mw-bar">
+          <span>{t("الاجتماعات الربعية لسنة", "Quarterly meetings of")}</span>
+          <select value={yr} onChange={(e) => setYr(Number(e.target.value))}>
+            {MW_YEARS.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
+          <b>{t(`${rows.length} جهة`, `${rows.length} entities`)}</b>
+        </div>
+      )}
       {shown.map((it) => {
         const key = `${sec}:${it.id}`;
         const ex = extras[key] || {};
-        const q: number[] = Array.isArray(ex.q) ? (ex.q as number[]) : [0, 0, 0, 0];
+        const q = qOf(ex, yr);
         const ent = txt(it.data[MAIN_ENT[sec]]);
+        const entN = ent || txt(it.data.name);
+        const sr = sessBy.get(nrm(entN));
+        /* بطاقةُ جلسةٍ قائمةٌ للجهة تعني أنها متعثّرة فعلاً — تُعرَض
+           معلَّمة، ومن يرفع العلامة يُسجَّل رفعُه فلا تعود تلقائياً */
+        const need = ex.needSess === undefined ? !!sr : num(ex.needSess) === 1;
+        const sd = sr?.data || {};
+        const sAt = Math.max(0, Math.min(SESS_SHORT.length, num(sd.done)));
         return (
           <div className="mw-row" key={it.id}>
             <div className="mw-h">
-              <b>{txt(it.data[MAIN_TITLE[sec]]) || "—"}</b>
-              {sec === "natstrat" && ent && <em>{ent}</em>}
+              <EntFace name={entN} logo={logos[logoKey(entN)]} />
+              <span className="mw-t">
+                <b>{txt(it.data[MAIN_TITLE[sec]]) || "—"}</b>
+                {sec === "natstrat" && ent && <em>{ent}</em>}
+              </span>
             </div>
 
             <div className="mw-f">
@@ -1341,16 +1427,18 @@ function MainWork({
 
             {/* الاجتماعات الربعية — بيانات محفظة، لا تظهر في صفحة القسم */}
             <div className="mw-q">
-              <span className="k">{t("الاجتماعات الربعية", "Quarterly meetings")}</span>
+              <span className="k">
+                {t("الاجتماعات الربعية", "Quarterly")} <i>{yr}</i>
+              </span>
               {QLABS.map((lb, i) => (
                 <button
                   key={lb}
                   className={`qb ${q[i] ? "on" : ""}`}
-                  title={lb}
+                  title={`${lb} ${yr}`}
                   onClick={() => {
                     const n = [...q];
                     n[i] = n[i] ? 0 : 1;
-                    onExtra(key, { ...ex, q: n });
+                    onExtra(key, qSet(ex, yr, n));
                   }}
                 >
                   {["١", "٢", "٣", "٤"][i]}
@@ -1365,15 +1453,74 @@ function MainWork({
               />
             </div>
 
+            <NoteBox
+              value={txt(ex.note)}
+              ph={t("ملاحظات…", "Notes…")}
+              onSave={(v) => onExtra(key, { ...ex, note: v })}
+            />
+
             {sec !== "cx" && (
-              <label className="mw-ns">
-                <input
-                  type="checkbox"
-                  checked={num(ex.needSess) === 1}
-                  onChange={(e) => void flagSession(ent || txt(it.data.name), e.target.checked, key, ex)}
-                />
-                <span>{t("متعثّرة — تحتاج جلسة مراجعة أداء", "Needs a performance review session")}</span>
-              </label>
+              <>
+                <label className="mw-ns">
+                  <input
+                    type="checkbox"
+                    checked={need}
+                    onChange={(e) =>
+                      void flagSession(entN, e.target.checked, key, ex, {
+                        kpiTot: num(it.data.kpisTot),
+                        initTot: num(it.data.initTot),
+                      })
+                    }
+                  />
+                  <span>{t("متعثّرة — تحتاج جلسة مراجعة أداء", "Needs a performance review session")}</span>
+                </label>
+
+                {/* تفاصيل التعثّر — تُكتب في بطاقة الجهة بصفحة الجلسات
+                    نفسها، فما يُدخَل هنا هو ما يُقرأ هناك */}
+                {need &&
+                  (sr ? (
+                    <div className="mw-esc">
+                      <div className="mw-f">
+                        <label className="wide">
+                          <span>{t("المرحلة الحالية", "Current stage")}</span>
+                          <select value={sAt} onChange={(e) => void put(sr.id, { done: Number(e.target.value) }, "sessions")}>
+                            {SESS_SHORT.map((x, i) => (
+                              <option key={x} value={i}>
+                                {i + 1}. {x}
+                              </option>
+                            ))}
+                            <option value={SESS_SHORT.length}>{t("اكتملت الجلسة", "Completed")}</option>
+                          </select>
+                        </label>
+                        <label>
+                          <span>{t("مؤشرات متعثّرة", "KPIs at risk")}</span>
+                          <input
+                            type="number"
+                            value={num(sd.kpiBad) || ""}
+                            onChange={(e) => void put(sr.id, { kpiBad: Number(e.target.value) || 0 }, "sessions")}
+                          />
+                        </label>
+                        <label>
+                          <span>{t("مبادرات متعثّرة", "Initiatives at risk")}</span>
+                          <input
+                            type="number"
+                            value={num(sd.initBad) || ""}
+                            onChange={(e) => void put(sr.id, { initBad: Number(e.target.value) || 0 }, "sessions")}
+                          />
+                        </label>
+                      </div>
+                      <NoteBox
+                        value={txt(sd.note)}
+                        ph={t("ملاحظات على تعثّر الجهة — تظهر في بطاقتها بصفحة الجلسات…", "Notes shown on the session card…")}
+                        onSave={(v) => void put(sr.id, { note: v }, "sessions")}
+                      />
+                    </div>
+                  ) : (
+                    <div className="mw-hint">
+                      {t("تُفتح بطاقة الجهة في صفحة الجلسات…", "Opening the session card…")}
+                    </div>
+                  ))}
+              </>
             )}
           </div>
         );
@@ -2452,6 +2599,7 @@ export default function Portfolio({
         <MainWork
           sec={k}
           rows={mw.mine[k]}
+          sess={mw.sess}
           loaded={mw.loaded}
           extras={mainx}
           t={t}
@@ -2896,7 +3044,8 @@ export default function Portfolio({
 
       {openW && (
         <div className="modal-overlay" onClick={() => setOpen(null)}>
-          <div className="modal wide" onClick={(e) => e.stopPropagation()}>
+          {/* الأعمال الرئيسية بطاقاتٌ في عمودين، فتحتاج عرضاً أكبر */}
+          <div className={`modal ${openW.group === "main" ? "xwide" : "wide"}`} onClick={(e) => e.stopPropagation()}>
             <div className="m-h">
               <span className="dot" style={{ background: openW.color }}>
                 <PIcon id={openW.icon} size={13} />

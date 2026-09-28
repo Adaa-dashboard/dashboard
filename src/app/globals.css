@@ -7655,6 +7655,10 @@ input.cell-date {
 .modal.wide {
   max-width: 900px;
 }
+/* الأعمال الرئيسية: بطاقتا جهةٍ جنباً إلى جنب، فالعرضُ أوسع */
+.modal.xwide {
+  max-width: 1280px;
+}
 .pf-map {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -10897,6 +10901,35 @@ input.cell-date {
 
 /* ---------- الأعمال الرئيسية في محفظتي ---------- */
 .mw { display: flex; flex-direction: column; gap: 9px; }
+/* داخل النافذة: عمودان من البطاقات لا قائمةً طويلة.
+   أعمدةُ CSS لا `grid`: البطاقة تطول حين تُفتح تفاصيل التعثّر،
+   والشبكةُ توحّد ارتفاع الصف فتترك فراغاً بجانب الطويلة. */
+.mw.grid { display: block; column-count: 2; column-gap: 10px; }
+.mw.grid > .mw-row { break-inside: avoid; margin-bottom: 10px; }
+.mw.grid > .mw-msg, .mw.grid > .mw-bar, .mw.grid > .mw-more { column-span: all; margin-bottom: 10px; }
+@media (max-width: 900px) { .mw.grid { column-count: 1; } }
+.mw-bar {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.mw-bar > span { white-space: nowrap; }
+.mw-bar select {
+  flex: none;
+  width: auto;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 26px 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+}
+.mw-bar b { margin-inline-start: auto; white-space: nowrap; color: var(--gt-900); }
 .mw-msg {
   font-size: 11px;
   color: var(--gt-700);
@@ -10911,7 +10944,8 @@ input.cell-date {
   padding: 9px 11px;
   background: var(--panel);
 }
-.mw-h { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 7px; }
+.mw-h { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; }
+.mw-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .mw-h b { font-size: 12.5px; font-weight: 800; color: var(--gt-900); overflow-wrap: anywhere; }
 .mw-h em { font-style: normal; font-size: 10.5px; color: var(--muted); }
 
@@ -10929,12 +10963,13 @@ input.cell-date {
   width: auto;
   min-width: 68px;
 }
-.mw-f label:first-child { flex: 1; min-width: 180px; }
+.mw-f label:first-child, .mw-f label.wide { flex: 1; min-width: 180px; }
 .mw-f select { width: 100%; max-width: 100%; }
 .mw-f input[type="number"] { width: 72px; }
 
 .mw-q { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
 .mw-q .k { font-size: 9.5px; font-weight: 700; color: var(--muted); }
+.mw-q .k i { font-style: normal; font-weight: 800; color: var(--gt-700); }
 .mw-q .qb {
   width: 24px;
   height: 24px;
@@ -10963,6 +10998,33 @@ input.cell-date {
 .mw-ns { display: flex; align-items: center; gap: 6px; margin-top: 7px; font-size: 11px; cursor: pointer; }
 .mw-ns input { width: auto; }
 .mw-more { font-size: 10.5px; color: var(--muted); text-align: center; }
+
+/* ملاحظاتٌ حرّة — تُحفظ عند الخروج من الحقل لا مع كل حرف */
+.mw-note {
+  display: block;
+  width: 100%;
+  margin-top: 7px;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.6;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel);
+  color: var(--text);
+  resize: vertical;
+}
+/* تفاصيل التعثّر — تظهر بفتح العلامة، وتكتب في بطاقة صفحة الجلسات */
+.mw-esc {
+  margin-top: 7px;
+  padding: 8px 9px 9px;
+  border: 1px solid color-mix(in srgb, #c0392b 34%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, #c0392b 5%, transparent);
+}
+.mw-esc .mw-f { margin-bottom: 0; }
+.mw-esc .mw-note { margin-top: 8px; background: var(--panel); }
+.mw-hint { margin-top: 7px; font-size: 10px; color: var(--muted); }
 
 /* ---------- بطاقة محفظتي: رقمٌ بدل الدائرة، وشرائح تفصّله ---------- */
 /* الدائرة كانت تحمل رقماً واحداً في مساحة كبيرة، والنسبة تحتها
