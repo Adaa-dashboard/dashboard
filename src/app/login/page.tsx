@@ -78,6 +78,26 @@ export default function LoginPage() {
     }
   }
 
+  /* رابطٌ يُرسَل لمن يفعّل حسابه أول مرة: `?u=اسم-الدخول` يملأ اسمه
+     ويفتح شاشة اختيار كلمة المرور مباشرة — فلا يُطلب منه رمزٌ ولا
+     كلمةٌ قديمة، ويبقى التحقق كما هو فلا يُفتح باب */
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const q = new URLSearchParams(window.location.search);
+    const u = (q.get("u") || q.get("user") || "").trim();
+    if (!u) return;
+    setUsername(u);
+    setMode("activate");
+    setIsReset(false);
+    setInfo(
+      t(
+        "أهلاً بك — اختر كلمة مرورك الآن لتدخل اللوحة.",
+        "Welcome — choose your password to sign in.",
+      ),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // قائمة القطاعات تُجلب عند فتح نموذج التسجيل فقط
   useEffect(() => {
     if (mode !== "activate" || isReset || sectors.length) return;
