@@ -2410,12 +2410,6 @@ function EntCard({
   const theirs = (x.theirs || []).filter((c) => !isVro(c));
   const vro = (x.theirs || []).filter(isVro);
   const lvl = (x.myLevel || "primary") as MyLevel;
-  /* زملاء المركز على هذه الجهة سواي — هم من تُشارَك معهم */
-  const alts = ours.filter(
-    (c) => c.id !== x.myContactId && (c as { userId?: number | string }).userId,
-  ) as (Contact & { userId?: number | string })[];
-  const shareOf = (uid: string) =>
-    (x.shares || []).find((s2) => String(s2.userId) === uid)?.level || "none";
   return (
     <div className="ecard">
       <div className="ec-h">
@@ -2437,28 +2431,8 @@ function EntCard({
         onDone={onDone}
       />
 
-      {/* الأساسي وحده يفتح جهته لبديله، ويسحبها متى شاء */}
-      {lvl === "primary" && alts.length > 0 && (
-        <div className="ct-grp sh">
-          <b>{t("مشاركة الجهة مع بديلك", "Share with your alternate")}</b>
-          {alts.map((c) => (
-            <ShareRow
-              key={c.id}
-              entityId={x.entityId}
-              c={c}
-              level={shareOf(String(c.userId ?? ""))}
-              t={t}
-              onDone={onDone}
-            />
-          ))}
-          <div className="ct-none">
-            {t(
-              "«اطّلاع فقط» يقرأ ولا يكتب · «اطّلاع وتعديل» يحدّث كما تحدّث أنت",
-              "View-only reads; edit updates like you",
-            )}
-          </div>
-        </div>
-      )}
+      {/* المنح كلُّه في مكانٍ واحد: «منح صلاحية» داخل الإعدادات.
+          هنا تُقال الحالة فقط، فلا يتكرّر مكانان للشيء نفسه. */}
       {lvl === "view" && (
         <div className="ct-lv">{t("شورِكت معك: اطّلاع فقط", "Shared with you: view only")}</div>
       )}
@@ -2956,6 +2930,87 @@ function SharedView({ owner, t, onBack }: { owner: Grant; t: T; onBack: () => vo
   );
 }
 
+/* ============================================================
+   مشاركة جهاتي — الجزء الثاني من «منح صلاحية»
+   ------------------------------------------------------------
+   المنح نوعان مختلفان لا يُجمعان في آلية واحدة، فجُمعا في مكان
+   واحد بدل نافذتين:
+
+     · «من يرى محفظتي» — أقسامُ محفظتي الخاصة (مهامي، مساهماتي…)
+       اطّلاعاً فقط ولأيّ زميل. بياناتها بياناتي وحدي.
+     · «مشاركة جهاتي» — جهةٌ بعينها من سجلّ المركز، لبديلها وحده،
+       اطّلاعاً **أو تعديلاً**. بياناتها بيانات المنصة لا محفظتي،
+       فالتعديل فيها يصل صفحة القسم ويُنسب لمن حرّره.
+
+   ولذلك بقيا آليتين: الأولى أقسامٌ بلا كتابة، والثانية جهةٌ
+   بكتابة. المشترك هو المكان فقط.
+   ============================================================ */
+function EntShareBox({ t }: { t: T }) {
+  const [reg, setReg] = useState<RegRow[]>([]);
+  const load = useCallback(() => {
+    void apiFetch("/api/entities/mine")
+      .then((r) => r.json())
+      .then((d) => setReg(Array.isArray(d.mine) ? (d.mine as RegRow[]) : []))
+      .catch(() => setReg([]));
+  }, []);
+  useEffect(() => load(), [load]);
+
+  /* جهاتي التي أنا أساسيُّها ولها زميلٌ آخر من المركز */
+  const rows = useMemo(
+    () =>
+      reg
+        .filter((x) => (x.myLevel || "primary") === "primary")
+        .map((x) => ({
+          x,
+          alts: (x.ours || []).filter(
+            (c) => c.id !== x.myContactId && (c as { userId?: number | string }).userId,
+          ) as (Contact & { userId?: number | string })[],
+        }))
+        .filter((r) => r.alts.length > 0),
+    [reg],
+  );
+
+  return (
+    <>
+      <div className="sec3">{t("مشاركة جهاتي مع بديلها", "Share my entities")}</div>
+      <p className="gr-hint sm">
+        {t(
+          "جهةٌ بعينها لبديلها وحده — «اطّلاع فقط» يقرأ ولا يكتب، و«اطّلاع وتعديل» يحدّث صفحة القسم كما تحدّثها أنت ويُسجَّل باسمه. تُسحب متى شئت.",
+          "Per entity, to its alternate only. View-only reads; edit writes to the section page under their name.",
+        )}
+      </p>
+      {!rows.length ? (
+        <div className="pf-none sm">
+          {t(
+            "لا توجد جهةٌ أنت أساسيُّها ولها زميلٌ آخر من المركز.",
+            "No entity of yours has another Adaa contact.",
+          )}
+        </div>
+      ) : (
+        <div className="esh">
+          {rows.map(({ x, alts }) => (
+            <div className="esh-r" key={x.entityId}>
+              <b>{x.name}</b>
+              {alts.map((c) => (
+                <ShareRow
+                  key={c.id}
+                  entityId={x.entityId}
+                  c={c}
+                  level={
+                    (x.shares || []).find((s2) => String(s2.userId) === String(c.userId ?? ""))?.level || "none"
+                  }
+                  t={t}
+                  onDone={load}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 /* ---------------- نافذة التخصيص ---------------- */
 const SWATCHES = [
   "#00584c", "#016b5f", "#1a9d5c", "#0f8a8a", "#2f7fd1", "#123a6b",
@@ -3070,6 +3125,7 @@ function CustomModal({
         )}
 
         <GrantsBox prefs={prefs} meId={meId} t={t} />
+        <EntShareBox t={t} />
 
         <div className="sec3">{t("قالب الترتيب", "Layout")}</div>
         <div className="lays">

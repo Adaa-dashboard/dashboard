@@ -10917,8 +10917,15 @@ input.cell-date {
 }
 .ct-add:hover { text-decoration: underline; }
 .ct-none { font-size: 10.5px; color: var(--muted); padding: 2px 0; }
-/* مشاركة الجهة مع البديل */
-.ct-grp.sh { border-inline-start-color: color-mix(in srgb, var(--g-700) 40%, var(--border)); }
+/* مشاركة الجهة مع البديل — داخل «منح صلاحية» بالإعدادات */
+.esh { display: flex; flex-direction: column; gap: 7px; }
+.esh-r {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--soft);
+  padding: 7px 10px;
+}
+.esh-r > b { display: block; font-size: 11.5px; font-weight: 800; color: var(--gt-900); margin-bottom: 4px; }
 .ct-sh { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 3px 0; }
 .ct-sh > span { flex: 1; min-width: 0; font-size: 11.5px; font-weight: 700; color: var(--text); }
 .ct-sh select {
