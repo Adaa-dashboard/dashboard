@@ -95,13 +95,36 @@ export const WIDGETS: WDef[] = [
   { key: "calendar", label: "التقويم", group: "top", icon: "calendar", color: "#1a9d5c" },
   { key: "notes", label: "ملاحظاتي", group: "top", icon: "note", color: "#c9a020" },
   { key: "tasks", label: "مهامي", group: "top", icon: "clipboard", color: "#016b5f" },
+
+  /* الأعمال الرئيسية — ما يقوم به الاستشاري على جهاته، وكلٌّ منها
+     مربوط بصفحة قسمه في المنصة */
+  { key: "natstrat", label: "الاستراتيجيات الوطنية", group: "main", icon: "map", color: "#016b5f", section: "natstrat" },
+  { key: "inststrat", label: "الاستراتيجيات المؤسسية", group: "main", icon: "building", color: "#1a9d5c", section: "inststrat" },
+  { key: "cx", label: "قياس تجربة المستفيد", group: "main", icon: "user-check", color: "#2f7fd1", section: "cx" },
+
   { key: "projects", label: "المشاريع الاستراتيجية", group: "projects", icon: "rocket", color: "#0f8a8a", section: "projects" },
-  { key: "strategies", label: "جهاتي ومساهماتها", group: "ops", icon: "map", color: "#016b5f", section: "entities" },
-  { key: "quarterly", label: "التقارير الربعية", group: "ops", icon: "calendar-check", color: "#1a9d5c", section: "entities" },
-  { key: "contrib", label: "المساهمات في الخطة التشغيلية", group: "ops", icon: "puzzle", color: "#7a5cd1", section: "contrib" },
+
+  /* الأعمال التشغيلية — الطلبات اليومية */
   { key: "changes", label: "طلبات التغيير", group: "ops", icon: "exchange", color: "#c9a020", section: "changes" },
   { key: "reverse", label: "طلبات العكس", group: "ops", icon: "undo", color: "#e07a3a", section: "reverse" },
-  { key: "workflow", label: "طلبات تحديث سير العمل", group: "ops", icon: "workflow", color: "#a24160", section: "workflow" },
+  /* «توثيق قيم المؤشرات/المبادرات» هو الاسم المعتمد لما كان
+     «طلبات تحديث سير العمل» — المفتاح والقسم كما هما فلا تضيع بياناته */
+  { key: "workflow", label: "توثيق قيم المؤشرات/المبادرات", group: "ops", icon: "workflow", color: "#a24160", section: "workflow" },
+
+  { key: "contrib", label: "المساهمات في الخطة التشغيلية", group: "contribs", icon: "puzzle", color: "#7a5cd1", section: "contrib" },
+
+  /* بقيا من الترتيب السابق — مخفيّان افتراضياً ولا تضيع بياناتهما،
+     ويُعادان من «تخصيص محفظتي» عند الحاجة */
+  { key: "strategies", label: "جهاتي ومساهماتها", group: "main", icon: "map", color: "#016b5f", section: "entities" },
+  { key: "quarterly", label: "التقارير الربعية", group: "main", icon: "calendar-check", color: "#1a9d5c", section: "entities" },
+];
+
+/** عناوين المجموعات بترتيب ظهورها */
+export const GROUPS: { id: string; label: [string, string] }[] = [
+  { id: "main", label: ["الأعمال الرئيسية", "Core work"] },
+  { id: "ops", label: ["الأعمال التشغيلية", "Operational work"] },
+  { id: "contribs", label: ["المساهمات في الخطة التشغيلية", "Operational plan contributions"] },
+  { id: "projects", label: ["المشاريع الاستراتيجية", "Strategic projects"] },
 ];
 const BASE_MAP: Record<string, WDef> = Object.fromEntries(WIDGETS.map((w) => [w.key, w]));
 
@@ -134,12 +157,16 @@ type Prefs = {
   noStamp?: Record<string, boolean>;
   /** علامة ترحيل الترتيب الافتراضي الجديد */
   v2?: boolean;
+  /** علامة ترحيل هيكل «الأعمال الرئيسية» */
+  v3?: boolean;
 };
+/** ما يبقى مخفيّاً في الترتيب الجديد — بياناته باقية ويُعاد من التخصيص */
+const HIDE_V3 = ["strategies", "quarterly"];
 const DEFAULT_PREFS: Prefs = {
   mode: "tiles",
   layout: "two",
   order: WIDGETS.map((w) => w.key),
-  hidden: [],
+  hidden: [...HIDE_V3],
   color: "#00584c",
   bg: "",
   bgDim: 35,
@@ -153,6 +180,39 @@ const DEFAULT_PREFS: Prefs = {
 /* أعمدة كل قسم — تُستعمل في الجداول وفي نافذة الإدخال */
 type Col = { k: string; label: string; kind?: "num" | "text" | "date" | "sel"; opts?: string[]; w?: number };
 const COLS: Record<string, Col[]> = {
+  /* الأعمال الرئيسية — الأعمدة نفسها التي تُعبَّأ في صفحة القسم،
+     فما يكتبه الاستشاري هنا هو ما يظهر هناك. و«الاجتماع الربعي»
+     و«المحضر» يبقيان في المحفظة ولا ينعكسان في صفحة القسم. */
+  natstrat: [
+    { k: "name", label: "الاستراتيجية", w: 3 },
+    { k: "owner", label: "الجهة المالكة", w: 2 },
+    { k: "stage", label: "حالة الاعتماد", kind: "sel",
+      opts: ["طور الإعداد/التحديث", "قيد المراجعة", "معتمدة من اللجنة", "معتمدة من مجلس الوزراء"] },
+    { k: "kpis", label: "المؤشرات", kind: "num" },
+    { k: "inits", label: "المبادرات", kind: "num" },
+    { k: "meet", label: "الاجتماع الربعي", kind: "sel", opts: ["لم يُعقد", "عُقد"] },
+    { k: "minutes", label: "رابط المحضر", w: 2 },
+    { k: "needSess", label: "تحتاج جلسة مراجعة أداء", kind: "sel", opts: ["لا", "نعم"] },
+    { k: "note", label: "ملاحظة", w: 3 },
+  ],
+  inststrat: [
+    { k: "name", label: "الجهة", w: 3 },
+    { k: "stage", label: "الحالة", kind: "sel", opts: ["لم تبدأ", "عُقد الاجتماع التعريفي", "الوثائق مستلمة", "فُعِّل القياس"] },
+    { k: "kpis", label: "المؤشرات", kind: "num" },
+    { k: "inits", label: "المبادرات", kind: "num" },
+    { k: "meet", label: "الاجتماع الربعي", kind: "sel", opts: ["لم يُعقد", "عُقد"] },
+    { k: "minutes", label: "رابط المحضر", w: 2 },
+    { k: "needSess", label: "تحتاج جلسة مراجعة أداء", kind: "sel", opts: ["لا", "نعم"] },
+    { k: "note", label: "ملاحظة", w: 3 },
+  ],
+  cx: [
+    { k: "name", label: "الجهاز", w: 3 },
+    { k: "stage", label: "المرحلة", kind: "sel", opts: ["لم تبدأ", "في التهيئة", "في القياس", "صدر التقرير"] },
+    { k: "services", label: "عدد الخدمات", kind: "num" },
+    { k: "meet", label: "الاجتماع الربعي", kind: "sel", opts: ["لم يُعقد", "عُقد"] },
+    { k: "minutes", label: "رابط المحضر", w: 2 },
+    { k: "note", label: "ملاحظة", w: 3 },
+  ],
   entities: [
     { k: "name", label: "اسم الجهة أو الاستراتيجية", w: 3 },
     { k: "type", label: "النوع", kind: "sel", opts: ["مؤسسية", "وطنية", "مناطقية", "برنامج"] },
@@ -1187,6 +1247,26 @@ function Tile({
 }
 
 /* ---------------- نافذة جهاتي ---------------- */
+type Contact = { id?: string; name?: string; role?: string; jobTitle?: string; email?: string; phone?: string };
+
+/** سطر نقطة تواصل — الاسم ودورُه، وتحته البريد والجوال قابلَين للنقر */
+function ContactLine({ c }: { c: Contact }) {
+  const role = (c.role || "").trim();
+  return (
+    <div className="ct-line">
+      <span className="ct-n">
+        {c.name || "—"}
+        {role && role !== "أساسي" && <i>{role}</i>}
+        {c.jobTitle && <em>{c.jobTitle}</em>}
+      </span>
+      <span className="ct-c" dir="ltr">
+        {c.email && <a href={`mailto:${c.email}`}>{c.email}</a>}
+        {c.phone && <a href={`tel:${c.phone}`}>{c.phone}</a>}
+      </span>
+    </div>
+  );
+}
+
 function EntitiesModal({
   rows,
   reg,
@@ -1197,7 +1277,7 @@ function EntitiesModal({
 }: {
   rows: Row[];
   reg: { entityId: string; name: string; sector: string; myContactId: string;
-         ours?: { id?: string; name?: string; role?: string }[] }[];
+         ours?: Contact[]; theirs?: Contact[] }[];
   t: T;
   onClose: () => void;
   onSave: (id: string, data: Rec) => void;
@@ -1231,13 +1311,30 @@ function EntitiesModal({
         {reg.map((x) => {
           const mineC = (x.ours || []).find((c) => c.id === x.myContactId);
           const role = (mineC?.role || "أساسي").trim();
+          const ours = (x.ours || []).filter((c) => c.id !== x.myContactId);
           return (
-            <div className="erow2" key={x.entityId}>
+            <div className="erow2 col" key={x.entityId}>
               <span className="n">
                 {role !== "أساسي" && <i className="erow2-b">{role}</i>}
                 {x.name}
                 <em>{x.sector}</em>
               </span>
+              {(x.theirs || []).length > 0 && (
+                <div className="ct-grp">
+                  <b>{t("نقطة التواصل من الجهة", "Their contact")}</b>
+                  {(x.theirs || []).map((c, i) => (
+                    <ContactLine key={c.id || i} c={c} />
+                  ))}
+                </div>
+              )}
+              {ours.length > 0 && (
+                <div className="ct-grp">
+                  <b>{t("من المركز معك", "Ours, with you")}</b>
+                  {ours.map((c, i) => (
+                    <ContactLine key={c.id || i} c={c} />
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}
@@ -1793,13 +1890,23 @@ export default function Portfolio({
 
   useEffect(() => {
     void loadUserData<Partial<Prefs>>("portfolio", {}).then((d) => {
-      const p = { ...DEFAULT_PREFS, ...(d || {}) } as Prefs & { v2?: boolean };
+      const p = { ...DEFAULT_PREFS, ...(d || {}) } as Prefs & { v2?: boolean; v3?: boolean };
       /* ترحيل مرة واحدة: كان «مهامي» أول الصف، وصار التقويم
          والملاحظات فوقه — نصلح الترتيب المحفوظ ولا نمسّ بقيته */
       if (!p.v2) {
         const top = ["calendar", "notes", "tasks"];
         p.order = [...top.filter((k) => !p.hidden.includes(k)), ...p.order.filter((k) => !top.includes(k))];
         p.v2 = true;
+        void saveUserData("portfolio", p);
+      }
+      /* ترحيل «الأعمال الرئيسية»: البنود الثلاثة الجديدة تُضاف إلى
+         ترتيب من خصّص صفحته سابقاً، والقديمان يُخفيان ولا يُحذفان
+         فتبقى بياناتهما ويُعادان من «تخصيص محفظتي» */
+      if (!p.v3) {
+        const add = ["natstrat", "inststrat", "cx"].filter((k) => !p.order.includes(k));
+        p.order = [...p.order, ...add];
+        p.hidden = [...new Set([...p.hidden, ...HIDE_V3])];
+        p.v3 = true;
         void saveUserData("portfolio", p);
       }
       setPrefs(p);
@@ -2415,17 +2522,19 @@ export default function Portfolio({
         ))}
       </div>
 
-      <div className="sect">
-        <h2>{t("المشاريع الاستراتيجية", "Strategic projects")}</h2>
-        <span className="ln" />
-      </div>
-      {renderGroup(group("projects"), "projects")}
-
-      <div className="sect">
-        <h2>{t("الأعمال التشغيلية", "Operational work")}</h2>
-        <span className="ln" />
-      </div>
-      {renderGroup(group("ops"), "ops")}
+      {/* العناوين وترتيبها من `GROUPS` — والمجموعة الفارغة لا يُرسم
+          عنوانها، فلا يبقى عنوانٌ تحته فراغ */}
+      {GROUPS.map((g) =>
+        group(g.id).length ? (
+          <div key={g.id}>
+            <div className="sect">
+              <h2>{t(g.label[0], g.label[1])}</h2>
+              <span className="ln" />
+            </div>
+            {renderGroup(group(g.id), g.id)}
+          </div>
+        ) : null,
+      )}
 
       {prefs.sections.map((sc) => (
         <div key={sc.id}>

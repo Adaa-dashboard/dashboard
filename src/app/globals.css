@@ -10824,3 +10824,37 @@ input.cell-date {
   border-radius: 99px;
   background: var(--gold, #c9a020);
 }
+
+/* ---------- نقاط التواصل داخل مربع «الجهات» في محفظتي ---------- */
+.erow2.col { display: block; }
+.erow2.col .n { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
+.ct-grp { margin: 7px 0 0; padding-inline-start: 10px; border-inline-start: 2px solid var(--border); }
+.ct-grp > b {
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+.ct-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 2px 0;
+}
+.ct-line .ct-n { font-size: 11.5px; font-weight: 700; color: var(--text); }
+.ct-line .ct-n i {
+  font-style: normal;
+  font-size: 9.5px;
+  font-weight: 800;
+  color: #8a5a00;
+  background: rgba(224, 151, 26, .16);
+  border-radius: 999px;
+  padding: 1px 6px;
+  margin-inline-start: 5px;
+}
+.ct-line .ct-n em { font-style: normal; font-size: 10.5px; color: var(--muted); margin-inline-start: 6px; }
+.ct-line .ct-c { display: flex; gap: 10px; flex-wrap: wrap; margin-inline-start: auto; }
+.ct-line .ct-c a { font-size: 10.5px; color: var(--gt-700); text-decoration: none; }
+.ct-line .ct-c a:hover { text-decoration: underline; }
