@@ -163,6 +163,27 @@ function tgtEff(refData: RefData, key: string, q: number): number | null {
 /* الصفحات التي تقبل ملاحظةً لاصقة — تُخزَّن بمفتاح صلاحيتها لا
    بمفتاح التبويب، فسياسة القاعدة تقارنه بالصلاحية مباشرة.
    («الإنجاز الأسبوعي» تبويبه report وصلاحيته weekly) */
+/* صلاحية كل صفحة — تُستعمل لاستعادة الصفحة المفتوحة بعد تحديث
+   المتصفح: الصفحة المحفوظة لا تُفتح إن سُحبت صلاحيتها بعدها.
+   «محفظتي» ليست هنا لأنها لكل موظف بلا صلاحية. */
+const TAB_SCOPE: Record<string, Scope> = {
+  overview: "overview",
+  details: "details",
+  tasks: "tasks",
+  report: "weekly",
+  structure: "structure",
+  entities: "entities",
+  users: "users",
+  audit: "audit",
+  docs: "docs",
+  sessions: "sessions",
+  natstrat: "natstrat",
+  inststrat: "inststrat",
+  outputs: "outputs",
+  cx: "cx",
+  projects: "projects",
+};
+
 const STICKY_PAGES: Record<string, Scope> = {
   overview: "overview",
   details: "details",
@@ -230,7 +251,33 @@ export default function Dashboard({ me }: { me: Me }) {
     (["overview", "details", "tasks", "report"] as const).find((k) =>
       can(k === "report" ? "weekly" : (k as Scope))
     ) || "overview";
+  const allowedTab = useCallback(
+    (k: string) => k === "mypage" || (k in TAB_SCOPE && can(TAB_SCOPE[k])),
+    [can],
+  );
   const [tab, setTabRaw] = useState<string>(firstTab);
+  /* تحديث المتصفح (F5) كان يعيد الجميع إلى الصفحة الأولى، لأن
+     الصفحات تبديلُ حالة لا انتقالُ روابط. الآن تُحفظ الصفحة
+     المفتوحة لكل متصفح وتُستعاد — بشرط أن تبقى من صفحاته. */
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("perfTab");
+      if (saved && saved !== tabRef.current && allowedTab(saved)) {
+        tabRef.current = saved;
+        setTabRaw(saved);
+      }
+    } catch {
+      /* ignore */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem("perfTab", tab);
+    } catch {
+      /* ignore */
+    }
+  }, [tab]);
   /* المجموعة التي فيها الصفحة المفتوحة تُفتح وحدها، فلا يبحث
      أحدٌ عن صفحته داخل عنوان مطويّ */
   useEffect(() => {
@@ -967,16 +1014,36 @@ function Overview({
   const [statusFilter, setStatusFilter] = useState<string | null>(null); // اسم الحالة
   const [openIndicator, setOpenIndicator] = useState<(Indicator & { num: number }) | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const d = await apiFetch("/api/measurements").then((r) => r.json());
-    setMeasurements(d.measurements || []);
-    setLoading(false);
+  /* التحديث الدوري صامت: «جارٍ التحميل» لأول مرة وحدها. كان كل
+     تحديث يرفع `loading` فتختفي المؤشرات كل ٢٠ ثانية ثم تعود —
+     والبيانات القديمة معروضة أصلاً، فلا داعي لإخفائها ريثما تصل
+     الجديدة. وإن فشل الطلب تبقى القديمة ولا تُمسح الشاشة. */
+  const load = useCallback(async (first = false) => {
+    if (first) setLoading(true);
+    try {
+      const d = await apiFetch("/api/measurements").then((r) => r.json());
+      if (Array.isArray(d.measurements)) setMeasurements(d.measurements);
+    } catch {
+      /* تبقى القيم السابقة معروضة */
+    } finally {
+      if (first) setLoading(false);
+    }
   }, []);
   useEffect(() => {
-    load();
-    const t = setInterval(load, 20000);
-    return () => clearInterval(t);
+    load(true);
+    /* لا تحديث والصفحة في الخلفية — يعود فوراً عند الرجوع إليها */
+    const tick = () => {
+      if (!document.hidden) void load();
+    };
+    const t = setInterval(tick, 20000);
+    const onShow = () => {
+      if (!document.hidden) void load();
+    };
+    document.addEventListener("visibilitychange", onShow);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", onShow);
+    };
   }, [load]);
 
   const latest = useMemo(() => latestByCell(measurements), [measurements]);
@@ -1107,7 +1174,7 @@ function Overview({
         {/* اختيار النطاق أُزيل بطلب المستخدمة — الصفحة على السنة
             كاملة، والأرباع في صفحة «المؤشرات التفصيلية» */}
         <div style={{ flex: 1 }} />
-        <button className="btn btn-ghost btn-sm" onClick={load}>
+        <button className="btn btn-ghost btn-sm" onClick={() => void load()}>
           {t("تحديث", "Refresh")}
         </button>
         <button className="btn btn-sm" onClick={exportCsv}>
