@@ -41,7 +41,38 @@ export const SECTION_NAV_TITLE: Partial<Record<SectionKey, [string, string]>> = 
 };
 
 /* مراحل المسار — مبدئية حتى تعتمدها الإدارة المعنية */
-const SESS_STAGES = ["تحديد الجهة", "جمع البيانات", "إعداد التقرير", "انعقاد الجلسة", "محضر وتوصيات", "الإغلاق"];
+/* المراحل الستّ كما في «آلية عمل جلسة مراجعة الأداء للأجهزة العامة»
+   — المركز الوطني لقياس أداء الأجهزة العامة، أكتوبر ٢٠٢٥ */
+const SESS_STAGES = [
+  "مراجعة وتحليل الأداء",
+  "حصر التحديات والإجراءات التصحيحية",
+  "عقد جلسة مراجعة الأداء التحضيرية",
+  "عقد جلسة مراجعة الأداء النهائية",
+  "مشاركة نتائج جلسة مراجعة الأداء",
+  "متابعة تطبيق الإجراءات التصحيحية",
+];
+/** أسماءٌ قصيرة للعرض في الأشرطة والتبويبات — الكاملة تطول عليها */
+const SESS_SHORT = [
+  "مراجعة وتحليل الأداء",
+  "حصر التحديات",
+  "الجلسة التحضيرية",
+  "الجلسة النهائية",
+  "مشاركة النتائج",
+  "متابعة الإجراءات",
+];
+/* الأسماء التي كانت قبل اعتماد الآلية — تُستبدل **عرضاً** لا حذفاً:
+   البند المحفوظ يبقى كما هو، وترتيب المراحل الست واحد فلا يضيع
+   موضع الجهة في المسار */
+const SESS_LEGACY = ["تحديد الجهة", "جمع البيانات", "إعداد التقرير", "انعقاد الجلسة", "محضر وتوصيات", "الإغلاق"];
+
+/* نطاقات الأداء العام كما في الآلية: ≥٩٠٪ على المسار الصحيح ·
+   ٧٠–٨٩٪ على المسار بشكل جزئي · أقل من ٧٠٪ متعثر */
+const PERF_BANDS: { min: number; label: string; tone: "hi" | "mid" | "low"; hex: string }[] = [
+  { min: 90, label: "على المسار الصحيح", tone: "hi", hex: "#1a9d5c" },
+  { min: 70, label: "على المسار بشكل جزئي", tone: "mid", hex: "#e0971a" },
+  { min: 0, label: "متعثر", tone: "low", hex: "#c0392b" },
+];
+const perfBand = (v: number) => PERF_BANDS.find((b) => v >= b.min) || PERF_BANDS[2];
 /* حالة اعتماد الاستراتيجية الوطنية — أربع محطات */
 const NAT_STEPS = ["طور الإعداد/التحديث", "قيد المراجعة", "معتمدة من اللجنة", "معتمدة من مجلس الوزراء"];
 const NAT_WHERE = ["لدى الجهة المالكة", "لدى اللجنة الاستراتيجية", "اللجنة الاستراتيجية", "اعتماد نهائي"];
@@ -629,10 +660,27 @@ function download(name: string, blob: Blob) {
    ============================================================ */
 function sessOf(d: Rec) {
   const raw = Array.isArray(d.stages) ? d.stages : [];
-  const names = raw.length ? raw.map((x: Rec) => txt(x.n)) : SESS_STAGES;
+  let names = raw.length ? raw.map((x: Rec) => txt(x.n)) : SESS_STAGES;
+  /* بندٌ محفوظ بالأسماء القديمة يُعرض بأسماء الآلية المعتمدة */
+  if (
+    names.length === SESS_LEGACY.length &&
+    names.every((n: string, i: number) => n === SESS_LEGACY[i])
+  )
+    names = SESS_STAGES;
   const dates = raw.map((x: Rec) => txt(x.d));
   const done = Math.max(0, Math.min(names.length, numOf(d.done)));
-  return { names, dates, done, full: names.length };
+  /* المرحلة الحالية: ما بعد المكتمل. وبلوغ الأخيرة يعني الاكتمال */
+  const at = done >= names.length ? -1 : done;
+  return { names, dates, done, full: names.length, at };
+}
+
+/** العناصر المتعثرة في بند جلسة — مؤشراتها ومبادراتها */
+function sessBad(d: Rec) {
+  const kpi = numOf(d.kpiBad);
+  const kpiOf = numOf(d.kpiTot);
+  const ini = numOf(d.initBad);
+  const iniOf = numOf(d.initTot);
+  return { kpi, kpiOf, ini, iniOf, all: kpi + ini };
 }
 
 export function Sessions({ limit, t }: { limit?: number; t: T }) {
@@ -720,8 +768,168 @@ export function Sessions({ limit, t }: { limit?: number; t: T }) {
   );
 }
 
+/* ---------- بطاقة جهة في جلسات مراجعة الأداء ----------
+   على نمط بطاقة الاستراتيجية الوطنية: حلقةُ الأداء العام أولاً،
+   ثم العناصر المتعثرة التي استوجبت الجلسة، ثم مسار المراحل الست. */
+function SessCard({ it, t }: { it: Item; t: T }) {
+  const d = it.data;
+  const s = sessOf(d);
+  const bad = sessBad(d);
+  const perf = numOf(d.perf);
+  const band = perfBand(perf);
+  const cur = s.at < 0 ? t("مكتملة", "Done") : s.names[s.at] || "";
+
+  return (
+    <div className="ncard">
+      <div className="hd">
+        <b>{txt(d.entity) || "—"}</b>
+        <span className="tg" style={{ background: band.hex, color: "#fff" }}>
+          {band.label}
+        </span>
+      </div>
+      <div className="own">
+        {txt(d.quarter) || "—"} · {cur}
+      </div>
+
+      <div className="bd">
+        <Ring pct={perf} size={104} tone={band.tone} />
+        <div className="nums">
+          <div className="n">
+            <div className="k">{t("المؤشرات المتعثرة", "Off-track KPIs")}</div>
+            <div className="v">
+              {AR(bad.kpi)} <em>{`${t("من", "of")} ${AR(bad.kpiOf)}`}</em>
+            </div>
+          </div>
+          <div className="n">
+            <div className="k">{t("المبادرات المتعثرة", "Off-track initiatives")}</div>
+            <div className="v">
+              {AR(bad.ini)} <em>{`${t("من", "of")} ${AR(bad.iniOf)}`}</em>
+            </div>
+          </div>
+          <div className="n">
+            <div className="k">{t("العناصر التي استوجبت الجلسة", "Elements triggering the session")}</div>
+            <div className="v">
+              {AR(bad.all)} <em>{t("عنصراً متعثراً", "off-track")}</em>
+            </div>
+          </div>
+          <div className="n">
+            <div className="k">{t("الأداء العام", "Overall performance")}</div>
+            <div className="v">
+              {AR(perf)}٪ <em>{band.label}</em>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <Flow stages={s.names} done={s.done} dates={s.dates} />
+      <div className="note">{txt(d.note) || t("لا توجد تحديات مسجّلة", "No challenges recorded")}</div>
+    </div>
+  );
+}
+
 function SessionsPage({ t }: { t: T }) {
-  return <Sessions t={t} />;
+  const { items, loaded } = useItems("sessions");
+  const [q, setQ] = useState("");
+  /* -1 = كل الجهات · 0..5 = مرحلة · 9 = مكتملة */
+  const [tab, setTab] = useState(-1);
+
+  const found = useMemo(
+    () =>
+      items.filter((it) => {
+        const d = it.data;
+        return !q || `${txt(d.entity)} ${txt(d.quarter)}`.includes(q);
+      }),
+    [items, q],
+  );
+  const rows = q
+    ? found
+    : tab < 0
+      ? found
+      : found.filter((it) => {
+          const at = sessOf(it.data).at;
+          return tab === 9 ? at < 0 : at === tab;
+        });
+
+  const sum = useMemo(() => {
+    let kpi = 0, kpiOf = 0, ini = 0, iniOf = 0, doneN = 0;
+    const at = new Array(SESS_STAGES.length).fill(0);
+    for (const it of items) {
+      const b = sessBad(it.data);
+      kpi += b.kpi; kpiOf += b.kpiOf; ini += b.ini; iniOf += b.iniOf;
+      const st = sessOf(it.data).at;
+      if (st < 0) doneN++;
+      else at[Math.min(st, SESS_STAGES.length - 1)]++;
+    }
+    return { kpi, kpiOf, ini, iniOf, at, doneN };
+  }, [items]);
+
+  function exportXl() {
+    const head = ["الجهة", "الربع", "المرحلة الحالية", "المراحل المكتملة", "نسبة الأداء العام ٪",
+      "المؤشرات المتعثرة", "إجمالي المؤشرات", "المبادرات المتعثرة", "إجمالي المبادرات", "أبرز التحديات"];
+    const body = items.map((it) => {
+      const d = it.data;
+      const s = sessOf(d);
+      const b = sessBad(d);
+      return [txt(d.entity), txt(d.quarter), s.at < 0 ? "مكتملة" : s.names[s.at] || "", s.done,
+        numOf(d.perf), b.kpi, b.kpiOf, b.ini, b.iniOf, txt(d.note)];
+    });
+    download("جلسات-مراجعة-الأداء.xlsx", writeXlsx([{ name: "الجلسات", rows: [head, ...body] }]));
+  }
+
+  if (!loaded) return <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>;
+  if (!items.length)
+    return (
+      <Empty
+        title={t("لا توجد جلسات بعد", "No sessions yet")}
+        note={t("تُضاف الجهات ومراحل جلساتها من زر «إضافة».", "Add entities and their session stages.")}
+      />
+    );
+
+  return (
+    <>
+      <Toolbar q={q} setQ={setQ} filter="" setFilter={() => {}} options={[]} onExport={exportXl} t={t} />
+
+      {/* العناصر التي استوجبت الجلسات — مجموعة الجهات كلها */}
+      <div className="stabs">
+        <button className={`stab ${!q && tab === -1 ? "on" : ""}`} style={{ ["--c" as string]: "#016b5f" }}
+          onClick={() => { setQ(""); setTab(-1); }}>
+          <span className="l">{t("كل الجهات", "All entities")}</span>
+          <b>{AR(items.length)}</b>
+        </button>
+        {SESS_SHORT.map((n, i) => (
+          <button key={n} className={`stab ${!q && tab === i ? "on" : ""}`}
+            style={{ ["--c" as string]: BAR_TONE[i % BAR_TONE.length] }}
+            onClick={() => { setQ(""); setTab(i); }}>
+            <span className="l">{n}</span>
+            <b>{AR(sum.at[i])}</b>
+          </button>
+        ))}
+        {sum.doneN > 0 && (
+          <button className={`stab ${!q && tab === 9 ? "on" : ""}`} style={{ ["--c" as string]: "#1a7a48" }}
+            onClick={() => { setQ(""); setTab(9); }}>
+            <span className="l">{t("مكتملة", "Done")}</span>
+            <b>{AR(sum.doneN)}</b>
+          </button>
+        )}
+      </div>
+
+      <div className="stab-doing">
+        {`${t("العناصر التي تحتاج جلسات مراجعة أداء", "Elements needing review sessions")}: `}
+        {`${AR(sum.kpi)} ${t("مؤشراً متعثراً من", "off-track KPIs of")} ${AR(sum.kpiOf)}`}
+        {` · ${AR(sum.ini)} ${t("مبادرة متعثرة من", "off-track initiatives of")} ${AR(sum.iniOf)}`}
+      </div>
+
+      {rows.length ? (
+        <div className="ncards">
+          {rows.map((it) => (
+            <SessCard key={it.id} it={it} t={t} />
+          ))}
+        </div>
+      ) : (
+        <div className="pf-none">{t("لا توجد جهات في هذه المرحلة", "Nothing here")}</div>
+      )}
+    </>
+  );
 }
 
 /* ============================================================
@@ -1370,12 +1578,19 @@ function GCell({ k, children }: { k: string; children: ReactNode }) {
    تقرأ من `weekSummary` نفسها التي يقرأ منها التقرير الأسبوعي،
    فلا يختلف رقمٌ بين الصفحة والتقرير.
    ============================================================ */
-const BAR_TONE = ["#1a7a48", "#e0971a", "#9aa8a4", "#2f7fd1", "#6b53c9"];
+const BAR_TONE = ["#1a7a48", "#e0971a", "#9aa8a4", "#2f7fd1", "#6b53c9", "#0f8a8a", "#a24160"];
 /* عبارةٌ داخل الشريط تشرح الحالة — لا تكرّر عنوانها */
 const BAR_INNER: Record<string, string> = {
-  مكتملة: "اكتملت محاضرها",
+  مكتملة: "اكتملت مراحلها",
   "قيد التنفيذ": "قيد الإعداد",
   "لم تبدأ": "لم تُجدول بعد",
+  /* مراحل جلسة مراجعة الأداء — شرحٌ لا تكرارٌ للعنوان */
+  "مراجعة وتحليل الأداء": "تحليل تاريخي ورصد المتعثر",
+  "حصر التحديات": "التحديات والإجراءات التصحيحية",
+  "الجلسة التحضيرية": "مع فريق العمل",
+  "الجلسة النهائية": "مع رئيس الجهاز",
+  "مشاركة النتائج": "محضر الجلسة وتوصياتها",
+  "متابعة الإجراءات": "حتى إغلاق الإجراء",
 };
 
 export function StatusBars({
@@ -2802,7 +3017,13 @@ const FIELDS: Record<Exclude<SectionKey, "outputs">, Field[]> = {
   sessions: [
     { k: "entity", label: "الجهة" },
     { k: "quarter", label: "الربع" },
-    { k: "done", label: "عدد المراحل المكتملة", kind: "num" },
+    { k: "done", label: "عدد المراحل المكتملة (0–6)", kind: "num" },
+    { k: "perf", label: "نسبة الأداء العام ٪", kind: "num" },
+    { k: "kpiBad", label: "المؤشرات المتعثرة", kind: "num" },
+    { k: "kpiTot", label: "إجمالي المؤشرات", kind: "num" },
+    { k: "initBad", label: "المبادرات المتعثرة", kind: "num" },
+    { k: "initTot", label: "إجمالي المبادرات", kind: "num" },
+    { k: "note", label: "أبرز التحديات", kind: "area" },
   ],
   natstrat: [
     { k: "name", label: "الاستراتيجية" },
@@ -3004,23 +3225,22 @@ export function weekSummary(section: SectionKey, items: Item[]): WeekSum {
   const d = (x: Item) => x.data;
 
   if (section === "sessions") {
+    /* كم جهة في كل مرحلة من مراحل الآلية الست — بطلب المستخدمة.
+       الجهة تقع في المرحلة التي تليها ما أنجزته، ومن أتمّ الست
+       يُعدّ «مكتملة» ولا يُحسب في أي مرحلة. */
+    const at = new Array(SESS_STAGES.length).fill(0);
     let done = 0;
-    let live = 0;
-    let none = 0;
     for (const it of items) {
       const s = sessOf(d(it));
-      if (s.done >= s.full) done++;
-      else if (s.done === 0) none++;
-      else live++;
+      if (s.at < 0) done++;
+      else at[Math.min(s.at, SESS_STAGES.length - 1)]++;
     }
+    const bd = SESS_SHORT.map((k, i) => ({ k, n: at[i] }));
+    if (done) bd.push({ k: "مكتملة", n: done });
     return {
       total: items.length,
-      totalLabel: "جلسة",
-      breakdown: [
-        { k: "مكتملة", n: done },
-        { k: "قيد التنفيذ", n: live },
-        { k: "لم تبدأ", n: none },
-      ],
+      totalLabel: "جهة",
+      breakdown: bd,
       prog: items.length ? { done, of: items.length } : null,
     };
   }
