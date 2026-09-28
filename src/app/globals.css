@@ -10927,3 +10927,40 @@ input.cell-date {
 .mw-ns { display: flex; align-items: center; gap: 6px; margin-top: 7px; font-size: 11px; cursor: pointer; }
 .mw-ns input { width: auto; }
 .mw-more { font-size: 10.5px; color: var(--muted); text-align: center; }
+
+/* ---------- بطاقة محفظتي: رقمٌ بدل الدائرة، وشرائح تفصّله ---------- */
+/* الدائرة كانت تحمل رقماً واحداً في مساحة كبيرة، والنسبة تحتها
+   لا تقول شيئاً عن التوزيع. الرقم وحده أوضح، والتفصيل في شرائح. */
+.pf .tile .num2 {
+  position: absolute;
+  inset-block-start: 10px;
+  inset-inline-end: 14px;
+  font-family: "Noto Kufi Arabic", sans-serif;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+}
+.pf .tile .chips3 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+.pf .tile .ch3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--c) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c) 22%, transparent);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.pf .tile .ch3 b {
+  font-family: "Noto Kufi Arabic", sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--c);
+}
