@@ -1106,10 +1106,22 @@ function RowForm({
 }
 
 /* ---------------- التقارير الربعية ---------------- */
+/** ما أملكه في الجهة: أساسيها · مُنحت تعديلاً · اطّلاعاً · لا شيء */
+type MyLevel = "primary" | "edit" | "view" | "none";
 type RegRow = {
   entityId: string; name: string; kind: string; sector: string;
   myContactId: string; ours?: Contact[]; theirs?: Contact[];
+  myLevel?: MyLevel;
+  /** المنوح لهم على هذه الجهة — يراها أساسيُّها ليديرها */
+  shares?: { userId: number | string; level: string }[];
 };
+const LV_EDIT = new Set<MyLevel>(["primary", "edit"]);
+const LV_SEE = new Set<MyLevel>(["primary", "edit", "view"]);
+const SHARE_OPT: { v: string; l: string }[] = [
+  { v: "none", l: "بلا مشاركة" },
+  { v: "view", l: "اطّلاع فقط" },
+  { v: "edit", l: "اطّلاع وتعديل" },
+];
 
 /* ============================================================
    الأعمال الرئيسية — بنود جهاتي من صفحات الأقسام
@@ -1157,14 +1169,18 @@ function useMineWork(reg: RegRow[], meName: string) {
     };
   }, [nonce]);
 
-  /* جهاتي: ما أنا نقطة تواصلها الأساسية — البديل لا يملك التحرير */
-  const mineNames = useMemo(() => {
-    const out = new Set<string>();
+  /* جهاتي على مستويين: ما أراه وما أحرّره.
+     الأساسي يحرّر، والبديل لا يرى شيئاً حتى يُشاركه الأساسي —
+     «اطّلاع فقط» أو «اطّلاع وتعديل». والحارس في القاعدة لا هنا. */
+  const [seeNames, editNames] = useMemo(() => {
+    const see = new Set<string>();
+    const edit = new Set<string>();
     for (const x of reg) {
-      const meC = (x.ours || []).find((c: Contact) => c.id === x.myContactId);
-      if ((meC?.role || "أساسي").trim() === "أساسي") out.add(nrm(x.name));
+      const lv = (x.myLevel || "primary") as MyLevel;
+      if (LV_SEE.has(lv)) see.add(nrm(x.name));
+      if (LV_EDIT.has(lv)) edit.add(nrm(x.name));
     }
-    return out;
+    return [see, edit];
   }, [reg]);
 
   const mine = useMemo(() => {
@@ -1172,16 +1188,26 @@ function useMineWork(reg: RegRow[], meName: string) {
       all[k].filter((it) => {
         const c = txt(it.data.consultant).trim();
         if (c && nrm(c) === nrm(meName)) return true;
-        return mineNames.has(nrm(txt(it.data[MAIN_ENT[k]])));
+        return seeNames.has(nrm(txt(it.data[MAIN_ENT[k]])));
       });
     return { natstrat: pick("natstrat"), inststrat: pick("inststrat"), cx: pick("cx") } as Record<MainSec, MineRow[]>;
-  }, [all, mineNames, meName]);
+  }, [all, seeNames, meName]);
+
+  /** هل أحرّر بند هذا القسم؟ — اسمي فيه، أو جهتُه مما أحرّره */
+  const canEdit = useCallback(
+    (k: MainSec, d: Rec) => {
+      const c = txt(d.consultant).trim();
+      if (c && nrm(c) === nrm(meName)) return true;
+      return editNames.has(nrm(txt(d[MAIN_ENT[k]])));
+    },
+    [editNames, meName],
+  );
 
   const patch = useCallback((k: ReadSec, id: string, p: Rec) => {
     setAll((v) => ({ ...v, [k]: v[k].map((x) => (x.id === id ? { ...x, data: { ...x.data, ...p } } : x)) }));
   }, []);
 
-  return { mine, sess: all.sessions, loaded, patch, reload: () => setNonce((n) => n + 1) };
+  return { mine, sess: all.sessions, loaded, patch, canEdit, reload: () => setNonce((n) => n + 1) };
 }
 
 /** شرائح صغيرة تحت رقم البطاقة — أهمّ ما في القسم بلا فتحه */
@@ -1257,11 +1283,12 @@ const CX_QF: Fld[] = [
 
 /** حقل نصّي حرّ يحفظ عند الخروج منه */
 function TextBox({
-  value, ph, ltr, onSave,
+  value, ph, ltr, dis, onSave,
 }: {
   value: string;
   ph?: string;
   ltr?: boolean;
+  dis?: boolean;
   onSave: (v: string) => void;
 }) {
   const [v, setV] = useState(value);
@@ -1270,6 +1297,7 @@ function TextBox({
     <input
       value={v}
       placeholder={ph}
+      disabled={dis}
       dir={ltr ? "ltr" : undefined}
       onChange={(e) => setV(e.target.value)}
       onBlur={() => v !== value && onSave(v)}
@@ -1278,13 +1306,13 @@ function TextBox({
 }
 
 /** خانة حقلٍ واحد — قائمةً أو رقماً أو نعم/لا أو نصّاً */
-function FldBox({ f, v, onPut }: { f: Fld; v: unknown; onPut: (v: unknown) => void }) {
+function FldBox({ f, v, dis, onPut }: { f: Fld; v: unknown; dis?: boolean; onPut: (v: unknown) => void }) {
   const cls = f.wide ? "wide" : undefined;
   if (f.opts)
     return (
       <label className={cls}>
         <span>{f.label}</span>
-        <select value={txt(v)} onChange={(e) => onPut(e.target.value)}>
+        <select value={txt(v)} disabled={dis} onChange={(e) => onPut(e.target.value)}>
           {f.opts.map((o) => (
             <option key={o} value={o}>
               {o || "—"}
@@ -1299,6 +1327,7 @@ function FldBox({ f, v, onPut }: { f: Fld; v: unknown; onPut: (v: unknown) => vo
         <span>{f.label}</span>
         <select
           value={num(v) === 1 ? "نعم" : txt(v) ? "لا" : ""}
+          disabled={dis}
           onChange={(e) => onPut(e.target.value === "نعم" ? 1 : e.target.value === "لا" ? 0 : "")}
         >
           {["", "نعم", "لا"].map((o) => (
@@ -1313,13 +1342,13 @@ function FldBox({ f, v, onPut }: { f: Fld; v: unknown; onPut: (v: unknown) => vo
     return (
       <label className={cls}>
         <span>{f.label}</span>
-        <input type="number" value={num(v) || ""} onChange={(e) => onPut(Number(e.target.value) || 0)} />
+        <input type="number" value={num(v) || ""} disabled={dis} onChange={(e) => onPut(Number(e.target.value) || 0)} />
       </label>
     );
   return (
     <label className={cls}>
       <span>{f.label}</span>
-      <TextBox value={txt(v)} onSave={onPut} />
+      <TextBox value={txt(v)} dis={dis} onSave={onPut} />
     </label>
   );
 }
@@ -1407,7 +1436,7 @@ function lowPerf(v: CritVals): { ok: boolean; hit: string[] } {
 }
 
 /** حقل نصّي يحفظ عند الخروج منه لا مع كل حرف */
-function NoteBox({ value, ph, rows, onSave }: { value: string; ph: string; rows?: number; onSave: (v: string) => void }) {
+function NoteBox({ value, ph, rows, dis, onSave }: { value: string; ph: string; rows?: number; dis?: boolean; onSave: (v: string) => void }) {
   const [v, setV] = useState(value);
   useEffect(() => setV(value), [value]);
   return (
@@ -1415,6 +1444,7 @@ function NoteBox({ value, ph, rows, onSave }: { value: string; ph: string; rows?
       className="mw-note"
       rows={rows || 2}
       value={v}
+      disabled={dis}
       placeholder={ph}
       onChange={(e) => setV(e.target.value)}
       onBlur={() => v !== value && onSave(v)}
@@ -1423,7 +1453,7 @@ function NoteBox({ value, ph, rows, onSave }: { value: string; ph: string; rows?
 }
 
 function MainWork({
-  sec, rows, sess, loaded, extras, t, onExtra, onPatch, onReload, full,
+  sec, rows, sess, loaded, extras, canEdit, t, onExtra, onPatch, onReload, full,
 }: {
   sec: MainSec;
   /** بنود جهاتي في هذا القسم — تُقرأ مرّةً في الصفحة وتُمرَّر هنا */
@@ -1433,6 +1463,8 @@ function MainWork({
   loaded: boolean;
   /** بيانات المحفظة الإضافية — المفتاح `sec:itemId` */
   extras: Record<string, Rec>;
+  /** هل أحرّر هذا البند؟ «اطّلاع فقط» يقرأ ولا يكتب */
+  canEdit: (sec: MainSec, d: Rec) => boolean;
   t: T;
   onExtra: (key: string, data: Rec) => void;
   onPatch: (sec: MainSec | "sessions", id: string, patch: Rec) => void;
@@ -1558,6 +1590,8 @@ function MainWork({
           for (const f of ["perf", "kpiBad", "initBad"]) if (f in patch) mir[f] = patch[f];
           if (Object.keys(mir).length) void put(sr.id, mir, "sessions");
         };
+        /* جهةٌ شورِكت معي «اطّلاع فقط» تُقرأ ولا تُحرَّر */
+        const ro = !canEdit(sec, it.data);
         /* الطيّ لتجربة المستفيد وحدها وداخل النافذة فقط */
         const foldable = sec === "cx" && !!full;
         const open2 = !foldable || !!shown2[it.id];
@@ -1572,6 +1606,7 @@ function MainWork({
                 <b>{txt(it.data[MAIN_TITLE[sec]]) || "—"}</b>
                 {sec === "natstrat" && ent && <em>{ent}</em>}
               </span>
+              {ro && <i className="mw-ro">{t("اطّلاع فقط", "Read only")}</i>}
               {foldable && <i className="fold-a">{open2 ? "▴" : "▾"}</i>}
             </div>
             {open2 && (
@@ -1583,6 +1618,7 @@ function MainWork({
                   <span>{t("حالة الاعتماد", "Approval")}</span>
                   <select
                     value={NAT_STAGE[Math.max(0, Math.min(3, num(it.data.stage, 1) - 1))]}
+                    disabled={ro}
                     onChange={(e) => void put(it.id, { stage: NAT_STAGE.indexOf(e.target.value) + 1 })}
                   >
                     {NAT_STAGE.map((o) => (
@@ -1594,7 +1630,7 @@ function MainWork({
                 </label>
               )}
               {MAIN_FIELDS[sec].map((f) => (
-                <FldBox key={f.k} f={f} v={it.data[f.k]} onPut={(v) => void put(it.id, { [f.k]: v })} />
+                <FldBox key={f.k} f={f} v={it.data[f.k]} dis={ro} onPut={(v) => void put(it.id, { [f.k]: v })} />
               ))}
             </div>
 
@@ -1630,6 +1666,7 @@ function MainWork({
                          لأن الربع مكتوبٌ في القائمة المجاورة */
                       f={{ ...f, opts: CX_COLS.find((c) => c.k === cxq + f.k)?.opts }}
                       v={it.data[cxq + f.k]}
+                      dis={ro}
                       onPut={(v) => void put(it.id, { [cxq + f.k]: v })}
                     />
                   ))}
@@ -1649,6 +1686,7 @@ function MainWork({
                   <button
                     key={lb}
                     className={`qb ${q[i] ? "on" : ""}`}
+                    disabled={ro}
                     title={`${lb} ${yr}`}
                     onClick={() => {
                       const n = [...q];
@@ -1671,6 +1709,7 @@ function MainWork({
                         value={txt(qlOf(ex, yr, i)[f as keyof QLink])}
                         ph={t(`${ph} في الشير فولدر…`, ph)}
                         ltr
+                        dis={ro}
                         onSave={(v) => onExtra(key, qlSet(ex, yr, i, { [f]: v }))}
                       />
                     ))}
@@ -1681,6 +1720,7 @@ function MainWork({
 
             <NoteBox
               value={txt(ex.note)}
+              dis={ro}
               ph={t("ملاحظات…", "Notes…")}
               onSave={(v) => onExtra(key, { ...ex, note: v })}
             />
@@ -1696,6 +1736,7 @@ function MainWork({
                       <input
                         type="number"
                         value={cv.perf || ""}
+                        disabled={ro}
                         onChange={(e) => setEx({ perf: Number(e.target.value) || 0 })}
                       />
                     </label>
@@ -1704,6 +1745,7 @@ function MainWork({
                       <input
                         type="number"
                         value={cv.kpiBad || ""}
+                        disabled={ro}
                         onChange={(e) => setEx({ kpiBad: Number(e.target.value) || 0 })}
                       />
                     </label>
@@ -1712,6 +1754,7 @@ function MainWork({
                       <input
                         type="number"
                         value={cv.initBad || ""}
+                        disabled={ro}
                         onChange={(e) => setEx({ initBad: Number(e.target.value) || 0 })}
                       />
                     </label>
@@ -1720,6 +1763,7 @@ function MainWork({
                     <input
                       type="checkbox"
                       checked={cv.rep2 === 1}
+                      disabled={ro}
                       onChange={(e) => setEx({ rep2: e.target.checked ? 1 : 0 })}
                     />
                     <span>{t("تكرّر التعثّر فترتَي قياس متتاليتين", "Repeated two periods")}</span>
@@ -1728,6 +1772,7 @@ function MainWork({
                     <input
                       type="checkbox"
                       checked={cv.bigInit === 1}
+                      disabled={ro}
                       onChange={(e) => setEx({ bigInit: e.target.checked ? 1 : 0 })}
                     />
                     <span>{t("تعثّر مبادرة ميزانيتها مليار ريال أو أكثر", "A ≥1bn initiative at risk")}</span>
@@ -1748,7 +1793,7 @@ function MainWork({
                   <input
                     type="checkbox"
                     checked={need}
-                    disabled={!lp.ok && !need}
+                    disabled={ro || (!lp.ok && !need)}
                     onChange={(e) =>
                       void flagSession(entN, e.target.checked, key, ex, {
                         kpiTot: num(it.data.kpisTot),
@@ -1775,7 +1820,7 @@ function MainWork({
                       <div className="mw-f">
                         <label className="wide">
                           <span>{t("المرحلة الحالية", "Current stage")}</span>
-                          <select value={sAt} onChange={(e) => void put(sr.id, { done: Number(e.target.value) }, "sessions")}>
+                          <select value={sAt} disabled={ro} onChange={(e) => void put(sr.id, { done: Number(e.target.value) }, "sessions")}>
                             {SESS_SHORT.map((x, i) => (
                               <option key={x} value={i}>
                                 {i + 1}. {x}
@@ -1787,6 +1832,7 @@ function MainWork({
                       </div>
                       <NoteBox
                         value={txt(sd.note)}
+                        dis={ro}
                         ph={t("ملاحظات على تعثّر الجهة — تظهر في بطاقتها بصفحة الجلسات…", "Notes shown on the session card…")}
                         onSave={(v) => void put(sr.id, { note: v }, "sessions")}
                       />
@@ -2307,6 +2353,51 @@ function CtGroup({
    كانت تُخفي نقطةَ صاحب المحفظة نفسه («البديل وحده يظهر»)، فيفتح
    الاستشاري جهاته ولا يرى اسمه ولا بريده ولا جواله. الآن تُعرض
    نقاط المركز كلها بأدوارها، ونقطتُه معلَّمةً «أنت». */
+/* صفُّ مشاركةٍ مع بديل: الأساسي يفتح جهته له «اطّلاع فقط» أو
+   «اطّلاع وتعديل»، ويسحبها متى شاء. القرار قرارُ الأساسي وحده —
+   والقاعدة هي التي تتحقّق، لا هذه القائمة. */
+function ShareRow({
+  entityId, c, level, t, onDone,
+}: {
+  entityId: string;
+  c: Contact & { userId?: number | string };
+  level: string;
+  t: T;
+  onDone: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  async function set(v: string) {
+    setBusy(true);
+    setErr("");
+    const r = await apiFetch("/api/entities/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entityId, userId: c.userId, level: v }),
+    });
+    setBusy(false);
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      setErr(txt(j.error) || t("تعذّر الحفظ", "Save failed"));
+      return;
+    }
+    onDone();
+  }
+  return (
+    <div className="ct-sh">
+      <span>{c.name || "—"}</span>
+      <select value={level} disabled={busy} onChange={(e) => void set(e.target.value)}>
+        {SHARE_OPT.map((o) => (
+          <option key={o.v} value={o.v}>
+            {t(o.l, o.v)}
+          </option>
+        ))}
+      </select>
+      {err && <div className="ct-err">{err}</div>}
+    </div>
+  );
+}
+
 function EntCard({
   x, logo, t, onDone,
 }: {
@@ -2318,6 +2409,13 @@ function EntCard({
   const ours = x.ours || [];
   const theirs = (x.theirs || []).filter((c) => !isVro(c));
   const vro = (x.theirs || []).filter(isVro);
+  const lvl = (x.myLevel || "primary") as MyLevel;
+  /* زملاء المركز على هذه الجهة سواي — هم من تُشارَك معهم */
+  const alts = ours.filter(
+    (c) => c.id !== x.myContactId && (c as { userId?: number | string }).userId,
+  ) as (Contact & { userId?: number | string })[];
+  const shareOf = (uid: string) =>
+    (x.shares || []).find((s2) => String(s2.userId) === uid)?.level || "none";
   return (
     <div className="ecard">
       <div className="ec-h">
@@ -2338,6 +2436,35 @@ function EntCard({
         t={t}
         onDone={onDone}
       />
+
+      {/* الأساسي وحده يفتح جهته لبديله، ويسحبها متى شاء */}
+      {lvl === "primary" && alts.length > 0 && (
+        <div className="ct-grp sh">
+          <b>{t("مشاركة الجهة مع بديلك", "Share with your alternate")}</b>
+          {alts.map((c) => (
+            <ShareRow
+              key={c.id}
+              entityId={x.entityId}
+              c={c}
+              level={shareOf(String(c.userId ?? ""))}
+              t={t}
+              onDone={onDone}
+            />
+          ))}
+          <div className="ct-none">
+            {t(
+              "«اطّلاع فقط» يقرأ ولا يكتب · «اطّلاع وتعديل» يحدّث كما تحدّث أنت",
+              "View-only reads; edit updates like you",
+            )}
+          </div>
+        </div>
+      )}
+      {lvl === "view" && (
+        <div className="ct-lv">{t("شورِكت معك: اطّلاع فقط", "Shared with you: view only")}</div>
+      )}
+      {lvl === "edit" && (
+        <div className="ct-lv ok">{t("شورِكت معك: اطّلاع وتعديل", "Shared with you: edit")}</div>
+      )}
       <CtGroup
         title={t("من الجهة", "From the entity")}
         list={theirs}
@@ -3354,6 +3481,7 @@ export default function Portfolio({
           sess={mw.sess}
           loaded={mw.loaded}
           extras={mainx}
+          canEdit={mw.canEdit}
           t={t}
           full={prefs.mode === "table" || open === k}
           onExtra={(key, data) => void pf.save("mainx", key, data, 1)}

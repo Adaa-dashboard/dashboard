@@ -10917,6 +10917,42 @@ input.cell-date {
 }
 .ct-add:hover { text-decoration: underline; }
 .ct-none { font-size: 10.5px; color: var(--muted); padding: 2px 0; }
+/* مشاركة الجهة مع البديل */
+.ct-grp.sh { border-inline-start-color: color-mix(in srgb, var(--g-700) 40%, var(--border)); }
+.ct-sh { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 3px 0; }
+.ct-sh > span { flex: 1; min-width: 0; font-size: 11.5px; font-weight: 700; color: var(--text); }
+.ct-sh select {
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+}
+.ct-lv {
+  margin-top: 7px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #8a5a00;
+  background: rgba(224, 151, 26, .14);
+  border-radius: 8px;
+  padding: 3px 9px;
+  display: inline-block;
+}
+.ct-lv.ok { color: var(--ok-tx); background: var(--ok-bg); }
+/* شارة «اطّلاع فقط» على بطاقة عملٍ مشارَكة */
+.mw-ro {
+  font-style: normal;
+  flex: none;
+  font-size: 9.5px;
+  font-weight: 800;
+  color: #8a5a00;
+  background: rgba(224, 151, 26, .16);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
 .ct-line {
   display: flex;
   align-items: baseline;
