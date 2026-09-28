@@ -850,13 +850,31 @@ export async function apiFetch(path: string, init: Init = {}) {
           kind: String(r.kind || ""), sector: String(r.sector || ""),
           myContactId: String(r.my_contact_id || ""),
           myRole: String(r.my_role || ""), theirs: r.theirs || [],
-          /* `side` يأتي مع كل نقطة فتُفرز الواجهة الأطراف الثلاثة */
+          /* `side` يأتي مع كل نقطة فتُفرز الواجهة الأطراف الثلاثة،
+             و`myLevel` يقول ما أملكه في هذه الجهة:
+             primary (أساسي) · edit · view · none (بديل بلا منح) */
+          myLevel: String(r.my_level || "primary"),
+          shares: r.shares || [],
           /* كل نقاط التواصل من المركز لهذه الجهة — بها يُعرف دوري
              فيها (أساسي أم بديل) ومن يشاركني إياها */
           ours: r.mine || [],
           addedByName: String(r.added_by_name || ""),
         })),
       });
+    }
+
+    /* مشاركة الجهة مع بديلها — لنقطة التواصل الأساسية وحدها،
+       والدالة تتحقّق من ذلك بنفسها. `level` = view · edit · none */
+    if (p === "/api/entities/share" && method === "POST") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const { error } = await s.rpc("perf_entity_share_set", {
+        p_entity: str(body.entityId),
+        p_user: Number(body.userId),
+        p_level: str(body.level) || "none",
+      });
+      if (error) return err(error.message, 403);
+      return ok({ ok: true });
     }
 
     /* اسمٌ بديل للجهة — صيغتها في ملف منصة الرؤية، فتُطابَق بعدها
