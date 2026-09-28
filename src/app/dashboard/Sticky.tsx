@@ -182,7 +182,7 @@ const inDays = (n: number) => {
 };
 
 const DURS: [string, string][] = [
-  [inDays(3), "٣ أيام"],
+  [inDays(3), "3 أيام"],
   [inDays(7), "أسبوع"],
   [inDays(30), "شهر"],
   ["", "بلا مدة"],

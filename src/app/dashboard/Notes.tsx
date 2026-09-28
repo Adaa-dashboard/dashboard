@@ -396,7 +396,7 @@ export default function Notes({
                     )}
                     {!open.due && (
                       <span className="hint">
-                        {t("«بكرة» أو «الأحد الساعة ٩» — يُلتقط الموعد تلقائياً", "Write a date and it is picked up")}
+                        {t("«بكرة» أو «الأحد الساعة 9» — يُلتقط الموعد تلقائياً", "Write a date and it is picked up")}
                       </span>
                     )}
                   </div>

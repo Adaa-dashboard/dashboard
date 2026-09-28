@@ -1,27 +1,38 @@
--- ما الملفات التي شُغِّلت فعلاً؟ — قراءة فقط، لا تغيّر شيئاً
-with chk(n, "الملف", "يفحص", "مُشغَّل") as (values
-  (1,'perf-weekly.sql','خطة التقرير الأسبوعي',
-     exists(select 1 from pg_policies where policyname='perf_settings_weekly_write')),
-  (2,'perf-section-edit.sql','تعديل كل قسم لصاحبه',
-     exists(select 1 from pg_policies
-             where policyname='perf_items_write' and qual like '%|| '':edit''%')),
-  (3,'perf-delegate.sql','تفويض الصلاحية في الإجازة',
-     to_regclass('public.perf_section_grants') is not null),
-  (4,'perf-selfphone.sql','الجوال يكتبه صاحبه عند التفعيل',
-     exists(select 1 from pg_proc where proname='perf_activate' and prosrc like '%phone_taken%')),
-  (5,'perf-audit.sql','صفحة سجل النشاط',
-     exists(select 1 from pg_proc where proname='perf_audit_log')),
-  (6,'perf-sticky.sql','ملاحظات القلم اللاصقة',
-     to_regclass('public.perf_stickies') is not null),
-  (7,'perf-sticky-writers.sql','القلم للحزامي والمدراء',
-     exists(select 1 from pg_policies where policyname='perf_stickies_insert' and with_check like '%sticky%')),
-  (8,'perf-notices.sql','تحديثات إضافية من المطوّر',
-     to_regclass('public.perf_notices') is not null),
-  (9,'perf-usernames.sql','أسماء الدخول = البريد',
-     exists(select 1 from public.perf_users where username='malhumayzi')),
-  (10,'perf-task-delete.sql','حذف التكاليف',
-     exists(select 1 from pg_policies where policyname='perf_tasks_delete' and qual like '%created_by_id%'))
+-- ============================================================
+--  فحصٌ: أيُّ ملفات SQL شُغِّلت فعلاً وأيُّها لم يُشغَّل
+--  ------------------------------------------------------------
+--  للقراءة فقط — لا يغيّر شيئاً. يُشغَّل من SQL Editor فيعرض
+--  جدولاً: كل عنصرٍ ومصدره وهل هو موجود في قاعدة البيانات.
+--  كل الصفوف ✅ ⇒ الملف مُشغَّل. أيُّ ❌ ⇒ شغِّل ملفه.
+-- ============================================================
+with checks(ord, "الملف", "العنصر", ok) as (values
+  (1, 'perf-portfolio-main.sql',    'perf_my_entity_names()',
+      to_regprocedure('public.perf_my_entity_names()') is not null),
+  (2, 'perf-portfolio-main.sql',    'perf_item_mine(text,jsonb)',
+      to_regprocedure('public.perf_item_mine(text,jsonb)') is not null),
+  (3, 'perf-portfolio-main.sql',    'perf_item_mine_save(text,text,jsonb)',
+      to_regprocedure('public.perf_item_mine_save(text,text,jsonb)') is not null),
+  (4, 'perf-portfolio-main.sql',    'perf_session_flag(text,text)',
+      to_regprocedure('public.perf_session_flag(text,text)') is not null),
+  (5, 'perf-sticky-mentions.sql',   'perf_stickies.audience',
+      exists (select 1 from information_schema.columns
+               where table_schema = 'public' and table_name = 'perf_stickies'
+                 and column_name = 'audience')),
+  (6, 'perf-sticky-mentions.sql',   'perf_stickies.mention_ids',
+      exists (select 1 from information_schema.columns
+               where table_schema = 'public' and table_name = 'perf_stickies'
+                 and column_name = 'mention_ids')),
+  (7, 'perf-sticky-mentions.sql',   'perf_is_lead()',
+      to_regprocedure('public.perf_is_lead()') is not null),
+  (8, 'perf-sticky-mentions.sql',   'perf_people() فيها username',
+      exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+               where n.nspname = 'public' and p.proname = 'perf_people'
+                 and pg_get_function_result(p.oid) ilike '%username%')),
+  (9, 'perf-sticky-mentions.sql',   'سياسة perf_stickies_read',
+      exists (select 1 from pg_policies
+               where schemaname = 'public' and tablename = 'perf_stickies'
+                 and policyname = 'perf_stickies_read'))
 )
-select "الملف", "يفحص",
-       case when "مُشغَّل" then '✅ مُشغَّل' else '❌ ناقص' end as "الحالة"
-  from chk order by n;
+select "الملف", "العنصر",
+       case when ok then '✅ موجود' else '❌ ناقص — شغِّل الملف' end as "الحالة"
+  from checks order by ord;
