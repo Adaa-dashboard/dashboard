@@ -1101,6 +1101,233 @@ function RowForm({
 }
 
 /* ---------------- التقارير الربعية ---------------- */
+type RegRow = {
+  entityId: string; name: string; kind: string; sector: string;
+  myContactId: string; ours?: Contact[]; theirs?: Contact[];
+};
+
+/* ============================================================
+   الأعمال الرئيسية — بنود جهاتي من صفحات الأقسام
+   ------------------------------------------------------------
+   الجدول يُقرأ من `perf_items` لا من نسخةٍ في المحفظة: ما يراه
+   الاستشاري هنا هو ما في صفحة القسم، وتعديلُه يصل إليها بالدالة
+   `perf_item_mine_save` التي تتحقّق في القاعدة أن البند من جهاته.
+
+   و«الاجتماعات الربعية» و«رابط المحضر» بيانات محفظةٍ لا قسم —
+   تبقى هنا ولا تظهر في صفحة القسم، كما طلبت المستخدمة.
+   ============================================================ */
+type MainSec = "natstrat" | "inststrat" | "cx";
+
+const MAIN_STAGE: Record<MainSec, { k: string; opts: string[]; label: string }> = {
+  natstrat: {
+    k: "stage",
+    label: "حالة الاعتماد",
+    opts: ["طور الإعداد/التحديث", "قيد المراجعة", "معتمدة من اللجنة", "معتمدة من مجلس الوزراء"],
+  },
+  inststrat: { k: "live", label: "القياس", opts: ["", "مفعل"] },
+  cx: { k: "meet", label: "الاجتماع التعريفي", opts: ["", "تم", "لم يبدأ"] },
+};
+/** الحقل الذي يحمل اسم جهة البند في كل قسم */
+const MAIN_ENT: Record<MainSec, string> = { natstrat: "owner", inststrat: "name", cx: "name" };
+/** عنوان الصف: الاستراتيجية في الوطنية، والجهة في البقية */
+const MAIN_TITLE: Record<MainSec, string> = { natstrat: "name", inststrat: "name", cx: "name" };
+
+const QLABS = ["الربع الأول", "الربع الثاني", "الربع الثالث", "الربع الرابع"];
+
+function MainWork({
+  sec, meName, reg, extras, t, onExtra, full,
+}: {
+  sec: MainSec;
+  meName: string;
+  reg: RegRow[];
+  /** بيانات المحفظة الإضافية — المفتاح `sec:itemId` */
+  extras: Record<string, Rec>;
+  t: T;
+  onExtra: (key: string, data: Rec) => void;
+  /** داخل النافذة: الجدول كاملاً. وفي البطاقة: أول ثلاثة صفوف */
+  full?: boolean;
+}) {
+  const [items, setItems] = useState<{ id: string; ord: number; data: Rec }[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const load = useCallback(() => {
+    apiFetch(`/api/items?section=${sec}`)
+      .then((r) => r.json())
+      .then((d) => setItems(Array.isArray(d.items) ? d.items : []))
+      .catch(() => setItems([]))
+      .finally(() => setLoaded(true));
+  }, [sec]);
+  useEffect(() => load(), [load]);
+
+  /* جهاتي: ما أنا نقطة تواصلها الأساسية — البديل لا يملك التحرير */
+  const mineNames = useMemo(() => {
+    const out = new Set<string>();
+    for (const x of reg) {
+      const meC = (x.ours || []).find((c: Contact) => c.id === x.myContactId);
+      if ((meC?.role || "أساسي").trim() === "أساسي") out.add(nrm(x.name));
+    }
+    return out;
+  }, [reg]);
+
+  const rows = useMemo(
+    () =>
+      items.filter((it) => {
+        const c = txt(it.data.consultant).trim();
+        if (c && nrm(c) === nrm(meName)) return true;
+        return mineNames.has(nrm(txt(it.data[MAIN_ENT[sec]])));
+      }),
+    [items, mineNames, meName, sec],
+  );
+
+  async function put(id: string, patch: Rec) {
+    /* تفاؤلياً في الشاشة، ثم يُحفظ — والفشل يُعيد القراءة */
+    setItems((v) => v.map((x) => (x.id === id ? { ...x, data: { ...x.data, ...patch } } : x)));
+    const r = await apiFetch("/api/items/mine", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ section: sec, id, patch }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      setMsg(d.error || t("تعذّر الحفظ", "Save failed"));
+      load();
+    } else setMsg("");
+  }
+
+  async function flagSession(entity: string, on: boolean, key: string, ex: Rec) {
+    onExtra(key, { ...ex, needSess: on ? 1 : 0 });
+    if (!on) return;
+    const r = await apiFetch("/api/items/session-flag", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entity, quarter: `${QLABS[Math.floor(new Date().getMonth() / 3)]} ${new Date().getFullYear()}` }),
+    });
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      setMsg(d.error || t("تعذّر فتح بطاقة الجلسة", "Could not open a session card"));
+    } else setMsg(t("فُتحت بطاقة في صفحة جلسات مراجعة الأداء", "A session card was opened"));
+  }
+
+  if (!loaded) return <div className="pf-none">{t("جارٍ التحميل…", "Loading…")}</div>;
+  if (!rows.length)
+    return (
+      <div className="pf-none">
+        {t(
+          "لا توجد بنود مسندة إليك — تُسنَد بأن تكون نقطة التواصل الأساسية لجهتها في «الجهات ونقاط التواصل».",
+          "Nothing assigned to you yet.",
+        )}
+      </div>
+    );
+
+  const st = MAIN_STAGE[sec];
+  const shown = full ? rows : rows.slice(0, 3);
+
+  return (
+    <div className="mw">
+      {msg && <div className="mw-msg">{msg}</div>}
+      {shown.map((it) => {
+        const key = `${sec}:${it.id}`;
+        const ex = extras[key] || {};
+        const q: number[] = Array.isArray(ex.q) ? (ex.q as number[]) : [0, 0, 0, 0];
+        const ent = txt(it.data[MAIN_ENT[sec]]);
+        return (
+          <div className="mw-row" key={it.id}>
+            <div className="mw-h">
+              <b>{txt(it.data[MAIN_TITLE[sec]]) || "—"}</b>
+              {sec === "natstrat" && ent && <em>{ent}</em>}
+            </div>
+
+            <div className="mw-f">
+              <label>
+                <span>{st.label}</span>
+                <select
+                  value={
+                    sec === "natstrat"
+                      ? st.opts[Math.max(0, Math.min(3, num(it.data.stage, 1) - 1))]
+                      : txt(it.data[st.k])
+                  }
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    void put(it.id, sec === "natstrat" ? { stage: st.opts.indexOf(v) + 1 } : { [st.k]: v });
+                  }}
+                >
+                  {st.opts.map((o) => (
+                    <option key={o} value={o}>
+                      {o || "—"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {sec !== "cx" && (
+                <>
+                  <label>
+                    <span>{t("المؤشرات", "KPIs")}</span>
+                    <input
+                      type="number"
+                      value={num(it.data.kpisTot) || ""}
+                      onChange={(e) => void put(it.id, { kpisTot: Number(e.target.value) || 0 })}
+                    />
+                  </label>
+                  <label>
+                    <span>{t("المبادرات", "Initiatives")}</span>
+                    <input
+                      type="number"
+                      value={num(it.data.initTot) || ""}
+                      onChange={(e) => void put(it.id, { initTot: Number(e.target.value) || 0 })}
+                    />
+                  </label>
+                </>
+              )}
+            </div>
+
+            {/* الاجتماعات الربعية — بيانات محفظة، لا تظهر في صفحة القسم */}
+            <div className="mw-q">
+              <span className="k">{t("الاجتماعات الربعية", "Quarterly meetings")}</span>
+              {QLABS.map((lb, i) => (
+                <button
+                  key={lb}
+                  className={`qb ${q[i] ? "on" : ""}`}
+                  title={lb}
+                  onClick={() => {
+                    const n = [...q];
+                    n[i] = n[i] ? 0 : 1;
+                    onExtra(key, { ...ex, q: n });
+                  }}
+                >
+                  {["١", "٢", "٣", "٤"][i]}
+                </button>
+              ))}
+              <input
+                className="mw-lnk"
+                dir="ltr"
+                value={txt(ex.minutes)}
+                placeholder={t("رابط المحضر في الشير فولدر…", "Minutes link…")}
+                onChange={(e) => onExtra(key, { ...ex, minutes: e.target.value })}
+              />
+            </div>
+
+            {sec !== "cx" && (
+              <label className="mw-ns">
+                <input
+                  type="checkbox"
+                  checked={num(ex.needSess) === 1}
+                  onChange={(e) => void flagSession(ent || txt(it.data.name), e.target.checked, key, ex)}
+                />
+                <span>{t("متعثّرة — تحتاج جلسة مراجعة أداء", "Needs a performance review session")}</span>
+              </label>
+            )}
+          </div>
+        );
+      })}
+      {!full && rows.length > shown.length && (
+        <div className="mw-more">{t(`و${rows.length - shown.length} غيرها`, `+${rows.length - shown.length} more`)}</div>
+      )}
+    </div>
+  );
+}
+
 function Quarterly({ rows, t, onToggle }: { rows: Row[]; t: T; onToggle: (r: Row, q: number) => void }) {
   const curQ = Math.floor(new Date().getMonth() / 3) + 1;
   if (!rows.length) return <div className="pf-none">{t("لا توجد جهات بعد — تُضاف من «جهاتي ومساهماتها».", "Add your entities first.")}</div>;
@@ -1984,10 +2211,6 @@ export default function Portfolio({
   const entities = pf.of("entities");
   /* جهات السجلّ المسندة إليّ — تُعدّ مع جهات المحفظة في كل رقم
      يظهر للمستخدم، فالعدد يوافق ما يراه داخل المربّع لا نصفه */
-  type RegRow = {
-    entityId: string; name: string; kind: string; sector: string;
-    myContactId: string; ours?: { id?: string; name?: string; role?: string }[];
-  };
   const [reg, setReg] = useState<RegRow[]>([]);
   useEffect(() => {
     void apiFetch("/api/entities/mine").then((r) => r.json())
@@ -1995,6 +2218,12 @@ export default function Portfolio({
       .catch(() => setReg([]));
   }, []);
   const regNames = useMemo(() => reg.map((x) => String(x.name || "")), [reg]);
+  /* بيانات المحفظة الإضافية للأعمال الرئيسية — المفتاح `القسم:معرّف البند` */
+  const mainx = useMemo(() => {
+    const m: Record<string, Rec> = {};
+    for (const r of pf.rows) if (r.section === "mainx") m[r.id] = r.data;
+    return m;
+  }, [pf.rows]);
   /* العدّ الموحَّد: جهات السجلّ + جهات المحفظة بلا تكرار الاسم */
   const entCount = useMemo(
     () =>
@@ -2131,6 +2360,19 @@ export default function Portfolio({
     const del = (id: string) => {
       if (confirm(t("حذف هذا البند؟", "Delete?"))) void pf.remove(sec, id);
     };
+    /* الأعمال الرئيسية — تُقرأ من صفحات الأقسام لا من نسخةٍ هنا */
+    if (k === "natstrat" || k === "inststrat" || k === "cx")
+      return (
+        <MainWork
+          sec={k}
+          meName={me.name || ""}
+          reg={reg}
+          extras={mainx}
+          t={t}
+          full={prefs.mode === "table" || open === k}
+          onExtra={(key, data) => void pf.save("mainx", key, data, 1)}
+        />
+      );
     if (k === "tasks") return <TasksWidget me={me} t={t} onCount={setTaskCount} />;
     if (k === "calendar") return <Cal t={t} meId={me.id} />;
     if (k === "notes") return <NotesWidget t={t} onOpen={onOpenNotes} />;
