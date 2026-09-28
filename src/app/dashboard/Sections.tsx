@@ -914,8 +914,211 @@ function NatCard({
   );
 }
 
+/* ---------- رفع ملف الاستراتيجيات الوطنية ----------
+   المطابقة بعنوان العمود لا بموضعه: ترتيب الأعمدة يختلف بين ملف
+   وآخر، والعنوان يبقى. والصف يُطابَق باسم الاستراتيجية فيُحدَّث
+   بندها ولا يتكرّر. الخانة الفارغة تُبقي القيمة الحالية — لا تمسحها
+   — ولا يُحذف بند أبداً مهما نقص من الملف. */
+const natNorm = (v: string) =>
+  String(v || "")
+    .replace(/[\n\r▼]/g, " ")
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي")
+    .replace(/[٪%]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/** عنوان العمود ⇒ مفتاح الحقل — الأكثر تخصيصاً أولاً */
+function natKeyOf(head: string): string {
+  const h = natNorm(head);
+  if (!h) return "";
+  const has = (...w: string[]) => w.every((x) => h.includes(x));
+  if (has("مؤشر", "ممثل")) return "kpisRep";
+  if (h.includes("مؤشر")) return "kpisTot";
+  if (has("مبادر", "ممثل")) return "initRep";
+  if (h.includes("مبادر")) return "initTot";
+  if (h.includes("قابلي")) return "meas";
+  if (h.includes("فتر")) return "period";
+  if (has("تاريخ", "اعتماد")) return "approvedAt";
+  if (h.includes("اعتماد") || h.includes("مرحل")) return "stage";
+  if (h.includes("فني")) return "tech";
+  if (h.includes("ملاحظ")) return "note";
+  if (h.includes("الوضع الحالي") || h.includes("المنجز")) return "current";
+  if (h.includes("تحدي") || h.includes("معوق")) return "challenge";
+  if (h.includes("القادم") || h.includes("التالي")) return "next";
+  if (h.includes("دعم")) return "support";
+  if (h.includes("جهه") || h.includes("مالك")) return "owner";
+  if (h.includes("استراتيجي") || h.includes("اسم")) return "name";
+  return "";
+}
+
+const NAT_NUM_KEYS = new Set(["meas", "kpisRep", "kpisTot", "initRep", "initTot"]);
+
+/** القيمة كما يفهمها الحقل · undefined = اتركها كما هي */
+function natVal(k: string, raw: string): unknown {
+  const v = String(raw ?? "").trim();
+  if (!v) return undefined;
+  if (NAT_NUM_KEYS.has(k)) {
+    const n = Number(v.replace(/[٪%,\s]/g, ""));
+    return Number.isFinite(n) ? n : undefined;
+  }
+  if (k === "tech") return !/^(غير|لا|no|false|0)/i.test(natNorm(v));
+  if (k === "stage") {
+    const n = Number(v);
+    if (n >= 1 && n <= NAT_STEPS.length) return n;
+    const h = natNorm(v);
+    const exact = NAT_STEPS.findIndex((x) => natNorm(x) === h);
+    if (exact >= 0) return exact + 1;
+    const near = NAT_STEPS.findIndex((x) => natNorm(x).includes(h) || h.includes(natNorm(x)));
+    return near >= 0 ? near + 1 : undefined;
+  }
+  return v;
+}
+
+/** معرّف ثابت من الاسم، فإعادة رفع الملف لا تكرّر الاستراتيجية */
+function natNewId(name: string): string {
+  const k = natNorm(name).replace(/\s/g, "");
+  let h = 5381;
+  for (let i = 0; i < k.length; i++) h = ((h * 33) ^ k.charCodeAt(i)) >>> 0;
+  return "nat-x" + h.toString(36);
+}
+
+function NatImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => void }) {
+  const [msg, setMsg] = useState("");
+  const ref = useRef<HTMLInputElement>(null);
+
+  async function pick(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    setMsg(t("جارٍ القراءة...", "Reading..."));
+    try {
+      const sheets = await readXlsxSheets(await f.arrayBuffer());
+
+      /* صف العناوين قد لا يكون الأول — نبحث عنه في أوائل صفوف كل ورقة */
+      let map: Record<number, string> = {};
+      let rows: string[][] = [];
+      let hi = -1;
+      for (const sh of sheets) {
+        const rs = sh.rows || [];
+        for (let i = 0; i < Math.min(rs.length, 8); i++) {
+          const m: Record<number, string> = {};
+          (rs[i] || []).forEach((c, ci) => {
+            const k = natKeyOf(txt(c));
+            if (k && !Object.values(m).includes(k)) m[ci] = k;
+          });
+          if (Object.values(m).includes("name") && Object.keys(m).length >= 3) {
+            map = m;
+            rows = rs;
+            hi = i;
+            break;
+          }
+        }
+        if (hi >= 0) break;
+      }
+      if (hi < 0) {
+        setMsg(
+          t(
+            "لم أجد صف العناوين في الملف — لا بدّ من عمود «الاستراتيجية». نزّلي ملف Excel من الزر المجاور، عدّلي عليه، ثم ارفعيه.",
+            "Could not find a header row with a strategy column.",
+          ),
+        );
+        return;
+      }
+
+      const nameCol = Number(Object.keys(map).find((c) => map[Number(c)] === "name"));
+      const byName = new Map<string, Item>();
+      for (const it of items) byName.set(natNorm(txt(it.data.name)), it);
+
+      const today = new Date().toISOString().slice(0, 10);
+      const upd: { id: string; ord: number; data: Rec }[] = [];
+      const add: { id: string; ord: number; data: Rec }[] = [];
+      const fresh: string[] = [];
+      let maxOrd = items.reduce((a, b) => Math.max(a, b.ord || 0), 0);
+
+      for (const r of rows.slice(hi + 1)) {
+        const nm = txt(r[nameCol]).trim();
+        if (!nm) continue;
+        const patch: Rec = {};
+        for (const [ci, k] of Object.entries(map)) {
+          if (k === "name") continue;
+          const v = natVal(k, txt(r[Number(ci)]));
+          if (v !== undefined) patch[k] = v;
+        }
+        const cur = byName.get(natNorm(nm));
+        if (cur) {
+          if (!Object.keys(patch).length) continue;
+          upd.push({ id: cur.id, ord: cur.ord, data: { ...cur.data, ...patch, updated: today } });
+        } else {
+          fresh.push(nm);
+          add.push({
+            id: natNewId(nm),
+            ord: ++maxOrd,
+            data: { stage: 1, ...patch, name: nm, updated: today },
+          });
+        }
+      }
+
+      if (!upd.length && !add.length) {
+        setMsg(t("لم يتغيّر شيء — الملف مطابق لما في المنصة", "Nothing changed"));
+        return;
+      }
+      const extra = fresh.length
+        ? `\n\nوستُضاف ${fresh.length} استراتيجية ليست في المنصة:\n• ${fresh
+            .slice(0, 6)
+            .join("\n• ")}${fresh.length > 6 ? "\n• …" : ""}`
+        : "";
+      if (
+        !confirm(
+          t(
+            `سيُحدَّث ${upd.length} استراتيجية من الملف.\nلا يُحذف شيء، والخانة الفارغة تُبقي القيمة الحالية كما هي.${extra}\n\nمتابعة؟`,
+            `Update ${upd.length} strategies?`,
+          ),
+        )
+      ) {
+        setMsg("");
+        return;
+      }
+
+      const all = [...upd, ...add];
+      for (let i = 0; i < all.length; i += 40) {
+        const res = await apiFetch("/api/items", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ section: "natstrat", items: all.slice(i, i + 40) }),
+        });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          setMsg(d.error || t("تعذّر الحفظ", "Save failed"));
+          return;
+        }
+      }
+      setMsg(
+        t(
+          `تم تحديث ${upd.length} استراتيجية${add.length ? ` · وأُضيفت ${add.length}` : ""}`,
+          `Updated ${upd.length}`,
+        ),
+      );
+      onDone();
+    } catch {
+      setMsg(t("تعذّرت قراءة الملف — تأكّدي أنه xlsx", "Could not read the file"));
+    }
+  }
+
+  return (
+    <span className="seedb">
+      <button className="btn btn-sm" onClick={() => ref.current?.click()}>
+        {t("رفع ملف Excel", "Upload Excel")}
+      </button>
+      <input ref={ref} type="file" accept=".xlsx" hidden onChange={pick} />
+      {msg && <em>{msg}</em>}
+    </span>
+  );
+}
+
 function NationalPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
-  const { items, loaded, save, undo, undoTop, dismissUndo } = useItems("natstrat");
+  const { items, loaded, save, reload, undo, undoTop, dismissUndo } = useItems("natstrat");
   const [q, setQ] = useState("");
   /* التبويب المختار — حالة الاعتماد */
   const [tab, setTab] = useState(4);
@@ -935,12 +1138,14 @@ function NationalPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
   function exportXl() {
     const head = ["الاستراتيجية", "الجهة", "حالة الاعتماد", "قابلية القياس ٪", "المؤشرات الممثلة",
       "إجمالي المؤشرات", "المبادرات الممثلة", "إجمالي المبادرات", "المراجعة الفنية",
-      "فترة الاستراتيجية", "تاريخ الاعتماد", "أبرز الملاحظات"];
+      "فترة الاستراتيجية", "تاريخ الاعتماد", "أبرز الملاحظات",
+      "الوضع الحالي", "التحديات", "الخطوات القادمة", "الدعم المطلوب"];
     const body = items.map((it) => {
       const d = it.data;
       return [txt(d.name), txt(d.owner), NAT_STEPS[natStage(d) - 1], numOf(d.meas),
         numOf(d.kpisRep), numOf(d.kpisTot), numOf(d.initRep), numOf(d.initTot),
-        d.tech ? "مقبولة فنياً" : "غير مقبولة فنياً", txt(d.period), txt(d.approvedAt), txt(d.note)];
+        d.tech ? "مقبولة فنياً" : "غير مقبولة فنياً", txt(d.period), txt(d.approvedAt), txt(d.note),
+        txt(d.current), txt(d.challenge), txt(d.next), txt(d.support)];
     });
     download("الاستراتيجيات-الوطنية.xlsx", writeXlsx([{ name: "الوطنية", rows: [head, ...body] }]));
   }
@@ -949,6 +1154,12 @@ function NationalPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
 
   return (
     <>
+      {canEdit && (
+        <div className="sx-tools">
+          <NatImport items={items} t={t} onDone={() => void reload()} />
+        </div>
+      )}
+
       <Toolbar q={q} setQ={setQ} filter="" setFilter={() => {}} options={[]} onExport={exportXl} t={t} />
 
       <div className="stabs">
