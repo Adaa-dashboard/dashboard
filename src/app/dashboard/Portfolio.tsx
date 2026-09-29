@@ -492,7 +492,7 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
 
   async function seedDemo() {
     if (!bossId) {
-      alert(t("لم يُعثر على حساب مديرك — شغّلي ملف الهيكل أولاً.", "Manager account not found."));
+      alert(t("لم يُعثر على حساب المدير — يلزم تشغيل ملف الهيكل أولاً.", "Manager account not found."));
       return;
     }
     const day = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);

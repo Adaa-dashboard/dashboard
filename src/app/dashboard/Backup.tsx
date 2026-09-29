@@ -253,7 +253,7 @@ export default function Backup({
 
     const w = window.open("", "_blank");
     if (!w) {
-      setErr(t("امنعي حجب النوافذ المنبثقة ثم أعيدي المحاولة.", "Allow pop-ups and try again."));
+      setErr(t("يلزم السماح بالنوافذ المنبثقة ثم إعادة المحاولة.", "Allow pop-ups and try again."));
       return;
     }
     w.document.write(html);

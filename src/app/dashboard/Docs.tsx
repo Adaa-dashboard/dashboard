@@ -183,7 +183,7 @@ export default function Docs({ t, canEdit }: { t: T; canEdit: boolean }) {
         <div className="soon">
           <b>{t("لا توجد وثائق بعد", "No documents yet")}</b>
           {canEdit
-            ? t("ارفعي المنهجيات والنماذج — يُقرأ نصّها فيجيب منها المساعد الذكي.",
+            ? t("رفعُ المنهجيات والنماذج — يُقرأ نصّها فيجيب منها المساعد الذكي.",
                 "Upload documents — the assistant will answer from them.")
             : t("ستظهر هنا منهجيات المركز ونماذجه.", "Documents will appear here.")}
         </div>
