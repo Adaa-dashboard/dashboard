@@ -10695,6 +10695,21 @@ input.cell-date {
 .en2-due .dr .yes { color: #8a5a00; border-color: color-mix(in srgb, #e0971a 45%, var(--border)); }
 .en2-dup .dr button:disabled, .en2-due .dr button:disabled { opacity: .5; cursor: default; }
 
+/* «الملف هو المرجع» في نافذة الرفع */
+.imp-ex {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex: 1;
+  min-width: 240px;
+  cursor: pointer;
+  text-align: start;
+}
+.imp-ex input { margin-top: 2px; flex: none; }
+.imp-ex > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.imp-ex b { font-size: 11.5px; font-weight: 800; color: var(--gt-900); }
+.imp-ex em { font-style: normal; font-size: 10.5px; color: var(--muted); line-height: 1.5; }
+
 /* زرّ طيّ خريطة الأعمدة في نافذة الرفع */
 .imp-mt {
   display: flex;

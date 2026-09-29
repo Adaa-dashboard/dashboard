@@ -753,10 +753,28 @@ export async function apiFetch(path: string, init: Init = {}) {
         const { error } = await s.from("perf_contacts").upsert(part);
         if (error) return err("تعذّر حفظ نقاط التواصل — " + error.message, 403);
       }
+      /* «الملف هو المرجع»: ما ليس في الملف يُعطَّل. بها يختفي ما
+         دخل السجلّ من مصدرٍ آخر أو بصيغةِ اسمٍ ثانية، فيصير السجلّ
+         نسخةَ الملف كما هو بلا دمجٍ يدوي.
+         تعطيلٌ لا حذف: البيانات باقية ويُعاد تفعيلها بظهور الاسم
+         في رفعةٍ تالية. */
+      let nOff = 0;
+      if (body.exact === true) {
+        const keep = new Set(entRows.map((r) => String(r.id)));
+        const off = ((curE || []) as Record<string, unknown>[])
+          .filter((r) => r.active !== false && !keep.has(String(r.id)))
+          .map((r) => String(r.id));
+        for (const part of chunk(off, 400)) {
+          const { error } = await s.from("perf_entities").update({ active: false }).in("id", part);
+          if (error) return err("تعذّر تعطيل الجهات خارج الملف — " + error.message, 403);
+        }
+        nOff = off.length;
+      }
+
       const nE = entRows.length, nC = conRows.length;
       const { data: link } = await s.rpc("perf_contacts_link");
       const L = Array.isArray(link) ? link[0] : link;
-      return ok({ entities: nE, contacts: nC, linked: Number(L?.linked || 0), unmatched: Number(L?.unmatched || 0) });
+      return ok({ entities: nE, contacts: nC, off: nOff, linked: Number(L?.linked || 0), unmatched: Number(L?.unmatched || 0) });
     }
 
     /* تعديل نقطة تواصل — من السجلّ أو من صفحة من يتولّى الجهة.
