@@ -15,6 +15,7 @@ import { apiFetch } from "@/lib/api";
 import { readXlsxSheets } from "@/lib/sheet";
 import { mapHeaders, buildRows, type MapResult, type Mapped, type Field } from "@/lib/entimport";
 import { initials, toneOf } from "@/lib/entlogo";
+import { nrm } from "@/lib/commit";
 
 type T = (ar: string, en: string) => string;
 
@@ -35,6 +36,8 @@ type Sheet = {
 };
 export type Entity = {
   id: string; name: string; kind: string; sector: string; note: string;
+  /** أسماءٌ بديلة للجهة — تُطابَق كاسمها عند الرفع */
+  aliases?: string[];
   /** أعمدة الملف التي لم تُقرأ نقاطَ تواصل — تُعرض كما وردت */
   extra: Record<string, string>;
   ours: Contact[]; theirs: Contact[];
@@ -286,6 +289,23 @@ export default function Entities2({
     if (prev && nUs === 0) setMapOpen(true);
   }, [prev, nUs]);
 
+  /* «الملف هو المرجع»: ما ليس فيه يُعطَّل. بها يختفي ما دخل السجلّ
+     من مصدرٍ آخر أو بصيغةِ اسمٍ ثانية — فيصير السجلّ نسخةَ الملف
+     كما هو بلا دمجٍ يدوي. مُطفأة افتراضاً: الرفع المعتاد إضافةٌ
+     وتحديث لا استبدال. */
+  const [exact, setExact] = useState(false);
+  /* أسماءُ ما سيخرج — تُعرض قبل الحفظ لا بعده */
+  const outNames = useMemo(() => {
+    if (!prev) return [];
+    const inFile = new Set(built.map((e) => nrm(e.name)));
+    return rows
+      .filter((r) => {
+        const alias = Array.isArray(r.aliases) ? r.aliases : [];
+        return !inFile.has(nrm(r.name)) && !alias.some((a) => inFile.has(nrm(a)));
+      })
+      .map((r) => r.name);
+  }, [prev, built, rows]);
+
   /* الاستيراد: الأعمدة تُطابَق بعناوينها مهما اختلفت صياغتها،
      فلا يُطلب من المستخدم ترتيبٌ بعينه */
   /* القراءة تسبق الحفظ: تُعرض خريطة الأعمدة وعيّنة على المستخدم
@@ -364,20 +384,28 @@ export default function Entities2({
 
   async function commit() {
     if (!prev) return;
+    if (exact && outNames.length && !confirm(
+      t(
+        `سيُعطَّل ${outNames.length} جهة ليست في الملف، أولها: ${outNames.slice(0, 3).join(" · ")}. تعطيلٌ لا حذف — تعود بظهور اسمها في رفعةٍ تالية. متابعة؟`,
+        `${outNames.length} entities not in the file will be deactivated. Continue?`,
+      ),
+    )) return;
     setMsg(t(`يُحفظ ${built.length} جهة…`, `Saving…`));
     const res = await apiFetch("/api/entities/import", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ entities: built }),
+      body: JSON.stringify({ entities: built, exact }),
     }).then((x) => x.json()).catch(() => ({ error: "تعذّر الاتصال" }));
     if (res.error) { setMsg(""); setErr(res.error); return; }
     setPrev(null);
     setMsg(t(
       `تمّ: ${res.entities} جهة · ${res.contacts} نقطة تواصل · رُبط ${res.linked} باسم الموظف` +
+        (res.off ? ` · عُطّل ${res.off} خارج الملف` : "") +
         (res.unmatched ? ` · ${res.unmatched} بلا حساب مطابق` : ""),
       `Done: ${res.entities} entities, ${res.contacts} contacts, ${res.linked} linked`,
     ));
     await load();
+    loadDups();
   }
 
   return (
@@ -683,6 +711,21 @@ export default function Entities2({
               ))}
             </div>
             <div className="m-f">
+              {/* الملف مرجعاً: يصير السجلّ نسخته كما هو بلا دمجٍ يدوي */}
+              <label className="imp-ex">
+                <input type="checkbox" checked={exact} onChange={(e) => setExact(e.target.checked)} />
+                <span>
+                  <b>{t("الملف هو المرجع", "The file is the source of truth")}</b>
+                  <em>
+                    {outNames.length
+                      ? t(
+                          `يُعطَّل ${outNames.length} جهة ليست في الملف — أولها: ${outNames.slice(0, 4).join(" · ")}`,
+                          `${outNames.length} entities not in the file will be deactivated`,
+                        )
+                      : t("كل جهات السجلّ موجودة في الملف — لن يُعطَّل شيء", "Nothing to deactivate")}
+                  </em>
+                </span>
+              </label>
               <button className="btn btn-ghost btn-sm" onClick={() => setPrev(null)}>{t("إلغاء", "Cancel")}</button>
               <button className="btn btn-sm" onClick={() => void commit()}>
                 {t("صحيحة — حفظ", "Looks right — save")}
