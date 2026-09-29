@@ -10695,6 +10695,33 @@ input.cell-date {
 .en2-due .dr .yes { color: #8a5a00; border-color: color-mix(in srgb, #e0971a 45%, var(--border)); }
 .en2-dup .dr button:disabled, .en2-due .dr button:disabled { opacity: .5; cursor: default; }
 
+/* زرّ طيّ خريطة الأعمدة في نافذة الرفع */
+.imp-mt {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--gt-900);
+  background: var(--soft);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 7px 10px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  text-align: start;
+}
+.imp-mt > i { font-style: normal; color: var(--muted); }
+.imp-mt > em {
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-inline-start: auto;
+}
+
 /* أعمدة الملف التي حُفظت كما وردت */
 .en2-ex { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .en2-ex span {

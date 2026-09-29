@@ -199,6 +199,10 @@ export default function Entities2({
   );
 
   /* الجهات المكرّرة — الرفع كان يطابق بالنصّ حرفياً فتتكرّر الجهة */
+  /* خريطة الأعمدة مطويّة ما دام التخمين سليماً، وتُفتح من نفسها
+     إن لم يُقرأ أي عمود على أنه نقطة تواصل من المركز — فذاك دليل
+     أن الملف مختلف وأن الخريطة تحتاج نظراً */
+  const [mapOpen, setMapOpen] = useState(false);
   const [dups, setDups] = useState<{ keepId: string; keepName: string; dropId: string; dropName: string; why: string }[]>([]);
   const [dupBusy, setDupBusy] = useState("");
   const [dupMsg, setDupMsg] = useState("");
@@ -278,6 +282,9 @@ export default function Entities2({
   );
   const nUs = built.reduce((n, e) => n + e.contacts.filter((c) => c.side === "نحن").length, 0);
   const nThem = built.reduce((n, e) => n + e.contacts.filter((c) => c.side !== "نحن").length, 0);
+  useEffect(() => {
+    if (prev && nUs === 0) setMapOpen(true);
+  }, [prev, nUs]);
 
   /* الاستيراد: الأعمدة تُطابَق بعناوينها مهما اختلفت صياغتها،
      فلا يُطلب من المستخدم ترتيبٌ بعينه */
@@ -598,13 +605,24 @@ export default function Entities2({
               {nUs === 0 && (
                 <div className="alert alert-info" style={{ marginBottom: 10 }}>
                   {t(
-                    "لم يُقرأ أي عمود على أنه نقطة تواصل من المركز — حدّدي عمود الاستشاري أدناه واجعلي طرفه «من المركز».",
+                    "لم يُقرأ أي عمود على أنه نقطة تواصل من المركز — يلزم تحديد عمود الاستشاري أدناه وجعل طرفه «من المركز».",
                     "No column was read as our contact.",
                   )}
                 </div>
               )}
-              <label>{t("كيف تُقرأ الأعمدة — تُعدَّل إن أخطأ التخمين", "Column mapping")}</label>
-              <div className="imp-map edit">
+              {/* الملفات المرفوعة متطابقة الأعمدة عملياً، والتخمين
+                  يصيبها، فعرضُ ثمانية عشر صفّاً من القوائم في كل رفعة
+                  عملٌ بلا طائل. تُطوى وتُفتح عند الحاجة وحدها. */}
+              <button className="imp-mt" onClick={() => setMapOpen((v) => !v)}>
+                <i>{mapOpen ? "▴" : "▾"}</i>
+                {t("كيف تُقرأ الأعمدة", "Column mapping")}
+                <em>
+                  {mapOpen
+                    ? t("تُعدَّل إن أخطأ التخمين", "Edit if the guess is wrong")
+                    : t("قُرئت تلقائياً — تُفتح عند اختلاف الملف", "Read automatically")}
+                </em>
+              </button>
+              <div className="imp-map edit" hidden={!mapOpen}>
                 {(cur?.heads || [])
                   .filter((h) => h && h !== cur?.map.entityCol)
                   .map((h) => {
@@ -645,7 +663,7 @@ export default function Entities2({
                     );
                   })}
               </div>
-              <p className="muted" style={{ fontSize: 11.5 }}>
+              <p className="muted" style={{ fontSize: 11.5 }} hidden={!mapOpen}>
                 {t(
                   "العمود «لا تُقرأ» يُحفظ كما هو تحت بطاقة الجهة، فلا تضيع معلومة.",
                   "Skipped columns are kept as-is on the entity card.",

@@ -350,7 +350,7 @@ export default function Changes({
       setErr("");
       setMsg(t(`نُسخ ${shown.length} طلباً — جاهز للّصق في إكسل أو Word`, "Copied"));
     } catch {
-      setErr(t("تعذّر النسخ التلقائي — استخدمي «⬇ Excel».", "Copy failed — use Excel export."));
+      setErr(t("تعذّر النسخ التلقائي — البديل زرّ «⬇ Excel».", "Copy failed — use Excel export."));
     }
   }
 
