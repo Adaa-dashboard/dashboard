@@ -688,15 +688,28 @@ export async function apiFetch(path: string, init: Init = {}) {
         for (let i = 0; i < a.length; i += n) out.push(a.slice(i, i + n));
         return out;
       };
-      const { data: curE } = await s.from("perf_entities").select("id,name");
-      const idByName = new Map((curE || []).map((r: Record<string, unknown>) => [String(r.name), String(r.id)]));
+      /* المطابقة **بالاسم المُطبَّع وبالأسماء البديلة** لا بالنصّ
+         حرفياً: فرقُ همزةٍ أو مسافة، أو اسمٌ سُجِّل بديلاً بعد دمج،
+         كان ينشئ جهةً ثانية فتصير الجهة الواحدة جهتين في السجلّ */
+      const { data: curE } = await s.from("perf_entities").select("id,name,aliases,active");
+      const idByName = new Map<string, string>();
+      for (const r of (curE || []) as Record<string, unknown>[]) {
+        const id = String(r.id);
+        const put = (v: unknown) => {
+          const k = nrm(v);
+          if (k && !idByName.has(k)) idByName.set(k, id);
+        };
+        put(r.name);
+        for (const a of Array.isArray(r.aliases) ? (r.aliases as unknown[]) : []) put(a);
+      }
 
       const entRows: Record<string, unknown>[] = [];
       const eidOf = new Map<string, string>();
       for (const E of ents) {
         const nm = String(E.name || "").trim();
         if (!nm || eidOf.has(nm)) continue;
-        const eid = idByName.get(nm) || "ent-" + newId();
+        const eid = idByName.get(nrm(nm)) || "ent-" + newId();
+        idByName.set(nrm(nm), eid);
         eidOf.set(nm, eid);
         entRows.push({
           id: eid, name: nm, kind: str(E.kind), sector: str(E.sector), note: str(E.note),
@@ -760,9 +773,12 @@ export async function apiFetch(path: string, init: Init = {}) {
                               ["role", "role"], ["side", "side"]] as const)
         if (body[k] !== undefined && str(body[k]) !== "") patch[col] = str(body[k]);
       if (id) {
-        const { data, error } = await s.from("perf_contacts").update(patch).eq("id", id).select("id");
+        const { data, error } = await s.from("perf_contacts").update(patch).eq("id", id).select("id,entity_id");
         if (error) return err(error.message, 403);
         if (!data?.length) return err("التعديل لمن يتولّى هذه الجهة أو لصاحب صلاحية «الجهات»", 403);
+        /* تعديلُ نقطةٍ هو مراجعةُ الجهة نفسها — فلا يُطلب من
+           المستخدم أن يعدّل ثم يضغط «راجعت» مرّةً ثانية */
+        await s.rpc("perf_review_done", { p_entity: String(data[0].entity_id) });
         return ok({ ok: true, id });
       }
       const entityId = str(body.entityId);
@@ -789,9 +805,12 @@ export async function apiFetch(path: string, init: Init = {}) {
     if (p === "/api/entities/review" && method === "GET") {
       const me = await whoAmI();
       if (!me) return err("غير مصرّح", 401);
-      const [due, st] = await Promise.all([
+      const [due, st, pend] = await Promise.all([
         s.rpc("perf_review_due"),
         s.rpc("perf_review_status"),
+        /* أسماءُ ما لم يُراجَع — لا عددُه فقط. تُرجع صفراً لمن لا
+           يملك «الجهات»، فلا تُسرَّب أعمالُ غيره */
+        s.rpc("perf_review_pending"),
       ]);
       return ok({
         due: (due.data || []).map((r: Record<string, unknown>) => ({
@@ -801,6 +820,10 @@ export async function apiFetch(path: string, init: Init = {}) {
         status: (st.data || []).map((r: Record<string, unknown>) => ({
           name: String(r.name || ""), entities: Number(r.entities || 0),
           reviewed: Number(r.reviewed || 0), lastAt: r.last_at || null,
+        })),
+        pending: (pend.data || []).map((r: Record<string, unknown>) => ({
+          person: String(r.person || ""), entityId: String(r.entity_id),
+          entity: String(r.entity || ""),
         })),
       });
     }
@@ -861,6 +884,31 @@ export async function apiFetch(path: string, init: Init = {}) {
           addedByName: String(r.added_by_name || ""),
         })),
       });
+    }
+
+    /* الجهات المكرّرة في السجلّ ودمجُها — لصاحب صلاحية «الجهات»،
+       والدالتان تتحقّقان من ذلك بأنفسهما */
+    if (p === "/api/entities/dups" && method === "GET") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const { data, error } = await s.rpc("perf_entity_dups");
+      if (error) return err(error.message, 403);
+      return ok({
+        dups: (data || []).map((r: Record<string, unknown>) => ({
+          keepId: String(r.keep_id), keepName: String(r.keep_name || ""),
+          dropId: String(r.drop_id), dropName: String(r.drop_name || ""),
+          why: String(r.why || ""),
+        })),
+      });
+    }
+    if (p === "/api/entities/merge" && method === "POST") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const { data, error } = await s.rpc("perf_entity_merge", {
+        p_keep: str(body.keepId), p_drop: str(body.dropId),
+      });
+      if (error) return err(error.message, 403);
+      return ok({ ok: true, result: data || {} });
     }
 
     /* مشاركة الجهة مع بديلها — لنقطة التواصل الأساسية وحدها،
