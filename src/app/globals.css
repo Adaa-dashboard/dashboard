@@ -10634,6 +10634,66 @@ input.cell-date {
 }
 .en2-rev > span.ok { background: var(--ok-bg); border-color: var(--ok-bd); color: var(--ok-tx); }
 .en2-rev i { font-style: normal; opacity: 0.8; }
+.en2-rev > span { cursor: pointer; }
+.en2-rev > span.on { box-shadow: 0 0 0 2px color-mix(in srgb, var(--g-700) 40%, transparent); }
+/* أيُّ الجهات لم تُراجَع عند من ضُغط اسمه */
+.rv-list {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--soft);
+  padding: 8px 10px;
+  margin-top: 2px;
+}
+.rv-list > b { font-size: 10.5px; color: var(--muted); font-weight: 800; }
+.rv-list > span {
+  font-size: 11px;
+  color: var(--dgr-tx);
+  background: var(--dgr-bg);
+  border: 1px solid var(--dgr-bd);
+  border-radius: 8px;
+  padding: 2px 8px;
+}
+.rv-list > em { font-style: normal; font-size: 11px; color: var(--ok-tx); }
+
+/* ---------- المكرّر والمراجعة المستحقّة ---------- */
+.en2-dup, .en2-due {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--soft);
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+.en2-dup { border-color: color-mix(in srgb, #e0971a 38%, var(--border)); background: #fdf7ec; }
+.en2-dup .dh > b { color: #8a5a00; }
+.en2-dup .dh, .en2-due .dh { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.en2-dup .dh > b, .en2-due .dh > b { font-size: 12px; }
+.en2-due .dh > b { color: var(--gt-900); }
+.en2-dup .dh > span, .en2-due .dh > span { font-size: 10.5px; color: var(--muted); flex: 1; min-width: 200px; }
+.en2-dup .dm { font-size: 11px; font-weight: 700; color: var(--ok-tx); padding: 3px 0; }
+.en2-dup .dr, .en2-due .dr {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 5px 0; border-top: 1px solid var(--border); font-size: 11.5px;
+}
+.en2-dup .dr .k, .en2-due .dr .k { font-weight: 800; color: var(--gt-900); }
+.en2-dup .dr .d { color: var(--dgr-tx); }
+.en2-dup .dr > i { font-style: normal; color: var(--muted); }
+.en2-dup .dr > em { font-style: normal; font-size: 10px; color: var(--muted); margin-inline-start: auto; }
+.en2-dup .dr button, .en2-due .dr button {
+  font: inherit; font-size: 10.5px; font-weight: 800; cursor: pointer;
+  padding: 4px 12px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--panel); color: var(--text);
+}
+.en2-dup .dr button { background: #8a5a00; border-color: #8a5a00; color: #fff; }
+.en2-due .dr { justify-content: flex-start; }
+.en2-due .dr .k { flex: 1; min-width: 160px; }
+.en2-due .dr .no { background: var(--gt-700); border-color: var(--gt-700); color: #fff; }
+.en2-due .dr .yes { color: #8a5a00; border-color: color-mix(in srgb, #e0971a 45%, var(--border)); }
+.en2-dup .dr button:disabled, .en2-due .dr button:disabled { opacity: .5; cursor: default; }
 
 /* أعمدة الملف التي حُفظت كما وردت */
 .en2-ex { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }

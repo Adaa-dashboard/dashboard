@@ -165,11 +165,49 @@ export default function Entities2({
   const [prev, setPrev] = useState<{ sheets: Sheet[]; pick: number } | null>(null);
   const cur = prev ? prev.sheets[prev.pick] : null;
   const [rev, setRev] = useState<{ name: string; entities: number; reviewed: number }[]>([]);
-  useEffect(() => {
-    if (!canEdit) return;
+  /* المستحقّ عليّ هذا الربع، وأسماءُ ما لم يُراجَع عند غيري */
+  const [due, setDue] = useState<{ entityId: string; entity: string }[]>([]);
+  const [pend, setPend] = useState<{ person: string; entityId: string; entity: string }[]>([]);
+  /* الشخص المفتوحة قائمتُه في شريط المراجعة — غير فلتر «الاستشاري» */
+  const [revWho, setRevWho] = useState("");
+  const loadRev = useCallback(() => {
     void apiFetch("/api/entities/review").then((r) => r.json())
-      .then((d) => setRev(Array.isArray(d.status) ? d.status : [])).catch(() => setRev([]));
+      .then((d) => {
+        setRev(Array.isArray(d.status) ? d.status : []);
+        setDue(Array.isArray(d.due) ? d.due : []);
+        setPend(Array.isArray(d.pending) ? d.pending : []);
+      })
+      .catch(() => {});
+  }, []);
+  useEffect(() => loadRev(), [loadRev]);
+
+  /* «لا يوجد تحديث» تختم الجهة فوراً، و«يوجد تحديث» تفتحها للتعديل
+     — وتعديلُ أي نقطةٍ فيها يختمها من نفسه */
+  const [revBusy, setRevBusy] = useState("");
+  const noChange = useCallback(
+    async (entityId: string) => {
+      setRevBusy(entityId);
+      const r = await apiFetch("/api/entities/review", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entityId }),
+      });
+      setRevBusy("");
+      if (r.ok) loadRev();
+    },
+    [loadRev],
+  );
+
+  /* الجهات المكرّرة — الرفع كان يطابق بالنصّ حرفياً فتتكرّر الجهة */
+  const [dups, setDups] = useState<{ keepId: string; keepName: string; dropId: string; dropName: string; why: string }[]>([]);
+  const [dupBusy, setDupBusy] = useState("");
+  const [dupMsg, setDupMsg] = useState("");
+  const loadDups = useCallback(() => {
+    if (!canEdit) return;
+    void apiFetch("/api/entities/dups").then((r) => r.json())
+      .then((d) => setDups(Array.isArray(d.dups) ? d.dups : [])).catch(() => setDups([]));
   }, [canEdit]);
+  useEffect(() => loadDups(), [loadDups]);
 
   const load = useCallback(async () => {
     const r = await apiFetch("/api/entities").then((x) => x.json()).catch(() => ({}));
@@ -391,14 +429,124 @@ export default function Entities2({
         )}
       </div>
 
+      {/* المكرّر: الرفع كان يطابق الاسم حرفياً، فالجهة الواحدة
+          بصيغتين تصير جهتين ونقاطُها موزّعة بينهما */}
+      {canEdit && dups.length > 0 && (
+        <div className="en2-dup">
+          <div className="dh">
+            <b>{t(`جهات يبدو أنها مكرّرة · ${dups.length}`, `${dups.length} possible duplicates`)}</b>
+            <span>
+              {t(
+                "الدمج ينقل نقاط التواصل إلى الجهة الباقية، ويحفظ الاسم المهجور اسماً بديلاً فلا تضيع بنودٌ تشير إليه. لا يُحذف شيء.",
+                "Merging moves contacts and keeps the old name as an alias.",
+              )}
+            </span>
+          </div>
+          {dupMsg && <div className="dm">{dupMsg}</div>}
+          {dups.map((d) => (
+            <div className="dr" key={`${d.keepId}|${d.dropId}`}>
+              <span className="k">{d.keepName}</span>
+              <i>←</i>
+              <span className="d">{d.dropName}</span>
+              <em>{d.why}</em>
+              <button
+                disabled={dupBusy !== ""}
+                onClick={async () => {
+                  if (
+                    !confirm(
+                      t(
+                        `دمج «${d.dropName}» في «${d.keepName}»؟ تنتقل نقاط تواصلها، ويُحفظ اسمها اسماً بديلاً.`,
+                        `Merge "${d.dropName}" into "${d.keepName}"?`,
+                      ),
+                    )
+                  )
+                    return;
+                  setDupBusy(d.dropId);
+                  const r = await apiFetch("/api/entities/merge", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ keepId: d.keepId, dropId: d.dropId }),
+                  });
+                  setDupBusy("");
+                  const j = await r.json().catch(() => ({}));
+                  if (!r.ok) {
+                    setDupMsg(String(j.error || "") || t("تعذّر الدمج", "Merge failed"));
+                    return;
+                  }
+                  setDupMsg(
+                    t(
+                      `دُمجت «${d.dropName}» في «${d.keepName}» — انتقلت ${Number(j.result?.moved || 0)} نقطة تواصل.`,
+                      `Merged — ${Number(j.result?.moved || 0)} contacts moved.`,
+                    ),
+                  );
+                  loadDups();
+                  void load();
+                }}
+              >
+                {t("دمج", "Merge")}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* المستحقّ عليّ هذا الربع — خياران صريحان لكل جهة */}
+      {due.length > 0 && (
+        <div className="en2-due">
+          <div className="dh">
+            <b>{t(`جهاتك تحتاج مراجعة هذا الربع · ${due.length}`, `${due.length} entities need review`)}</b>
+            <span>
+              {t(
+                "تُصفَّر مع كل ربع. «لا يوجد تحديث» تختمها فوراً، و«يوجد تحديث» تفتحها للتعديل — وأي تعديل عليها يختمها من نفسه.",
+                "Resets each quarter.",
+              )}
+            </span>
+          </div>
+          {due.map((x) => (
+            <div className="dr" key={x.entityId}>
+              <span className="k">{x.entity}</span>
+              <button className="no" disabled={revBusy !== ""} onClick={() => void noChange(x.entityId)}>
+                {t("لا يوجد تحديث", "No change")}
+              </button>
+              <button
+                className="yes"
+                onClick={() => {
+                  setQ(x.entity);
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+              >
+                {t("يوجد تحديث", "Needs updating")}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {canEdit && rev.length > 0 && rev.some((x) => x.reviewed < x.entities) && (
         <div className="en2-rev">
           <b>{t("مراجعة هذا الربع", "This quarter's review")}</b>
           {rev.map((x) => (
-            <span key={x.name} className={x.reviewed >= x.entities ? "ok" : ""}>
+            <span
+              key={x.name}
+              className={`${x.reviewed >= x.entities ? "ok" : ""} ${revWho === x.name ? "on" : ""}`}
+              onClick={() => setRevWho(revWho === x.name ? "" : x.name)}
+              title={t("اضغط لعرض جهاته التي لم تُراجَع", "Show pending entities")}
+            >
               {x.name} <i>{x.reviewed}/{x.entities}</i>
             </span>
           ))}
+          {/* أيُّ الجهات لم تُراجَع عنده — لا عددٌ مجرّد */}
+          {revWho && (
+            <div className="rv-list">
+              <b>{t(`لم يراجع بعدُ — ${revWho}`, `Pending — ${revWho}`)}</b>
+              {pend.filter((x) => x.person === revWho).map((x) => (
+                <span key={x.entityId}>{x.entity}</span>
+              ))}
+              {!pend.some((x) => x.person === revWho) && (
+                <em>{t("راجع جهاته كلها ✅", "All reviewed ✅")}</em>
+              )}
+            </div>
+          )}
         </div>
       )}
 
