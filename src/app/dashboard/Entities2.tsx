@@ -420,7 +420,7 @@ export default function Entities2({
         <div className="modal-overlay" onClick={() => setPrev(null)}>
           <div className="modal" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
             <div className="m-h">
-              <h3>{t("راجعي قراءة الملف قبل الحفظ", "Review before saving")}</h3>
+              <h3>{t("مراجعة قراءة الملف قبل الحفظ", "Review before saving")}</h3>
               <button className="mx" onClick={() => setPrev(null)}>✕</button>
             </div>
             <div className="m-b">
@@ -455,7 +455,7 @@ export default function Entities2({
                   )}
                 </div>
               )}
-              <label>{t("كيف تُقرأ الأعمدة — عدّليها إن أخطأ التخمين", "Column mapping")}</label>
+              <label>{t("كيف تُقرأ الأعمدة — تُعدَّل إن أخطأ التخمين", "Column mapping")}</label>
               <div className="imp-map edit">
                 {(cur?.heads || [])
                   .filter((h) => h && h !== cur?.map.entityCol)
@@ -519,7 +519,7 @@ export default function Entities2({
             <div className="m-f">
               <button className="btn btn-ghost btn-sm" onClick={() => setPrev(null)}>{t("إلغاء", "Cancel")}</button>
               <button className="btn btn-sm" onClick={() => void commit()}>
-                {t("صحيحة — احفظي", "Looks right — save")}
+                {t("صحيحة — حفظ", "Looks right — save")}
               </button>
             </div>
           </div>
@@ -532,9 +532,9 @@ export default function Entities2({
         <div className="soon">
           <b>{rows.length ? t("لا نتائج", "No results") : t("لا توجد جهات بعد", "No entities yet")}</b>
           {rows.length
-            ? t("جرّبي اسماً آخر أو جزءاً منه.", "Try another name.")
+            ? t("لا مطابقة — اسمٌ آخر أو جزءٌ منه قد يفي.", "Try another name.")
             : canEdit
-              ? t("ارفعي ملف الجهات ونقاط التواصل — تُربط الأسماء بحسابات الموظفين تلقائياً.",
+              ? t("رفعُ ملف الجهات ونقاط التواصل — تُربط الأسماء بحسابات الموظفين تلقائياً.",
                   "Import the contacts file.")
               : t("ستظهر هنا الجهات ونقاط التواصل معها.", "Entities will appear here.")}
         </div>

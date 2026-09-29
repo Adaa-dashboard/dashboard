@@ -169,7 +169,7 @@ export default function Tasks({
     const to = findPerson("عبدالله البكر");
     const by = findPerson("عبدالله الحزامي");
     if (!to || !by) {
-      setErr(t("الحسابان غير موجودين — شغّلي ملف الهيكل أولاً.", "Accounts not found — run the roster file first."));
+      setErr(t("الحسابان غير موجودَين — يلزم تشغيل ملف الهيكل أولاً.", "Accounts not found — run the roster file first."));
       return;
     }
     setDemoBusy(true);

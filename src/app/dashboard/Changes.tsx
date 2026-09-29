@@ -414,7 +414,7 @@ export default function Changes({
             <div className="m-b">
               <p className="muted" style={{ marginTop: 0 }}>
                 {t(
-                  "الاسم كما ورد في ملف منصة الرؤية إلى يمينه، واختاري الجهة المقابلة من السجلّ. يُحفظ اسماً بديلاً لها، ولا يتغيّر اسمها المعتمد.",
+                  "الاسم كما ورد في ملف منصة الرؤية إلى يمينه، ثم اختيار الجهة المقابلة من السجلّ. يُحفظ اسماً بديلاً لها، ولا يتغيّر اسمها المعتمد.",
                   "Pick the registry entity for each name in the file.",
                 )}
               </p>
@@ -432,7 +432,7 @@ export default function Changes({
                     value={pick[nm] || ""}
                     onChange={(e) => setPick((o) => ({ ...o, [nm]: e.target.value }))}
                   >
-                    <option value="">{t("اختاري الجهة…", "Choose…")}</option>
+                    <option value="">{t("اختيار الجهة…", "Choose…")}</option>
                     {ents.map((e) => (
                       <option key={e.id} value={e.id}>{e.name}</option>
                     ))}
@@ -442,7 +442,7 @@ export default function Changes({
                     disabled={!pick[nm]}
                     onClick={() => void linkAlias(nm, pick[nm])}
                   >
-                    {t("اربطي", "Link")}
+                    {t("ربط", "Link")}
                   </button>
                 </div>
               ))}
