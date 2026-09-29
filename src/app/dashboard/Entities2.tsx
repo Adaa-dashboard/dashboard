@@ -201,20 +201,10 @@ export default function Entities2({
     [loadRev],
   );
 
-  /* الجهات المكرّرة — الرفع كان يطابق بالنصّ حرفياً فتتكرّر الجهة */
   /* خريطة الأعمدة مطويّة ما دام التخمين سليماً، وتُفتح من نفسها
      إن لم يُقرأ أي عمود على أنه نقطة تواصل من المركز — فذاك دليل
      أن الملف مختلف وأن الخريطة تحتاج نظراً */
   const [mapOpen, setMapOpen] = useState(false);
-  const [dups, setDups] = useState<{ keepId: string; keepName: string; dropId: string; dropName: string; why: string }[]>([]);
-  const [dupBusy, setDupBusy] = useState("");
-  const [dupMsg, setDupMsg] = useState("");
-  const loadDups = useCallback(() => {
-    if (!canEdit) return;
-    void apiFetch("/api/entities/dups").then((r) => r.json())
-      .then((d) => setDups(Array.isArray(d.dups) ? d.dups : [])).catch(() => setDups([]));
-  }, [canEdit]);
-  useEffect(() => loadDups(), [loadDups]);
 
   const load = useCallback(async () => {
     const r = await apiFetch("/api/entities").then((x) => x.json()).catch(() => ({}));
@@ -405,7 +395,6 @@ export default function Entities2({
       `Done: ${res.entities} entities, ${res.contacts} contacts, ${res.linked} linked`,
     ));
     await load();
-    loadDups();
   }
 
   return (
@@ -463,67 +452,6 @@ export default function Entities2({
           </>
         )}
       </div>
-
-      {/* المكرّر: الرفع كان يطابق الاسم حرفياً، فالجهة الواحدة
-          بصيغتين تصير جهتين ونقاطُها موزّعة بينهما */}
-      {canEdit && dups.length > 0 && (
-        <div className="en2-dup">
-          <div className="dh">
-            <b>{t(`جهات يبدو أنها مكرّرة · ${dups.length}`, `${dups.length} possible duplicates`)}</b>
-            <span>
-              {t(
-                "الدمج ينقل نقاط التواصل إلى الجهة الباقية، ويحفظ الاسم المهجور اسماً بديلاً فلا تضيع بنودٌ تشير إليه. لا يُحذف شيء.",
-                "Merging moves contacts and keeps the old name as an alias.",
-              )}
-            </span>
-          </div>
-          {dupMsg && <div className="dm">{dupMsg}</div>}
-          {dups.map((d) => (
-            <div className="dr" key={`${d.keepId}|${d.dropId}`}>
-              <span className="k">{d.keepName}</span>
-              <i>←</i>
-              <span className="d">{d.dropName}</span>
-              <em>{d.why}</em>
-              <button
-                disabled={dupBusy !== ""}
-                onClick={async () => {
-                  if (
-                    !confirm(
-                      t(
-                        `دمج «${d.dropName}» في «${d.keepName}»؟ تنتقل نقاط تواصلها، ويُحفظ اسمها اسماً بديلاً.`,
-                        `Merge "${d.dropName}" into "${d.keepName}"?`,
-                      ),
-                    )
-                  )
-                    return;
-                  setDupBusy(d.dropId);
-                  const r = await apiFetch("/api/entities/merge", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ keepId: d.keepId, dropId: d.dropId }),
-                  });
-                  setDupBusy("");
-                  const j = await r.json().catch(() => ({}));
-                  if (!r.ok) {
-                    setDupMsg(String(j.error || "") || t("تعذّر الدمج", "Merge failed"));
-                    return;
-                  }
-                  setDupMsg(
-                    t(
-                      `دُمجت «${d.dropName}» في «${d.keepName}» — انتقلت ${Number(j.result?.moved || 0)} نقطة تواصل.`,
-                      `Merged — ${Number(j.result?.moved || 0)} contacts moved.`,
-                    ),
-                  );
-                  loadDups();
-                  void load();
-                }}
-              >
-                {t("دمج", "Merge")}
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
 
       {/* المستحقّ عليّ هذا الربع — خياران صريحان لكل جهة */}
       {due.length > 0 && (
