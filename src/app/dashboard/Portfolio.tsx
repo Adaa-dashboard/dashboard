@@ -13,7 +13,7 @@ import { IconGear } from "./icons";
 import MyEntities, { contribsOf, sumOf } from "./Entities";
 import { publishUndo } from "@/lib/undoBus";
 import { useLogos, logoKey, SESS_SHORT, INST_COLS, CX_COLS, CX_QS, cxStagesOf } from "./Sections";
-import { OP_OWNERS } from "./OpPlan";
+import { OP_OWNERS, OP_STATUSES, opRoles, opStatus, opTone } from "./OpPlan";
 import { initials, toneOf } from "@/lib/entlogo";
 import { asset } from "@/lib/base";
 
@@ -1984,12 +1984,31 @@ const CONTRIB_KINDS: { k: string; label: string }[] = [
   { k: "init", label: "مبادرات" },
   { k: "win", label: "مكاسب سريعة" },
 ];
-const CONTRIB_ST = ["جديدة", "مستمرة", "مكتملة", "لم تبدأ"];
+/** قيمة مُدخَلة فعلاً — الصفر قيمة، والفراغ ليس صفراً */
+const has = (v: unknown) => v !== undefined && v !== null && String(v).trim() !== "";
+const ROLE_TONE: Record<string, string> = {
+  راعي: "sp",
+  مسؤول: "as",
+  "صاحب المحفظة": "ow",
+  مساهمة: "ct",
+};
+
+/** بندٌ من الخطة يخصّ صاحب الجلسة، ومعه أدواره فيه */
+export type MyOp = { id: string; data: Rec; roles: string[]; own: boolean };
+
+/** كل ما يخصّ شخصاً في الخطة التشغيلية — راعياً كان أو مسؤولاً أو مساهماً */
+export function myOpItems(all: { id: string; data: Rec }[], meName: string): MyOp[] {
+  const n = nrm(meName);
+  return all
+    .map((x) => ({ ...x, roles: opRoles(x.data, meName), own: nrm(txt(x.data.contributor)) === n }))
+    .filter((x) => x.roles.length > 0);
+}
 
 function Contrib({ rows, meName, t }: { rows: Row[]; meName: string; t: T }) {
-  const [mine, setMine] = useState<{ id: string; data: Rec }[]>([]);
+  const [mine, setMine] = useState<MyOp[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [msg, setMsg] = useState("");
+  const [edit, setEdit] = useState<MyOp | null>(null);
   const [add, setAdd] = useState<Rec | null>(null);
 
   const load = useCallback(() => {
@@ -1997,7 +2016,7 @@ function Contrib({ rows, meName, t }: { rows: Row[]; meName: string; t: T }) {
       .then((r) => r.json())
       .then((d) => {
         const all = (Array.isArray(d.items) ? d.items : []) as { id: string; data: Rec }[];
-        setMine(all.filter((x) => nrm(txt(x.data.contributor)) === nrm(meName)));
+        setMine(myOpItems(all, meName));
       })
       .catch(() => setMine([]))
       .finally(() => setLoaded(true));
@@ -2032,20 +2051,47 @@ function Contrib({ rows, meName, t }: { rows: Row[]; meName: string; t: T }) {
 
   if (!loaded) return <div className="pf-none">{t("جارٍ التحميل…", "Loading…")}</div>;
 
+  const nRole = (r: string) => mine.filter((x) => x.roles.includes(r)).length;
+  const nSt = (st: string) => mine.filter((x) => opStatus(x.data) === st).length;
+
   return (
     <div className="cb">
       <div className="cb-h">
         <span>
           {t(
-            "ما تضيفه هنا يظهر في صفحة «الخطة التشغيلية» تحت محفظة المدير الذي تختاره.",
-            "Added here, shown under the chosen manager's portfolio.",
+            "كل بندٍ في الخطة التشغيلية أنت راعيه أو المسؤول عنه يظهر هنا. التحديث من هنا يصل صفحة «الخطة التشغيلية» مباشرة.",
+            "Every plan item you sponsor or own. Updates here reach the plan page.",
           )}
         </span>
-        <button onClick={() => setAdd({ kind: "win", owner: OP_OWNERS[0], status: "جديدة" })}>
+        <button onClick={() => setAdd({ kind: "win", owner: OP_OWNERS[0], status: "على المسار" })}>
           + {t("مساهمة جديدة", "New")}
         </button>
       </div>
       {msg && <div className="cb-msg">{msg}</div>}
+
+      {/* الرقم أولاً: كم بنداً يخصّني، وبأي دور، وعلى أي حال */}
+      <div className="cb-sum">
+        <div className="tot">
+          <b>{mine.length}</b>
+          <span>{t("بنداً يخصّك في الخطة", "items")}</span>
+        </div>
+        <div className="brk">
+          <span className="r sp">{t("راعٍ", "Sponsor")} <b>{nRole("راعي")}</b></span>
+          <span className="r as">{t("مسؤول", "Owner")} <b>{nRole("مسؤول")}</b></span>
+          {CONTRIB_KINDS.map(({ k, label }) => (
+            <span className="r kd" key={k}>
+              {label} <b>{mine.filter((x) => txt(x.data.kind) === k).length}</b>
+            </span>
+          ))}
+        </div>
+        <div className="brk st">
+          {OP_STATUSES.map((st) => (
+            <span className={`r ${opTone(st)}`} key={st}>
+              {st} <b>{nSt(st)}</b>
+            </span>
+          ))}
+        </div>
+      </div>
 
       <div className="c3">
         {CONTRIB_KINDS.map(({ k, label }) => {
@@ -2056,21 +2102,27 @@ function Contrib({ rows, meName, t }: { rows: Row[]; meName: string; t: T }) {
                 {label}
                 <b>{list.length}</b>
               </div>
-              {list.map((r) => (
-                <div className="li cb-li" key={r.id}>
-                  <span className="n">{txt(r.data.name)}</span>
-                  <span className="o">{txt(r.data.owner)}</span>
-                  <select
-                    value={txt(r.data.status) || "جديدة"}
-                    onChange={(e) => void put(r.id, { status: e.target.value })}
-                  >
-                    {CONTRIB_ST.map((x) => (
-                      <option key={x} value={x}>{x}</option>
-                    ))}
-                  </select>
-                  <button className="x" title={t("حذف", "Delete")} onClick={() => void del(r.id)}>✕</button>
-                </div>
-              ))}
+              {list.map((r) => {
+                const st = opStatus(r.data);
+                return (
+                  <div className="li cb-li" key={r.id}>
+                    <span className="n">{txt(r.data.name)}</span>
+                    <span className="rr">
+                      {r.roles.map((x) => (
+                        <i className={ROLE_TONE[x] || "ow"} key={x}>{x}</i>
+                      ))}
+                    </span>
+                    <span className="o">{txt(r.data.owner)}</span>
+                    {st && <span className={`stc ${opTone(st)}`}>{st}</span>}
+                    <button className="up" onClick={() => setEdit(r)}>
+                      {t("تحديث", "Update")}
+                    </button>
+                    {r.own && (
+                      <button className="x" title={t("حذف", "Delete")} onClick={() => void del(r.id)}>✕</button>
+                    )}
+                  </div>
+                );
+              })}
               {!list.length && <div className="pf-none sm">—</div>}
             </div>
           );
@@ -2098,7 +2150,7 @@ function Contrib({ rows, meName, t }: { rows: Row[]; meName: string; t: T }) {
                     kind,
                     name: txt(r.data.name),
                     owner: OP_OWNERS[0],
-                    status: txt(r.data.status) || "جديدة",
+                    status: "على المسار",
                   });
                 }}
               >
@@ -2107,6 +2159,17 @@ function Contrib({ rows, meName, t }: { rows: Row[]; meName: string; t: T }) {
             </div>
           ))}
         </div>
+      )}
+
+      {edit && (
+        <ContribEdit
+          it={edit}
+          t={t}
+          onClose={() => setEdit(null)}
+          onSave={async (patch) => {
+            if (await put(edit.id, patch)) setEdit(null);
+          }}
+        />
       )}
 
       {add && (
@@ -2141,7 +2204,7 @@ function Contrib({ rows, meName, t }: { rows: Row[]; meName: string; t: T }) {
               <label>
                 <span>{t("الحالة", "Status")}</span>
                 <select value={txt(add.status)} onChange={(e) => setAdd({ ...add, status: e.target.value })}>
-                  {CONTRIB_ST.map((x) => (
+                  {OP_STATUSES.map((x) => (
                     <option key={x} value={x}>{x}</option>
                   ))}
                 </select>
@@ -2162,6 +2225,137 @@ function Contrib({ rows, meName, t }: { rows: Row[]; meName: string; t: T }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ============================================================
+   تحديث بندٍ من الخطة من داخل المحفظة
+   ------------------------------------------------------------
+   **الراعي والمسؤول يحدّثان الحالة والفعلي والملاحظة فقط.**
+   المستهدفات واسم البند والمحفظة بنودُ خطةٍ معتمدة، فلا تُعدَّل
+   إلا من صفحة الخطة بصلاحية التحرير — إلا أن تكون المساهمة
+   مساهمتَه هو فيملك كل حقولها.
+   ============================================================ */
+function ContribEdit({
+  it, t, onClose, onSave,
+}: {
+  it: MyOp;
+  t: T;
+  onClose: () => void;
+  onSave: (patch: Rec) => Promise<void>;
+}) {
+  const [f, setF] = useState<Rec>({ ...it.data });
+  const [busy, setBusy] = useState(false);
+  const kind = txt(it.data.kind);
+  const isKpi = kind === "kpi";
+  const set = (k: string, v: unknown) => setF((o) => ({ ...o, [k]: v }));
+  const numOrNull = (k: string, v: string) => set(k, v.trim() === "" ? null : Number(v));
+  const val = (k: string) => {
+    const v = f[k];
+    return v === undefined || v === null || v === "" ? "" : String(v);
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="m-h">
+          <h3>{t("تحديث بند الخطة", "Update plan item")}</h3>
+          <button className="mx" onClick={onClose} aria-label="close">✕</button>
+        </div>
+
+        <div className="cb-ed">
+          <p className="nm">{txt(it.data.name)}</p>
+          <p className="mt">
+            {it.roles.map((r) => (
+              <i className={ROLE_TONE[r] || "ow"} key={r}>{r}</i>
+            ))}
+            <span>{t("محفظة", "Portfolio")} <b>{txt(it.data.owner) || "—"}</b></span>
+            {has(it.data.sponsor) && <span>{t("الراعي", "Sponsor")} <b>{txt(it.data.sponsor)}</b></span>}
+            {has(it.data.assignee) && <span>{t("المسؤول", "Owner")} <b>{txt(it.data.assignee)}</b></span>}
+          </p>
+        </div>
+
+        <div className="op-f">
+          {it.own && (
+            <label className="wide">
+              <span>{t("البند", "Item")}</span>
+              <textarea rows={2} value={txt(f.name)} onChange={(e) => set("name", e.target.value)} />
+            </label>
+          )}
+          <label>
+            <span>{t("الحالة", "Status")}</span>
+            <select value={txt(f.status)} onChange={(e) => set("status", e.target.value)}>
+              <option value="">
+                {isKpi ? t("تلقائي من الأرباع", "Auto") : t("— اختر —", "— pick —")}
+              </option>
+              {OP_STATUSES.map((x) => (
+                <option key={x} value={x}>{x}</option>
+              ))}
+            </select>
+          </label>
+          {it.own && (
+            <label>
+              <span>{t("محفظة المدير", "Portfolio")}</span>
+              <select value={txt(f.owner)} onChange={(e) => set("owner", e.target.value)}>
+                {OP_OWNERS.map((o) => (
+                  <option key={o} value={o}>{o}</option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+
+        {isKpi && (
+          <>
+            <div className="op-qh">
+              {t("الفعلي لكل ربع — المستهدف معتمدٌ في الخطة فلا يُعدَّل هنا", "Quarterly actuals")}
+            </div>
+            <div className="op-q">
+              {[1, 2, 3, 4].map((i) => (
+                <div className="r" key={i}>
+                  <b>Q{i}</b>
+                  <label>
+                    <span>{t("المستهدف", "Target")}</span>
+                    <input value={has(it.data[`q${i}t`]) ? String(it.data[`q${i}t`]) : "—"} readOnly disabled />
+                  </label>
+                  <label>
+                    <span>{t("الفعلي", "Actual")}</span>
+                    <input type="number" value={val(`q${i}a`)}
+                           onChange={(e) => numOrNull(`q${i}a`, e.target.value)} />
+                  </label>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        <label className="op-note">
+          <span>{t("ملاحظات", "Notes")}</span>
+          <textarea rows={2} value={txt(f.note)} onChange={(e) => set("note", e.target.value)} />
+        </label>
+
+        <div className="m-f">
+          <button className="btn btn-ghost" onClick={onClose}>{t("إلغاء", "Cancel")}</button>
+          <button
+            className="btn"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              const patch: Rec = { status: txt(f.status), note: txt(f.note) };
+              if (isKpi) for (const i of [1, 2, 3, 4]) patch[`q${i}a`] = f[`q${i}a`] ?? null;
+              if (it.own) {
+                patch.name = txt(f.name);
+                patch.owner = txt(f.owner);
+              }
+              await onSave(patch);
+              setBusy(false);
+            }}
+          >
+            {t("حفظ", "Save")}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -3555,14 +3749,14 @@ export default function Portfolio({
     [entities, regNames],
   );
   const contrib = pf.of("contrib");
-  /* مساهماتي في الخطة التشغيلية — تُقرأ للعدّاد في البطاقة */
-  const [myContrib, setMyContrib] = useState<Rec[]>([]);
+  /* ما يخصّني في الخطة التشغيلية — راعياً أو مسؤولاً أو مساهماً */
+  const [myContrib, setMyContrib] = useState<MyOp[]>([]);
   useEffect(() => {
     void apiFetch("/api/items?section=opplan")
       .then((r) => r.json())
       .then((d) => {
-        const all = (Array.isArray(d.items) ? d.items : []) as { data: Rec }[];
-        setMyContrib(all.map((x) => x.data).filter((x) => nrm(txt(x.contributor)) === nrm(me.name || "")));
+        const all = (Array.isArray(d.items) ? d.items : []) as { id: string; data: Rec }[];
+        setMyContrib(myOpItems(all, me.name || ""));
       })
       .catch(() => setMyContrib([]));
   }, [me.name]);
@@ -3684,14 +3878,20 @@ export default function Portfolio({
       case "contrib": {
         /* العدّ من الخطة التشغيلية لا من المحفظة: المساهمة بندٌ
            هناك، والبنود المحلية القديمة تُعدّ منفصلةً حتى تُنقل */
-        const n = (x: string) => myContrib.filter((d) => txt(d.kind) === x).length;
+        const n = (x: string) => myContrib.filter((d) => txt(d.data.kind) === x).length;
+        const role = (x: string) => myContrib.filter((d) => d.roles.includes(x)).length;
+        const late = myContrib.filter((d) => opStatus(d.data) === "متأخرة").length;
         return {
           count: myContrib.length,
           pct: 0,
           sub: myContrib.length
-            ? `${n("kpi")} مؤشرات · ${n("init")} مبادرات · ${n("win")} مكاسب`
-            : t("لا توجد مساهمات بعد", "Nothing yet"),
-          warn: rows.length ? t(`${rows.length} غير مربوطة`, `${rows.length} local`) : undefined,
+            ? `${role("راعي")} راعٍ · ${role("مسؤول")} مسؤول — ${n("kpi")} مؤشرات · ${n("init")} مبادرات · ${n("win")} مكاسب`
+            : t("لا يخصّك بندٌ في الخطة بعد", "Nothing yet"),
+          warn: late
+            ? t(`${late} متأخرة`, `${late} late`)
+            : rows.length
+              ? t(`${rows.length} غير مربوطة`, `${rows.length} local`)
+              : undefined,
         };
       }
       default: {
