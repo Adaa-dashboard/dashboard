@@ -220,6 +220,11 @@ function OpCard({
         {kind === "kpi" && num(d.level) > 0 && <span className="chip nw">{LEVELS[num(d.level)]}</span>}
         {kind === "init" && has(d.itype) && <span className="chip go">{txt(d.itype)}</span>}
         {st && <span className={`chip ${ST_TONE[st] || "nw"}`}>{st}</span>}
+        {has(d.contributor) && (
+          <span className="chip ct" title={t("مساهمة من محفظة موظف", "From a portfolio")}>
+            {t(`مساهمة · ${txt(d.contributor)}`, txt(d.contributor))}
+          </span>
+        )}
         {canEdit && (
           <button className="op-pen" title={t("تعديل", "Edit")} onClick={onEdit}>
             ✎

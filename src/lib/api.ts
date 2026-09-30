@@ -904,6 +904,26 @@ export async function apiFetch(path: string, init: Init = {}) {
       });
     }
 
+    /* مساهمة الموظف في الخطة التشغيلية — الدالة تتحقّق بنفسها أن
+       البند مساهمتُه، وتكتب اسمه في `contributor` فلا يُنتحَل */
+    if (p === "/api/opplan/mine" && method === "POST") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const { data, error } = await s.rpc("perf_opplan_mine_save", {
+        p_id: str(body.id) || null,
+        p_patch: (body.patch || {}) as Record<string, unknown>,
+      });
+      if (error) return err(error.message, 403);
+      return ok({ ok: true, id: String(data || "") });
+    }
+    if (p.startsWith("/api/opplan/mine/") && method === "DELETE") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const { error } = await s.rpc("perf_opplan_mine_del", { p_id: decodeURIComponent(p.split("/")[4] || "") });
+      if (error) return err(error.message, 403);
+      return ok({ ok: true });
+    }
+
     /* الجهات المكرّرة في السجلّ ودمجُها — لصاحب صلاحية «الجهات»،
        والدالتان تتحقّقان من ذلك بأنفسهما */
     if (p === "/api/entities/dups" && method === "GET") {

@@ -13,6 +13,7 @@ import { IconGear } from "./icons";
 import MyEntities, { contribsOf, sumOf } from "./Entities";
 import { publishUndo } from "@/lib/undoBus";
 import { useLogos, logoKey, SESS_SHORT, INST_COLS, CX_COLS, CX_QS, cxStagesOf } from "./Sections";
+import { OP_OWNERS } from "./OpPlan";
 import { initials, toneOf } from "@/lib/entlogo";
 import { asset } from "@/lib/base";
 
@@ -1970,28 +1971,197 @@ function CrBox({
 
 /* ---------------- المساهمات: ثلاثة أعمدة ---------------- */
 const KINDS = ["مؤشر", "مبادرة", "مكاسب سريعة"];
-function Contrib({ rows, t }: { rows: Row[]; t: T }) {
-  if (!rows.length) return <div className="pf-none">{t("لا توجد مساهمات بعد.", "Nothing yet.")}</div>;
+/* ============================================================
+   المساهمات في الخطة التشغيلية — مربوطة بصفحة الخطة
+   ------------------------------------------------------------
+   ما يضيفه الموظف هنا **بندٌ في الخطة التشغيلية نفسها** يظهر تحت
+   محفظة المدير الذي يختاره، لا نسخةً محلية في محفظته. والكتابة
+   عبر `perf_opplan_mine_save` التي تتحقّق في القاعدة أن البند
+   مساهمتُه وتكتب اسمه بنفسها — فلا تُفتح سياسة `perf_items` لأحد.
+   ============================================================ */
+const CONTRIB_KINDS: { k: string; label: string }[] = [
+  { k: "kpi", label: "مؤشرات" },
+  { k: "init", label: "مبادرات" },
+  { k: "win", label: "مكاسب سريعة" },
+];
+const CONTRIB_ST = ["جديدة", "مستمرة", "مكتملة", "لم تبدأ"];
+
+function Contrib({ rows, meName, t }: { rows: Row[]; meName: string; t: T }) {
+  const [mine, setMine] = useState<{ id: string; data: Rec }[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [add, setAdd] = useState<Rec | null>(null);
+
+  const load = useCallback(() => {
+    void apiFetch("/api/items?section=opplan")
+      .then((r) => r.json())
+      .then((d) => {
+        const all = (Array.isArray(d.items) ? d.items : []) as { id: string; data: Rec }[];
+        setMine(all.filter((x) => nrm(txt(x.data.contributor)) === nrm(meName)));
+      })
+      .catch(() => setMine([]))
+      .finally(() => setLoaded(true));
+  }, [meName]);
+  useEffect(() => load(), [load]);
+
+  async function put(id: string | null, patch: Rec) {
+    const r = await apiFetch("/api/opplan/mine", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: id || "", patch }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      setMsg(txt(j.error) || t("تعذّر الحفظ", "Save failed"));
+      return false;
+    }
+    setMsg("");
+    load();
+    return true;
+  }
+  async function del(id: string) {
+    if (!confirm(t("حذف هذه المساهمة من الخطة التشغيلية؟", "Delete this contribution?"))) return;
+    const r = await apiFetch(`/api/opplan/mine/${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      setMsg(txt(j.error) || t("تعذّر الحذف", "Delete failed"));
+      return;
+    }
+    load();
+  }
+
+  if (!loaded) return <div className="pf-none">{t("جارٍ التحميل…", "Loading…")}</div>;
+
   return (
-    <div className="c3">
-      {KINDS.map((k) => {
-        const list = rows.filter((r) => txt(r.data.kind) === k);
-        return (
-          <div className="col2" key={k}>
-            <div className="h">
-              {k === "مؤشر" ? "مؤشرات" : k === "مبادرة" ? "مبادرات" : "مكاسب سريعة"}
-              <b>{list.length}</b>
-            </div>
-            {list.map((r) => (
-              <div className="li" key={r.id}>
-                {txt(r.data.name)}
-                <span className="chip">{txt(r.data.status) || `${num(r.data.pct)}٪`}</span>
+    <div className="cb">
+      <div className="cb-h">
+        <span>
+          {t(
+            "ما تضيفه هنا يظهر في صفحة «الخطة التشغيلية» تحت محفظة المدير الذي تختاره.",
+            "Added here, shown under the chosen manager's portfolio.",
+          )}
+        </span>
+        <button onClick={() => setAdd({ kind: "win", owner: OP_OWNERS[0], status: "جديدة" })}>
+          + {t("مساهمة جديدة", "New")}
+        </button>
+      </div>
+      {msg && <div className="cb-msg">{msg}</div>}
+
+      <div className="c3">
+        {CONTRIB_KINDS.map(({ k, label }) => {
+          const list = mine.filter((r) => txt(r.data.kind) === k);
+          return (
+            <div className="col2" key={k}>
+              <div className="h">
+                {label}
+                <b>{list.length}</b>
               </div>
-            ))}
-            {!list.length && <div className="pf-none sm">—</div>}
+              {list.map((r) => (
+                <div className="li cb-li" key={r.id}>
+                  <span className="n">{txt(r.data.name)}</span>
+                  <span className="o">{txt(r.data.owner)}</span>
+                  <select
+                    value={txt(r.data.status) || "جديدة"}
+                    onChange={(e) => void put(r.id, { status: e.target.value })}
+                  >
+                    {CONTRIB_ST.map((x) => (
+                      <option key={x} value={x}>{x}</option>
+                    ))}
+                  </select>
+                  <button className="x" title={t("حذف", "Delete")} onClick={() => void del(r.id)}>✕</button>
+                </div>
+              ))}
+              {!list.length && <div className="pf-none sm">—</div>}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* بنودٌ قديمة بقيت في المحفظة قبل الربط — تُنقل بضغطة */}
+      {rows.length > 0 && (
+        <div className="cb-old">
+          <b>{t(`مساهمات قديمة في محفظتك · ${rows.length}`, `${rows.length} local`)}</b>
+          <em>{t("سُجّلت قبل الربط بالخطة، فلا تظهر فيها — انقلها لتصل محفظة مديرها.", "Not linked yet")}</em>
+          {rows.map((r) => (
+            <div className="li cb-li" key={r.id}>
+              <span className="n">{txt(r.data.name)}</span>
+              <span className="o">{txt(r.data.kind)}</span>
+              <button
+                className="mv"
+                onClick={async () => {
+                  const kind = txt(r.data.kind).includes("مؤشر")
+                    ? "kpi"
+                    : txt(r.data.kind).includes("مبادر")
+                      ? "init"
+                      : "win";
+                  await put(null, {
+                    kind,
+                    name: txt(r.data.name),
+                    owner: OP_OWNERS[0],
+                    status: txt(r.data.status) || "جديدة",
+                  });
+                }}
+              >
+                {t("نقل إلى الخطة", "Move")}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {add && (
+        <div className="modal-overlay" onClick={() => setAdd(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="m-h">
+              <h3>{t("مساهمة في الخطة التشغيلية", "New contribution")}</h3>
+              <button className="mx" onClick={() => setAdd(null)} aria-label="close">✕</button>
+            </div>
+            <div className="op-f">
+              <label className="wide">
+                <span>{t("البند", "Item")}</span>
+                <textarea rows={2} value={txt(add.name)}
+                          onChange={(e) => setAdd({ ...add, name: e.target.value })} />
+              </label>
+              <label>
+                <span>{t("النوع", "Kind")}</span>
+                <select value={txt(add.kind)} onChange={(e) => setAdd({ ...add, kind: e.target.value })}>
+                  {CONTRIB_KINDS.map(({ k, label }) => (
+                    <option key={k} value={k}>{label}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>{t("محفظة المدير", "Portfolio")}</span>
+                <select value={txt(add.owner)} onChange={(e) => setAdd({ ...add, owner: e.target.value })}>
+                  {OP_OWNERS.map((o) => (
+                    <option key={o} value={o}>{o}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>{t("الحالة", "Status")}</span>
+                <select value={txt(add.status)} onChange={(e) => setAdd({ ...add, status: e.target.value })}>
+                  {CONTRIB_ST.map((x) => (
+                    <option key={x} value={x}>{x}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <div className="m-f">
+              <button className="btn btn-ghost" onClick={() => setAdd(null)}>{t("إلغاء", "Cancel")}</button>
+              <button
+                className="btn"
+                onClick={async () => {
+                  if (!txt(add.name).trim()) return;
+                  if (await put(null, add)) setAdd(null);
+                }}
+              >
+                {t("إضافة", "Add")}
+              </button>
+            </div>
           </div>
-        );
-      })}
+        </div>
+      )}
     </div>
   );
 }
@@ -3385,6 +3555,17 @@ export default function Portfolio({
     [entities, regNames],
   );
   const contrib = pf.of("contrib");
+  /* مساهماتي في الخطة التشغيلية — تُقرأ للعدّاد في البطاقة */
+  const [myContrib, setMyContrib] = useState<Rec[]>([]);
+  useEffect(() => {
+    void apiFetch("/api/items?section=opplan")
+      .then((r) => r.json())
+      .then((d) => {
+        const all = (Array.isArray(d.items) ? d.items : []) as { data: Rec }[];
+        setMyContrib(all.map((x) => x.data).filter((x) => nrm(txt(x.contributor)) === nrm(me.name || "")));
+      })
+      .catch(() => setMyContrib([]));
+  }, [me.name]);
   const changes = pf.of("changes");
   /* التزامي محسوبٌ من طلبات جهاتي في الجدول المركزي — بنفس حسبة
      «أعلى الاستشاريين التزاماً»، فالرقم واحد في المكانين. والبديل
@@ -3501,10 +3682,17 @@ export default function Portfolio({
         };
       }
       case "contrib": {
-        const p = rows.length
-          ? Math.round(rows.reduce((a, r) => a + num(r.data.pct), 0) / rows.length)
-          : 0;
-        return { count: rows.length, pct: p, sub: KINDS.map((x) => rows.filter((r) => txt(r.data.kind) === x).length).join(" · ") };
+        /* العدّ من الخطة التشغيلية لا من المحفظة: المساهمة بندٌ
+           هناك، والبنود المحلية القديمة تُعدّ منفصلةً حتى تُنقل */
+        const n = (x: string) => myContrib.filter((d) => txt(d.kind) === x).length;
+        return {
+          count: myContrib.length,
+          pct: 0,
+          sub: myContrib.length
+            ? `${n("kpi")} مؤشرات · ${n("init")} مبادرات · ${n("win")} مكاسب`
+            : t("لا توجد مساهمات بعد", "Nothing yet"),
+          warn: rows.length ? t(`${rows.length} غير مربوطة`, `${rows.length} local`) : undefined,
+        };
       }
       default: {
         const d = doneOf(rows, WMAP[k]?.section || "");
@@ -3573,7 +3761,8 @@ export default function Portfolio({
           onAdd={(data) => void pf.save("entities", "ent-" + newId(), data, entities.length + 1)}
         />
       );
-    if (k === "contrib" && prefs.mode === "tiles" && open !== k) return <Contrib rows={contrib} t={t} />;
+    /* المساهمات تُعرض من الخطة دائماً — لا جدولاً محلياً عند فتحها */
+    if (k === "contrib") return <Contrib rows={contrib} meName={me.name || ""} t={t} />;
     const base = k.startsWith("cw-") ? "custom" : sec;
     return (
       <>
