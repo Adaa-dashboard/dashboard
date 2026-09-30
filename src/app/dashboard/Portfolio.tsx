@@ -13,7 +13,7 @@ import { IconGear } from "./icons";
 import MyEntities, { contribsOf, sumOf } from "./Entities";
 import { publishUndo } from "@/lib/undoBus";
 import { useLogos, logoKey, SESS_SHORT, INST_COLS, CX_COLS, CX_QS, cxStagesOf } from "./Sections";
-import { OP_OWNERS, OP_STATUSES, opRoles, opStatus, opTone } from "./OpPlan";
+import { OP_OWNERS, OP_STATUSES, opFix, opRoles, opStatus, opTone } from "./OpPlan";
 import { initials, toneOf } from "@/lib/entlogo";
 import { asset } from "@/lib/base";
 
@@ -2000,7 +2000,13 @@ export type MyOp = { id: string; data: Rec; roles: string[]; own: boolean };
 export function myOpItems(all: { id: string; data: Rec }[], meName: string): MyOp[] {
   const n = nrm(meName);
   return all
-    .map((x) => ({ ...x, roles: opRoles(x.data, meName), own: nrm(txt(x.data.contributor)) === n }))
+    .map((x) => opFix(x.data))
+    .map((d, i) => ({
+      id: all[i].id,
+      data: d,
+      roles: opRoles(d, meName),
+      own: nrm(txt(d.contributor)) === n,
+    }))
     .filter((x) => x.roles.length > 0);
 }
 

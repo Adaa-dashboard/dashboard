@@ -87,6 +87,36 @@ function onTrack(d: Rec): boolean | null {
   return q.a >= q.t;
 }
 
+/* ---------- أسماء قديمة بقيت في المخزون ---------- */
+/* بندٌ محفوظ باسمٍ قديم يصنع **محفظةً ثانية** للشخص نفسه: واحدة
+   فارغة بالاسم الصحيح من قائمة أصحاب المحافظ، وأخرى فيها بنوده
+   بالاسم الخطأ لأنها ليست في القائمة فتُعرض كمحفظةٍ زائدة.
+   فتُصحَّح الأسماء عند العرض، ويُصحَّح المخزون نفسه بملف
+   perf-opplan-rename.sql — والاثنان معاً: الواجهة تصلح فوراً
+   والقاعدة تصلح دائماً. */
+const NAME_ALIAS: Record<string, string> = { "معاذ البقاص": "معاذ الهقاص" };
+export const opName = (v: unknown) => {
+  const x = txt(v).trim();
+  return NAME_ALIAS[x] ?? x;
+};
+/** خانةٌ قد تحمل عدة أسماء — يُصحَّح كلٌّ منها على حدة */
+const fixList = (v: unknown) => {
+  const x = txt(v).trim();
+  if (!x) return x;
+  const parts = x.split(/[·,،|]+/).map((p) => p.trim()).filter(Boolean);
+  return parts.length > 1 ? parts.map(opName).join(" · ") : opName(x);
+};
+/** نسخةٌ من بيانات البند بأسماءٍ مصحَّحة — تُستعمل في العرض والمطابقة */
+export function opFix(d: Rec): Rec {
+  return {
+    ...d,
+    owner: opName(d.owner),
+    sponsor: fixList(d.sponsor),
+    assignee: fixList(d.assignee),
+    contributor: opName(d.contributor),
+  };
+}
+
 /* ---------- «مَن يخصّه البند» ---------- */
 /** خانةٌ قد تحمل أكثر من اسم: «أ · ب» أو «أ، ب» */
 const namesOf = (v: unknown) =>
@@ -121,7 +151,7 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
   const [own, setOwn] = useState("");
   const [edit, setEdit] = useState<Item | null>(null);
 
-  const rows = useMemo(() => items.map((x) => ({ ...x, data: x.data as Rec })), [items]);
+  const rows = useMemo(() => items.map((x) => ({ ...x, data: opFix(x.data as Rec) })), [items]);
   const byOwner = useMemo(() => {
     const m: Record<string, typeof rows> = {};
     for (const o of OP_OWNERS) m[o] = [];
@@ -439,7 +469,7 @@ function OpEdit({
 /* ---------------- بطاقة «نظرة عامة» ---------------- */
 export function OpPlanCard({ t, onOpen }: { t: T; onOpen: () => void }) {
   const { items, loaded } = useItems("opplan");
-  const rows = useMemo(() => items.map((x) => x.data as Rec), [items]);
+  const rows = useMemo(() => items.map((x) => opFix(x.data as Rec)), [items]);
   if (!loaded || !rows.length) return null;
 
   const of = (k: string) => rows.filter((d) => txt(d.kind) === k);
