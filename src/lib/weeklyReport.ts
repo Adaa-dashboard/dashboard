@@ -54,6 +54,7 @@ export const SEC_NAME: Record<SectionKey, string> = {
   inststrat: "الاستراتيجيات المؤسسية",
   outputs: "المخرجات الوطنية",
   cx: "أعمال قياس تجربة المستفيد",
+  opplan: "الخطة التشغيلية",
   projects: "المشاريع الاستراتيجية",
 };
 

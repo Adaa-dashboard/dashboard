@@ -18,6 +18,8 @@ export type Scope =
   | "inststrat"
   | "outputs"
   | "projects"
+  | "opplan"
+  | "opplan:edit"
   | "cx"
   | "sessions:edit"
   | "natstrat:edit"
@@ -63,6 +65,7 @@ export const SCOPE_GROUPS: { title: string; items: { key: Scope; label: string; 
       { key: "outputs", label: "المخرجات الوطنية" },
       { key: "projects", label: "المشاريع الاستراتيجية" },
       { key: "cx", label: "أعمال قياس تجربة المستفيد", note: "من الخدمات الحكومية" },
+      { key: "opplan", label: "الخطة التشغيلية", note: "محافظ المدراء: مؤشرات ومبادرات ومكاسب سريعة" },
     ],
   },
   {
@@ -70,6 +73,7 @@ export const SCOPE_GROUPS: { title: string; items: { key: Scope; label: string; 
        تحريره. فمدير القطاع يرى الأقسام كلها ولا يحدّث إلا قسمه. */
     title: "تحرير بيانات الأقسام",
     items: [
+      { key: "opplan:edit", label: "تحرير الخطة التشغيلية", note: "صاحب المحفظة يحدّث بنوده" },
       { key: "sessions:edit", label: "تحرير جلسات مراجعة الأداء" },
       { key: "natstrat:edit", label: "تحرير الاستراتيجيات الوطنية" },
       { key: "inststrat:edit", label: "تحرير الاستراتيجيات المؤسسية" },

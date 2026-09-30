@@ -61,6 +61,7 @@ import {
   IconFolder,
   IconOrg,
 } from "./icons";
+import OpPlan, { OpPlanCard } from "./OpPlan";
 import WeeklyPanel from "./WeeklyPanel";
 import Details from "./Details";
 import { useRouter } from "next/navigation";
@@ -184,6 +185,7 @@ const TAB_SCOPE: Record<string, Scope> = {
   inststrat: "inststrat",
   outputs: "outputs",
   cx: "cx",
+  opplan: "opplan",
   projects: "projects",
 };
 
@@ -591,6 +593,10 @@ export default function Dashboard({ me }: { me: Me }) {
           {can("tasks") && (isAdmin || me.isLead || can("tasks:all")) && (
             <NavItem id="tasks" icon={<IconTask />} label={["التكاليف والمهام", "Tasks"]} />
           )}
+          {/* الخطة التشغيلية بعد التكاليف والمهام — خطة الإدارة نفسها */}
+          {can("opplan") && (
+            <NavItem id="opplan" icon={<IconProj />} label={["الخطة التشغيلية", "Operational plan"]} />
+          )}
           {can("weekly") && (isAdmin || me.isLead) && (
             <NavItem id="report" icon={<IconWeek />} label={["الإنجاز الأسبوعي", "Weekly Achievement"]} />
           )}
@@ -771,6 +777,9 @@ export default function Dashboard({ me }: { me: Me }) {
                   me={{ id: me.id, sectorIds: me.sectorIds || [], scopes: me.scopes || [] }}
                 />
               )}
+              {tab === "opplan" && can("opplan") && (
+                <OpPlan t={t} canEdit={can("opplan:edit")} />
+              )}
               {SECTION_NAV.map(([key]) =>
                 tab === key && can(key) ? (
                   <SectionPage key={key} section={key} canEdit={can(`${key}:edit` as Scope)} meId={me.id} t={t} />
@@ -839,6 +848,7 @@ export default function Dashboard({ me }: { me: Me }) {
             {SECTION_NAV.map(([key]) =>
               can(key) ? <SheetItem key={key} id={key} label={SECTION_NAV_TITLE[key] ?? SECTION_TITLE[key]} /> : null,
             )}
+            {can("opplan") && <SheetItem id="opplan" label={["الخطة التشغيلية", "Operational plan"]} />}
             {can("details") && <SheetItem id="details" label={["المؤشرات التفصيلية", "KPI Details"]} />}
             <div className="sheet-h">{t("المزيد", "More")}</div>
             {can("weekly") && (isAdmin || me.isLead) && (
@@ -1421,6 +1431,12 @@ function Overview({
             canEdit={hasScope(me.scopes, "changes:upload")}
             canLink={hasScope(me.scopes, "changes:upload") || hasScope(me.scopes, "entities:edit")}
           />
+        </Sec>
+      )}
+
+      {hasScope(me.scopes, "opplan") && (
+        <Sec id="opplan" title={t("الخطة التشغيلية", "Operational plan")}>
+          <OpPlanCard t={t} onOpen={() => onOpenTab("opplan")} />
         </Sec>
       )}
 
