@@ -2063,7 +2063,11 @@ function Contrib({ rows, meName, t }: { rows: Row[]; meName: string; t: T }) {
             "Every plan item you sponsor or own. Updates here reach the plan page.",
           )}
         </span>
-        <button onClick={() => setAdd({ kind: "win", owner: OP_OWNERS[0], status: "على المسار" })}>
+        <button
+          onClick={() =>
+            setAdd({ kind: "win", owner: OP_OWNERS[0], status: "على المسار", assignee: meName, unit: "عدد" })
+          }
+        >
           + {t("مساهمة جديدة", "New")}
         </button>
       </div>
@@ -2173,58 +2177,193 @@ function Contrib({ rows, meName, t }: { rows: Row[]; meName: string; t: T }) {
       )}
 
       {add && (
-        <div className="modal-overlay" onClick={() => setAdd(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="m-h">
-              <h3>{t("مساهمة في الخطة التشغيلية", "New contribution")}</h3>
-              <button className="mx" onClick={() => setAdd(null)} aria-label="close">✕</button>
-            </div>
-            <div className="op-f">
-              <label className="wide">
-                <span>{t("البند", "Item")}</span>
-                <textarea rows={2} value={txt(add.name)}
-                          onChange={(e) => setAdd({ ...add, name: e.target.value })} />
-              </label>
-              <label>
-                <span>{t("النوع", "Kind")}</span>
-                <select value={txt(add.kind)} onChange={(e) => setAdd({ ...add, kind: e.target.value })}>
-                  {CONTRIB_KINDS.map(({ k, label }) => (
-                    <option key={k} value={k}>{label}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>{t("محفظة المدير", "Portfolio")}</span>
-                <select value={txt(add.owner)} onChange={(e) => setAdd({ ...add, owner: e.target.value })}>
-                  {OP_OWNERS.map((o) => (
-                    <option key={o} value={o}>{o}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>{t("الحالة", "Status")}</span>
-                <select value={txt(add.status)} onChange={(e) => setAdd({ ...add, status: e.target.value })}>
-                  {OP_STATUSES.map((x) => (
-                    <option key={x} value={x}>{x}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <div className="m-f">
-              <button className="btn btn-ghost" onClick={() => setAdd(null)}>{t("إلغاء", "Cancel")}</button>
-              <button
-                className="btn"
-                onClick={async () => {
-                  if (!txt(add.name).trim()) return;
-                  if (await put(null, add)) setAdd(null);
-                }}
-              >
-                {t("إضافة", "Add")}
-              </button>
-            </div>
-          </div>
-        </div>
+        <AddContrib
+          f={add}
+          setF={setAdd}
+          meName={meName}
+          t={t}
+          onClose={() => setAdd(null)}
+          onAdd={async (d) => {
+            if (await put(null, d)) setAdd(null);
+          }}
+        />
       )}
+    </div>
+  );
+}
+
+/* ============================================================
+   إضافة مساهمة — بكل حقول بند الخطة
+   ------------------------------------------------------------
+   كان النموذج أربعة حقول (البند · النوع · المحفظة · الحالة)، فتصل
+   الخطةَ مساهمةٌ بلا راعٍ ولا مسؤول ولا أرقام، وقد طُلب صراحةً أن
+   لكل مساهمة **راعياً ومسؤولاً**. فصار النموذج كنموذج الخطة نفسه،
+   والمسؤول يبدأ باسم المضيف لأنه الغالب.
+   ============================================================ */
+function AddContrib({
+  f, setF, meName, t, onClose, onAdd,
+}: {
+  f: Rec;
+  setF: (v: Rec) => void;
+  meName: string;
+  t: T;
+  onClose: () => void;
+  onAdd: (d: Rec) => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const kind = txt(f.kind);
+  const set = (k: string, v: unknown) => setF({ ...f, [k]: v });
+  const numOrDel = (k: string, v: string) => {
+    const n = { ...f };
+    if (v.trim() === "") delete n[k];
+    else n[k] = Number(v);
+    setF(n);
+  };
+  const val = (k: string) => (has(f[k]) ? String(f[k]) : "");
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal wide" onClick={(e) => e.stopPropagation()}>
+        <div className="m-h">
+          <h3>{t("مساهمة في الخطة التشغيلية", "New contribution")}</h3>
+          <button className="mx" onClick={onClose} aria-label="close">✕</button>
+        </div>
+
+        <div className="op-f">
+          <label className="wide">
+            <span>{t("البند", "Item")}</span>
+            <textarea rows={2} value={txt(f.name)} onChange={(e) => set("name", e.target.value)} />
+          </label>
+          <label>
+            <span>{t("النوع", "Kind")}</span>
+            <select value={kind} onChange={(e) => set("kind", e.target.value)}>
+              {CONTRIB_KINDS.map(({ k, label }) => (
+                <option key={k} value={k}>{label}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>{t("محفظة المدير", "Portfolio")}</span>
+            <select value={txt(f.owner)} onChange={(e) => set("owner", e.target.value)}>
+              {OP_OWNERS.map((o) => (
+                <option key={o} value={o}>{o}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>{t("الراعي", "Sponsor")}</span>
+            <input
+              list="op-owners"
+              value={txt(f.sponsor)}
+              placeholder={t("اسم الراعي", "Sponsor")}
+              onChange={(e) => set("sponsor", e.target.value)}
+            />
+            <datalist id="op-owners">
+              {OP_OWNERS.map((o) => (
+                <option key={o} value={o} />
+              ))}
+            </datalist>
+          </label>
+          <label>
+            <span>{t("المسؤول", "Responsible")}</span>
+            <input
+              value={txt(f.assignee)}
+              placeholder={meName}
+              onChange={(e) => set("assignee", e.target.value)}
+            />
+          </label>
+          <label>
+            <span>{t("الحالة", "Status")}</span>
+            <select value={txt(f.status)} onChange={(e) => set("status", e.target.value)}>
+              {OP_STATUSES.map((x) => (
+                <option key={x} value={x}>{x}</option>
+              ))}
+            </select>
+          </label>
+
+          {kind === "init" && (
+            <label>
+              <span>{t("نوع المبادرة", "Type")}</span>
+              <select value={txt(f.itype)} onChange={(e) => set("itype", e.target.value)}>
+                <option value="">{t("— اختر —", "— pick —")}</option>
+                <option value="استراتيجية">استراتيجية</option>
+                <option value="تشغيلية">تشغيلية</option>
+              </select>
+            </label>
+          )}
+          {kind === "kpi" && (
+            <>
+              <label>
+                <span>{t("المستوى", "Level")}</span>
+                <select value={has(f.level) ? Number(f.level) : 3}
+                        onChange={(e) => set("level", Number(e.target.value))}>
+                  <option value={1}>مستوى أول</option>
+                  <option value={2}>مستوى ثانٍ</option>
+                  <option value={3}>مستوى ثالث</option>
+                </select>
+              </label>
+              <label>
+                <span>{t("الوحدة", "Unit")}</span>
+                <select value={txt(f.unit) || "عدد"} onChange={(e) => set("unit", e.target.value)}>
+                  <option value="عدد">{t("عدد", "count")}</option>
+                  <option value="%">٪</option>
+                </select>
+              </label>
+              <label>
+                <span>{t("المستهدف العام", "Year target")}</span>
+                <input type="number" value={val("yearTarget")}
+                       onChange={(e) => numOrDel("yearTarget", e.target.value)} />
+              </label>
+            </>
+          )}
+        </div>
+
+        {kind === "kpi" && (
+          <>
+            <div className="op-qh">
+              {t("مستهدف وفعلي كل ربع — الفراغ يعني لم يُدخَل بعد", "Quarterly")}
+            </div>
+            <div className="op-q">
+              {[1, 2, 3, 4].map((i) => (
+                <div className="r" key={i}>
+                  <b>Q{i}</b>
+                  <label>
+                    <span>{t("المستهدف", "Target")}</span>
+                    <input type="number" value={val(`q${i}t`)}
+                           onChange={(e) => numOrDel(`q${i}t`, e.target.value)} />
+                  </label>
+                  <label>
+                    <span>{t("الفعلي", "Actual")}</span>
+                    <input type="number" value={val(`q${i}a`)}
+                           onChange={(e) => numOrDel(`q${i}a`, e.target.value)} />
+                  </label>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        <label className="op-note">
+          <span>{t("ملاحظات", "Notes")}</span>
+          <textarea rows={2} value={txt(f.note)} onChange={(e) => set("note", e.target.value)} />
+        </label>
+
+        <div className="m-f">
+          <button className="btn btn-ghost" onClick={onClose}>{t("إلغاء", "Cancel")}</button>
+          <button
+            className="btn"
+            disabled={busy || !txt(f.name).trim()}
+            onClick={async () => {
+              setBusy(true);
+              /* المسؤول الفارغ = المضيف نفسه، وهو الغالب */
+              await onAdd({ ...f, assignee: txt(f.assignee).trim() || meName });
+              setBusy(false);
+            }}
+          >
+            {t("إضافة", "Add")}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
