@@ -13,6 +13,7 @@
 
 import { useMemo, useState } from "react";
 import { useItems, type Item, SECTION_TITLE } from "./Sections";
+import { nrm } from "@/lib/commit";
 
 type T = (ar: string, en: string) => string;
 type Rec = Record<string, unknown>;
@@ -48,12 +49,13 @@ const KIND_LABEL: Record<string, [string, string]> = {
 };
 const LEVELS = ["", "مستوى أول", "مستوى ثانٍ", "مستوى ثالث"];
 const INIT_TYPES = ["استراتيجية", "تشغيلية"];
-const STATUSES = ["جديدة", "مستمرة", "مكتملة", "لم تبدأ"];
+/** الحالات الأربع المعتمدة — لا «جديدة» ولا «مستمرة» بعد اليوم */
+export const OP_STATUSES = ["على المسار", "متأخرة", "مكتملة", "لم تبدأ"];
 const ST_TONE: Record<string, string> = {
   مكتملة: "ok",
-  مستمرة: "go",
-  جديدة: "nw",
-  "لم تبدأ": "no",
+  "على المسار": "nw",
+  متأخرة: "no",
+  "لم تبدأ": "nt",
 };
 
 /** أحرف الاسم الأولى — وجهٌ صغير للمحفظة */
@@ -84,6 +86,35 @@ function onTrack(d: Rec): boolean | null {
   if (q.t === null) return null;
   return q.a >= q.t;
 }
+
+/* ---------- «مَن يخصّه البند» ---------- */
+/** خانةٌ قد تحمل أكثر من اسم: «أ · ب» أو «أ، ب» */
+const namesOf = (v: unknown) =>
+  txt(v).split(/[·,،/|]+/).map((x) => x.trim()).filter(Boolean);
+
+/** أدوار الشخص في البند — فارغة إن لم يكن له فيه شيء */
+export function opRoles(d: Rec, me: string): string[] {
+  const n = nrm(me);
+  if (!n) return [];
+  const r: string[] = [];
+  if (namesOf(d.sponsor).some((x) => nrm(x) === n)) r.push("راعي");
+  if (namesOf(d.assignee).some((x) => nrm(x) === n)) r.push("مسؤول");
+  if (namesOf(d.owner).some((x) => nrm(x) === n) && !r.length) r.push("صاحب المحفظة");
+  if (nrm(txt(d.contributor)) === n && !r.length) r.push("مساهمة");
+  return r;
+}
+
+/** الحالة المعروضة: المُدخَلة يدوياً، وإلا تُشتقّ للمؤشر من آخر ربعٍ فيه فعلي */
+export function opStatus(d: Rec): string {
+  const s = txt(d.status).trim();
+  if (s) return s;
+  if (txt(d.kind) !== "kpi") return "";
+  const ok = onTrack(d);
+  if (ok === true) return "على المسار";
+  if (ok === false) return "متأخرة";
+  return lastQ(quarters(d)) ? "على المسار" : "لم تبدأ";
+}
+export const opTone = (s: string) => ST_TONE[s] || "nt";
 
 export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
   const { items, loaded, save } = useItems("opplan");
@@ -202,7 +233,7 @@ function OpCard({
   const kind = txt(d.kind);
   const qs = quarters(d);
   const ok = onTrack(d);
-  const st = txt(d.status);
+  const st = opStatus(d);
   const unit = txt(d.unit) === "عدد" ? "" : "٪";
 
   return (
@@ -219,7 +250,7 @@ function OpCard({
         )}
         {kind === "kpi" && num(d.level) > 0 && <span className="chip nw">{LEVELS[num(d.level)]}</span>}
         {kind === "init" && has(d.itype) && <span className="chip go">{txt(d.itype)}</span>}
-        {st && <span className={`chip ${ST_TONE[st] || "nw"}`}>{st}</span>}
+        {st && <span className={`chip ${opTone(st)}`}>{st}</span>}
         {has(d.contributor) && (
           <span className="chip ct" title={t("مساهمة من محفظة موظف", "From a portfolio")}>
             {t(`مساهمة · ${txt(d.contributor)}`, txt(d.contributor))}
@@ -343,16 +374,17 @@ function OpEdit({
               </select>
             </label>
           )}
-          {kind !== "kpi" && (
-            <label>
-              <span>{t("الحالة", "Status")}</span>
-              <select value={txt(f.status)} onChange={(e) => set("status", e.target.value)}>
-                {STATUSES.map((x) => (
-                  <option key={x} value={x}>{x}</option>
-                ))}
-              </select>
-            </label>
-          )}
+          <label>
+            <span>{t("الحالة", "Status")}</span>
+            <select value={txt(f.status)} onChange={(e) => set("status", e.target.value)}>
+              <option value="">
+                {kind === "kpi" ? t("تلقائي من الأرباع", "Auto") : t("— اختر —", "— pick —")}
+              </option>
+              {OP_STATUSES.map((x) => (
+                <option key={x} value={x}>{x}</option>
+              ))}
+            </select>
+          </label>
         </div>
 
         {kind === "kpi" && (
@@ -414,7 +446,7 @@ export function OpPlanCard({ t, onOpen }: { t: T; onOpen: () => void }) {
   const kpis = of("kpi");
   const good = kpis.filter((d) => onTrack(d) === true).length;
   const bad = kpis.filter((d) => onTrack(d) === false).length;
-  const stOf = (k: string, s: string) => of(k).filter((d) => txt(d.status) === s).length;
+  const stOf = (k: string, s: string) => of(k).filter((d) => opStatus(d) === s).length;
   const perOwner = OP_OWNERS.map((o) => ({ o, n: rows.filter((d) => txt(d.owner) === o).length }));
 
   return (
@@ -435,7 +467,7 @@ export function OpPlanCard({ t, onOpen }: { t: T; onOpen: () => void }) {
           <span>{t("مبادرة", "Initiatives")}</span>
           <em>
             {t(
-              `${stOf("init", "مكتملة")} مكتملة · ${stOf("init", "مستمرة")} مستمرة · ${stOf("init", "لم تبدأ")} لم تبدأ`,
+              `${stOf("init", "مكتملة")} مكتملة · ${stOf("init", "على المسار")} على المسار · ${stOf("init", "متأخرة")} متأخرة`,
               `${stOf("init", "مكتملة")} done`,
             )}
           </em>
@@ -444,7 +476,10 @@ export function OpPlanCard({ t, onOpen }: { t: T; onOpen: () => void }) {
           <b>{of("win").length}</b>
           <span>{t("مكاسب سريعة", "Quick wins")}</span>
           <em>
-            {t(`${stOf("win", "جديدة")} جديدة · ${stOf("win", "مستمرة")} مستمرة`, `${stOf("win", "جديدة")} new`)}
+            {t(
+              `${stOf("win", "مكتملة")} مكتملة · ${stOf("win", "على المسار")} على المسار · ${stOf("win", "متأخرة")} متأخرة`,
+              `${stOf("win", "مكتملة")} done`,
+            )}
           </em>
         </div>
       </div>
