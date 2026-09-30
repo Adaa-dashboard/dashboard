@@ -165,7 +165,7 @@ export function opStatus(d: Rec): string {
 export const opTone = (s: string) => ST_TONE[s] || "nt";
 
 export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
-  const { items, loaded, save } = useItems("opplan");
+  const { items, loaded, save, remove } = useItems("opplan");
   const [own, setOwn] = useState("");
   const [edit, setEdit] = useState<Item | null>(null);
 
@@ -259,6 +259,11 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
           onClose={() => setEdit(null)}
           onSave={async (d) => {
             const err = await save(edit.id, d, edit.ord);
+            if (!err) setEdit(null);
+            return err;
+          }}
+          onDelete={async () => {
+            const err = await remove(edit.id);
             if (!err) setEdit(null);
             return err;
           }}
@@ -356,13 +361,15 @@ function OpCard({
 
 /* ---------------- نافذة التعديل ---------------- */
 function OpEdit({
-  it, t, owners, onClose, onSave,
+  it, t, owners, onClose, onSave, onDelete,
 }: {
   it: Item;
   t: T;
   owners: string[];
   onClose: () => void;
   onSave: (d: Rec) => Promise<string | null>;
+  /** حذف بندٍ سقط من الخطة — التراجع يعيده من شريط ↩ */
+  onDelete: () => Promise<string | null>;
 }) {
   const [f, setF] = useState<Rec>({ ...(it.data as Rec) });
   const [busy, setBusy] = useState(false);
@@ -503,6 +510,19 @@ function OpEdit({
 
         {err && <div className="op-err">{err}</div>}
         <div className="m-f">
+          <button
+            className="btn btn-del"
+            disabled={busy}
+            onClick={async () => {
+              if (!confirm(t(`حذف «${txt(it.data.name)}» من الخطة؟`, "Delete this item?"))) return;
+              setBusy(true);
+              const e = await onDelete();
+              setBusy(false);
+              if (e) setErr(e);
+            }}
+          >
+            🗑 {t("حذف البند", "Delete")}
+          </button>
           <button className="btn btn-ghost" onClick={onClose}>{t("إلغاء", "Cancel")}</button>
           <button
             className="btn"
