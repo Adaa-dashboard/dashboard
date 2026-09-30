@@ -2117,19 +2117,19 @@ function Contrib({ rows, meName, t }: { rows: Row[]; meName: string; t: T }) {
                 return (
                   <div className="li cb-li" key={r.id}>
                     <span className="n">{txt(r.data.name)}</span>
-                    <span className="rr">
+                    <div className="mt">
                       {r.roles.map((x) => (
                         <i className={ROLE_TONE[x] || "ow"} key={x}>{x}</i>
                       ))}
-                    </span>
-                    <span className="o">{txt(r.data.owner)}</span>
-                    {st && <span className={`stc ${opTone(st)}`}>{st}</span>}
-                    <button className="up" onClick={() => setEdit(r)}>
-                      {t("تحديث", "Update")}
-                    </button>
-                    {r.own && (
-                      <button className="x" title={t("حذف", "Delete")} onClick={() => void del(r.id)}>✕</button>
-                    )}
+                      <span className="o">{txt(r.data.owner)}</span>
+                      {st && <span className={`stc ${opTone(st)}`}>{st}</span>}
+                      <button className="up" onClick={() => setEdit(r)}>
+                        {t("تحديث", "Update")}
+                      </button>
+                      {r.own && (
+                        <button className="x" title={t("حذف", "Delete")} onClick={() => void del(r.id)}>✕</button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -2147,6 +2147,7 @@ function Contrib({ rows, meName, t }: { rows: Row[]; meName: string; t: T }) {
           {rows.map((r) => (
             <div className="li cb-li" key={r.id}>
               <span className="n">{txt(r.data.name)}</span>
+              <div className="mt">
               <span className="o">{txt(r.data.kind)}</span>
               <button
                 className="mv"
@@ -2166,6 +2167,7 @@ function Contrib({ rows, meName, t }: { rows: Row[]; meName: string; t: T }) {
               >
                 {t("نقل إلى الخطة", "Move")}
               </button>
+              </div>
             </div>
           ))}
         </div>
@@ -2219,6 +2221,17 @@ function AddContrib({
   const [busy, setBusy] = useState(false);
   const kind = txt(f.kind);
   const set = (k: string, v: unknown) => setF({ ...f, [k]: v });
+  /* تبديل النوع يُسقط حقول النوع السابق: الأرباع والمستهدف
+     للمؤشر وحده، ونوع المبادرة للمبادرة وحدها. وبدون ذلك يبقى ما
+     كُتب قبل التبديل فيُحفظ مع مبادرةٍ لا أرباع لها. */
+  const setKind = (v: string) => {
+    const n: Rec = { ...f, kind: v };
+    if (v !== "kpi")
+      for (const k of ["level", "unit", "yearTarget",
+                       "q1t","q1a","q2t","q2a","q3t","q3a","q4t","q4a"]) delete n[k];
+    if (v !== "init") delete n.itype;
+    setF(n);
+  };
   const numOrDel = (k: string, v: string) => {
     const n = { ...f };
     if (v.trim() === "") delete n[k];
@@ -2242,7 +2255,7 @@ function AddContrib({
           </label>
           <label>
             <span>{t("النوع", "Kind")}</span>
-            <select value={kind} onChange={(e) => set("kind", e.target.value)}>
+            <select value={kind} onChange={(e) => setKind(e.target.value)}>
               {CONTRIB_KINDS.map(({ k, label }) => (
                 <option key={k} value={k}>{label}</option>
               ))}

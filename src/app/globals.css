@@ -11586,8 +11586,17 @@ input.cell-date {
   background: var(--gt-700); border: 1px solid var(--gt-700); color: #fff;
 }
 .cb-msg { font-size: 11px; font-weight: 700; color: var(--dgr-tx); margin-bottom: 8px; }
-.cb-li { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.cb-li .n { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+/* صفُّ مساهمة: العنوان سطرٌ كامل، والشرائح تحته.
+   كان الصفُّ `flex` واحداً يضمّ العنوان وخمس شرائح، فيُسحق العنوان
+   إلى عرض حرفٍ واحد و`overflow-wrap:anywhere` يكسره حرفاً حرفاً
+   في عمود رأسي. العنوان الآن كتلةٌ مستقلّة فلا ينسحق. */
+.pf .c3 .li.cb-li { display: block; }
+.cb-li .n {
+  display: block; font-size: 11px; font-weight: 700; line-height: 1.65;
+  color: var(--ink); overflow-wrap: break-word; word-break: normal;
+  margin-bottom: 7px;
+}
+.cb-li .mt { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
 .cb-li .o { font-size: 9.5px; color: var(--muted); }
 .cb-li select {
   font: inherit; font-size: 9.5px; font-weight: 700; padding: 2px 6px;
@@ -11722,3 +11731,12 @@ input.cell-date {
   border: 1px solid color-mix(in srgb, var(--dgr-tx) 30%, var(--line2));
 }
 .modal .m-f .btn.btn-del:hover { background: var(--dgr-bg); }
+
+/* الأزرار إلى طرف سطر الشرائح، والأعمدة الثلاثة تنزل واحداً تلو
+   الآخر على الشاشات الضيقة فلا يضيق العمود على النص */
+.cb-li .mt .up { margin-inline-start: auto; }
+.cb-li .mt .mv { margin-inline-start: auto; }
+@media (max-width: 1100px) { .pf .c3 { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 760px)  { .pf .c3 { grid-template-columns: 1fr; } }
+/* الأعمدة لا تتمدّد لطول أطولها — العمود القصير كان يترك فراغاً */
+.pf .c3 { align-items: start; }
