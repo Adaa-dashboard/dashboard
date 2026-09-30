@@ -11714,3 +11714,11 @@ input.cell-date {
   font-size: 8.5px; font-weight: 800; color: var(--muted);
 }
 .op-it .op-nt em.old { color: #8a5a00; }
+/* حذف بندٍ من الخطة — يسار الشريط، بعيداً عن «حفظ» */
+.op .modal .m-f .btn.btn-del,
+.modal .m-f .btn.btn-del {
+  margin-inline-end: auto;
+  background: transparent; color: var(--dgr-tx);
+  border: 1px solid color-mix(in srgb, var(--dgr-tx) 30%, var(--line2));
+}
+.modal .m-f .btn.btn-del:hover { background: var(--dgr-bg); }
