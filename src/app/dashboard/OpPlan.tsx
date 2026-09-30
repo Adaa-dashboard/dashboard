@@ -134,6 +134,24 @@ export function opRoles(d: Rec, me: string): string[] {
   return r;
 }
 
+/* ---------- آخر تحديثٍ لحالة المساهمة ---------- */
+/* «حالة المساهمة» تتحدّث أسبوعياً، فمتى تحدّثت آخر مرة جزءٌ من
+   المعلومة: سطرٌ عمره أسبوعان يُقرأ على أنه الحاضر وهو ليس كذلك. */
+export function agoOf(iso?: string): { txt: string; stale: boolean } | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const days = Math.floor((Date.now() - d.getTime()) / 86400000);
+  const w =
+    days <= 0 ? "اليوم"
+    : days === 1 ? "أمس"
+    : days === 2 ? "قبل يومين"
+    : days < 11 ? `قبل ${days} أيام`
+    : days < 30 ? `قبل ${days} يوماً`
+    : d.toLocaleDateString("ar-SA-u-nu-latn", { year: "numeric", month: "short", day: "numeric" });
+  return { txt: w, stale: days > 10 };
+}
+
 /** الحالة المعروضة: المُدخَلة يدوياً، وإلا تُشتقّ للمؤشر من آخر ربعٍ فيه فعلي */
 export function opStatus(d: Rec): string {
   const s = txt(d.status).trim();
@@ -254,7 +272,7 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
 function OpCard({
   r, canEdit, t, onEdit,
 }: {
-  r: { id: string; ord: number; data: Rec };
+  r: { id: string; ord: number; data: Rec; updatedAt?: string };
   canEdit: boolean;
   t: T;
   onEdit: () => void;
@@ -319,7 +337,19 @@ function OpCard({
           <span>{t("النهاية", "End")} <b>{txt(d.end) || "—"}</b></span>
         </div>
       )}
-      {has(d.note) && <div className="op-nt">{txt(d.note)}</div>}
+      {has(d.note) && (
+        <div className="op-nt">
+          {txt(d.note)}
+          {(() => {
+            const a = agoOf(r.updatedAt);
+            return a ? (
+              <em className={a.stale ? "old" : ""}>
+                {t(`آخر تحديث ${a.txt}`, `Updated ${a.txt}`)}
+              </em>
+            ) : null;
+          })()}
+        </div>
+      )}
     </div>
   );
 }

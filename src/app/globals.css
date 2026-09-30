@@ -11708,3 +11708,9 @@ input.cell-date {
 .op-it .op-dt i { flex: 1; height: 1px; background: var(--line2); }
 .cb-dt { font-size: 10.5px; color: var(--muted); margin: 0 0 8px; }
 .cb-dt b { color: var(--ink-2); font-weight: 700; }
+/* متى تحدّثت «حالة المساهمة» آخر مرة */
+.op-it .op-nt em {
+  display: block; margin-top: 5px; font-style: normal;
+  font-size: 8.5px; font-weight: 800; color: var(--muted);
+}
+.op-it .op-nt em.old { color: #8a5a00; }
