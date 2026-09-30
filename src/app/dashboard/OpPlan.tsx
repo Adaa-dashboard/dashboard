@@ -312,6 +312,13 @@ function OpCard({
           )}
         </>
       )}
+      {(has(d.start) || has(d.end)) && (
+        <div className="op-dt">
+          <span>{t("البداية", "Start")} <b>{txt(d.start) || "—"}</b></span>
+          <i />
+          <span>{t("النهاية", "End")} <b>{txt(d.end) || "—"}</b></span>
+        </div>
+      )}
       {has(d.note) && <div className="op-nt">{txt(d.note)}</div>}
     </div>
   );
@@ -440,9 +447,28 @@ function OpEdit({
           </>
         )}
 
+        <div className="op-f">
+          <label>
+            <span>{t("تاريخ البداية", "Start")}</span>
+            <input
+              value={txt(f.start)}
+              placeholder={t("مثال: 1 يناير 2026م", "e.g. Jan 2026")}
+              onChange={(e) => set("start", e.target.value)}
+            />
+          </label>
+          <label>
+            <span>{t("تاريخ النهاية", "End")}</span>
+            <input
+              value={txt(f.end)}
+              placeholder={t("مثال: 31 ديسمبر 2026م", "e.g. Dec 2026")}
+              onChange={(e) => set("end", e.target.value)}
+            />
+          </label>
+        </div>
+
         <label className="op-note">
-          <span>{t("ملاحظات", "Notes")}</span>
-          <textarea rows={2} value={txt(f.note)} onChange={(e) => set("note", e.target.value)} />
+          <span>{t("حالة المساهمة", "Progress")}</span>
+          <textarea rows={3} value={txt(f.note)} onChange={(e) => set("note", e.target.value)} />
         </label>
 
         {err && <div className="op-err">{err}</div>}

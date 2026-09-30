@@ -11699,3 +11699,12 @@ input.cell-date {
   background: var(--g-100); border-radius: 9px;
   padding: 6px 9px; margin: 6px 0 2px; line-height: 1.6;
 }
+/* تاريخا البداية والنهاية على بطاقة بند الخطة */
+.op-it .op-dt {
+  display: flex; align-items: center; gap: 7px; margin-top: 6px;
+  font-size: 9px; color: var(--muted);
+}
+.op-it .op-dt b { color: var(--ink-2); font-weight: 700; }
+.op-it .op-dt i { flex: 1; height: 1px; background: var(--line2); }
+.cb-dt { font-size: 10.5px; color: var(--muted); margin: 0 0 8px; }
+.cb-dt b { color: var(--ink-2); font-weight: 700; }

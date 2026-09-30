@@ -2349,9 +2349,24 @@ function AddContrib({
           </>
         )}
 
+        <div className="op-f">
+          <label>
+            <span>{t("تاريخ البداية", "Start")}</span>
+            <input value={txt(f.start)} placeholder={t("مثال: 1 يناير 2026م", "e.g. Jan 2026")}
+                   onChange={(e) => set("start", e.target.value)} />
+          </label>
+          <label>
+            <span>{t("تاريخ النهاية", "End")}</span>
+            <input value={txt(f.end)} placeholder={t("مثال: 31 ديسمبر 2026م", "e.g. Dec 2026")}
+                   onChange={(e) => set("end", e.target.value)} />
+          </label>
+        </div>
+
         <label className="op-note">
-          <span>{t("ملاحظات", "Notes")}</span>
-          <textarea rows={2} value={txt(f.note)} onChange={(e) => set("note", e.target.value)} />
+          <span>{t("حالة المساهمة", "Progress")}</span>
+          <textarea rows={3} value={txt(f.note)}
+                    placeholder={t("أين وصل العمل؟", "Where does it stand?")}
+                    onChange={(e) => set("note", e.target.value)} />
         </label>
 
         <div className="m-f">
@@ -2475,9 +2490,34 @@ function ContribEdit({
           </>
         )}
 
+        {it.own && (
+          <div className="op-f">
+            <label>
+              <span>{t("تاريخ البداية", "Start")}</span>
+              <input value={txt(f.start)} onChange={(e) => set("start", e.target.value)} />
+            </label>
+            <label>
+              <span>{t("تاريخ النهاية", "End")}</span>
+              <input value={txt(f.end)} onChange={(e) => set("end", e.target.value)} />
+            </label>
+          </div>
+        )}
+        {!it.own && (has(it.data.start) || has(it.data.end)) && (
+          <p className="cb-dt">
+            {t("البداية", "Start")} <b>{txt(it.data.start) || "—"}</b>
+            {" · "}
+            {t("النهاية", "End")} <b>{txt(it.data.end) || "—"}</b>
+          </p>
+        )}
+
         <label className="op-note">
-          <span>{t("ملاحظات", "Notes")}</span>
-          <textarea rows={2} value={txt(f.note)} onChange={(e) => set("note", e.target.value)} />
+          <span>{t("حالة المساهمة", "Progress")}</span>
+          <textarea
+            rows={3}
+            value={txt(f.note)}
+            placeholder={t("أين وصل العمل؟", "Where does it stand?")}
+            onChange={(e) => set("note", e.target.value)}
+          />
         </label>
 
         <div className="m-f">
@@ -2492,6 +2532,8 @@ function ContribEdit({
               if (it.own) {
                 patch.name = txt(f.name);
                 patch.owner = txt(f.owner);
+                patch.start = txt(f.start);
+                patch.end = txt(f.end);
               }
               await onSave(patch);
               setBusy(false);
