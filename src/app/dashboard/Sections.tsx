@@ -25,7 +25,7 @@ type Rec = Record<string, any>;
 export type Item = { id: string; ord: number; data: Rec; updatedAt?: string; updatedBy?: string };
 type T = (ar: string, en: string) => string;
 
-export type SectionKey = "sessions" | "natstrat" | "inststrat" | "outputs" | "cx" | "projects";
+export type SectionKey = "sessions" | "natstrat" | "inststrat" | "outputs" | "cx" | "projects" | "opplan";
 
 export const SECTION_TITLE: Record<SectionKey, [string, string]> = {
   sessions: ["جلسات مراجعة الأداء", "Performance review sessions"],
@@ -34,11 +34,13 @@ export const SECTION_TITLE: Record<SectionKey, [string, string]> = {
   outputs: ["المخرجات الوطنية", "National outputs"],
   cx: ["أعمال قياس تجربة المستفيد من الخدمات الحكومية", "Beneficiary experience measurement"],
   projects: ["المشاريع الاستراتيجية", "Strategic projects"],
+  opplan: ["الخطة التشغيلية لإدارة عمليات الأداء", "Operational plan"],
 };
 
 /* اسم مختصر لعنصر القائمة الجانبية — الاسم الكامل يطول عليه */
 export const SECTION_NAV_TITLE: Partial<Record<SectionKey, [string, string]>> = {
   cx: ["قياس تجربة المستفيد", "Beneficiary experience"],
+  opplan: ["الخطة التشغيلية", "Operational plan"],
 };
 
 /* مراحل المسار — مبدئية حتى تعتمدها الإدارة المعنية */
@@ -3452,7 +3454,7 @@ export function SectionPage({
 /* ---------------- نافذة إدخال/تعديل بند ---------------- */
 type Field = { k: string; label: string; kind?: "num" | "text" | "date" | "bool" | "area" };
 
-const FIELDS: Record<Exclude<SectionKey, "outputs">, Field[]> = {
+const FIELDS: Record<Exclude<SectionKey, "outputs" | "opplan">, Field[]> = {
   sessions: [
     { k: "entity", label: "الجهة" },
     { k: "quarter", label: "الربع" },
@@ -3534,7 +3536,7 @@ function ItemForm({
   t: T;
   onClose: (changed: boolean) => void;
 }) {
-  const fields = FIELDS[section as Exclude<SectionKey, "outputs">] || [];
+  const fields = FIELDS[section as Exclude<SectionKey, "outputs" | "opplan">] || [];
   const [form, setForm] = useState<Rec>(() => ({ ...(item?.data || {}) }));
   const [stages, setStages] = useState<{ n: string; d: string }[]>(() => {
     if (section !== "sessions") return [];
