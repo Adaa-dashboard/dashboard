@@ -11684,3 +11684,18 @@ input.cell-date {
 .cb-ed .mt i.as { color: var(--g-800); background: var(--g-100); }
 .cb-ed .mt i.ct { color: #8a5a00; background: rgba(224, 151, 26, .16); }
 .op-q .r label input:disabled { background: var(--soft); color: var(--muted); }
+
+/* مصدر رقم المؤشر داخل نافذته — الرقم مشتقٌّ من صفحة القسم */
+.kpi-src {
+  margin-top: 12px; padding: 10px 12px; border-radius: 11px;
+  background: var(--soft); border: 1px solid var(--line2);
+  display: flex; flex-direction: column; gap: 5px;
+}
+.kpi-src > b { font-size: 11.5px; font-weight: 800; color: var(--g-800); }
+.kpi-src > span { font-size: 10.5px; color: var(--ink-2); line-height: 1.7; overflow-wrap: anywhere; }
+.kpi-src > em { font-style: normal; font-size: 10px; color: var(--muted); }
+.ec-derived {
+  font-size: 10.5px; font-weight: 700; color: var(--g-800);
+  background: var(--g-100); border-radius: 9px;
+  padding: 6px 9px; margin: 6px 0 2px; line-height: 1.6;
+}

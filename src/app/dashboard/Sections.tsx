@@ -3712,6 +3712,82 @@ export function sectionKpi(section: SectionKey, items: Item[]): SecKpi {
   return none;
 }
 
+/* ============================================================
+   توزيع منجز القسم على القطاعات — لنافذة المؤشر في «نظرة عامة»
+   ------------------------------------------------------------
+   بطاقةُ المؤشر تقرأ رقمها من صفحة القسم، لكن النافذة التفصيلية
+   بقيت تقرأ جدول «القياسات» المُدخَل يدوياً. فتناقض الرقمان:
+   مؤشر الاستراتيجيات المؤسسية على البطاقة جهةٌ واحدة فُعِّل قياسها،
+   وفي النافذة عشر موزّعةً على القطاعات من إدخالٍ قديم.
+   فصارت النافذة تُشتقّ من القسم نفسه بنفس قاعدة البطاقة.
+
+   وما لا يحمل بنودُه قطاعاً (الجلسات) يُعرض صفّاً واحداً، وما ليس
+   عدّاً أصلاً (الاستراتيجيات الوطنية نسبةُ تمثيلٍ لا عدد جهات)
+   يبقى على الإدخال اليدوي — فلا يُقحَم رقمٌ لا معنى له.
+   ============================================================ */
+export type SecSplit = {
+  /** اسم القطاع كما يُكتب في القسم ⇐ المنجز فيه · null حيث لا قطاع */
+  bySector: Record<string, number> | null;
+  total: number;
+  /** أسماء الجهات المنجَزة — تُذكر في النافذة فيُعرف الرقم من أين جاء */
+  names: string[];
+  /** آخر تحديثٍ لبندٍ منجَز */
+  updated: string;
+  unitLabel: [string, string];
+};
+
+/** يطابق «قطاع المالي والاقتصادي» مع «المالي والاقتصادي» */
+export const secKey = (v: unknown) =>
+  txt(v).replace(/^\s*قطاع\s+/, "").replace(/\s+/g, " ").trim();
+
+export function sectionSplit(section: SectionKey, items: Item[]): SecSplit | null {
+  if (!items.length) return null;
+  const lastUpd = (list: Item[]) =>
+    list.map((x) => x.updatedAt || "").filter(Boolean).sort().slice(-1)[0] || "";
+  const group = (list: Item[]) => {
+    const by: Record<string, number> = {};
+    for (const it of list) by[secKey(it.data.sector)] = (by[secKey(it.data.sector)] || 0) + 1;
+    return by;
+  };
+
+  if (section === "inststrat") {
+    const done = items.filter((it) => txt(it.data.live) === "مفعل");
+    return {
+      bySector: group(done),
+      total: done.length,
+      names: done.map((it) => txt(it.data.owner)).filter(Boolean),
+      updated: lastUpd(done),
+      unitLabel: ["جهة فُعِّل قياس استراتيجيتها", "measurement live"],
+    };
+  }
+
+  if (section === "cx") {
+    const { rows } = cxSplit(items);
+    const done = rows.filter((x) => CX_QS.some((q) => txt(x.data[`${q.k}Issue`]) === CX_OK));
+    return {
+      bySector: group(done),
+      total: done.length,
+      names: done.map((it) => txt(it.data.owner)).filter(Boolean),
+      updated: lastUpd(done),
+      unitLabel: ["جهازاً صدر له تقرير", "with a report"],
+    };
+  }
+
+  if (section === "sessions") {
+    /* بنود الجلسات بلا قطاع، فصفٌّ واحد أصدق من توزيعٍ مُختلَق */
+    const held = items.filter((it) => sessOf(it.data).done >= 4);
+    return {
+      bySector: null,
+      total: held.length,
+      names: held.map((it) => txt(it.data.entity)).filter(Boolean),
+      updated: lastUpd(held),
+      unitLabel: ["جهة عُقدت لها الجلسة النهائية", "final session held"],
+    };
+  }
+
+  return null;
+}
+
 /** الأقسام التي تُغذّي مؤشرات «نظرة عامة» */
 export const KPI_SECTIONS: SectionKey[] = ["cx", "sessions", "natstrat", "inststrat"];
 

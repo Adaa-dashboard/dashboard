@@ -45,6 +45,9 @@ import {
   SECTION_TITLE,
   SECTION_NAV_TITLE,
   type SectionKey,
+  useItems,
+  sectionSplit,
+  secKey,
 } from "./Sections";
 import {
   IconOverview,
@@ -1102,11 +1105,14 @@ function Overview({
         if (k && (k.pct != null || k.count != null)) {
           if (k.pct != null) value = Math.round(k.pct);
           else {
-            /* «عدد» لا «نسبة»: الإنجاز = المحقَّق ÷ المستهدف */
+            /* «عدد» لا «نسبة»: الإنجاز = المحقَّق ÷ المستهدف.
+               والمستهدف **مجموع** مستهدفات القطاعات لا أكبرها:
+               الرقم المحقَّق مجموع الجهات في القطاعات كلها، فقسمته
+               على مستهدف قطاعٍ واحد يضخّم النسبة (٨ بدل ١٩). */
             const tgts = sectors
               .map((s) => tgtForScope(refData, tkey(s.id, ind.id), scopeQ))
               .filter((x): x is number => !!x && x > 0);
-            const tgt = tgts.length ? Math.max(...tgts) : 0;
+            const tgt = tgts.reduce((a, b) => a + b, 0);
             value = tgt > 0 ? Math.round(((k.count as number) / tgt) * 100) : null;
           }
           src = link ? link.page : "";
@@ -1503,7 +1509,8 @@ function IndicatorModal({
   refData: RefData;
   onClose: () => void;
 }) {
-  const { t, lang } = useT();
+  const { t } = useT();
+  const link = indSection(indicator.name);
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" style={{ maxWidth: 920 }} onClick={(e) => e.stopPropagation()}>
@@ -1521,39 +1528,197 @@ function IndicatorModal({
           </button>
         </div>
 
-        <div className="sector-detail" style={{ overflowX: "auto", marginTop: 16, padding: 0 }}>
-          <table className="detail-table">
-            <thead>
-              <tr className="sub-head">
-                <th className="ind-col">{t("القطاع", "Sector")}</th>
-                <DetailHead />
+        {link ? (
+          <SplitRows
+            section={link.section}
+            page={link.page}
+            indicator={indicator}
+            sectors={sectors}
+            latest={latest}
+            scopeQ={scopeQ}
+            bands={bands}
+            refData={refData}
+          />
+        ) : (
+          <ManualRows
+            indicator={indicator}
+            sectors={sectors}
+            latest={latest}
+            scopeQ={scopeQ}
+            bands={bands}
+            refData={refData}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* الصفوف كما كانت: من «القياسات» المُدخَلة يدوياً */
+function ManualRows({
+  indicator, sectors, latest, scopeQ, bands, refData,
+}: {
+  indicator: Indicator & { num: number };
+  sectors: Sector[];
+  latest: Map<string, Measurement>;
+  scopeQ: number | null;
+  bands: Band[];
+  refData: RefData;
+}) {
+  const { t, lang } = useT();
+  return (
+    <div className="sector-detail" style={{ overflowX: "auto", marginTop: 16, padding: 0 }}>
+      <table className="detail-table">
+        <thead>
+          <tr className="sub-head">
+            <th className="ind-col">{t("القطاع", "Sector")}</th>
+            <DetailHead />
+          </tr>
+        </thead>
+        <tbody>
+          {sectors.map((s) => {
+            const key = tkey(s.id, indicator.id);
+            const m = latest.get(key);
+            const tgt = tgtForScope(refData, key, scopeQ);
+            const r = evaluate(m?.actual, tgt, bands);
+            return (
+              <tr key={s.id}>
+                <td className="ind-col">{s.name}</td>
+                <DetailCells
+                  target={fmtValue(tgt, indicator.unit)}
+                  actual={fmtValue(m?.actual, indicator.unit)}
+                  pct={r.achievement != null ? `${Math.round(r.achievement)}%` : "—"}
+                  updated={fmtDate(m?.updatedAt, lang)}
+                  bg={r.bg}
+                  color={r.color}
+                />
               </tr>
-            </thead>
-            <tbody>
-              {sectors.map((s) => {
-                const key = tkey(s.id, indicator.id);
-                const m = latest.get(key);
-                const tgt = tgtForScope(refData, key, scopeQ);
-                const r = evaluate(m?.actual, tgt, bands);
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ============================================================
+   صفوف المؤشر المرتبط بصفحة — تُشتقّ منها لا من «القياسات»
+   ------------------------------------------------------------
+   بطاقةُ المؤشر تقرأ صفحة القسم أصلاً، فبقاءُ النافذة على الإدخال
+   اليدوي كان يُظهر رقمين متناقضين للمؤشر الواحد. وما لا يُشتقّ
+   (الاستراتيجيات الوطنية نسبةٌ لا عدد) يرجع إلى الجدول اليدوي.
+   ============================================================ */
+function SplitRows({
+  section, page, indicator, sectors, latest, scopeQ, bands, refData,
+}: {
+  section: SectionKey;
+  page: string;
+  indicator: Indicator & { num: number };
+  sectors: Sector[];
+  latest: Map<string, Measurement>;
+  scopeQ: number | null;
+  bands: Band[];
+  refData: RefData;
+}) {
+  const { t, lang } = useT();
+  const { items, loaded } = useItems(section);
+  const split = useMemo(() => (loaded ? sectionSplit(section, items) : null), [loaded, section, items]);
+
+  if (!loaded) return <div className="empty" style={{ marginTop: 16 }}>{t("جارٍ التحميل...", "Loading...")}</div>;
+  if (!split)
+    return (
+      <ManualRows
+        indicator={indicator}
+        sectors={sectors}
+        latest={latest}
+        scopeQ={scopeQ}
+        bands={bands}
+        refData={refData}
+      />
+    );
+
+  /* قطاعاتُ المرجع أولاً، ثم أي قطاعٍ ورد في الصفحة وليس فيها */
+  const known = new Set(sectors.map((s) => secKey(s.name)));
+  const extra = split.bySector
+    ? Object.keys(split.bySector).filter((k) => k && !known.has(k))
+    : [];
+  const upd = fmtDate(split.updated, lang);
+
+  return (
+    <>
+      <div className="sector-detail" style={{ overflowX: "auto", marginTop: 16, padding: 0 }}>
+        <table className="detail-table">
+          <thead>
+            <tr className="sub-head">
+              <th className="ind-col">{t("القطاع", "Sector")}</th>
+              <DetailHead />
+            </tr>
+          </thead>
+          <tbody>
+            {split.bySector ? (
+              [...sectors.map((s) => ({ id: s.id, name: s.name, k: secKey(s.name) })),
+               ...extra.map((k) => ({ id: `x-${k}`, name: k, k }))].map((s) => {
+                const done = split.bySector?.[s.k] ?? 0;
+                const tgt = tgtForScope(refData, tkey(s.id, indicator.id), scopeQ);
+                const r = evaluate(done, tgt, bands);
                 return (
                   <tr key={s.id}>
                     <td className="ind-col">{s.name}</td>
                     <DetailCells
                       target={fmtValue(tgt, indicator.unit)}
-                      actual={fmtValue(m?.actual, indicator.unit)}
+                      actual={fmtValue(done, indicator.unit)}
                       pct={r.achievement != null ? `${Math.round(r.achievement)}%` : "—"}
-                      updated={fmtDate(m?.updatedAt, lang)}
+                      updated={done ? upd : ""}
                       bg={r.bg}
                       color={r.color}
                     />
                   </tr>
                 );
-              })}
-            </tbody>
-          </table>
-        </div>
+              })
+            ) : (
+              <tr>
+                <td className="ind-col">{t("كل القطاعات", "All sectors")}</td>
+                {(() => {
+                  const tgts = sectors
+                    .map((s) => tgtForScope(refData, tkey(s.id, indicator.id), scopeQ))
+                    .filter((x): x is number => !!x && x > 0);
+                  const tgt = tgts.length ? tgts.reduce((a, b) => a + b, 0) : null;
+                  const r = evaluate(split.total, tgt, bands);
+                  return (
+                    <DetailCells
+                      target={fmtValue(tgt, indicator.unit)}
+                      actual={fmtValue(split.total, indicator.unit)}
+                      pct={r.achievement != null ? `${Math.round(r.achievement)}%` : "—"}
+                      updated={upd}
+                      bg={r.bg}
+                      color={r.color}
+                    />
+                  );
+                })()}
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
-    </div>
+
+      <div className="kpi-src">
+        <b>
+          {t(
+            `المصدر: صفحة «${page}» — ${split.total} ${split.unitLabel[0]}`,
+            `Source: ${page} — ${split.total} ${split.unitLabel[1]}`,
+          )}
+        </b>
+        {split.names.length > 0 && (
+          <span>{split.names.slice(0, 12).join(" · ")}{split.names.length > 12 ? " …" : ""}</span>
+        )}
+        <em>
+          {t(
+            "هذا الرقم يُحسب من الصفحة مباشرة، فتحديثها يغيّره — ولا يُدخَل في «القياسات».",
+            "Computed from the page.",
+          )}
+        </em>
+      </div>
+    </>
   );
 }
 
@@ -1622,8 +1787,11 @@ function DataEntry({ me, refData, reload }: { me: Me; refData: RefData; reload: 
     setLoading(true);
     try {
       const pid = await ensureCurrentPeriodId();
-      // المنجز = القيمة المُدخَلة مباشرةً (المستهدف ثابت من شاشة المستهدفات)
-      const items = indicators.map((ind) => ({
+      /* المنجز = القيمة المُدخَلة مباشرةً (المستهدف ثابت من شاشة
+         المستهدفات). والمؤشر الذي له صفحة تحسبه لا يُكتب له شيء:
+         رقمه يُقرأ من صفحته، فكتابته هنا تُنشئ رقماً ثانياً مهملاً
+         — وهو أصل اختلاف بطاقة المؤشر عن نافذته. */
+      const items = indicators.filter((ind) => !indSection(ind.name)).map((ind) => ({
         sectorId,
         indicatorId: ind.id,
         periodId: pid,
@@ -1688,7 +1856,8 @@ function DataEntry({ me, refData, reload }: { me: Me; refData: RefData; reload: 
       <div className="entry-cards">
         {indicators.map((ind, i) => {
           const tgt = targetOf(ind.id);
-          const av = vals[ind.id] ?? "";
+          const link = indSection(ind.name);
+          const av = link ? "" : vals[ind.id] ?? "";
           const r = evaluate(av === "" ? null : Number(av), tgt, bands);
           return (
             <div className="entry-card" key={ind.id}>
@@ -1696,6 +1865,14 @@ function DataEntry({ me, refData, reload }: { me: Me; refData: RefData; reload: 
                 <span className="ec-num">KPI {i + 1}</span>
                 {ind.name}
               </div>
+              {link && (
+                <div className="ec-derived">
+                  {t(
+                    `يُحسب تلقائياً من صفحة «${link.page}» — لا يُدخَل هنا. حدِّث الصفحة يتحدّث المؤشر.`,
+                    `Computed from ${link.page} — not entered here.`,
+                  )}
+                </div>
+              )}
               <div className="ec-boxes">
                 <div className="ec-box">
                   <label>{t("المستهدف (ثابت)", "Target (fixed)")}</label>
@@ -1714,17 +1891,23 @@ function DataEntry({ me, refData, reload }: { me: Me; refData: RefData; reload: 
                     type="number"
                     min="0"
                     step="1"
-                    placeholder="—"
+                    placeholder={link ? t("من الصفحة", "from page") : "—"}
                     value={av}
+                    disabled={!!link}
+                    readOnly={!!link}
                     onChange={(e) => setVal(ind.id, e.target.value)}
                   />
                 </div>
               </div>
               <div className="ec-status">
                 <span className="badge" style={{ background: r.bg, color: r.color }}>
-                  {r.achievement != null ? `${Math.round(r.achievement)}% · ${r.label}` : t("لم يُعبّأ", "Not filled")}
+                  {link
+                    ? t("من الصفحة", "From page")
+                    : r.achievement != null
+                      ? `${Math.round(r.achievement)}% · ${r.label}`
+                      : t("لم يُعبّأ", "Not filled")}
                 </span>
-                {updated[ind.id] && (
+                {!link && updated[ind.id] && (
                   <span className="muted" style={{ fontSize: 11, marginInlineStart: 8 }}>
                     {t("آخر تحديث:", "Last update:")} {fmtDate(updated[ind.id], lang)}
                   </span>
