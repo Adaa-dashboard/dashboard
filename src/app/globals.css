@@ -184,6 +184,17 @@ textarea {
   background: var(--bg2);
   color: var(--text);
 }
+/* مربع الاختيار وزرّ الاختيار ليسا حقلَي كتابة: `width:100%`
+   أعلاه كان يمدّهما على عرض السطر كله، فيُزاح ما بجانبهما إلى صفر
+   عرض وينكسر نصّه عمودياً — وهو ما طوّل شريط أزرار نافذة رفع
+   الجهات مئات البكسلات. */
+input[type="checkbox"],
+input[type="radio"] {
+  width: auto;
+  flex: none;
+  padding: 0;
+  border-radius: 0;
+}
 input::placeholder,
 textarea::placeholder {
   color: var(--muted);
@@ -454,12 +465,20 @@ tr:last-child td {
   cursor: pointer;
   line-height: 1;
 }
+/* شريط أزرار النافذة.
+   `flex: none` و`nowrap` على الأزرار ضرورةٌ لا زينة: بجانبها في
+   بعض النوافذ نصٌّ طويل (خيار «الملف هو المرجع») يأخذ العرض كلّه،
+   فتنسحق الأزرار إلى عرض حرفٍ واحد وينكسر نصّها عمودياً فيطول
+   الشريط مئات البكسلات. والالتفاف يُنزل النصّ سطراً فوقها. */
 .m-f {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 16px;
 }
+.m-f > .btn { flex: none; white-space: nowrap; }
 .modal {
   background: var(--panel);
   border: 1px solid var(--border);
@@ -10687,17 +10706,22 @@ input.cell-date {
 .en2-due .dr button:disabled { opacity: .5; cursor: default; }
 
 /* «الملف هو المرجع» في نافذة الرفع */
+/* سطرٌ كامل فوق الأزرار — نصُّه أطول من أن يقاسمها الصفّ */
 .imp-ex {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  flex: 1;
-  min-width: 240px;
+  flex: 1 1 100%;
+  min-width: 0;
   cursor: pointer;
   text-align: start;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line2);
+  margin-bottom: 4px;
 }
 .imp-ex input { margin-top: 2px; flex: none; }
-.imp-ex > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+/* `flex:1` لا `auto`: بلا نموٍّ صريح ينسحق النصّ إلى صفر عرض */
+.imp-ex > span { display: flex; flex-direction: column; gap: 2px; flex: 1 1 0; min-width: 0; }
 .imp-ex b { font-size: 11.5px; font-weight: 800; color: var(--gt-900); }
 .imp-ex em { font-style: normal; font-size: 10.5px; color: var(--muted); line-height: 1.5; }
 
