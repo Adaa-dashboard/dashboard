@@ -12,7 +12,7 @@ import { PIcon, IconPicker } from "./pickicons";
 import { IconGear } from "./icons";
 import MyEntities, { contribsOf, sumOf } from "./Entities";
 import { publishUndo } from "@/lib/undoBus";
-import { useLogos, logoKey, SESS_SHORT, INST_COLS, CX_COLS, CX_QS, cxStagesOf } from "./Sections";
+import { useLogos, logoKey, SESS_SHORT, INST_COLS, CX_COLS, CX_QS, cxStagesOf, SECTION_TITLE } from "./Sections";
 import { OP_OWNERS, OP_STATUSES, opFix, opRoles, opStatus, opTone } from "./OpPlan";
 import { initials, toneOf } from "@/lib/entlogo";
 import { asset } from "@/lib/base";
@@ -1236,6 +1236,109 @@ function mainChips(sec: MainSec, rows: MineRow[]): { k: string; v: number }[] {
 
 
 
+/* ============================================================
+   إضافة جهة إلى قسمٍ من الأعمال الرئيسية
+   ------------------------------------------------------------
+   الاختيار من **جهات الاستشاري نفسه** لا بالكتابة الحرة: الحارس
+   في القاعدة يرفض ما سواها، فقائمةٌ تمنع الخطأ قبل وقوعه. وتُستبعد
+   منها ما له بندٌ أصلاً، إلا في الوطنية — فللجهة الواحدة أكثر من
+   استراتيجية، والتمييز باسمها.
+   ============================================================ */
+function AddMainEnt({
+  sec, have, busy, t, onClose, onAdd,
+}: {
+  sec: MainSec;
+  have: string[];
+  busy: boolean;
+  t: T;
+  onClose: () => void;
+  onAdd: (entity: string, title: string) => void;
+}) {
+  const [mine, setMine] = useState<{ name: string }[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [ent, setEnt] = useState("");
+  const [title, setTitle] = useState("");
+
+  useEffect(() => {
+    void apiFetch("/api/entities/mine")
+      .then((r) => r.json())
+      .then((d) => setMine(Array.isArray(d.mine) ? (d.mine as { name: string }[]) : []))
+      .catch(() => setMine([]))
+      .finally(() => setLoaded(true));
+  }, []);
+
+  const hv = useMemo(() => new Set(have.map((x) => nrm(x)).filter(Boolean)), [have]);
+  const opts = useMemo(() => {
+    const names = Array.from(new Set(mine.map((m) => txt(m.name).trim()).filter(Boolean)));
+    names.sort((a, b) => a.localeCompare(b, "ar"));
+    return sec === "natstrat" ? names : names.filter((n) => !hv.has(nrm(n)));
+  }, [mine, hv, sec]);
+
+  const isNat = sec === "natstrat";
+  const ok = !!ent && (!isNat || !!title.trim());
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="m-h">
+          <h3>{t(`إضافة جهة إلى ${SECTION_TITLE[sec][0]}`, "Add an entity")}</h3>
+          <button className="mx" onClick={onClose} aria-label="close">✕</button>
+        </div>
+
+        {!loaded ? (
+          <div className="pf-none">{t("جارٍ التحميل…", "Loading…")}</div>
+        ) : !opts.length ? (
+          <div className="pf-none">
+            {mine.length
+              ? t("كل جهاتك لها بندٌ في هذا القسم.", "All your entities are already here.")
+              : t(
+                  "لا توجد جهات مسندة إليك في «الجهات ونقاط التواصل».",
+                  "No entities assigned to you.",
+                )}
+          </div>
+        ) : (
+          <>
+            <div className="op-f">
+              <label className="wide">
+                <span>{t("الجهة", "Entity")}</span>
+                <select value={ent} onChange={(e) => setEnt(e.target.value)}>
+                  <option value="">{t("— اختر من جهاتك —", "— pick —")}</option>
+                  {opts.map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </label>
+              {isNat && (
+                <label className="wide">
+                  <span>{t("اسم الاستراتيجية", "Strategy name")}</span>
+                  <input
+                    value={title}
+                    placeholder={t("مثال: استراتيجية التنمية بمنطقة الأحساء", "Strategy name")}
+                    onChange={(e) => setTitle(e.target.value)}
+                  />
+                </label>
+              )}
+            </div>
+            <p className="muted" style={{ fontSize: 11.5, lineHeight: 1.7 }}>
+              {t(
+                `يُنشأ البند في صفحة «${SECTION_TITLE[sec][0]}» باسمك استشارياً، ويظهر هنا في محفظتك لتحدّثه.`,
+                "Created on the section page with you as the consultant.",
+              )}
+            </p>
+          </>
+        )}
+
+        <div className="m-f">
+          <button className="btn btn-ghost" onClick={onClose}>{t("إلغاء", "Cancel")}</button>
+          <button className="btn" disabled={!ok || busy} onClick={() => onAdd(ent, title.trim())}>
+            {busy ? t("يُضاف…", "Adding…") : t("إضافة", "Add")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const NAT_STAGE = ["طور الإعداد/التحديث", "قيد المراجعة", "معتمدة من اللجنة", "معتمدة من مجلس الوزراء"];
 
 /* ============================================================
@@ -1354,9 +1457,12 @@ function FldBox({ f, v, dis, onPut }: { f: Fld; v: unknown; dis?: boolean; onPut
   );
 }
 /** الحقل الذي يحمل اسم جهة البند في كل قسم */
-const MAIN_ENT: Record<MainSec, string> = { natstrat: "owner", inststrat: "name", cx: "name" };
+/* المؤسسية تسمّي الجهة `owner` كالوطنية — كانت هنا `name` فلا
+   يطابق شيءٌ، فتُعرض بنودها بلا اسمٍ ولا شعار ولا تصل من شاركها
+   صاحبُها إلا إن كان اسمه في `consultant`. */
+const MAIN_ENT: Record<MainSec, string> = { natstrat: "owner", inststrat: "owner", cx: "name" };
 /** عنوان الصف: الاستراتيجية في الوطنية، والجهة في البقية */
-const MAIN_TITLE: Record<MainSec, string> = { natstrat: "name", inststrat: "name", cx: "name" };
+const MAIN_TITLE: Record<MainSec, string> = { natstrat: "name", inststrat: "owner", cx: "name" };
 
 const QLABS = ["الربع الأول", "الربع الثاني", "الربع الثالث", "الربع الرابع"];
 const YR_NOW = new Date().getFullYear();
@@ -1481,6 +1587,9 @@ function MainWork({
      فعرضُها كلها لكل جهة يجعل النافذة جداراً من الصناديق. الجهة
      تُفتح بالضغط على اسمها. */
   const [shown2, setShown2] = useState<Record<string, boolean>>({});
+  /* إضافة جهة إلى القسم — تُفتح من الشريط داخل النافذة */
+  const [add, setAdd] = useState<{ entity: string; title: string } | null>(null);
+  const [adding, setAdding] = useState(false);
   const logos = useLogos();
 
   /* بطاقة الجلسة لكل جهة — بها تُعرض أرقام التعثّر وتُحرَّر */
@@ -1506,6 +1615,29 @@ function MainWork({
       setMsg(d.error || t("تعذّر الحفظ", "Save failed"));
       onReload();
     } else setMsg("");
+  }
+
+  async function addEntity(entity: string, title: string) {
+    setAdding(true);
+    const r = await apiFetch("/api/items/mine/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ section: sec, entity, title }),
+    });
+    setAdding(false);
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      setMsg(txt(d.error) || t("تعذّرت الإضافة", "Could not add"));
+      return;
+    }
+    setAdd(null);
+    setMsg(
+      t(
+        `أُضيفت «${entity}» — تظهر الآن هنا وفي صفحة ${SECTION_TITLE[sec][0]}`,
+        `Added — it now appears on the ${sec} page too`,
+      ),
+    );
+    onReload();
   }
 
   async function flagSession(entity: string, on: boolean, key: string, ex: Rec, seed: Rec) {
@@ -1534,15 +1666,6 @@ function MainWork({
   }
 
   if (!loaded) return <div className="pf-none">{t("جارٍ التحميل…", "Loading…")}</div>;
-  if (!rows.length)
-    return (
-      <div className="pf-none">
-        {t(
-          "لا توجد بنود مسندة إليك — تُسنَد بأن تكون نقطة التواصل الأساسية لجهتها في «الجهات ونقاط التواصل».",
-          "Nothing assigned to you yet.",
-        )}
-      </div>
-    );
 
   const shown = full ? rows : rows.slice(0, 3);
 
@@ -1559,7 +1682,28 @@ function MainWork({
             ))}
           </select>
           <b>{t(`${rows.length} جهة`, `${rows.length} entities`)}</b>
+          <button className="mw-add" onClick={() => setAdd({ entity: "", title: "" })}>
+            + {t("إضافة جهة", "Add entity")}
+          </button>
         </div>
+      )}
+      {!rows.length && (
+        <div className="pf-none">
+          {t(
+            "لا توجد بنود مسندة إليك — تُسنَد بأن تكون نقطة التواصل الأساسية لجهتها في «الجهات ونقاط التواصل»، أو تُضاف من زرّ «إضافة جهة».",
+            "Nothing assigned to you yet.",
+          )}
+        </div>
+      )}
+      {add && (
+        <AddMainEnt
+          sec={sec}
+          have={rows.map((r) => txt(r.data[MAIN_ENT[sec]]))}
+          busy={adding}
+          t={t}
+          onClose={() => setAdd(null)}
+          onAdd={addEntity}
+        />
       )}
       {shown.map((it) => {
         const key = `${sec}:${it.id}`;

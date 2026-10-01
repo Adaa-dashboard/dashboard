@@ -3767,7 +3767,7 @@ export function sectionSplit(section: SectionKey, items: Item[]): SecSplit | nul
     return {
       bySector: group(done),
       total: done.length,
-      names: done.map((it) => txt(it.data.owner)).filter(Boolean),
+      names: done.map((it) => txt(it.data.name)).filter(Boolean),
       updated: lastUpd(done),
       unitLabel: ["جهازاً صدر له تقرير", "with a report"],
     };
