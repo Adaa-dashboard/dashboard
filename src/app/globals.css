@@ -11764,3 +11764,12 @@ input.cell-date {
 @media (max-width: 760px)  { .pf .c3 { grid-template-columns: 1fr; } }
 /* الأعمدة لا تتمدّد لطول أطولها — العمود القصير كان يترك فراغاً */
 .pf .c3 { align-items: start; }
+/* زرّ «إضافة جهة» في شريط نافذة الأعمال الرئيسية */
+.mw-bar .mw-add {
+  margin-inline-start: auto;
+  font: inherit; font-size: 11px; font-weight: 800; cursor: pointer;
+  padding: 5px 12px; border-radius: 9px; white-space: nowrap;
+  background: var(--g-100); color: var(--g-800);
+  border: 1px solid color-mix(in srgb, var(--g-700) 28%, var(--line2));
+}
+.mw-bar .mw-add:hover { background: var(--g-200, var(--g-100)); border-color: var(--g-700); }

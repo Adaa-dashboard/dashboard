@@ -869,6 +869,20 @@ export async function apiFetch(path: string, init: Init = {}) {
       return ok({ ok: data === true });
     }
 
+    /* جهةٌ بلا بندٍ في صفحة قسمها — تُضاف من المحفظة، والحارس في
+       القاعدة يتحقّق أنها من جهات صاحب الجلسة */
+    if (p === "/api/items/mine/add" && method === "POST") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const { data, error } = await s.rpc("perf_item_mine_add", {
+        p_section: str(body.section),
+        p_entity: str(body.entity),
+        p_title: str(body.title || ""),
+      });
+      if (error) return err(error.message, 403);
+      return ok({ ok: true, id: String(data || "") });
+    }
+
     /* «تحتاج جلسة مراجعة أداء» ⇒ تُفتح للجهة بطاقة في صفحة الجلسات */
     if (p === "/api/items/session-flag" && method === "POST") {
       const me = await whoAmI();
