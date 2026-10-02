@@ -1019,6 +1019,8 @@ function lastUpdatedOf(measurements: Measurement[]): string {
 }
 
 /* ============ النظرة العامة ============ */
+/** سنةُ القراءة — تُعرض في فلتر النطاق بدل «السنة كاملة» */
+const YR_NOW = new Date().getFullYear();
 const SCOPES: { key: string; label: string; en: string; q: number | null }[] = [
   { key: "year", label: "السنة كاملة", en: "Full Year", q: null },
   { key: "q1", label: "الربع الأول", en: "Q1", q: 1 },
@@ -1278,7 +1280,9 @@ function Overview({
             >
               {SCOPES.map((x) => (
                 <option key={x.key} value={x.key}>
-                  {t(x.label, x.en)}
+                  {/* السنة بسنتها لا بكلمة «السنة كاملة»: أقصر، وتقول
+                      أيَّ سنةٍ تُقرأ الأرقام عليها */}
+                  {x.key === "year" ? String(YR_NOW) : x.en}
                 </option>
               ))}
             </select>

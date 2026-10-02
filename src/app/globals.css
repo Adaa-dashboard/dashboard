@@ -11810,7 +11810,10 @@ input.cell-date {
 /* ===== حالة المؤشرات: الشرائح في صفٍّ واحد + اختيار الربع ===== */
 /* الثلاث شرائح كانت تنزل سطرين لعرضها، والعنوان واختيار الربع
    معها في الصفّ — فصُغِّرت حتى تجتمع كلها في سطر */
-.pills.sm { gap: 5px; flex-wrap: nowrap; }
+/* تلتفّ ولا تطفح: `nowrap` كان يجعل أقلّ عرضٍ لها عرضَ الثلاث
+   مجتمعةً، فتدفع فلترَ الأرباع خارج حدّ المربّع على الشاشات
+   المتوسطة بدل أن تنزل سطراً */
+.pills.sm { gap: 5px; flex-wrap: wrap; min-width: 0; }
 .pills.sm .pill {
   gap: 5px; padding: 3px 9px; font-size: 10.5px; font-weight: 700;
   border-width: 1px; white-space: nowrap;
@@ -11823,10 +11826,10 @@ input.cell-date {
    تعطي الحقول 100% فتبتلع الصفّ. */
 select.qsel {
   width: auto; flex: none;
-  font: inherit; font-size: 10.5px; font-weight: 800;
+  font: inherit; font-size: 9.5px; font-weight: 800;
   color: var(--g-800); background: var(--soft);
-  border: 1px solid var(--line2); border-radius: 9px;
-  padding: 4px 8px; cursor: pointer;
+  border: 1px solid var(--line2); border-radius: 8px;
+  padding: 3px 6px; cursor: pointer;
 }
 select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--line2)); }
 .qnote {
@@ -11834,10 +11837,7 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
   margin: 0 0 8px; padding: 5px 9px;
   background: var(--soft); border-radius: 8px;
 }
-@media (max-width: 900px) {
-  .card-top { flex-wrap: wrap; }
-  .pills.sm { flex-wrap: wrap; }
-}
+.card-top { flex-wrap: wrap; }
 .newent-s.first { margin-top: 0; padding-top: 0; border-top: 0; }
 .newent-s > i {
   font-style: normal; font-weight: 800; color: var(--g-800);
