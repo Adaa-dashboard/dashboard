@@ -1640,8 +1640,33 @@ export async function apiFetch(path: string, init: Init = {}) {
           sectorId: g.sector_id, indicatorId: g.indicator_id,
         });
       }
-      items.sort((a, b) => (b.at || "").localeCompare(a.at || ""));
-      const top = items.slice(0, 6);
+      /* ============================================================
+         ما يصل «آخر التحديثات» = ما يُرى في «نظرة عامة» وحدها
+         ------------------------------------------------------------
+         الصندوق يقع في نظرة عامة، فتحديثٌ عن بندٍ لا أثر له في
+         الصفحة يصرف النظر عمّا فيها. والمهام الشخصية أوضح مثال:
+         «اكتملت المهمة: ارفع ملاحظاتك على تقييمك» لا شأن للوحة به.
+         والتكاليف تبقى — فـ«التكاليف الواردة للمركز» قسمٌ في
+         الصفحة. والبوّابة واحدةٌ هنا لا شروطٌ متفرّقة في كل مُنتج.
+         ============================================================ */
+      const OV_SECTIONS = new Set([
+        "natstrat", "inststrat", "cx", "projects", "changes", "opplan", "outputs", "assignments",
+      ]);
+      const onOverview = (x: Item) => {
+        /* المهام الشخصية وصفحتها ليستا في نظرة عامة */
+        if (x.kind === "task") return false;
+        /* الجهات تُراجَع في صفحتها «الجهات ونقاط التواصل» */
+        if (x.kind === "entity") return false;
+        /* ملاحظةٌ لاصقة: على نظرة عامة أو على قسمٍ معروضٍ فيها */
+        if (x.kind === "sticky") return x.section === "overview" || OV_SECTIONS.has(x.section || "");
+        /* بند قسم: إن كان قسمه معروضاً في الصفحة */
+        if (x.kind === "section") return OV_SECTIONS.has(x.section || "");
+        /* المؤشرات ومستهدفاتها وتعليقاتها وطلبات التغيير والتكاليف */
+        return ["measurement", "target", "note", "change", "assignment"].includes(x.kind);
+      };
+      const shown = items.filter(onOverview);
+      shown.sort((a, b) => (b.at || "").localeCompare(a.at || ""));
+      const top = shown.slice(0, 6);
       /* إعلانات المطوّر كتلةٌ مستقلة تحت عنوانها — لا تزاحم
          تحديثات العمل ولا تُدفن تحتها */
       const notices = (ntc.data || []).map((r) => ({

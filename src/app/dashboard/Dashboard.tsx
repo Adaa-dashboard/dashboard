@@ -1035,7 +1035,9 @@ function Overview({
   const sectors = visibleSectors(me, refData);
   const indicators = activeIndicators(refData);
   const bands = refData.statuses;
-  const scope = "year";
+  /* نطاق المقارنة: السنة كاملة أو ربعٌ بعينه — المستهدف يتغيّر
+     بتغيّره. كان ثابتاً على السنة بلا خيار. */
+  const [scope, setScope] = useState("year");
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [loading, setLoading] = useState(true);
   const [asgFocus, setAsgFocus] = useState<string | null>(null);
@@ -1245,7 +1247,7 @@ function Overview({
         <div className="card">
           <div className="card-top">
             <h3>{t("حالة المؤشرات", "KPI status")}</h3>
-            <span className="pills">
+            <span className="pills sm">
               {bands.map((b) => (
                 <button
                   key={b.label}
@@ -1259,7 +1261,28 @@ function Overview({
                 </button>
               ))}
             </span>
+            {/* الربع يغيّر **المستهدف** الذي تُقاس عليه النسبة */}
+            <span className="qsel">
+              {SCOPES.map((x) => (
+                <button
+                  key={x.key}
+                  className={scope === x.key ? "on" : ""}
+                  onClick={() => setScope(x.key)}
+                  title={t(x.label, x.en)}
+                >
+                  {x.key === "year" ? t("السنة", "Year") : x.en}
+                </button>
+              ))}
+            </span>
           </div>
+          {scopeQ != null && (
+            <div className="qnote">
+              {t(
+                `النسبة مقيسةٌ على مستهدف ${SCOPES.find((x) => x.key === scope)?.label} — والمنجز تراكميٌّ حتى الآن.`,
+                "Measured against the quarter's target; the achieved value is cumulative.",
+              )}
+            </div>
+          )}
           {/* المؤشرات أعمدةً: الأطول إنجازاً أولاً، ولونُ كلٍّ لون حالته،
               وما لا قياس له عمودٌ مخطَّط بـ«—» فلا يختفي من اللوحة */}
           {loading ? (
