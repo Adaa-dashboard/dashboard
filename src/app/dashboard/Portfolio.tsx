@@ -12,7 +12,7 @@ import { PIcon, IconPicker } from "./pickicons";
 import { IconGear } from "./icons";
 import MyEntities, { contribsOf, sumOf } from "./Entities";
 import { publishUndo } from "@/lib/undoBus";
-import { useLogos, logoKey, SESS_SHORT, INST_COLS, CX_COLS, CX_QS, cxStagesOf, SECTION_TITLE } from "./Sections";
+import { useLogos, logoKey, SESS_SHORT, INST_COLS, INST_SECTORS, CX_COLS, CX_QS, cxStagesOf, SECTION_TITLE } from "./Sections";
 import { OP_OWNERS, OP_STATUSES, opFix, opRoles, opStatus, opTone } from "./OpPlan";
 import { initials, toneOf } from "@/lib/entlogo";
 import { asset } from "@/lib/base";
@@ -1237,6 +1237,141 @@ function mainChips(sec: MainSec, rows: MineRow[]): { k: string; v: number }[] {
 
 
 /* ============================================================
+   إضافة جهة إلى السجلّ المركزي وإسنادها إليّ
+   ------------------------------------------------------------
+   الجهة تُضاف حيث تُقرأ: في «الجهات ونقاط التواصل». وتُسند لمن
+   أضافها نقطةَ تواصلٍ أساسية من المركز، فتظهر في محفظته وفي
+   قوائم إضافة الأقسام. وإن كانت مسجّلةً ومسندةً لغيره فلا تُنتزع
+   منه — تُذكر باسم متولّيها ليطلب مشاركتها.
+   ============================================================ */
+function NewEntity({ t, onDone }: { t: T; onDone: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState<Rec>({});
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [bad, setBad] = useState(false);
+  const set = (k: string, v: string) => setF((o) => ({ ...o, [k]: v }));
+
+  async function go() {
+    const name = txt(f.name).trim();
+    if (!name || busy) return;
+    setBusy(true);
+    setMsg("");
+    const r = await apiFetch("/api/entities/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name,
+        kind: txt(f.kind),
+        sector: txt(f.sector),
+        theirName: txt(f.theirName),
+        theirPhone: txt(f.theirPhone),
+        theirEmail: txt(f.theirEmail),
+      }),
+    })
+      .then((x) => x.json())
+      .catch(() => ({ error: "تعذّر الاتصال" }));
+    setBusy(false);
+    if (r?.error) {
+      setBad(true);
+      setMsg(String(r.error));
+      return;
+    }
+    setBad(false);
+    setMsg(
+      r.existed
+        ? t(
+            `«${name}» مسجّلة في السجلّ — نقطة التواصل فيها: ${r.owner || "—"}`,
+            `Already in the registry — contact: ${r.owner || "—"}`,
+          )
+        : t(`أُضيفت «${name}» وأُسندت إليك — عبّئ نقاط التواصل من بطاقتها أعلاه.`, "Added."),
+    );
+    if (!r.existed) setF({});
+    onDone();
+  }
+
+  if (!open)
+    return (
+      <div className="newent-c">
+        <button className="newent-b" onClick={() => setOpen(true)}>
+          + {t("إضافة جهة", "Add an entity")}
+        </button>
+        <span>
+          {t(
+            "تُضاف إلى سجلّ «الجهات ونقاط التواصل» وتُسند إليك، فتظهر هنا ببطاقتها وفي قوائم الأقسام.",
+            "Added to the central registry and assigned to you.",
+          )}
+        </span>
+      </div>
+    );
+
+  return (
+    <div className="newent">
+      <div className="newent-h">
+        <b>{t("إضافة جهة", "Add an entity")}</b>
+        <button onClick={() => setOpen(false)}>{t("إغلاق", "Close")}</button>
+      </div>
+      <div className="op-f">
+        <label className="wide">
+          <span>{t("اسم الجهة", "Entity name")}</span>
+          <input value={txt(f.name)} onChange={(e) => set("name", e.target.value)} />
+        </label>
+        <label>
+          <span>{t("التصنيف", "Kind")}</span>
+          <input
+            list="ent-kinds"
+            value={txt(f.kind)}
+            placeholder={t("وزارة · هيئة · برنامج · مركز", "Ministry · Authority …")}
+            onChange={(e) => set("kind", e.target.value)}
+          />
+          <datalist id="ent-kinds">
+            {["وزارة", "هيئة", "برنامج", "مركز", "مكتب", "مناطقية", "جامعة", "اتحاد"].map((k) => (
+              <option key={k} value={k} />
+            ))}
+          </datalist>
+        </label>
+        <label>
+          <span>{t("القطاع", "Sector")}</span>
+          <select value={txt(f.sector)} onChange={(e) => set("sector", e.target.value)}>
+            <option value="">{t("— اختر —", "— pick —")}</option>
+            {INST_SECTORS.map((x) => (
+              <option key={x} value={x}>{x}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="newent-s">{t("نقطة التواصل من الجهة — اختيارية الآن وتُكمَّل لاحقاً", "Entity contact — optional")}</div>
+      <div className="op-f">
+        <label>
+          <span>{t("الاسم", "Name")}</span>
+          <input value={txt(f.theirName)} onChange={(e) => set("theirName", e.target.value)} />
+        </label>
+        <label>
+          <span>{t("الجوال", "Phone")}</span>
+          <input value={txt(f.theirPhone)} onChange={(e) => set("theirPhone", e.target.value)} />
+        </label>
+        <label>
+          <span>{t("البريد الإلكتروني", "Email")}</span>
+          <input value={txt(f.theirEmail)} onChange={(e) => set("theirEmail", e.target.value)} />
+        </label>
+      </div>
+      {msg && <div className={`newent-m ${bad ? "bad" : ""}`}>{msg}</div>}
+      <div className="newent-f">
+        <button className="btn btn-sm" disabled={busy || !txt(f.name).trim()} onClick={() => void go()}>
+          {busy ? t("يُضاف…", "Adding…") : t("إضافة الجهة", "Add")}
+        </button>
+        <em>
+          {t(
+            "نقاط التواصل من المركز ومن مكتب تحقيق الرؤية تُعبَّأ من بطاقة الجهة بعد إضافتها.",
+            "Our and VRO contacts are filled from the entity card.",
+          )}
+        </em>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
    إضافة جهة إلى قسمٍ من الأعمال الرئيسية
    ------------------------------------------------------------
    الاختيار من **جهات الاستشاري نفسه** لا بالكتابة الحرة: الحارس
@@ -1244,6 +1379,9 @@ function mainChips(sec: MainSec, rows: MineRow[]): { k: string; v: number }[] {
    منها ما له بندٌ أصلاً، إلا في الوطنية — فللجهة الواحدة أكثر من
    استراتيجية، والتمييز باسمها.
    ============================================================ */
+/** قيمةُ خيار «جهة ليست في القائمة» — لا تُطابق اسم جهةٍ حقيقية */
+const NEW_ENT = "\u0000new";
+
 function AddMainEnt({
   sec, have, busy, t, onClose, onAdd,
 }: {
@@ -1252,12 +1390,15 @@ function AddMainEnt({
   busy: boolean;
   t: T;
   onClose: () => void;
-  onAdd: (entity: string, title: string) => void;
+  onAdd: (entity: string, title: string, fresh: boolean) => void;
 }) {
   const [mine, setMine] = useState<{ name: string }[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [ent, setEnt] = useState("");
   const [title, setTitle] = useState("");
+  /* جهةٌ خارج القائمة: تُضاف إلى سجلّ الجهات وتُسند إليّ، ثم يُنشأ
+     بندُها في القسم — خطوتان من ضغطةٍ واحدة. */
+  const [fresh, setFresh] = useState("");
 
   useEffect(() => {
     void apiFetch("/api/entities/mine")
@@ -1275,7 +1416,9 @@ function AddMainEnt({
   }, [mine, hv, sec]);
 
   const isNat = sec === "natstrat";
-  const ok = !!ent && (!isNat || !!title.trim());
+  const isNew = ent === NEW_ENT;
+  const name = isNew ? fresh.trim() : ent;
+  const ok = !!name && (!isNat || !!title.trim());
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -1287,17 +1430,18 @@ function AddMainEnt({
 
         {!loaded ? (
           <div className="pf-none">{t("جارٍ التحميل…", "Loading…")}</div>
-        ) : !opts.length ? (
-          <div className="pf-none">
-            {mine.length
-              ? t("كل جهاتك لها بندٌ في هذا القسم.", "All your entities are already here.")
-              : t(
-                  "لا توجد جهات مسندة إليك في «الجهات ونقاط التواصل».",
-                  "No entities assigned to you.",
-                )}
-          </div>
         ) : (
           <>
+            {!opts.length && (
+              <div className="pf-none">
+                {mine.length
+                  ? t("كل جهاتك لها بندٌ في هذا القسم — تُضاف جهةٌ جديدة من الخيار أدناه.", "All yours are here.")
+                  : t(
+                      "لا توجد جهات مسندة إليك في «الجهات ونقاط التواصل» — تُضاف جهةٌ جديدة من الخيار أدناه.",
+                      "No entities assigned to you.",
+                    )}
+              </div>
+            )}
             <div className="op-f">
               <label className="wide">
                 <span>{t("الجهة", "Entity")}</span>
@@ -1306,8 +1450,19 @@ function AddMainEnt({
                   {opts.map((n) => (
                     <option key={n} value={n}>{n}</option>
                   ))}
+                  <option value={NEW_ENT}>{t("— جهة ليست في القائمة —", "— not listed —")}</option>
                 </select>
               </label>
+              {isNew && (
+                <label className="wide">
+                  <span>{t("اسم الجهة الجديدة", "New entity name")}</span>
+                  <input
+                    value={fresh}
+                    placeholder={t("كما تُكتب في سجلّ الجهات", "As written in the registry")}
+                    onChange={(e) => setFresh(e.target.value)}
+                  />
+                </label>
+              )}
               {isNat && (
                 <label className="wide">
                   <span>{t("اسم الاستراتيجية", "Strategy name")}</span>
@@ -1321,16 +1476,26 @@ function AddMainEnt({
             </div>
             <p className="muted" style={{ fontSize: 11.5, lineHeight: 1.7 }}>
               {t(
-                `يُنشأ البند في صفحة «${SECTION_TITLE[sec][0]}» باسمك استشارياً، ويظهر هنا في محفظتك لتحدّثه.`,
-                "Created on the section page with you as the consultant.",
+                "القائمة هي الجهات المسندة إليك في «الجهات ونقاط التواصل» — أنت نقطةُ تواصلها الأساسية من المركز، أو شورِكت معك.",
+                "The list is the entities assigned to you.",
               )}
+              <br />
+              {isNew
+                ? t(
+                    `الجهة الجديدة تُضاف إلى سجلّ الجهات وتُسند إليك، ثم يُنشأ بندُها في «${SECTION_TITLE[sec][0]}».`,
+                    "A new entity is added to the registry, assigned to you, then created here.",
+                  )
+                : t(
+                    `يُنشأ البند في صفحة «${SECTION_TITLE[sec][0]}» باسمك استشارياً، ويظهر هنا في محفظتك لتحدّثه.`,
+                    "Created on the section page with you as the consultant.",
+                  )}
             </p>
           </>
         )}
 
         <div className="m-f">
           <button className="btn btn-ghost" onClick={onClose}>{t("إلغاء", "Cancel")}</button>
-          <button className="btn" disabled={!ok || busy} onClick={() => onAdd(ent, title.trim())}>
+          <button className="btn" disabled={!ok || busy} onClick={() => onAdd(name, title.trim(), isNew)}>
             {busy ? t("يُضاف…", "Adding…") : t("إضافة", "Add")}
           </button>
         </div>
@@ -1617,8 +1782,24 @@ function MainWork({
     } else setMsg("");
   }
 
-  async function addEntity(entity: string, title: string) {
+  async function addEntity(entity: string, title: string, fresh: boolean) {
     setAdding(true);
+    /* جهةٌ خارج القائمة: تُسجَّل أولاً وتُسند إليّ، وإلا رفضها حارسُ
+       القاعدة — فهو يسأل «أهي من جهاتك؟» لا «أموجودةٌ هي؟» */
+    if (fresh) {
+      const e = await apiFetch("/api/entities/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: entity }),
+      })
+        .then((x) => x.json())
+        .catch(() => ({ error: "تعذّر الاتصال" }));
+      if (e?.error) {
+        setAdding(false);
+        setMsg(String(e.error));
+        return;
+      }
+    }
     const r = await apiFetch("/api/items/mine/add", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -3189,8 +3370,6 @@ function EntitiesModal({
   /** إعادة قراءة سجلّ جهاتي بعد تعديل نقطة تواصل */
   onReload: () => void;
 }) {
-  const [name, setName] = useState("");
-  const [type, setType] = useState("مؤسسية");
   const [edit, setEdit] = useState<Row | null>(null);
   const logos = useLogos();
   return (
@@ -3274,34 +3453,12 @@ function EntitiesModal({
             </div>
           ))}
           {!rows.length && <div className="pf-none">{t("لا توجد جهات بعد.", "No entities yet.")}</div>}
-          <div className="addent">
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t("اسم الجهة أو الاستراتيجية", "Entity or strategy")}
-            />
-            <select value={type} onChange={(e) => setType(e.target.value)}>
-              {["مؤسسية", "وطنية", "مناطقية", "برنامج"].map((o) => (
-                <option key={o}>{o}</option>
-              ))}
-            </select>
-            <button
-              className="go2"
-              onClick={() => {
-                if (!name.trim()) return;
-                onSave("", { name: name.trim(), type, q: [0, 0, 0, 0] });
-                setName("");
-              }}
-            >
-              + {t("إضافة", "Add")}
-            </button>
-          </div>
-          <div className="pf-hint">
-            {t(
-              "ما يُضاف هنا يظهر في «جهاتي ومساهماتها» و«التقارير الربعية».",
-              "Added entities appear in your strategies and quarterly widgets.",
-            )}
-          </div>
+          {/* الإضافة صارت إلى **سجلّ الجهات** لا إلى سطرٍ محليّ في
+              المحفظة: السطر المحليّ كان بلا نقاط تواصل ولا شعار ولا
+              وجودٍ في صفحة الجهات، وتصنيفُه (مؤسسية/وطنية) لا محلّ
+              له هنا. والجهة المضافة تعود ببطاقتها أعلاه فتُعبَّأ
+              نقاطُها الثلاث. */}
+          <NewEntity t={t} onDone={onReload} />
         </div>
       </div>
     </div>

@@ -11773,3 +11773,36 @@ input.cell-date {
   border: 1px solid color-mix(in srgb, var(--g-700) 28%, var(--line2));
 }
 .mw-bar .mw-add:hover { background: var(--g-200, var(--g-100)); border-color: var(--g-700); }
+
+/* ===== إضافة جهة إلى سجلّ الجهات من «جهاتي» ===== */
+.newent-c {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--line2);
+}
+.newent-c > span { flex: 1 1 220px; min-width: 0; font-size: 10.5px; color: var(--muted); line-height: 1.7; }
+.newent-b {
+  font: inherit; font-size: 11.5px; font-weight: 800; cursor: pointer;
+  padding: 7px 14px; border-radius: 10px; white-space: nowrap;
+  background: var(--g-100); color: var(--g-800);
+  border: 1px solid color-mix(in srgb, var(--g-700) 28%, var(--line2));
+}
+.newent-b:hover { border-color: var(--g-700); }
+.newent {
+  margin-top: 12px; padding: 12px 13px;
+  border: 1px solid color-mix(in srgb, var(--g-700) 22%, var(--line2));
+  border-radius: 13px; background: var(--soft);
+}
+.newent-h { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+.newent-h > b { flex: 1; font-size: 12.5px; font-weight: 800; color: var(--g-800); }
+.newent-h > button {
+  font: inherit; font-size: 10.5px; font-weight: 700; cursor: pointer;
+  color: var(--muted); background: none; border: 0; padding: 2px 6px;
+}
+.newent-s {
+  font-size: 10.5px; font-weight: 700; color: var(--muted);
+  margin: 10px 0 6px; padding-top: 9px; border-top: 1px dashed var(--line2);
+}
+.newent-m { font-size: 11px; font-weight: 700; color: var(--g-800); margin-top: 9px; line-height: 1.7; }
+.newent-m.bad { color: var(--dgr-tx); }
+.newent-f { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 11px; }
+.newent-f > em { flex: 1 1 220px; min-width: 0; font-style: normal; font-size: 10px; color: var(--muted); line-height: 1.6; }
