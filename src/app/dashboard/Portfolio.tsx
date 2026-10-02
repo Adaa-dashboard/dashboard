@@ -3633,9 +3633,10 @@ function GrantsBox({ prefs, meId, t }: { prefs: Prefs; meId: string; t: T }) {
       ? t("كل المحفظة", "Everything")
       : g.scopes.map((k) => opts.find((o) => o.k === k)?.label || k).join(" · ");
 
+  /* بلا عنوانٍ هنا: «من يرى محفظتي» مكتوبٌ فوقه في نافذة التخصيص،
+     فتكراره يجعل عنواناً واحداً مرّتين في شاشةٍ واحدة */
   return (
     <>
-      <div className="sec3">{t("من يرى محفظتي", "Who can see my portfolio")}</div>
       <p className="gr-hint">
         {t(
           "المحفظة خاصة — لا يراها أحد. والمنح للاطّلاع فقط، ويُسحب في أي وقت.",
@@ -3968,7 +3969,6 @@ function CustomModal({
   secOrder,
   onClose,
   onChange,
-  onArrange,
 }: {
   prefs: Prefs;
   t: T;
@@ -3978,8 +3978,6 @@ function CustomModal({
   secOrder: string[];
   onClose: () => void;
   onChange: (p: Partial<Prefs>) => void;
-  /** الخروج إلى الصفحة في وضع السحب */
-  onArrange: () => void;
 }) {
   const moveSec = (i: number, d: number) => {
     const a = [...secOrder];
@@ -4129,11 +4127,8 @@ function CustomModal({
           })}
         </div>
         <div className="secord-f">
-          <button className="rst" onClick={() => onChange({ order: DEFAULT_PREFS.order, hidden: [] })}>
-            ↺ {t("إعادة ترتيب البنود الافتراضي", "Reset item order")}
-          </button>
-          <button className="arr" onClick={onArrange}>
-            ⋮⋮ {t("ترتيب البنود بالسحب", "Drag to arrange")}
+          <button className="rst" onClick={() => onChange({ hidden: [] })}>
+            ↺ {t("إظهار كل البنود", "Show all")}
           </button>
         </div>
 
@@ -4213,7 +4208,6 @@ export default function Portfolio({
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
   const [ready, setReady] = useState(false);
   const [custom, setCustom] = useState(false);
-  const [arrange, setArrange] = useState(false);
   const [ents, setEnts] = useState(false);
   /* صورة الموظف: يرفعها لنفسه، فتظهر هنا وفي «أعلى الاستشاريين
      التزاماً». تُخزَّن في مجلد avatars/ داخل سلّة الوثائق */
@@ -4666,31 +4660,22 @@ export default function Portfolio({
   function Card({ k, wide }: { k: WKey; wide?: boolean }) {
     const w = WMAP[k];
     const st = stat(k);
+    /* بلا سحبٍ ولا وضعِ ترتيب — والتسمية والإخفاء يظهران عند
+       المرور على البطاقة، فلا يحتاجان وضعاً خاصاً يُدخَل ويُخرَج */
     return (
-      <div
-        className={`card2 ${wide ? "wide" : ""}`}
-        draggable={arrange}
-        onDragStart={() => setDrag(k)}
-        onDragOver={(e) => arrange && e.preventDefault()}
-        onDrop={() => dropOn(k)}
-      >
+      <div className={`card2 ${wide ? "wide" : ""}`}>
         <div className="ch">
-          {arrange && <span className="grip">⋮⋮</span>}
           <span className="dot" style={{ background: w.color }}>
             <PIcon id={w.icon} size={13} />
           </span>
           <h3>{w.label}</h3>
           {["tasks", "calendar", "notes"].includes(k) ? null : <span className="n">{st.count}</span>}
-          {arrange && (
-            <>
-              <span className="edit" title={t("تغيير الاسم والأيقونة", "Rename / icon")} onClick={() => setEditLook(k)}>
-                ✎
-              </span>
-              <span className="hide" onClick={() => patch({ hidden: [...prefs.hidden, k] })}>
-                ✕
-              </span>
-            </>
-          )}
+          <span className="edit" title={t("تغيير الاسم والأيقونة", "Rename / icon")} onClick={() => setEditLook(k)}>
+            ✎
+          </span>
+          <span className="hide" title={t("إخفاء", "Hide")} onClick={() => patch({ hidden: [...prefs.hidden, k] })}>
+            ✕
+          </span>
         </div>
         <div className="cb">{bodyOf(k)}</div>
       </div>
@@ -4750,12 +4735,7 @@ export default function Portfolio({
               onOpen={() => setOpen(k)}
               onHide={() => patch({ hidden: [...prefs.hidden, k] })}
               onEdit={() => setEditLook(k)}
-              dragProps={{
-                draggable: arrange,
-                onDragStart: () => setDrag(k),
-                onDragOver: (e: React.DragEvent) => arrange && e.preventDefault(),
-                onDrop: () => dropOn(k),
-              }}
+              dragProps={{}}
             />
           );
         })}
@@ -4884,11 +4864,6 @@ export default function Portfolio({
             صارت داخل «تخصيص» — والرأس لا يحتمل شريط أدوات.
             و«تم الترتيب» يظهر وقت السحب وحده ليُخرَج منه. */}
         <div className="acts">
-          {arrange && (
-            <button className="btn2 solid" onClick={() => setArrange(false)}>
-              ✓ {t("تم الترتيب", "Done")}
-            </button>
-          )}
           <button className="btn2 solid" onClick={() => setCustom(true)}>
             <IconGear size={15} /> {t("تخصيص", "Customize")}
           </button>
@@ -4918,15 +4893,6 @@ export default function Portfolio({
           </div>
         </div>
       </div>
-
-      {arrange && (
-        <div className="pf-arr hint">
-          {t(
-            "اسحب البنود من المقبض ⋮⋮ لترتيبها، ثم اضغط «تم الترتيب».",
-            "Drag items by the ⋮⋮ handle, then press Done.",
-          )}
-        </div>
-      )}
 
       {/* ترتيب الأقسام من تفضيلات صاحب المحفظة لا من `GROUPS`:
           هذا يبدأ بتقويمه وملاحظاته، وذاك يبدأ بأعماله. والمجموعة
@@ -5022,10 +4988,6 @@ export default function Portfolio({
           secOrder={secOrder}
           onClose={() => setCustom(false)}
           onChange={patch}
-          onArrange={() => {
-            setArrange(true);
-            setCustom(false);
-          }}
         />
       )}
 

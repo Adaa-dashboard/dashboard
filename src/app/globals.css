@@ -11976,3 +11976,17 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
 }
 .seenby > b { display: block; font-size: 11.5px; font-weight: 800; color: var(--g-800); margin-bottom: 3px; }
 .seenby > em { font-style: normal; font-size: 10.5px; color: var(--ink-2); line-height: 1.7; }
+
+/* ✎ و ✕ على البطاقة: تظهران عند المرور لا في وضع ترتيبٍ خاص —
+   فالوضع الخاص أُزيل، وبقاؤهما ظاهرتين دائماً تشويش */
+.pf .card2 .ch .edit,
+.pf .card2 .ch .hide {
+  opacity: 0;
+  transition: opacity .12s;
+}
+.pf .card2:hover .ch .edit,
+.pf .card2:hover .ch .hide,
+.pf .card2 .ch .edit:focus-visible,
+.pf .card2 .ch .hide:focus-visible { opacity: .65; }
+.pf .card2 .ch .edit:hover,
+.pf .card2 .ch .hide:hover { opacity: 1; }
