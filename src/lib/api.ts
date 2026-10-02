@@ -1005,6 +1005,15 @@ export async function apiFetch(path: string, init: Init = {}) {
         p_their_name: str(body.theirName),
         p_their_phone: str(body.theirPhone),
         p_their_email: str(body.theirEmail),
+        /* بياناتي: تُترك فارغةً فتملؤها القاعدة من نقطتي السابقة */
+        p_my_title: str(body.myTitle),
+        p_my_phone: str(body.myPhone),
+        p_my_email: str(body.myEmail),
+        p_their_title: str(body.theirTitle),
+        p_vro_name: str(body.vroName),
+        p_vro_title: str(body.vroTitle),
+        p_vro_phone: str(body.vroPhone),
+        p_vro_email: str(body.vroEmail),
       });
       if (error) return err(error.message, 403);
       const r = (Array.isArray(data) ? data[0] : data) || {};

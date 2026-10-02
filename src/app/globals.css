@@ -11839,3 +11839,8 @@ input.cell-date {
   .card-top { flex-wrap: wrap; }
   .pills.sm { flex-wrap: wrap; }
 }
+.newent-s.first { margin-top: 0; padding-top: 0; border-top: 0; }
+.newent-s > i {
+  font-style: normal; font-weight: 800; color: var(--g-800);
+  background: var(--g-100); border-radius: 999px; padding: 2px 8px; margin-inline-start: 7px;
+}

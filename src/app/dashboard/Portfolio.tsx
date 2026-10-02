@@ -1244,6 +1244,34 @@ function mainChips(sec: MainSec, rows: MineRow[]): { k: string; v: number }[] {
    قوائم إضافة الأقسام. وإن كانت مسجّلةً ومسندةً لغيره فلا تُنتزع
    منه — تُذكر باسم متولّيها ليطلب مشاركتها.
    ============================================================ */
+/** مجموعةُ حقولِ نقطةِ تواصل — الأربعة نفسها في كل طرف */
+function CtFields({
+  t, pre, f, set, dis,
+}: {
+  t: T;
+  pre: string;
+  f: Rec;
+  set: (k: string, v: string) => void;
+  dis?: boolean;
+}) {
+  const F: [string, string, string][] = [
+    ["Name", "الاسم", "Name"],
+    ["Title", "المسمّى الوظيفي", "Job title"],
+    ["Phone", "الجوال", "Phone"],
+    ["Email", "البريد الإلكتروني", "Email"],
+  ];
+  return (
+    <div className="op-f">
+      {F.map(([k, ar, en]) => (
+        <label key={k}>
+          <span>{t(ar, en)}</span>
+          <input value={txt(f[pre + k])} disabled={dis} onChange={(e) => set(pre + k, e.target.value)} />
+        </label>
+      ))}
+    </div>
+  );
+}
+
 function NewEntity({ t, onDone }: { t: T; onDone: () => void }) {
   const [open, setOpen] = useState(false);
   const [f, setF] = useState<Rec>({});
@@ -1251,6 +1279,32 @@ function NewEntity({ t, onDone }: { t: T; onDone: () => void }) {
   const [msg, setMsg] = useState("");
   const [bad, setBad] = useState(false);
   const set = (k: string, v: string) => setF((o) => ({ ...o, [k]: v }));
+
+  /* نقطةُ تواصلي على جهةٍ أخرى تحمل بياناتي — تُنسخ منها فتظهر
+     معبّأةً من أول لحظة بدل أن تُكتب في كل جهة من جديد. والقاعدة
+     تملؤها كذلك لو وصلت فارغة، فالتعبئة مضمونة لا مظهرية. */
+  useEffect(() => {
+    if (!open) return;
+    void apiFetch("/api/entities/mine")
+      .then((r) => r.json())
+      .then((d) => {
+        const rows = (Array.isArray(d.mine) ? d.mine : []) as RegRow[];
+        for (const x of rows) {
+          const c = (x.ours || []).find((y: Contact) => String(y.id) === String(x.myContactId));
+          if (c && (txt(c.phone) || txt(c.email))) {
+            setF((o) => ({
+              ...o,
+              myName: txt(c.name),
+              myTitle: txt(o.myTitle) || txt(c.jobTitle),
+              myPhone: txt(o.myPhone) || txt(c.phone),
+              myEmail: txt(o.myEmail) || txt(c.email),
+            }));
+            return;
+          }
+        }
+      })
+      .catch(() => {});
+  }, [open]);
 
   async function go() {
     const name = txt(f.name).trim();
@@ -1264,9 +1318,17 @@ function NewEntity({ t, onDone }: { t: T; onDone: () => void }) {
         name,
         kind: txt(f.kind),
         sector: txt(f.sector),
+        myTitle: txt(f.myTitle),
+        myPhone: txt(f.myPhone),
+        myEmail: txt(f.myEmail),
         theirName: txt(f.theirName),
+        theirTitle: txt(f.theirTitle),
         theirPhone: txt(f.theirPhone),
         theirEmail: txt(f.theirEmail),
+        vroName: txt(f.vroName),
+        vroTitle: txt(f.vroTitle),
+        vroPhone: txt(f.vroPhone),
+        vroEmail: txt(f.vroEmail),
       }),
     })
       .then((x) => x.json())
@@ -1284,9 +1346,9 @@ function NewEntity({ t, onDone }: { t: T; onDone: () => void }) {
             `«${name}» مسجّلة في السجلّ — نقطة التواصل فيها: ${r.owner || "—"}`,
             `Already in the registry — contact: ${r.owner || "—"}`,
           )
-        : t(`أُضيفت «${name}» وأُسندت إليك — عبّئ نقاط التواصل من بطاقتها أعلاه.`, "Added."),
+        : t(`أُضيفت «${name}» وأُسندت إليك ببياناتك ونقاط تواصلها.`, "Added."),
     );
-    if (!r.existed) setF({});
+    if (!r.existed) setF((o) => ({ myName: o.myName, myTitle: o.myTitle, myPhone: o.myPhone, myEmail: o.myEmail }));
     onDone();
   }
 
@@ -1298,8 +1360,8 @@ function NewEntity({ t, onDone }: { t: T; onDone: () => void }) {
         </button>
         <span>
           {t(
-            "تُضاف إلى سجلّ «الجهات ونقاط التواصل» وتُسند إليك، فتظهر هنا ببطاقتها وفي قوائم الأقسام.",
-            "Added to the central registry and assigned to you.",
+            "تُضاف إلى سجلّ «الجهات ونقاط التواصل» بنقاط تواصلها الثلاث، وتُسند إليك ببياناتك.",
+            "Added to the central registry with its three contacts.",
           )}
         </span>
       </div>
@@ -1311,6 +1373,8 @@ function NewEntity({ t, onDone }: { t: T; onDone: () => void }) {
         <b>{t("إضافة جهة", "Add an entity")}</b>
         <button onClick={() => setOpen(false)}>{t("إغلاق", "Close")}</button>
       </div>
+
+      <div className="newent-s first">{t("بيانات الجهة", "Entity")}</div>
       <div className="op-f">
         <label className="wide">
           <span>{t("اسم الجهة", "Entity name")}</span>
@@ -1325,7 +1389,7 @@ function NewEntity({ t, onDone }: { t: T; onDone: () => void }) {
             onChange={(e) => set("kind", e.target.value)}
           />
           <datalist id="ent-kinds">
-            {["وزارة", "هيئة", "برنامج", "مركز", "مكتب", "مناطقية", "جامعة", "اتحاد"].map((k) => (
+            {["وزارة", "هيئة", "برنامج", "مركز", "مكتب", "مناطقية", "جامعة", "اتحاد", "أمانة"].map((k) => (
               <option key={k} value={k} />
             ))}
           </datalist>
@@ -1340,21 +1404,19 @@ function NewEntity({ t, onDone }: { t: T; onDone: () => void }) {
           </select>
         </label>
       </div>
-      <div className="newent-s">{t("نقطة التواصل من الجهة — اختيارية الآن وتُكمَّل لاحقاً", "Entity contact — optional")}</div>
-      <div className="op-f">
-        <label>
-          <span>{t("الاسم", "Name")}</span>
-          <input value={txt(f.theirName)} onChange={(e) => set("theirName", e.target.value)} />
-        </label>
-        <label>
-          <span>{t("الجوال", "Phone")}</span>
-          <input value={txt(f.theirPhone)} onChange={(e) => set("theirPhone", e.target.value)} />
-        </label>
-        <label>
-          <span>{t("البريد الإلكتروني", "Email")}</span>
-          <input value={txt(f.theirEmail)} onChange={(e) => set("theirEmail", e.target.value)} />
-        </label>
+
+      <div className="newent-s">
+        {t("نقطة التواصل من مركز أداء — أساسي", "Our contact — primary")}
+        <i>{txt(f.myName) || t("أنت", "You")}</i>
       </div>
+      <CtFields t={t} pre="my" f={f} set={set} />
+
+      <div className="newent-s">{t("نقطة التواصل من الجهة — أساسي", "Entity contact — primary")}</div>
+      <CtFields t={t} pre="their" f={f} set={set} />
+
+      <div className="newent-s">{t("نقطة التواصل من مكتب تحقيق الرؤية (VRO)", "VRO contact")}</div>
+      <CtFields t={t} pre="vro" f={f} set={set} />
+
       {msg && <div className={`newent-m ${bad ? "bad" : ""}`}>{msg}</div>}
       <div className="newent-f">
         <button className="btn btn-sm" disabled={busy || !txt(f.name).trim()} onClick={() => void go()}>
@@ -1362,8 +1424,8 @@ function NewEntity({ t, onDone }: { t: T; onDone: () => void }) {
         </button>
         <em>
           {t(
-            "نقاط التواصل من المركز ومن مكتب تحقيق الرؤية تُعبَّأ من بطاقة الجهة بعد إضافتها.",
-            "Our and VRO contacts are filled from the entity card.",
+            "ما يُترك فارغاً يُضاف لاحقاً من بطاقة الجهة — وبديلُ كلِّ طرفٍ يُضاف منها كذلك.",
+            "Anything left blank can be filled later from the entity card.",
           )}
         </em>
       </div>
