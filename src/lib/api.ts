@@ -1374,6 +1374,40 @@ export async function apiFetch(path: string, init: Init = {}) {
     }
 
     /* ---------------- آخر التحديثات ---------------- */
+    /* ---------------- شريط الإعلانات ----------------
+       القراءة لكل من دخل، والنشر لصاحب صلاحية «announce»،
+       والحارس في القاعدة لا هنا. */
+    if (p === "/api/ticker" && method === "GET") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const { data, error } = await s.rpc("perf_ticker_live");
+      if (error) return err(error.message, 403);
+      return ok({
+        ticker: (data || []).map((r: Record<string, unknown>) => ({
+          id: String(r.id), body: String(r.body || ""), tone: String(r.tone || "green"),
+          byName: String(r.by_name || ""), until: String(r.until || ""), mine: r.mine === true,
+        })),
+      });
+    }
+    if (p === "/api/ticker" && method === "POST") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const { data, error } = await s.rpc("perf_ticker_say", {
+        p_body: str(body.body),
+        p_tone: str(body.tone) === "red" ? "red" : "green",
+        p_hours: Number(body.hours) || 24,
+      });
+      if (error) return err(error.message, 403);
+      return ok({ ok: true, id: String(data || "") });
+    }
+    if (p.startsWith("/api/ticker/") && method === "DELETE") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const { error } = await s.rpc("perf_ticker_stop", { p_id: p.split("/")[3] });
+      if (error) return err(error.message, 403);
+      return ok({ ok: true });
+    }
+
     if (p === "/api/activity") {
       const me = await whoAmI();
       if (!me) return err("غير مصرّح", 401);

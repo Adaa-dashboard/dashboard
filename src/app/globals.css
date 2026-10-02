@@ -11843,3 +11843,81 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
   font-style: normal; font-weight: 800; color: var(--g-800);
   background: var(--g-100); border-radius: 999px; padding: 2px 8px; margin-inline-start: 7px;
 }
+
+/* ============================================================
+   شريط الإعلانات المتحرّك
+   ------------------------------------------------------------
+   شبه شفاف بـ`backdrop-filter` فلا يحجب ما تحته، ويقف الدوران
+   عند المرور عليه ليُقرأ على مهل — وكذلك لمن يطلب تقليل الحركة.
+   ============================================================ */
+.anb {
+  display: flex; flex-wrap: nowrap; align-items: center; gap: 10px;
+  margin: 0 0 12px; padding: 0 4px;
+  border: 1px solid color-mix(in srgb, var(--g-700) 20%, transparent);
+  border-radius: 11px; min-height: 36px; overflow: hidden;
+  background: color-mix(in srgb, var(--g-100) 55%, transparent);
+  backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+}
+.anb.urg {
+  border-color: color-mix(in srgb, #d34a4a 32%, transparent);
+  background: color-mix(in srgb, var(--dgr-bg) 50%, transparent);
+}
+/* تلاشٍ عند الطرفين فلا يُقتطع النصّ قطعاً حادّاً وهو يدخل ويخرج */
+.anb-win {
+  flex: 1; min-width: 0; overflow: hidden;
+  -webkit-mask-image: linear-gradient(to left, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%);
+  mask-image: linear-gradient(to left, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%);
+}
+.anb-track {
+  display: inline-flex; align-items: center; gap: 34px;
+  white-space: nowrap; will-change: transform;
+  animation-name: anb-run; animation-timing-function: linear; animation-iteration-count: infinite;
+}
+/* يمشي من اليمين إلى اليسار — والنسخة الثانية تسدّ الفجوة */
+@keyframes anb-run { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.anb:hover .anb-track, .anb:focus-within .anb-track { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .anb-track { animation: none; }
+  .anb-win { overflow-x: auto; }
+}
+.anb-it { display: inline-flex; align-items: center; gap: 7px; padding: 7px 0; }
+.anb-it > i { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.anb-it.red > i { background: #d34a4a; box-shadow: 0 0 0 3px rgba(211, 74, 74, .16); }
+.anb-it.green > i { background: #1a9d5c; box-shadow: 0 0 0 3px rgba(26, 157, 92, .16); }
+.anb-it > b { font-size: 12px; font-weight: 700; color: var(--ink); }
+.anb-it.red > b { color: var(--dgr-tx); font-weight: 800; }
+.anb-it > em { font-style: normal; font-size: 10px; color: var(--muted); }
+.anb-none { flex: 1; font-size: 11px; color: var(--muted); padding-inline-start: 6px; }
+.anb-btn {
+  flex: none; font: inherit; font-size: 11px; font-weight: 800; cursor: pointer;
+  padding: 5px 11px; border-radius: 9px; margin: 4px 0; white-space: nowrap;
+  background: var(--panel); color: var(--g-800);
+  border: 1px solid color-mix(in srgb, var(--g-700) 28%, var(--line2));
+}
+.anb-btn:hover { border-color: var(--g-700); }
+
+/* نافذة النشر */
+.anb-cnt { font-size: 10px; color: var(--muted); text-align: start; margin: -4px 0 10px; }
+.anb-prev {
+  display: flex; align-items: center; gap: 8px; margin: 11px 0 9px;
+  padding: 9px 11px; border-radius: 10px; font-size: 12px; font-weight: 700;
+  background: var(--g-100); color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--g-700) 20%, transparent);
+}
+.anb-prev.red { background: var(--dgr-bg); color: var(--dgr-tx); border-color: color-mix(in srgb, #d34a4a 28%, transparent); }
+.anb-prev > i { width: 7px; height: 7px; border-radius: 50%; flex: none; background: currentColor; }
+.anb-list { margin-top: 13px; padding-top: 11px; border-top: 1px solid var(--line2); }
+.anb-list > b { display: block; font-size: 11px; font-weight: 800; color: var(--muted); margin-bottom: 7px; }
+.anb-row {
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  padding: 6px 9px; border-radius: 9px; background: var(--soft); margin-bottom: 5px;
+}
+.anb-row > i { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+.anb-row.red > i { background: #d34a4a; }
+.anb-row.green > i { background: #1a9d5c; }
+.anb-row .n { flex: 1 1 200px; min-width: 0; font-size: 11px; font-weight: 700; color: var(--ink); overflow-wrap: break-word; }
+.anb-row > em { font-style: normal; font-size: 9.5px; color: var(--muted); white-space: nowrap; }
+.anb-row > button {
+  font: inherit; font-size: 9.5px; font-weight: 800; cursor: pointer;
+  color: var(--dgr-tx); background: none; border: 0; padding: 2px 6px;
+}

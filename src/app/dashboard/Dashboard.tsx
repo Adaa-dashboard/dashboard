@@ -30,6 +30,7 @@ import {
   type Scope,
 } from "@/lib/scopes";
 import Tasks from "./Tasks";
+import Ticker, { useTicker } from "./Ticker";
 import {
   SectionPage,
   Sessions,
@@ -362,6 +363,7 @@ export default function Dashboard({ me }: { me: Me }) {
   const [pwOpen, setPwOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const pins = usePins();
+  const tick = useTicker();
   const [sheet, setSheet] = useState(false); // ورقة الإعدادات على الجوال
   // طيّ الشريط الجانبي — الحالة تبقى بين الجلسات لكل متصفح
   const [railCol, setRailCol] = useState(false);
@@ -693,6 +695,10 @@ export default function Dashboard({ me }: { me: Me }) {
             )}
             <Tools t={t} meId={me.id} />
           </div>
+
+          {/* شريط الإعلانات فوق كل صفحة — يراه الجميع، وينشره
+              صاحب صلاحية «إعلان» وحده */}
+          <Ticker items={tick.items} canAnnounce={can("announce")} t={t} onReload={tick.reload} />
 
           <PinnedBar pins={pins.pins} onRemove={pins.remove} t={t} />
 

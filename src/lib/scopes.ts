@@ -39,6 +39,7 @@ export type Scope =
   | "docs"
   | "docs:edit"
   | "entities"
+  | "announce"
   | "entities:edit";
 
 export const SCOPE_GROUPS: { title: string; items: { key: Scope; label: string; note?: string }[] }[] = [
@@ -88,6 +89,7 @@ export const SCOPE_GROUPS: { title: string; items: { key: Scope; label: string; 
       { key: "assignments", label: "التكاليف", note: "الواردة من جهة أعلى" },
       { key: "changes", label: "طلبات التغيير", note: "عرض ونسخ وتصدير" },
       { key: "changes:upload", label: "رفع ملف طلبات التغيير", note: "لمن يسحب الملف من منصة الرؤية" },
+      { key: "announce", label: "نشر إعلان", note: "شريط متحرّك يراه الجميع — بمدّة تنتهي وحدها" },
     ],
   },
   {
