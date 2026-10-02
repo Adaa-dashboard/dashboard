@@ -1261,19 +1261,21 @@ function Overview({
                 </button>
               ))}
             </span>
-            {/* الربع يغيّر **المستهدف** الذي تُقاس عليه النسبة */}
-            <span className="qsel">
+            {/* الربع يغيّر **المستهدف** الذي تُقاس عليه النسبة.
+                قائمةٌ منسدلة لا خمسةُ أزرار: الأزرار تزاحم العنوان
+                وشرائح الحالة في الصفّ نفسه. */}
+            <select
+              className="qsel"
+              value={scope}
+              aria-label={t("نطاق المقارنة", "Scope")}
+              onChange={(e) => setScope(e.target.value)}
+            >
               {SCOPES.map((x) => (
-                <button
-                  key={x.key}
-                  className={scope === x.key ? "on" : ""}
-                  onClick={() => setScope(x.key)}
-                  title={t(x.label, x.en)}
-                >
-                  {x.key === "year" ? t("السنة", "Year") : x.en}
-                </button>
+                <option key={x.key} value={x.key}>
+                  {t(x.label, x.en)}
+                </option>
               ))}
-            </span>
+            </select>
           </div>
           {scopeQ != null && (
             <div className="qnote">
