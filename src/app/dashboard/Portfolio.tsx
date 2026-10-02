@@ -133,6 +133,9 @@ export const GROUPS: { id: string; label: [string, string] }[] = [
   { id: "projects", label: ["المشاريع الاستراتيجية", "Strategic projects"] },
 ];
 const BASE_MAP: Record<string, WDef> = Object.fromEntries(WIDGETS.map((w) => [w.key, w]));
+/** عنوان كل مجموعة بمعرّفها */
+const GMAP: Record<string, { id: string; label: [string, string] }> =
+  Object.fromEntries(GROUPS.map((g) => [g.id, g]));
 
 const CCOLORS = ["#016b5f", "#1a9d5c", "#2f7fd1", "#7a5cd1", "#a24160", "#c9a020", "#e07a3a", "#0f8a8a"];
 
@@ -146,6 +149,9 @@ type Prefs = {
   mode: "tiles" | "table";
   layout: "two" | "one" | "three" | "main";
   order: string[];
+  /** ترتيب الأقسام نفسها — لكلٍّ ترتيبُه: هذا يبدأ بالتقويم
+      وملاحظاته، وذاك يبدأ بأعماله ويُنزل التقويم آخراً */
+  secOrder?: string[];
   hidden: string[];
   color: string;
   bg: string;
@@ -166,6 +172,16 @@ type Prefs = {
   /** علامة ترحيل هيكل «الأعمال الرئيسية» */
   v3?: boolean;
 };
+/** الأقسام بترتيبها الافتراضي — «top» قسمٌ بلا عنوان فوق البقية */
+export const SEC_ALL = ["top", "main", "ops", "contribs", "projects"];
+export const SEC_LABEL: Record<string, string> = {
+  top: "التقويم والملاحظات والمهام",
+  main: "الأعمال الرئيسية",
+  ops: "الأعمال التشغيلية",
+  contribs: "المساهمات في الخطة التشغيلية",
+  projects: "المشاريع الاستراتيجية",
+};
+
 /** ما يبقى مخفيّاً في الترتيب الجديد — بياناته باقية ويُعاد من التخصيص */
 const HIDE_V3 = ["strategies", "quarterly"];
 const DEFAULT_PREFS: Prefs = {
@@ -3948,15 +3964,30 @@ function CustomModal({
   prefs,
   t,
   meId,
+  leads,
+  secOrder,
   onClose,
   onChange,
+  onArrange,
 }: {
   prefs: Prefs;
   t: T;
   meId: string;
+  /** مدراء القطاع الذين يطّلعون على المحفظة — يُعرَّف بهم هنا */
+  leads: string[];
+  secOrder: string[];
   onClose: () => void;
   onChange: (p: Partial<Prefs>) => void;
+  /** الخروج إلى الصفحة في وضع السحب */
+  onArrange: () => void;
 }) {
+  const moveSec = (i: number, d: number) => {
+    const a = [...secOrder];
+    const j = i + d;
+    if (j < 0 || j >= a.length) return;
+    [a[i], a[j]] = [a[j], a[i]];
+    onChange({ secOrder: a });
+  };
   const file = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState("");
 
@@ -4051,6 +4082,78 @@ function CustomModal({
           </>
         )}
 
+        <div className="sec3">{t("شكل العرض", "View")}</div>
+        <div className="viewtog in-modal">
+          <span className={prefs.mode === "tiles" ? "on" : ""} onClick={() => onChange({ mode: "tiles" })}>
+            ◫ {t("بطاقات", "Tiles")}
+          </span>
+          <span className={prefs.mode === "table" ? "on" : ""} onClick={() => onChange({ mode: "table" })}>
+            ▤ {t("جداول", "Tables")}
+          </span>
+        </div>
+
+        {/* ترتيب الأقسام — لكلٍّ ترتيبُه: هذا يبدأ بتقويمه
+            وملاحظاته، وذاك يبدأ بأعماله ويُنزلهما آخراً */}
+        <div className="sec3">{t("ترتيب الأقسام", "Section order")}</div>
+        <div className="secord">
+          {secOrder.map((id, i) => (
+            <div className="r" key={id}>
+              <b>{i + 1}</b>
+              <span>{SEC_LABEL[id] || id}</span>
+              <button disabled={i === 0} onClick={() => moveSec(i, -1)} title={t("أعلى", "Up")}>▲</button>
+              <button disabled={i === secOrder.length - 1} onClick={() => moveSec(i, 1)} title={t("أسفل", "Down")}>▼</button>
+            </div>
+          ))}
+          <button className="rst" onClick={() => onChange({ secOrder: SEC_ALL })}>
+            ↺ {t("الترتيب الافتراضي للأقسام", "Reset sections")}
+          </button>
+        </div>
+
+        <div className="sec3">{t("البنود الظاهرة", "Visible items")}</div>
+        <div className="pf-arr in-modal">
+          {WIDGETS.map((w) => {
+            const on = !prefs.hidden.includes(w.key);
+            return (
+              <span
+                key={w.key}
+                className={`b ${on ? "on" : ""}`}
+                onClick={() =>
+                  onChange({
+                    hidden: on ? [...prefs.hidden, w.key] : prefs.hidden.filter((x) => x !== w.key),
+                  })
+                }
+              >
+                {w.label} {on ? "✓" : "+"}
+              </span>
+            );
+          })}
+        </div>
+        <div className="secord-f">
+          <button className="rst" onClick={() => onChange({ order: DEFAULT_PREFS.order, hidden: [] })}>
+            ↺ {t("إعادة ترتيب البنود الافتراضي", "Reset item order")}
+          </button>
+          <button className="arr" onClick={onArrange}>
+            ⋮⋮ {t("ترتيب البنود بالسحب", "Drag to arrange")}
+          </button>
+        </div>
+
+        {/* من يرى محفظتي: التعريف بمن يطّلع، ثم المنح */}
+        <div className="sec3">{t("من يرى محفظتي", "Who sees my portfolio")}</div>
+        <div className="seenby">
+          {leads.length ? (
+            <>
+              <b>{t("مدير قطاعك يطّلع على أعمال محفظتك", "Your manager can view your portfolio")}</b>
+              <em>
+                {t(
+                  `${leads.join(" · ")} — اطّلاع فقط، ولا يستطيع التعديل. وملاحظاتك وتقويمك لا يراهما أحد.`,
+                  `${leads.join(" · ")} — read only. Your notes and calendar stay private.`,
+                )}
+              </em>
+            </>
+          ) : (
+            <em>{t("لا أحد يطّلع على محفظتك إلا بمنحٍ منك.", "Nobody sees it unless you grant access.")}</em>
+          )}
+        </div>
         <GrantsBox prefs={prefs} meId={meId} t={t} />
         <EntShareBox t={t} />
 
@@ -4606,6 +4709,12 @@ export default function Portfolio({
   }
 
   const group = (g: string) => order.filter((k) => WMAP[k]?.group === g);
+  /* ترتيب الأقسام: ما حفظه صاحب المحفظة، ثم ما استُجدّ منها بعده
+     — فقسمٌ يُضاف في نسخةٍ لاحقة لا يختفي عمّن رتّب قبلها */
+  const secOrder = useMemo(() => {
+    const saved = (prefs.secOrder || []).filter((x) => SEC_ALL.includes(x));
+    return [...saved, ...SEC_ALL.filter((x) => !saved.includes(x))];
+  }, [prefs.secOrder]);
 
   function renderGroup(keys: WKey[], addTo?: string) {
     if (!keys.length && !addTo) return null;
@@ -4721,22 +4830,6 @@ export default function Portfolio({
         </div>
       )}
 
-      {/* الموظف يعرف من يطّلع عليه — قبل أن يكتشفه */}
-      {myLeads.length > 0 && (
-        <div className="pf-note-lead">
-          <span>👁️</span>
-          <div>
-            <b>{t("مدير قطاعك يطّلع على أعمال محفظتك", "Your manager can view your portfolio")}</b>
-            <em>
-              {t(
-                `${myLeads.join(" · ")} — اطّلاع فقط، ولا يستطيع التعديل. وملاحظاتك وتقويمك لا يراهما أحد.`,
-                `${myLeads.join(" · ")} — read only. Your notes and calendar stay private.`,
-              )}
-            </em>
-          </div>
-        </div>
-      )}
-
       <div className="pf-hero">
         <button
           className="av"
@@ -4787,20 +4880,17 @@ export default function Portfolio({
             </button>
           )}
         </div>
+        {/* زرٌّ واحد في الرأس: العرض والترتيب وإظهار البنود كلها
+            صارت داخل «تخصيص» — والرأس لا يحتمل شريط أدوات.
+            و«تم الترتيب» يظهر وقت السحب وحده ليُخرَج منه. */}
         <div className="acts">
-          <span className="viewtog">
-            <span className={prefs.mode === "tiles" ? "on" : ""} onClick={() => patch({ mode: "tiles" })}>
-              ◫ {t("بطاقات", "Tiles")}
-            </span>
-            <span className={prefs.mode === "table" ? "on" : ""} onClick={() => patch({ mode: "table" })}>
-              ▤ {t("جداول", "Tables")}
-            </span>
-          </span>
+          {arrange && (
+            <button className="btn2 solid" onClick={() => setArrange(false)}>
+              ✓ {t("تم الترتيب", "Done")}
+            </button>
+          )}
           <button className="btn2 solid" onClick={() => setCustom(true)}>
             <IconGear size={15} /> {t("تخصيص", "Customize")}
-          </button>
-          <button className={`btn2 ${arrange ? "solid" : ""}`} onClick={() => setArrange(!arrange)}>
-            {arrange ? `✓ ${t("تم الترتيب", "Done")}` : `⋮⋮ ${t("ترتيب", "Arrange")}`}
           </button>
         </div>
       </div>
@@ -4830,46 +4920,36 @@ export default function Portfolio({
       </div>
 
       {arrange && (
-        <div className="pf-arr">
-          <b>{t("الويدجت", "Widgets")}</b>
-          {WIDGETS.map((w) => {
-            const on = !prefs.hidden.includes(w.key);
-            return (
-              <span
-                key={w.key}
-                className={`b ${on ? "on" : ""}`}
-                onClick={() =>
-                  patch({
-                    hidden: on ? [...prefs.hidden, w.key] : prefs.hidden.filter((x) => x !== w.key),
-                  })
-                }
-              >
-                {w.label} {on ? "✓" : "+"}
-              </span>
-            );
-          })}
-          <span className="b" onClick={() => patch({ order: DEFAULT_PREFS.order, hidden: [] })}>
-            ↺ {t("الترتيب الافتراضي", "Reset order")}
-          </span>
+        <div className="pf-arr hint">
+          {t(
+            "اسحب البنود من المقبض ⋮⋮ لترتيبها، ثم اضغط «تم الترتيب».",
+            "Drag items by the ⋮⋮ handle, then press Done.",
+          )}
         </div>
       )}
 
-      <div className={`pf-top ${prefs.mode === "table" || prefs.layout === "one" ? "one" : ""}`}>
-        {group("top").map((k) => (
-          <Card key={k} k={k} wide={k === "tasks"} />
-        ))}
-      </div>
-
-      {/* العناوين وترتيبها من `GROUPS` — والمجموعة الفارغة لا يُرسم
-          عنوانها، فلا يبقى عنوانٌ تحته فراغ */}
-      {GROUPS.map((g) =>
-        group(g.id).length ? (
-          <div key={g.id}>
+      {/* ترتيب الأقسام من تفضيلات صاحب المحفظة لا من `GROUPS`:
+          هذا يبدأ بتقويمه وملاحظاته، وذاك يبدأ بأعماله. والمجموعة
+          الفارغة لا يُرسم عنوانها فلا يبقى عنوانٌ تحته فراغ. */}
+      {secOrder.map((id) =>
+        id === "top" ? (
+          group("top").length ? (
+            <div
+              key="top"
+              className={`pf-top ${prefs.mode === "table" || prefs.layout === "one" ? "one" : ""}`}
+            >
+              {group("top").map((k) => (
+                <Card key={k} k={k} wide={k === "tasks"} />
+              ))}
+            </div>
+          ) : null
+        ) : group(id).length ? (
+          <div key={id}>
             <div className="sect">
-              <h2>{t(g.label[0], g.label[1])}</h2>
+              <h2>{t(GMAP[id]?.label[0] || id, GMAP[id]?.label[1] || id)}</h2>
               <span className="ln" />
             </div>
-            {renderGroup(group(g.id), g.id)}
+            {renderGroup(group(id), id)}
           </div>
         ) : null,
       )}
@@ -4934,7 +5014,19 @@ export default function Portfolio({
       )}
 
       {custom && (
-        <CustomModal prefs={prefs} t={t} meId={me.id} onClose={() => setCustom(false)} onChange={patch} />
+        <CustomModal
+          prefs={prefs}
+          t={t}
+          meId={me.id}
+          leads={myLeads}
+          secOrder={secOrder}
+          onClose={() => setCustom(false)}
+          onChange={patch}
+          onArrange={() => {
+            setArrange(true);
+            setCustom(false);
+          }}
+        />
       )}
 
       {addW && (
