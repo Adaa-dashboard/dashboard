@@ -210,6 +210,28 @@ const DEFAULT_PREFS: Prefs = {
   cols: {},
 };
 
+/* ============================================================
+   خطة التطوير الفردية — قوائم ثابتة
+   ------------------------------------------------------------
+   تُستعمل في بطاقات الخطة وفي أعمدة الاستيراد معاً، فما يُرفع من
+   ملف الموارد البشرية يقع على القيم نفسها التي تعرضها البطاقة.
+   ============================================================ */
+/** مجموعتا النموذج بترتيبهما — الرقم جزءٌ من العنوان كما في الملف */
+export const DEV_KINDS: { k: string; n: string; label: string }[] = [
+  { k: "سلوكية", n: "١", label: "الجدارات السلوكية" },
+  { k: "مهنية", n: "٢", label: "الجدارات المهنية" },
+];
+/** سلّم المستوى — الترتيب هو المعنى، فلا تُبدّله */
+export const DEV_LEVELS = ["مبتدئ", "متوسط", "متقدم", "خبير"];
+export const DEV_STATES = ["لم تبدأ", "قيد التنفيذ", "مكتملة"];
+export const DEV_HOWS = [
+  "تدريب بالممارسة",
+  "تدريب عن طريق المنصة",
+  "دورة تدريبية",
+  "إرشاد وتوجيه",
+  "مشروع عملي",
+];
+
 /* أعمدة كل قسم — تُستعمل في الجداول وفي نافذة الإدخال */
 type Col = { k: string; label: string; kind?: "num" | "text" | "date" | "sel"; opts?: string[]; w?: number };
 const COLS: Record<string, Col[]> = {
@@ -287,16 +309,15 @@ const COLS: Record<string, Col[]> = {
      و«حالة الاكتمال» عنوانها يحوي «حالة»، فعدّادُ البطاقة ونسبةُ
      الهدف السنوي يقرآنها بلا استثناءٍ خاص. */
   devplan: [
-    { k: "kind", label: "نوع الجدارة", kind: "sel", opts: ["سلوكية", "مهنية"] },
+    { k: "kind", label: "نوع الجدارة", kind: "sel", opts: DEV_KINDS.map((x) => x.k) },
     { k: "name", label: "الجدارة ذات الأولوية", w: 2 },
     { k: "steps", label: "الخطوات لتطوير الجدارة", w: 3 },
     { k: "measure", label: "مقياس النجاح", w: 2 },
     { k: "due", label: "التاريخ المتوقع لتحقيق الجدارة", kind: "date" },
-    { k: "now", label: "المستوى الحالي", kind: "sel", opts: ["مبتدئ", "متوسط", "متقدم", "خبير"] },
-    { k: "need", label: "المستوى المطلوب", kind: "sel", opts: ["مبتدئ", "متوسط", "متقدم", "خبير"] },
-    { k: "how", label: "آلية التطوير", kind: "sel",
-      opts: ["تدريب بالممارسة", "تدريب عن طريق المنصة", "دورة تدريبية", "إرشاد وتوجيه", "مشروع عملي"] },
-    { k: "state", label: "حالة الاكتمال", kind: "sel", opts: ["لم تبدأ", "قيد التنفيذ", "مكتملة"] },
+    { k: "now", label: "المستوى الحالي", kind: "sel", opts: DEV_LEVELS },
+    { k: "need", label: "المستوى المطلوب", kind: "sel", opts: DEV_LEVELS },
+    { k: "how", label: "آلية التطوير", kind: "sel", opts: DEV_HOWS },
+    { k: "state", label: "حالة الاكتمال", kind: "sel", opts: DEV_STATES },
     { k: "final", label: "التقييم النهائي", w: 2 },
   ],
   projects: [
@@ -1850,6 +1871,267 @@ function NoteBox({ value, ph, rows, dis, onSave }: { value: string; ph: string; 
     />
   );
 }
+
+
+/* ============================================================
+   خطتي التطويرية — بطاقات لا جدول
+   ------------------------------------------------------------
+   النموذج ورقةٌ من عشرة أعمدة، ولو عُرض جدولاً لصار سطراً أفقياً
+   طويلاً لا يُقرأ على شاشة. فكل جدارةٍ **بطاقة**: اسمها وحالتها
+   في رأسها، ثم سلّمٌ من أربع درجات يُرى فيه أين هي وإلى أين
+   تُريد، ثم الخطوات ومقياس النجاح نصّاً مفروداً، والتاريخ وآلية
+   التطوير والتقييم في سطرٍ هادئ أسفلها.
+
+   والمجموعتان مفصولتان بعنوانيهما كما في الملف: «١ · الجدارات
+   السلوكية» و«٢ · الجدارات المهنية» — وترتيب الحقول داخل البطاقة
+   ترتيبُ أعمدة النموذج نفسه، فمن عبّأ الورقة يجد ما اعتاده.
+
+   وفي البطاقة المصغّرة سطرٌ لكل جدارة، وفي النافذة البطاقة كاملة:
+   الملخّص يُلمح والتفصيل يُفتح.
+   ============================================================ */
+/** موضع المستوى في السلّم — غير المعروف −1 فلا يُرسم */
+const lvIdx = (v: unknown) => DEV_LEVELS.indexOf(txt(v).trim());
+const devTone = (v: unknown) =>
+  txt(v) === "مكتملة" ? "done" : txt(v) === "قيد التنفيذ" ? "live" : "idle";
+
+function DevLevels({ now, need, t }: { now: unknown; need: unknown; t: T }) {
+  const a = lvIdx(now);
+  const b = lvIdx(need);
+  if (a < 0 && b < 0) return null;
+  return (
+    <div className="dvc-lv">
+      {DEV_LEVELS.map((l, i) => (
+        <span
+          key={l}
+          className={`s ${a >= 0 && i <= a ? "on" : ""} ${i === b ? "goal" : ""}`}
+          title={i === b ? t("المستوى المطلوب", "Target level") : l}
+        >
+          {l}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function DevCard({
+  r, t, onEdit, onDelete,
+}: {
+  r: Row;
+  t: T;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const d = r.data;
+  const st = txt(d.state) || "لم تبدأ";
+  return (
+    <div className={`dvc ${devTone(st)}`}>
+      <div className="dvc-h">
+        <b className="n">{txt(d.name) || t("جدارة بلا اسم", "Untitled")}</b>
+        <span className={`dvc-st ${devTone(st)}`}>{st}</span>
+        <button className="dvc-b" title={t("تعديل", "Edit")} onClick={onEdit}>✎</button>
+        <button className="dvc-b" title={t("حذف", "Delete")} onClick={onDelete}>✕</button>
+      </div>
+
+      <DevLevels now={d.now} need={d.need} t={t} />
+
+      {txt(d.steps) && (
+        <div className="dvc-f">
+          <b>{t("الخطوات لتطوير الجدارة", "Development steps")}</b>
+          <p>{txt(d.steps)}</p>
+        </div>
+      )}
+      {txt(d.measure) && (
+        <div className="dvc-f">
+          <b>{t("مقياس النجاح", "Success measure")}</b>
+          <p>{txt(d.measure)}</p>
+        </div>
+      )}
+
+      <div className="dvc-m">
+        <em>
+          {t("التاريخ المتوقع", "Target date")} <b>{txt(d.due) || "—"}</b>
+        </em>
+        <em>
+          {t("آلية التطوير", "Method")} <b>{txt(d.how) || "—"}</b>
+        </em>
+        <em>
+          {t("التقييم النهائي", "Final rating")} <b>{txt(d.final) || "—"}</b>
+        </em>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- نافذة جدارة ---------------- */
+function DevEdit({
+  row, kind, t, onClose, onSave,
+}: {
+  row: Row | null;
+  kind: string;
+  t: T;
+  onClose: () => void;
+  onSave: (id: string, data: Rec) => void;
+}) {
+  const [f, setF] = useState<Rec>(() => ({
+    kind,
+    name: "", steps: "", measure: "", due: "",
+    now: DEV_LEVELS[0], need: DEV_LEVELS[1], how: DEV_HOWS[0],
+    state: DEV_STATES[0], final: "",
+    ...(row?.data || {}),
+  }));
+  const set = (k: string, v: string) => setF((o) => ({ ...o, [k]: v }));
+  const sel = (k: string, label: string, opts: string[]) => (
+    <label>
+      <span>{label}</span>
+      <select value={txt(f[k])} onChange={(e) => set(k, e.target.value)}>
+        {opts.map((o) => (
+          <option key={o} value={o}>{o}</option>
+        ))}
+      </select>
+    </label>
+  );
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="m-h">
+          <h3>{row ? t("تعديل جدارة", "Edit competency") : t("إضافة جدارة", "Add competency")}</h3>
+          <button className="mx" onClick={onClose} aria-label="close">✕</button>
+        </div>
+
+        <label className="op-note">
+          <span>{t("الجدارة ذات الأولوية", "Priority competency")}</span>
+          <input value={txt(f.name)} autoFocus onChange={(e) => set("name", e.target.value)} />
+        </label>
+        <label className="op-note">
+          <span>{t("الخطوات لتطوير الجدارة", "Development steps")}</span>
+          <textarea rows={3} value={txt(f.steps)} onChange={(e) => set("steps", e.target.value)} />
+        </label>
+        <label className="op-note">
+          <span>{t("مقياس النجاح", "Success measure")}</span>
+          <textarea rows={2} value={txt(f.measure)} onChange={(e) => set("measure", e.target.value)} />
+        </label>
+
+        <div className="op-f">
+          <label>
+            <span>{t("التاريخ المتوقع لتحقيق الجدارة", "Target date")}</span>
+            <input type="date" value={txt(f.due)} onChange={(e) => set("due", e.target.value)} />
+          </label>
+          {sel("how", t("آلية التطوير", "Method"), DEV_HOWS)}
+        </div>
+        <div className="op-f">
+          {sel("now", t("المستوى الحالي", "Current level"), DEV_LEVELS)}
+          {sel("need", t("المستوى المطلوب", "Target level"), DEV_LEVELS)}
+        </div>
+        <div className="op-f">
+          {sel("kind", t("نوع الجدارة", "Type"), DEV_KINDS.map((x) => x.k))}
+          {sel("state", t("حالة الاكتمال", "Completion"), DEV_STATES)}
+        </div>
+        <label className="op-note">
+          <span>{t("التقييم النهائي", "Final rating")}</span>
+          <input value={txt(f.final)} onChange={(e) => set("final", e.target.value)} />
+        </label>
+
+        <div className="m-f">
+          <button className="btn btn-ghost" onClick={onClose}>{t("إلغاء", "Cancel")}</button>
+          <button
+            className="btn"
+            disabled={!txt(f.name).trim()}
+            onClick={() => {
+              onSave(row?.id || "", { ...f, name: txt(f.name).trim() });
+              onClose();
+            }}
+          >
+            {t("حفظ", "Save")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DevPlan({
+  rows, full, t, onSave, onDelete,
+}: {
+  rows: Row[];
+  /** داخل النافذة: البطاقات كاملة. وفي بطاقة المحفظة: سطرٌ لكل جدارة */
+  full?: boolean;
+  t: T;
+  onSave: (id: string, data: Rec) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [edit, setEdit] = useState<{ row: Row | null; kind: string } | null>(null);
+  const of = (k: string) => rows.filter((r) => txt(r.data.kind).trim() === k);
+  /* ما لم يُحدَّد نوعه يُعرض مع السلوكية لا يختفي — بطاقةٌ لا تُرى
+     أسوأ من بطاقةٍ في المجموعة الخطأ */
+  const loose = rows.filter((r) => !DEV_KINDS.some((x) => x.k === txt(r.data.kind).trim()));
+
+  return (
+    <div className="dvp">
+      {DEV_KINDS.map((g, gi) => {
+        const list = gi === 0 ? [...of(g.k), ...loose] : of(g.k);
+        const done = list.filter((r) => txt(r.data.state) === "مكتملة").length;
+        return (
+          <div className="dvp-g" key={g.k}>
+            <div className="dvp-gh">
+              <span className="num">{g.n}</span>
+              <b>{t(g.label, g.label)}</b>
+              <em>{list.length ? t(`${done} من ${list.length} مكتملة`, `${done}/${list.length}`) : ""}</em>
+              <button className="dvp-add" onClick={() => setEdit({ row: null, kind: g.k })}>
+                + {t("جدارة", "Add")}
+              </button>
+            </div>
+
+            {!list.length ? (
+              <div className="dvp-none">
+                {t("لم تُضف جدارات في هذه المجموعة بعد.", "No competencies yet.")}
+              </div>
+            ) : full ? (
+              <div className="dvp-cards">
+                {list.map((r) => (
+                  <DevCard
+                    key={r.id}
+                    r={r}
+                    t={t}
+                    onEdit={() => setEdit({ row: r, kind: txt(r.data.kind) || g.k })}
+                    onDelete={() => onDelete(r.id)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="dvp-lines">
+                {list.map((r) => (
+                  <button
+                    className={`dvp-li ${devTone(r.data.state)}`}
+                    key={r.id}
+                    onClick={() => setEdit({ row: r, kind: txt(r.data.kind) || g.k })}
+                  >
+                    <i />
+                    <span className="n">{txt(r.data.name) || t("جدارة بلا اسم", "Untitled")}</span>
+                    <em>
+                      {txt(r.data.now) || "—"} ← {txt(r.data.need) || "—"}
+                    </em>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {edit && (
+        <DevEdit
+          row={edit.row}
+          kind={edit.kind}
+          t={t}
+          onClose={() => setEdit(null)}
+          onSave={onSave}
+        />
+      )}
+    </div>
+  );
+}
+
 
 function MainWork({
   sec, rows, sess, loaded, extras, canEdit, t, onExtra, onPatch, onReload, full,
@@ -4898,6 +5180,20 @@ export default function Portfolio({
       );
     /* المساهمات تُعرض من الخطة دائماً — لا جدولاً محلياً عند فتحها */
     if (k === "contrib") return <Contrib rows={contrib} meName={me.name || ""} t={t} />;
+    /* الخطة التطويرية بطاقاتٌ مقسّمةٌ على مجموعتي النموذج — عشرة
+       أعمدة في سطرٍ واحد لا تُقرأ */
+    if (k === "devplan")
+      return (
+        <DevPlan
+          rows={devplan}
+          full={prefs.mode === "table" || open === k}
+          t={t}
+          onSave={(id, data) => void pf.save("devplan", id || "dv-" + newId(), data, devplan.length + 1)}
+          onDelete={(id) => {
+            if (confirm(t("حذف هذه الجدارة؟", "Delete this competency?"))) void pf.remove("devplan", id);
+          }}
+        />
+      );
     const base = k.startsWith("cw-") ? "custom" : sec;
     return (
       <>

@@ -12137,3 +12137,107 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
 .gl-i.gl-nw .gl-bar > i { background: #e0971a; }
 .gl-i.gl-no .gl-bar > i { background: #d34a4a; }
 .gl-src { font-size: 9.5px; color: var(--muted); line-height: 1.7; margin-top: 5px; overflow-wrap: anywhere; }
+
+/* ============================================================
+   خطتي التطويرية — بطاقات الجدارات
+   ------------------------------------------------------------
+   مجموعتان بعنوانيهما المرقّمين كما في نموذج الموارد البشرية،
+   وتحت كل عنوان بطاقاتٌ لا صفوف: عشرة حقول في سطرٍ أفقي لا
+   تُقرأ على شاشة، فجُعل لكل جدارةٍ لوحُها.
+   ============================================================ */
+.dvp { display: flex; flex-direction: column; gap: 16px; }
+
+.dvp-gh { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+.dvp-gh .num {
+  width: 20px; height: 20px; border-radius: 50%;
+  display: grid; place-items: center; flex: none;
+  background: var(--g-800); color: #fff; font-size: 10px; font-weight: 800;
+}
+.dvp-gh > b { font-size: 12.5px; font-weight: 800; color: var(--g-800); }
+.dvp-gh > em { font-style: normal; font-size: 10px; color: var(--muted); }
+.dvp-add {
+  margin-inline-start: auto; font: inherit; font-size: 10.5px; font-weight: 700;
+  cursor: pointer; color: var(--g-700); background: var(--tint);
+  border: 1px solid var(--tint-bd); border-radius: 20px; padding: 3px 11px;
+}
+.dvp-add:hover { background: var(--g-100); }
+.dvp-none {
+  font-size: 11px; color: var(--muted); line-height: 1.8;
+  background: var(--soft); border: 1px dashed var(--line2);
+  border-radius: 12px; padding: 12px 14px;
+}
+
+/* البطاقات: عمودان على السعة وعمودٌ على الضيق */
+/* `auto-fill` لا `auto-fit`: المجموعة التي فيها جدارةٌ واحدة
+   تُبقي بطاقتها بعرض بطاقات أختها، ولا تتمدّد على السطر كلّه
+   فيصير سلّم المستوى شريطاً ممدوداً */
+.dvp-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 10px; }
+.dvc {
+  border: 1px solid var(--border); border-radius: 14px;
+  background: var(--panel); padding: 11px 13px;
+  border-inline-start: 3px solid var(--line2);
+}
+.dvc.done { border-inline-start-color: #1a9d5c; }
+.dvc.live { border-inline-start-color: #e0971a; }
+.dvc.idle { border-inline-start-color: #c3cfca; }
+
+.dvc-h { display: flex; align-items: center; gap: 6px; }
+.dvc-h .n {
+  flex: 1; font-size: 12.5px; font-weight: 800; color: var(--text);
+  line-height: 1.6; overflow-wrap: anywhere;
+}
+.dvc-st {
+  font-size: 9.5px; font-weight: 800; border-radius: 20px;
+  padding: 2px 9px; white-space: nowrap;
+  background: var(--soft2); color: var(--muted);
+}
+.dvc-st.done { background: var(--ok-bg); color: var(--ok-tx); }
+.dvc-st.live { background: #fdf2e0; color: #8a5b08; }
+.dvc-b {
+  font: inherit; font-size: 11px; cursor: pointer; color: var(--muted);
+  background: none; border: none; padding: 2px 3px; border-radius: 6px; opacity: 0;
+}
+.dvc:hover .dvc-b, .dvc:focus-within .dvc-b { opacity: 1; }
+.dvc-b:hover { color: var(--g-800); background: var(--soft); }
+
+/* سلّم المستوى: ما بلغته مصمتٌ، والمطلوب مؤطَّرٌ بالذهبي */
+.dvc-lv { display: flex; gap: 4px; margin: 9px 0 2px; }
+.dvc-lv .s {
+  flex: 1; text-align: center; font-size: 9.5px; font-weight: 700;
+  padding: 3px 2px; border-radius: 7px;
+  background: var(--soft); color: var(--muted);
+  border: 1px solid transparent;
+}
+.dvc-lv .s.on { background: var(--g-100); color: var(--g-800); }
+.dvc-lv .s.goal { border-color: var(--gold); color: var(--g-900); }
+
+.dvc-f { margin-top: 8px; }
+.dvc-f > b { display: block; font-size: 9.5px; font-weight: 800; color: var(--muted); margin-bottom: 2px; }
+.dvc-f > p {
+  margin: 0; font-size: 11.5px; line-height: 1.8; color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.dvc-m {
+  display: flex; flex-wrap: wrap; gap: 4px 14px;
+  margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--line2);
+}
+.dvc-m > em { font-style: normal; font-size: 9.5px; color: var(--muted); }
+.dvc-m > em > b { font-size: 10.5px; font-weight: 800; color: var(--ink-2); }
+
+/* الملخّص داخل بطاقة المحفظة — سطرٌ لكل جدارة يُفتح بالضغط */
+.dvp-lines { display: flex; flex-direction: column; gap: 5px; }
+.dvp-li {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  font: inherit; text-align: start; cursor: pointer;
+  background: var(--soft); border: 1px solid var(--line2);
+  border-radius: 10px; padding: 6px 10px;
+}
+.dvp-li:hover { border-color: color-mix(in srgb, var(--g-700) 34%, var(--line2)); }
+.dvp-li > i { width: 7px; height: 7px; border-radius: 50%; flex: none; background: #c3cfca; }
+.dvp-li.done > i { background: #1a9d5c; }
+.dvp-li.live > i { background: #e0971a; }
+.dvp-li .n {
+  flex: 1; font-size: 11.5px; font-weight: 700; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.dvp-li > em { font-style: normal; font-size: 9.5px; color: var(--muted); white-space: nowrap; }
