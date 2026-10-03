@@ -89,7 +89,6 @@ export const SCOPE_GROUPS: { title: string; items: { key: Scope; label: string; 
       { key: "assignments", label: "التكاليف", note: "الواردة من جهة أعلى" },
       { key: "changes", label: "طلبات التغيير", note: "عرض ونسخ وتصدير" },
       { key: "changes:upload", label: "رفع ملف طلبات التغيير", note: "لمن يسحب الملف من منصة الرؤية" },
-      { key: "announce", label: "نشر إعلان", note: "شريط متحرّك يراه الجميع — بمدّة تنتهي وحدها" },
     ],
   },
   {
@@ -176,7 +175,6 @@ export const PAGE_ROWS: { title: string; rows: PageRow[] }[] = [
       { view: "structure", label: "الهيكل التنظيمي" },
       { view: "users", label: "المستخدمون والصلاحيات" },
       { view: "sticky", label: "كتابة الملاحظات اللاصقة", note: "القلم في زاوية كل صفحة" },
-      { view: "announce", label: "نشر إعلان", note: "شريط متحرّك يراه الجميع — بمدّة تنتهي وحدها" },
       { view: "audit", label: "سجل النشاط", note: "من عدّل ماذا ومتى" },
     ],
   },

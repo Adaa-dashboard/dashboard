@@ -1385,7 +1385,8 @@ export async function apiFetch(path: string, init: Init = {}) {
       return ok({
         ticker: (data || []).map((r: Record<string, unknown>) => ({
           id: String(r.id), body: String(r.body || ""), tone: String(r.tone || "green"),
-          byName: String(r.by_name || ""), until: String(r.until || ""), mine: r.mine === true,
+          byName: String(r.by_name || ""), until: String(r.until || ""),
+          mine: r.mine === true, canStop: r.can_stop === true,
         })),
       });
     }

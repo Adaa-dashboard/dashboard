@@ -25,6 +25,8 @@ export type TickItem = {
   byName: string;
   until: string;
   mine: boolean;
+  /** يُنهيه صاحبُه، أو صاحب الصلاحية الكاملة ليكنس ما لا يصلح */
+  canStop: boolean;
 };
 
 type T = (ar: string, en: string) => string;
@@ -74,14 +76,14 @@ export function useTicker() {
   return { items, reload: load };
 }
 
+/* النشر لكل من دخل — لا صلاحية له. والإعلان خبرٌ قصير بمدّةٍ
+   تنتهي وحدها، لا قراراً يحتاج إذناً. */
 export default function Ticker({
   items,
-  canAnnounce,
   t,
   onReload,
 }: {
   items: TickItem[];
-  canAnnounce: boolean;
   t: T;
   onReload: () => void;
 }) {
@@ -131,8 +133,6 @@ export default function Ticker({
     onReload();
   }
 
-  if (!items.length && !canAnnounce) return null;
-
   const urgent = items.some((x) => x.tone === "red");
   /* النسخة الثانية تجعل الدوران بلا فجوة: حين تخرج الأولى تكون
      الثانية قد حلّت محلّها تماماً */
@@ -153,15 +153,13 @@ export default function Ticker({
           </div>
         </div>
       )}
-      {!items.length && canAnnounce && (
+      {!items.length && (
         <span className="anb-none">{t("لا توجد إعلانات سارية.", "No announcements.")}</span>
       )}
 
-      {canAnnounce && (
-        <button className="anb-btn" onClick={() => setOpen(true)} title={t("نشر إعلان", "Announce")}>
-          📣 {t("إعلان", "Announce")}
-        </button>
-      )}
+      <button className="anb-btn" onClick={() => setOpen(true)} title={t("نشر إعلان", "Announce")}>
+        📣 {t("إعلان", "Announce")}
+      </button>
 
       {open && (
         <div className="modal-overlay" onClick={() => setOpen(false)}>
@@ -223,7 +221,7 @@ export default function Ticker({
                     <i />
                     <span className="n">{x.body}</span>
                     <em>{x.mine ? t("منك", "You") : x.byName} · {left(x.until)}</em>
-                    {x.mine && (
+                    {x.canStop && (
                       <button onClick={() => void stop(x.id)}>{t("إنهاء", "End")}</button>
                     )}
                   </div>

@@ -696,9 +696,9 @@ export default function Dashboard({ me }: { me: Me }) {
             <Tools t={t} meId={me.id} />
           </div>
 
-          {/* شريط الإعلانات فوق كل صفحة — يراه الجميع، وينشره
-              صاحب صلاحية «إعلان» وحده */}
-          <Ticker items={tick.items} canAnnounce={can("announce")} t={t} onReload={tick.reload} />
+          {/* شريط الإعلانات فوق كل صفحة — يراه الجميع وينشر فيه
+              الجميع، ولا يُنهي إعلاناً إلا صاحبُه أو المدير */}
+          <Ticker items={tick.items} t={t} onReload={tick.reload} />
 
           <PinnedBar pins={pins.pins} onRemove={pins.remove} t={t} />
 
