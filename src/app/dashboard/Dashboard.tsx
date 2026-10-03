@@ -30,7 +30,7 @@ import {
   type Scope,
 } from "@/lib/scopes";
 import Tasks from "./Tasks";
-import Ticker, { useTicker } from "./Ticker";
+import Ticker, { TickerCompose, useTicker } from "./Ticker";
 import {
   SectionPage,
   Sessions,
@@ -364,6 +364,8 @@ export default function Dashboard({ me }: { me: Me }) {
   const [notesOpen, setNotesOpen] = useState(false);
   const pins = usePins();
   const tick = useTicker();
+  /* نافذة نشر الإعلان — تُفتح من قلم الصفحة */
+  const [announce, setAnnounce] = useState(false);
   const [sheet, setSheet] = useState(false); // ورقة الإعدادات على الجوال
   // طيّ الشريط الجانبي — الحالة تبقى بين الجلسات لكل متصفح
   const [railCol, setRailCol] = useState(false);
@@ -696,9 +698,8 @@ export default function Dashboard({ me }: { me: Me }) {
             <Tools t={t} meId={me.id} />
           </div>
 
-          {/* شريط الإعلانات فوق كل صفحة — يراه الجميع وينشر فيه
-              الجميع، ولا يُنهي إعلاناً إلا صاحبُه أو المدير */}
-          <Ticker items={tick.items} t={t} onReload={tick.reload} />
+          {/* شريط الإعلانات فوق كل صفحة — للقراءة، والنشر من القلم */}
+          <Ticker items={tick.items} t={t} />
 
           <PinnedBar pins={pins.pins} onRemove={pins.remove} t={t} />
 
@@ -797,14 +798,29 @@ export default function Dashboard({ me }: { me: Me }) {
             </>
           )}
 
-          {/* الملاحظات اللاصقة — على الصفحات التي لها صلاحية باسمها،
-              فالورقة تُرى وتُكتب بقدر ما تُرى الصفحة نفسها */}
-          {STICKY_PAGES[tab] && can(STICKY_PAGES[tab]) && (
-            <StickyLayer
-              page={STICKY_PAGES[tab]}
-              canWrite={can("sticky")}
-              canClose={can(`${STICKY_PAGES[tab]}:edit` as Scope)}
+          {/* القلم في كل صفحة — فالإعلان يُنشر من أيّها كان. أما
+              الملاحظات اللاصقة فعلى الصفحات التي لها صلاحية باسمها
+              وحدها، فالورقة تُرى وتُكتب بقدر ما تُرى صفحتُها. */}
+          {(() => {
+            const sp = STICKY_PAGES[tab];
+            const notes = !!sp && can(sp);
+            return (
+              <StickyLayer
+                page={notes ? sp : ""}
+                canWrite={notes && can("sticky")}
+                canClose={notes && can(`${sp}:edit` as Scope)}
+                t={t}
+                onAnnounce={() => setAnnounce(true)}
+              />
+            );
+          })()}
+
+          {announce && (
+            <TickerCompose
+              items={tick.items}
               t={t}
+              onClose={() => setAnnounce(false)}
+              onReload={tick.reload}
             />
           )}
         </main>

@@ -13,6 +13,10 @@
    ٣) **شفافٌ يقف عند المرور** — خلفيته شبه شفافة فلا تحجب ما
       تحتها، ويقف الدوران عند التمرير عليه ليُقرأ على مهل، ويقف
       كذلك لمن يطلب تقليل الحركة في نظامه.
+
+   والنشر من **قلم الصفحة** لا من زرٍّ في الشريط: القلم مكان
+   الكتابة في المنصة، فتجتمع عنده الملاحظة والإعلان — ويبقى
+   الشريط للقراءة وحدها.
    ============================================================ */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -76,23 +80,8 @@ export function useTicker() {
   return { items, reload: load };
 }
 
-/* النشر لكل من دخل — لا صلاحية له. والإعلان خبرٌ قصير بمدّةٍ
-   تنتهي وحدها، لا قراراً يحتاج إذناً. */
-export default function Ticker({
-  items,
-  t,
-  onReload,
-}: {
-  items: TickItem[];
-  t: T;
-  onReload: () => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [body, setBody] = useState("");
-  const [tone, setTone] = useState("green");
-  const [hours, setHours] = useState(24);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState("");
+/* ---------------- الشريط: للقراءة وحدها ---------------- */
+export default function Ticker({ items, t }: { items: TickItem[]; t: T }) {
   const trackRef = useRef<HTMLDivElement | null>(null);
   const [dur, setDur] = useState(30);
 
@@ -102,9 +91,53 @@ export default function Ticker({
   useEffect(() => {
     const el = trackRef.current;
     if (!el) return;
-    const w = el.scrollWidth / 2;
-    setDur(Math.max(14, Math.round(w / 60)));
+    setDur(Math.max(14, Math.round(el.scrollWidth / 2 / 60)));
   }, [items]);
+
+  /* بلا إعلانات لا شريط: سطرُ «لا توجد إعلانات» يشغل مكاناً بلا
+     خبر — والنشر صار عند القلم لا هنا */
+  if (!items.length) return null;
+
+  const urgent = items.some((x) => x.tone === "red");
+  /* النسخة الثانية تجعل الدوران بلا فجوة: حين تخرج الأولى تكون
+     الثانية قد حلّت محلّها تماماً */
+  const run = [...items, ...items];
+
+  return (
+    <div className={`anb ${urgent ? "urg" : ""}`}>
+      <div className="anb-win">
+        <div className="anb-track" ref={trackRef} style={{ animationDuration: `${dur}s` }}>
+          {run.map((x, i) => (
+            <span className={`anb-it ${x.tone}`} key={`${x.id}-${i}`}>
+              <i />
+              <b>{x.body}</b>
+              <em>{x.byName}</em>
+            </span>
+          ))}
+        </div>
+      </div>
+      <span className="anb-tag">{t("إعلانات", "Announcements")}</span>
+    </div>
+  );
+}
+
+/* ---------------- نافذة النشر — تُفتح من القلم ---------------- */
+export function TickerCompose({
+  items,
+  t,
+  onClose,
+  onReload,
+}: {
+  items: TickItem[];
+  t: T;
+  onClose: () => void;
+  onReload: () => void;
+}) {
+  const [body, setBody] = useState("");
+  const [tone, setTone] = useState("green");
+  const [hours, setHours] = useState(24);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
 
   async function say() {
     if (!body.trim() || busy) return;
@@ -123,8 +156,8 @@ export default function Ticker({
       return;
     }
     setBody("");
-    setOpen(false);
     onReload();
+    onClose();
   }
 
   async function stop(id: string) {
@@ -133,111 +166,80 @@ export default function Ticker({
     onReload();
   }
 
-  const urgent = items.some((x) => x.tone === "red");
-  /* النسخة الثانية تجعل الدوران بلا فجوة: حين تخرج الأولى تكون
-     الثانية قد حلّت محلّها تماماً */
-  const run = items.length ? [...items, ...items] : [];
-
   return (
-    <div className={`anb ${urgent ? "urg" : ""}`}>
-      {items.length > 0 && (
-        <div className="anb-win">
-          <div className="anb-track" ref={trackRef} style={{ animationDuration: `${dur}s` }}>
-            {run.map((x, i) => (
-              <span className={`anb-it ${x.tone}`} key={`${x.id}-${i}`}>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="m-h">
+          <h3>{t("نشر إعلان", "New announcement")}</h3>
+          <button className="mx" onClick={onClose} aria-label="close">✕</button>
+        </div>
+
+        <label className="op-note">
+          <span>{t("نصّ الإعلان", "Text")}</span>
+          <textarea
+            rows={2}
+            maxLength={280}
+            autoFocus
+            value={body}
+            placeholder={t("مثال: حدّثوا جهات الاتصال قبل نهاية الأسبوع.", "e.g. Update your contacts")}
+            onChange={(e) => setBody(e.target.value)}
+          />
+        </label>
+        <div className="anb-cnt">{280 - body.length}</div>
+
+        <div className="op-f">
+          <label>
+            <span>{t("النوع", "Tone")}</span>
+            <select value={tone} onChange={(e) => setTone(e.target.value)}>
+              {TONES.map((x) => (
+                <option key={x.v} value={x.v}>{t(x.ar, x.en)}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>{t("يبقى لمدّة", "Duration")}</span>
+            <select value={hours} onChange={(e) => setHours(Number(e.target.value))}>
+              {SPANS.map((x) => (
+                <option key={x.h} value={x.h}>{t(x.ar, x.en)}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className={`anb-prev ${tone}`}>
+          <i />
+          <b>{body.trim() || t("هكذا يظهر إعلانك", "Preview")}</b>
+        </div>
+        <p className="muted" style={{ fontSize: 11, lineHeight: 1.7 }}>
+          {t(
+            "ينتهي وحده بانقضاء المدّة فلا يحتاج حذفاً. وإن أعلن غيرك في الوقت نفسه مشى الإعلانان في الشريط وراء بعضهما.",
+            "It expires on its own.",
+          )}
+        </p>
+
+        {err && <div className="op-err">{err}</div>}
+
+        {items.length > 0 && (
+          <div className="anb-list">
+            <b>{t("الإعلانات السارية", "Running now")}</b>
+            {items.map((x) => (
+              <div className={`anb-row ${x.tone}`} key={x.id}>
                 <i />
-                <b>{x.body}</b>
-                <em>{x.byName}</em>
-              </span>
+                <span className="n">{x.body}</span>
+                <em>{x.mine ? t("منك", "You") : x.byName} · {left(x.until)}</em>
+                {x.canStop && <button onClick={() => void stop(x.id)}>{t("إنهاء", "End")}</button>}
+              </div>
             ))}
           </div>
+        )}
+
+        <div className="m-f">
+          <button className="btn btn-ghost" onClick={onClose}>{t("إغلاق", "Close")}</button>
+          <button className="btn" disabled={busy || !body.trim()} onClick={() => void say()}>
+            {busy ? t("يُنشر…", "Posting…") : t("نشر", "Post")}
+          </button>
         </div>
-      )}
-      {!items.length && (
-        <span className="anb-none">{t("لا توجد إعلانات سارية.", "No announcements.")}</span>
-      )}
-
-      <button className="anb-btn" onClick={() => setOpen(true)} title={t("نشر إعلان", "Announce")}>
-        📣 {t("إعلان", "Announce")}
-      </button>
-
-      {open && (
-        <div className="modal-overlay" onClick={() => setOpen(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="m-h">
-              <h3>{t("نشر إعلان", "New announcement")}</h3>
-              <button className="mx" onClick={() => setOpen(false)} aria-label="close">✕</button>
-            </div>
-
-            <label className="op-note">
-              <span>{t("نصّ الإعلان", "Text")}</span>
-              <textarea
-                rows={2}
-                maxLength={280}
-                value={body}
-                placeholder={t("مثال: حدّثوا جهات الاتصال قبل نهاية الأسبوع.", "e.g. Update your contacts")}
-                onChange={(e) => setBody(e.target.value)}
-              />
-            </label>
-            <div className="anb-cnt">{280 - body.length}</div>
-
-            <div className="op-f">
-              <label>
-                <span>{t("النوع", "Tone")}</span>
-                <select value={tone} onChange={(e) => setTone(e.target.value)}>
-                  {TONES.map((x) => (
-                    <option key={x.v} value={x.v}>{t(x.ar, x.en)}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>{t("يبقى لمدّة", "Duration")}</span>
-                <select value={hours} onChange={(e) => setHours(Number(e.target.value))}>
-                  {SPANS.map((x) => (
-                    <option key={x.h} value={x.h}>{t(x.ar, x.en)}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            <div className={`anb-prev ${tone}`}>
-              <i />
-              <b>{body.trim() || t("هكذا يظهر إعلانك", "Preview")}</b>
-            </div>
-            <p className="muted" style={{ fontSize: 11, lineHeight: 1.7 }}>
-              {t(
-                "ينتهي وحده بانقضاء المدّة فلا يحتاج حذفاً. وإن أعلن غيرك في الوقت نفسه مشى الإعلانان في الشريط وراء بعضهما.",
-                "It expires on its own.",
-              )}
-            </p>
-
-            {err && <div className="op-err">{err}</div>}
-
-            {items.length > 0 && (
-              <div className="anb-list">
-                <b>{t("الإعلانات السارية", "Running now")}</b>
-                {items.map((x) => (
-                  <div className={`anb-row ${x.tone}`} key={x.id}>
-                    <i />
-                    <span className="n">{x.body}</span>
-                    <em>{x.mine ? t("منك", "You") : x.byName} · {left(x.until)}</em>
-                    {x.canStop && (
-                      <button onClick={() => void stop(x.id)}>{t("إنهاء", "End")}</button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="m-f">
-              <button className="btn btn-ghost" onClick={() => setOpen(false)}>{t("إغلاق", "Close")}</button>
-              <button className="btn" disabled={busy || !body.trim()} onClick={() => void say()}>
-                {busy ? t("يُنشر…", "Posting…") : t("نشر", "Post")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

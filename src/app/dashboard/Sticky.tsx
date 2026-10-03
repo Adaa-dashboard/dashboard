@@ -422,6 +422,7 @@ export default function StickyLayer({
   canWrite,
   canClose,
   t,
+  onAnnounce,
 }: {
   /** مفتاح الصفحة — هو نفسه مفتاح صلاحيتها */
   page: string;
@@ -430,11 +431,15 @@ export default function StickyLayer({
   /** من يحرّر الصفحة يقدر يغلق ملاحظات غيره بعد معالجتها */
   canClose: boolean;
   t: T;
+  /** فتح نافذة نشر إعلان — القلم يجمع الكتابتين */
+  onAnnounce: () => void;
 }) {
   const [rows, setRows] = useState<StickyRow[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [meId, setMeId] = useState("");
   const [placing, setPlacing] = useState(false);
+  /* قائمة القلم: ملاحظة أو إعلان */
+  const [menu, setMenu] = useState(false);
   const [err, setErr] = useState("");
   const host = useRef<HTMLDivElement | null>(null);
 
@@ -448,7 +453,13 @@ export default function StickyLayer({
     return () => { live = false; };
   }, []);
 
+  /* صفحةٌ بلا ملاحظات لاصقة (`page` فارغ): القلم يبقى للإعلان،
+     ولا تُطلب أوراقٌ لصفحةٍ لا تحملها */
   const load = useCallback(async () => {
+    if (!page) {
+      setRows([]);
+      return;
+    }
     const r = await apiFetch(`/api/stickies?page=${page}`).then((x) => x.json()).catch(() => ({}));
     setRows(r.stickies || []);
     setMeId(String(r.meId || ""));
@@ -465,6 +476,19 @@ export default function StickyLayer({
     window.addEventListener("keydown", k);
     return () => window.removeEventListener("keydown", k);
   }, [placing]);
+
+  /* قائمة القلم تُغلق بالضغط خارجها وبـEsc — وإلا بقيت معلّقة */
+  useEffect(() => {
+    if (!menu) return;
+    const shut = () => setMenu(false);
+    const k = (e: KeyboardEvent) => e.key === "Escape" && setMenu(false);
+    window.addEventListener("click", shut);
+    window.addEventListener("keydown", k);
+    return () => {
+      window.removeEventListener("click", shut);
+      window.removeEventListener("keydown", k);
+    };
+  }, [menu]);
 
   async function place(e: React.MouseEvent) {
     if (!placing || !canWrite || !host.current) return;
@@ -638,20 +662,52 @@ export default function StickyLayer({
       {/* الرصيف: يلتصق بأسفل الشاشة ويبقى داخل عرض الصفحة البيضاء،
           فلا يعلو الشريط الجانبي ولا يغيب مع التمرير */}
       <div className="stk-dock">
-        {(canWrite || rows.length > 0) && (
-          <button
-            className={`stk-pen ${placing ? "on" : ""} ${canWrite ? "" : "ro"}`}
-            onClick={() => canWrite && setPlacing((v) => !v)}
-            title={
-              canWrite
-                ? t("ملاحظة على هذه الصفحة", "Note on this page")
-                : t("ملاحظات على هذه الصفحة", "Notes on this page")
-            }
-          >
-            {canWrite ? "✎" : "📌"}
-            {rows.length > 0 && <span>{rows.length}</span>}
-          </button>
+        {/* القلم يجمع الكتابتين: ملاحظةٌ على هذه الصفحة، أو إعلانٌ
+            يمرّ على المنصة كلها. وهو مكان الكتابة المعروف فيها،
+            فلا يحتاج الإعلان زرّاً ثانياً في شريطه. */}
+        <div className="stk-pw">
+        {menu && (
+          <div className="stk-menu" onClick={(e) => e.stopPropagation()}>
+            {canWrite && (
+              <button
+                onClick={() => {
+                  setMenu(false);
+                  setPlacing(true);
+                }}
+              >
+                <i>✎</i>
+                <b>{t("اكتب ملاحظة", "Write a note")}</b>
+                <em>{t("ورقة على هذه الصفحة", "A note on this page")}</em>
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setMenu(false);
+                onAnnounce();
+              }}
+            >
+              <i>📣</i>
+              <b>{t("نشر إعلان", "Announce")}</b>
+              <em>{t("شريط يراه الجميع بمدّة تنتهي وحدها", "Seen by everyone")}</em>
+            </button>
+          </div>
         )}
+        <button
+          className={`stk-pen ${placing || menu ? "on" : ""}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (placing) {
+              setPlacing(false);
+              return;
+            }
+            setMenu((v) => !v);
+          }}
+          title={t("اكتب ملاحظة أو انشر إعلاناً", "Write a note or announce")}
+        >
+          ✎
+          {rows.length > 0 && <span>{rows.length}</span>}
+        </button>
+        </div>
         {err && (
           <div className="stk-hint err no-print" onClick={() => setErr("")}>
             {t("تعذّر حفظ الموضع", "Could not save")}: {err}
