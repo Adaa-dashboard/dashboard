@@ -11874,7 +11874,14 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
   animation-name: anb-run; animation-timing-function: linear; animation-iteration-count: infinite;
 }
 /* يمشي من اليمين إلى اليسار — والنسخة الثانية تسدّ الفجوة */
-@keyframes anb-run { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+/* مرّةٌ واحدة لا نسختان: يدخل من اليمين ويمشي حتى يختفي عند
+   اليسار ثم يعود. `--anb-t` عرض الشريط و`--anb-w` عرض النافذة،
+   يُقاسان في جافاسكربت — فالمسافة مجموعهما مهما طال النصّ.
+   (الصفحة RTL: الشريط يبدأ ملتصقاً بحافّتها اليمنى) */
+@keyframes anb-run {
+  from { transform: translateX(var(--anb-t, 100%)); }
+  to   { transform: translateX(calc(-1 * var(--anb-w, 100%))); }
+}
 .anb:hover .anb-track, .anb:focus-within .anb-track { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) {
   .anb-track { animation: none; }
@@ -11885,8 +11892,10 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
 .anb-it.red > i { background: #d34a4a; box-shadow: 0 0 0 3px rgba(211, 74, 74, .16); }
 .anb-it.green > i { background: #1a9d5c; box-shadow: 0 0 0 3px rgba(26, 157, 92, .16); }
 .anb-it > b { font-size: 12px; font-weight: 700; color: var(--ink); }
-.anb-it.red > b { color: var(--dgr-tx); font-weight: 800; }
 .anb-it > em { font-style: normal; font-size: 10px; color: var(--muted); }
+/* العاجل بخطٍّ أحمر — نصّه واسم ناشره، فيُعرف عجَلُه قبل قراءته */
+.anb-it.red > b { color: #c0392b; font-weight: 800; }
+.anb-it.red > em { color: color-mix(in srgb, #c0392b 62%, var(--muted)); }
 .anb-none { flex: 1; font-size: 11px; color: var(--muted); padding-inline-start: 6px; }
 /* وسمٌ صغير يقول ما هذا الشريط — حلّ محلّ زرّ النشر بعد انتقاله
    إلى قلم الصفحة */

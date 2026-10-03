@@ -82,16 +82,30 @@ export function useTicker() {
 
 /* ---------------- الشريط: للقراءة وحدها ---------------- */
 export default function Ticker({ items, t }: { items: TickItem[]; t: T }) {
+  const winRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
-  const [dur, setDur] = useState(30);
+  const [run, setRun] = useState({ t: 0, w: 0, dur: 30 });
 
-  /* سرعةٌ ثابتةٌ بالبكسل لا مدّةٌ ثابتة: إعلانٌ واحد قصير وعشرةٌ
-     طويلة لا يمشيان بالسرعة نفسها إن ثبتت المدّة — يسابق أحدهما
-     العين ويزحف الآخر. ٦٠ بكسل في الثانية قراءةٌ مريحة. */
+  /* **مرّة واحدة لا نسختان**: الشريط يدخل من اليمين ويمشي حتى
+     يختفي عند اليسار ثم يعود — فلا يُرى الإعلان مرّتين في وقتٍ
+     واحد. المسافة = عرض الشريط + عرض النافذة، ولذلك يُقاسان.
+
+     والسرعة ثابتةٌ بالبكسل لا المدّة: إعلانٌ قصير وعشرةٌ طوال لا
+     يمشيان بالسرعة نفسها إن ثبتت المدّة — يسابق أحدهما العين
+     ويزحف الآخر. ٧٠ بكسل في الثانية قراءةٌ مريحة. */
   useEffect(() => {
     const el = trackRef.current;
-    if (!el) return;
-    setDur(Math.max(14, Math.round(el.scrollWidth / 2 / 60)));
+    const win = winRef.current;
+    if (!el || !win) return;
+    const measure = () => {
+      const tw = el.scrollWidth;
+      const ww = win.clientWidth;
+      setRun({ t: tw, w: ww, dur: Math.max(10, Math.round((tw + ww) / 70)) });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(win);
+    return () => ro.disconnect();
   }, [items]);
 
   /* بلا إعلانات لا شريط: سطرُ «لا توجد إعلانات» يشغل مكاناً بلا
@@ -99,16 +113,21 @@ export default function Ticker({ items, t }: { items: TickItem[]; t: T }) {
   if (!items.length) return null;
 
   const urgent = items.some((x) => x.tone === "red");
-  /* النسخة الثانية تجعل الدوران بلا فجوة: حين تخرج الأولى تكون
-     الثانية قد حلّت محلّها تماماً */
-  const run = [...items, ...items];
 
   return (
     <div className={`anb ${urgent ? "urg" : ""}`}>
-      <div className="anb-win">
-        <div className="anb-track" ref={trackRef} style={{ animationDuration: `${dur}s` }}>
-          {run.map((x, i) => (
-            <span className={`anb-it ${x.tone}`} key={`${x.id}-${i}`}>
+      <div className="anb-win" ref={winRef}>
+        <div
+          className="anb-track"
+          ref={trackRef}
+          style={{
+            animationDuration: `${run.dur}s`,
+            ["--anb-t" as string]: `${run.t}px`,
+            ["--anb-w" as string]: `${run.w}px`,
+          }}
+        >
+          {items.map((x) => (
+            <span className={`anb-it ${x.tone}`} key={x.id}>
               <i />
               <b>{x.body}</b>
               <em>{x.byName}</em>
