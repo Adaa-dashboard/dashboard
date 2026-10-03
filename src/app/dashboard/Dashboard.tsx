@@ -53,8 +53,6 @@ import {
 import {
   IconOverview,
   IconKpi,
-  IconTask,
-  IconWeek,
   IconSess,
   IconNat,
   IconInst,
@@ -63,7 +61,11 @@ import {
   IconCx,
   IconSettings,
   IconFolder,
-  IconOrg,
+  IconBank,
+  IconAward,
+  IconLayers,
+  IconTree,
+  IconCheck3,
 } from "./icons";
 import OpPlan, { OpPlanCard } from "./OpPlan";
 import WeeklyPanel from "./WeeklyPanel";
@@ -598,17 +600,17 @@ export default function Dashboard({ me }: { me: Me }) {
           {/* التكاليف والمهام والإنجاز الأسبوعي: لمن يُسند ويتابع — مدير
               الإدارة ومدير القطاع. وبقية الفريق يرون مهامهم في محفظتهم */}
           {can("tasks") && (isAdmin || me.isLead || can("tasks:all")) && (
-            <NavItem id="tasks" icon={<IconTask />} label={["التكاليف والمهام", "Tasks"]} />
+            <NavItem id="tasks" icon={<IconCheck3 />} label={["التكاليف والمهام", "Tasks"]} />
           )}
           {/* الخطة التشغيلية بعد التكاليف والمهام — خطة الإدارة نفسها */}
           {can("opplan") && (
-            <NavItem id="opplan" icon={<IconProj />} label={["الخطة التشغيلية", "Operational plan"]} />
+            <NavItem id="opplan" icon={<IconLayers />} label={["الخطة التشغيلية", "Operational plan"]} />
           )}
           {can("weekly") && (isAdmin || me.isLead) && (
-            <NavItem id="report" icon={<IconWeek />} label={["الإنجاز الأسبوعي", "Weekly Achievement"]} />
+            <NavItem id="report" icon={<IconAward />} label={["الإنجاز الأسبوعي", "Weekly Achievement"]} />
           )}
-          {can("structure") && <NavItem id="structure" icon={<IconOrg />} label={["الهيكل التنظيمي", "Org chart"]} />}
-          {can("entities") && <NavItem id="entities" icon={<IconOrg />} label={["الجهات ونقاط التواصل", "Entities"]} />}
+          {can("structure") && <NavItem id="structure" icon={<IconTree />} label={["الهيكل التنظيمي", "Org chart"]} />}
+          {can("entities") && <NavItem id="entities" icon={<IconBank />} label={["الجهات ونقاط التواصل", "Entities"]} />}
 
           <div className="rail-gap" />
 
