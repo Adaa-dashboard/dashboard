@@ -12270,3 +12270,13 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
   border-inline-start: 1px solid color-mix(in srgb, currentColor 22%, transparent);
 }
 .pf-arr .b > i.p:hover { opacity: 1; background: rgba(0, 0, 0, .06); }
+
+/* أزرار رأس نافذة البند — التسمية والإخفاء. هادئةٌ حتى تُقصد،
+   ومسافتُها عن زرّ الإغلاق تمنع الضغط الخاطئ */
+.m-h .mh-b {
+  background: transparent; border: none; cursor: pointer;
+  color: var(--muted); font-size: 11px; font-weight: 700; line-height: 1;
+  padding: 6px 9px; border-radius: 8px; margin-inline-start: -6px;
+}
+.m-h .mh-b:hover { color: var(--g-800); background: var(--soft); }
+.m-h .mh-b + .mx { margin-inline-start: 6px; }

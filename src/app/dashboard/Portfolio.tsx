@@ -3319,19 +3319,6 @@ function Tile({
 }) {
   return (
     <div className="tile" style={{ ["--c" as string]: w.color }} onClick={onOpen} {...dragProps}>
-      <span className="grip" title="اسحب" onClick={(e) => e.stopPropagation()}>
-        ⋮⋮
-      </span>
-      <span
-        className="hide"
-        title="إخفاء"
-        onClick={(e) => {
-          e.stopPropagation();
-          onHide();
-        }}
-      >
-        ✕
-      </span>
       <div className="num2">{count}</div>
       {warn ? <span className="warn">{warn}</span> : null}
       {/* الأيقونة أُزيلت من وجه البطاقة بطلب المستخدمة — تُختار لاحقاً،
@@ -5234,8 +5221,9 @@ export default function Portfolio({
   function Card({ k, wide }: { k: WKey; wide?: boolean }) {
     const w = WMAP[k];
     const st = stat(k);
-    /* بلا سحبٍ ولا وضعِ ترتيب — والتسمية والإخفاء يظهران عند
-       المرور على البطاقة، فلا يحتاجان وضعاً خاصاً يُدخَل ويُخرَج */
+    /* رأس البطاقة عنوانٌ وعدد لا غير: القلم والإكس كانا يقعان فوق
+       الكلام فيُضغطان بالخطأ. التسمية والإخفاء داخل نافذة البند
+       وفي «تخصيص» — عملٌ يُفعل مرّةً لا في كل نظرة. */
     return (
       <div className={`card2 ${wide ? "wide" : ""}`}>
         <div className="ch">
@@ -5244,9 +5232,6 @@ export default function Portfolio({
           </span>
           <h3>{w.label}</h3>
           {["tasks", "calendar", "notes"].includes(k) ? null : <span className="n">{st.count}</span>}
-          <span className="hide" title={t("إخفاء", "Hide")} onClick={() => patch({ hidden: [...prefs.hidden, k] })}>
-            ✕
-          </span>
         </div>
         <div className="cb">{bodyOf(k)}</div>
       </div>
@@ -5530,6 +5515,30 @@ export default function Portfolio({
                 <PIcon id={openW.icon} size={13} />
               </span>
               <h3>{openW.label}</h3>
+              {/* التسمية والإخفاء هنا لا على وجه البطاقة: هناك كانا
+                  يقعان فوق العنوان فيُضغطان بالخطأ، وهنا لا يُرَيان
+                  إلا لمن فتح البند قاصداً التصرّف فيه */}
+              <button
+                className="mh-b"
+                title={t("تغيير الاسم والأيقونة", "Rename / icon")}
+                onClick={() => {
+                  setOpen(null);
+                  setEditLook(openW.key);
+                }}
+              >
+                ✎
+              </button>
+              <button
+                className="mh-b"
+                title={t("إخفاء هذا البند من محفظتي", "Hide this item")}
+                onClick={() => {
+                  if (!confirm(t("إخفاء هذا البند؟ يُعاد من «تخصيص».", "Hide it? Restore from Customize."))) return;
+                  patch({ hidden: [...prefs.hidden, openW.key] });
+                  setOpen(null);
+                }}
+              >
+                {t("إخفاء", "Hide")}
+              </button>
               <button className="mx" onClick={() => setOpen(null)} aria-label="close">
                 ✕
               </button>
