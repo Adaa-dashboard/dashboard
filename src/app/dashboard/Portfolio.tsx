@@ -445,9 +445,13 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
   const [draft, setDraft] = useState("");
   const [adding, setAdding] = useState(false);
   const [newT, setNewT] = useState({ title: "", dueDate: "" });
-  /* حدّ العرض خمسة، وما زاد خلف زر — في الأعمدة وفي تحديثات المهمة */
+  /* ما زاد عن الحدّ خلف زر. والعمود **اثنتان** لا خمس: البطاقة في
+     المحفظة لمحةٌ لا قائمة، وثلاثة أعمدةٍ بخمسٍ تطيل الصفحة حتى
+     يُدفع ما تحتها بعيداً — بطلب صاحبة المنصة. وتحديثات المهمة
+     تبقى على خمسة، فهي داخل بطاقةٍ فُتحت قصداً. */
   const [moreCol, setMoreCol] = useState<Record<string, boolean>>({});
   const [moreUpd, setMoreUpd] = useState<Record<string, boolean>>({});
+  const COL_LIMIT = 2;
   const LIMIT = 5;
 
   const [people, setPeople] = useState<Person[]>([]);
@@ -544,54 +548,9 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
     await load();
   }
 
-  /* ---- بيانات تجريبية للعرض ----
-     مهام من مديري وأخرى ذاتية، لتوضيح شكل الصفحة قبل تعبئتها.
-     معرّفاتها تبدأ بـ tsk-demo- فتُعرف وتُحذف دفعة واحدة. */
+  /* صفوفٌ تجريبية أضافها من جرّب المنصة قبل أن يُزال زرّ الإضافة —
+     تُعرف بمعرّفها `tsk-demo-` ويبقى لها زرّ حذفٍ وحده */
   const hasDemo = tasks.some((x) => x.id.startsWith("tsk-demo-"));
-  const bossId = useMemo(() => {
-    const mine = people.find((x) => x.id === me.id);
-    const mySec = mine?.sectorIds || [];
-    const lead = people.find(
-      (x) => x.id !== me.id && x.isLead && x.sectorIds?.some((sc) => mySec.includes(sc))
-    );
-    return (lead || people.find((x) => x.id !== me.id && x.isLead))?.id || "";
-  }, [people, me.id]);
-
-  async function seedDemo() {
-    if (!bossId) {
-      alert(t("لم يُعثر على حساب المدير — يلزم تشغيل ملف الهيكل أولاً.", "Manager account not found."));
-      return;
-    }
-    const day = (n: number) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
-    const bossName = people.find((x) => x.id === bossId)?.name || "";
-    const rows = [
-      { id: "tsk-demo-p1", title: "إعداد ملخّص تنفيذي لجاهزية الاستراتيجيات الوطنية قبل جلسة المجلس",
-        createdById: bossId, dueDate: day(4), state: "ok", priority: "high",
-        updates: [{ id: "d1", text: "الملخّص يُرفع بصيغة عرض من 5 شرائح.", byId: bossId, byName: bossName, at: new Date(Date.now() - 2 * 86400000).toISOString() }] },
-      { id: "tsk-demo-p2", title: "مراجعة الجهات ذات قابلية القياس المنخفضة ورفع التوصيات",
-        createdById: bossId, dueDate: day(-3), state: "ok", priority: "high", updates: [] },
-      { id: "tsk-demo-p3", title: "تحديث بيانات الاستراتيجيات المؤسسية لقطاع الشؤون الاقتصادية",
-        createdById: bossId, dueDate: day(-8), state: "done", priority: "mid", updates: [] },
-      { id: "tsk-demo-p4", title: "تجهيز عرض الإنجاز الأسبوعي للإدارة",
-        createdById: me.id, dueDate: day(2), state: "ok", priority: "mid", updates: [] },
-      { id: "tsk-demo-p5", title: "متابعة استلام وثائق الاستراتيجيات المتبقية من الجهات",
-        createdById: me.id, dueDate: day(9), state: "ok", priority: "mid", updates: [] },
-      { id: "tsk-demo-p6", title: "توحيد أسماء الجهات في ملف الاستراتيجيات المؤسسية",
-        createdById: me.id, dueDate: day(-5), state: "done", priority: "mid", updates: [] },
-    ].map((x) => ({ ...x, assigneeId: me.id, kind: "task" }));
-    setBusy(true);
-    const r = await apiFetch("/api/tasks/demo", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tasks: rows }),
-    });
-    setBusy(false);
-    if (!r.ok) {
-      alert(t("تعذّر إضافة البيانات التجريبية.", "Could not add demo data."));
-      return;
-    }
-    await load();
-  }
 
   async function clearDemo() {
     if (!confirm(t("حذف كل المهام التجريبية؟", "Delete all demo tasks?"))) return;
@@ -690,7 +649,7 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
       <div className="tkboard">
         {COLS.map((c) => {
           const list = shown.filter((x) => colOf(x) === c.key);
-          const vis = moreCol[c.key] ? list : list.slice(0, LIMIT);
+          const vis = moreCol[c.key] ? list : list.slice(0, COL_LIMIT);
           return (
             <div className="tkcol" key={c.key}>
               <div className="h" style={{ ["--c" as string]: c.color }}>
@@ -700,11 +659,11 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
               {vis.map((x) => (
                 <TaskCard key={x.id} x={x} />
               ))}
-              {list.length > LIMIT && (
+              {list.length > COL_LIMIT && (
                 <button className="moreln" onClick={() => setMoreCol({ ...moreCol, [c.key]: !moreCol[c.key] })}>
                   {moreCol[c.key]
                     ? t("عرض أقل", "Show less")
-                    : `${t("عرض مهام أخرى", "More tasks")} (${list.length - LIMIT})`}
+                    : `${t("عرض المزيد", "Show more")} (${list.length - COL_LIMIT})`}
                 </button>
               )}
               {!list.length && <div className="pf-none sm">—</div>}
@@ -740,17 +699,17 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
         </div>
       )}
 
-      <div className="demorow">
-        {hasDemo ? (
+      {/* زرّ «إضافة بيانات تجريبية للعرض» أُزيل من المنصة بطلب
+          صاحبتها — المنصة صارت عامرةً ببيانات حقيقية، والزرّ
+          التعريفي بعدها دعوةٌ لتلويثها. ويبقى زرّ الحذف لمن أضاف
+          تجريبيّاً قبل الإزالة، فلا تبقى صفوفٌ لا سبيل إلى كنسها. */}
+      {hasDemo && (
+        <div className="demorow">
           <button className="btn btn-ghost btn-sm" disabled={busy} onClick={clearDemo}>
             {t("حذف البيانات التجريبية", "Remove demo data")}
           </button>
-        ) : (
-          <button className="btn btn-ghost btn-sm" disabled={busy} onClick={seedDemo}>
-            {t("إضافة بيانات تجريبية للعرض", "Add demo data")}
-          </button>
-        )}
-      </div>
+        </div>
+      )}
     </>
   );
 }
