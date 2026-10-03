@@ -30,6 +30,8 @@ export type GoalFrom =
   | "commit"
   /** مؤشر في الخطة التشغيلية — رقم الإدارة لا الفرد */
   | "opplan"
+  /** جدارات «خطتي التطويرية» في المحفظة — ما اكتمل منها */
+  | "devplan"
   /** يُدخله صاحب المحفظة */
   | "manual";
 
@@ -100,8 +102,8 @@ export const ANNUAL_GOALS: Goal[] = [
     target: 100,
     weight: 10,
     unit: "%",
-    from: "manual",
-    how: "لا مصدر لها في المنصة — يُدخل الرقم من نظام الموارد البشرية",
+    from: "devplan",
+    how: "نسبة الجدارات المكتملة في «خطتي التطويرية» بالمحفظة",
   },
   {
     id: "g7",
@@ -119,6 +121,8 @@ export const GOALS_WEIGHT = ANNUAL_GOALS.reduce((a, g) => a + g.weight, 0);
 export type GoalRow = Goal & {
   /** المحقّق — null إن لم يُرصد بعد */
   got: number | null;
+  /** يُكتب رقمه بخانةٍ في صفّه — لا مصدر له في المنصة بعد */
+  typed: boolean;
   /** نسبة التحقيق من المستهدف، مسقوفةً بـ 100 */
   pct: number | null;
   /** مصدرُ الرقم كما يُعرض */

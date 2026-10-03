@@ -120,6 +120,11 @@ export const WIDGETS: WDef[] = [
 
   { key: "contrib", label: "المساهمات في الخطة التشغيلية", group: "contribs", icon: "puzzle", color: "#7a5cd1", section: "contrib" },
 
+  /* خطة التطوير الفردية — نموذج الموارد البشرية نفسه بلا ترويسته:
+     الاسم والمسمّى والمدير وتواريخ التقييم معروفةٌ في المنصة
+     أصلاً، فلا تُكتب مرّةً ثانية */
+  { key: "devplan", label: "خطتي التطويرية", group: "dev", icon: "trend", color: "#2f7fd1", section: "devplan" },
+
   /* بقيا من الترتيب السابق — مخفيّان افتراضياً ولا تضيع بياناتهما،
      ويُعادان من «تخصيص محفظتي» عند الحاجة */
   { key: "strategies", label: "جهاتي ومساهماتها", group: "main", icon: "map", color: "#016b5f", section: "entities" },
@@ -132,6 +137,7 @@ export const GROUPS: { id: string; label: [string, string] }[] = [
   { id: "ops", label: ["الأعمال التشغيلية", "Operational work"] },
   { id: "contribs", label: ["المساهمات في الخطة التشغيلية", "Operational plan contributions"] },
   { id: "projects", label: ["المشاريع الاستراتيجية", "Strategic projects"] },
+  { id: "dev", label: ["خطة التطوير الفردية", "Individual development plan"] },
 ];
 const BASE_MAP: Record<string, WDef> = Object.fromEntries(WIDGETS.map((w) => [w.key, w]));
 /** عنوان كل مجموعة بمعرّفها */
@@ -177,13 +183,14 @@ type Prefs = {
   v3?: boolean;
 };
 /** الأقسام بترتيبها الافتراضي — «top» قسمٌ بلا عنوان فوق البقية */
-export const SEC_ALL = ["top", "main", "ops", "contribs", "projects"];
+export const SEC_ALL = ["top", "main", "ops", "contribs", "projects", "dev"];
 export const SEC_LABEL: Record<string, string> = {
   top: "التقويم والملاحظات والمهام",
   main: "الأعمال الرئيسية",
   ops: "الأعمال التشغيلية",
   contribs: "المساهمات في الخطة التشغيلية",
   projects: "المشاريع الاستراتيجية",
+  dev: "خطة التطوير الفردية",
 };
 
 /** ما يبقى مخفيّاً في الترتيب الجديد — بياناته باقية ويُعاد من التخصيص */
@@ -273,6 +280,24 @@ const COLS: Record<string, Col[]> = {
     { k: "pct", label: "نسبة الإنجاز ٪", kind: "num" },
     { k: "note", label: "ملاحظة", w: 2 },
     { k: "date", label: "التاريخ", kind: "date" },
+  ],
+  /* نموذج «الخطة التطويرية» كما في ملف الموارد البشرية، بلا جدول
+     الترويسة (الموظف · المسمّى · المدير · تواريخ التقييم والانضمام)
+     — تلك بياناتٌ تعرفها المنصة، وإعادةُ كتابتها بابُ تناقض.
+     و«حالة الاكتمال» عنوانها يحوي «حالة»، فعدّادُ البطاقة ونسبةُ
+     الهدف السنوي يقرآنها بلا استثناءٍ خاص. */
+  devplan: [
+    { k: "kind", label: "نوع الجدارة", kind: "sel", opts: ["سلوكية", "مهنية"] },
+    { k: "name", label: "الجدارة ذات الأولوية", w: 2 },
+    { k: "steps", label: "الخطوات لتطوير الجدارة", w: 3 },
+    { k: "measure", label: "مقياس النجاح", w: 2 },
+    { k: "due", label: "التاريخ المتوقع لتحقيق الجدارة", kind: "date" },
+    { k: "now", label: "المستوى الحالي", kind: "sel", opts: ["مبتدئ", "متوسط", "متقدم", "خبير"] },
+    { k: "need", label: "المستوى المطلوب", kind: "sel", opts: ["مبتدئ", "متوسط", "متقدم", "خبير"] },
+    { k: "how", label: "آلية التطوير", kind: "sel",
+      opts: ["تدريب بالممارسة", "تدريب عن طريق المنصة", "دورة تدريبية", "إرشاد وتوجيه", "مشروع عملي"] },
+    { k: "state", label: "حالة الاكتمال", kind: "sel", opts: ["لم تبدأ", "قيد التنفيذ", "مكتملة"] },
+    { k: "final", label: "التقييم النهائي", w: 2 },
   ],
   projects: [
     { k: "name", label: "اسم المشروع", w: 2 },
@@ -4049,7 +4074,7 @@ function GoalsModal({
                 </em>
                 <em>
                   {t("المحقّق", "Achieved")}{" "}
-                  {g.from === "manual" ? (
+                  {g.typed ? (
                     <input
                       type="number"
                       min={0}
@@ -4580,6 +4605,7 @@ export default function Portfolio({
   const reverse = pf.of("reverse");
   const workflow = pf.of("workflow");
   const projects = pf.of("projects");
+  const devplan = pf.of("devplan");
 
   const dataOf = (k: WKey): Row[] =>
     k.startsWith("cw-")
@@ -4596,7 +4622,9 @@ export default function Portfolio({
               ? workflow
               : k === "projects"
                 ? projects
-                : [];
+                : k === "devplan"
+                  ? devplan
+                  : [];
 
   /* عمود «الحالة» قد يتغيّر اسمه ومفتاحه إن اعتمد صاحب المحفظة
      أعمدة جدولٍ لصقه — فنبحث عنه بعنوانه قبل الرجوع للمفتاح الأصلي */
@@ -4659,8 +4687,11 @@ export default function Portfolio({
     const instLive = mw.mine.inststrat.filter((r) => txt(r.data.live) === "مفعل").length;
     const cxDone = mw.mine.cx.filter((r) => num(r.data.counted) === 1).length;
 
+    const devDone = devplan.filter((r) => txt(r.data.state) === "مكتملة").length;
+
     return ANNUAL_GOALS.map((g) => {
       let got: number | null = null;
+      let typed = false;
       let src = g.how;
       switch (g.from) {
         case "inststrat":
@@ -4683,13 +4714,34 @@ export default function Portfolio({
           got = noteQ ? noteQ.pct : null;
           src = noteQ ? `${t("من الخطة التشغيلية", "From the operational plan")} · ${noteQ.q}` : g.how;
           break;
+        /* خطتي التطويرية: ما اكتمل من جدارات الخطة. وقبل أن
+           تُدخَل جدارةٌ واحدة لا رقم يُحسب، فتُفتح الخانة ليُكتب
+           الرقم من نظام الموارد البشرية — ويُستغنى عنها أول ما
+           تُضاف الجدارات */
+        case "devplan":
+          if (devplan.length) {
+            got = Math.round((devDone / devplan.length) * 100);
+            src = t(
+              `من «خطتي التطويرية» · ${devDone} من ${devplan.length} جدارة مكتملة`,
+              `From my development plan · ${devDone}/${devplan.length}`,
+            );
+          } else {
+            got = man[g.id] === undefined ? null : num(man[g.id]);
+            typed = true;
+            src = t(
+              "لم تُضف جدارات بعد — اكتب النسبة، أو أضف جداراتك في «خطتي التطويرية» فتُحسب وحدها",
+              "No competencies yet — type the figure or add them to your plan",
+            );
+          }
+          break;
         default:
           got = man[g.id] === undefined ? null : num(man[g.id]);
+          typed = true;
           src = g.how;
       }
-      return { ...g, got, pct: got === null ? null : cap(got, g.target), src };
+      return { ...g, got, typed, pct: got === null ? null : cap(got, g.target), src };
     });
-  }, [mw.mine, mw.loaded, myCommit, noteQ, prefs.goals, t]);
+  }, [mw.mine, mw.loaded, myCommit, noteQ, prefs.goals, devplan, t]);
   const goalScore = useMemo(() => goalsScore(goalRows), [goalRows]);
   /** رقمٌ يُدخله صاحب المحفظة لمؤشرٍ لا مصدر له */
   const setGoal = useCallback(
