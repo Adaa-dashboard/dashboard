@@ -47,8 +47,14 @@ export default function Structure({
     people
       .filter((p) => (p.sectorIds || []).includes(sid))
       .sort((a, b) => Number(!!b.isLead) - Number(!!a.isLead) || a.name.localeCompare(b.name, "ar"));
-  // من لا قطاع له يُعرض تحت الإدارة مباشرة — مدير الإدارة ومن يتبعه
+  /* من لا قطاع له يُعرض تحت الإدارة مباشرة. ومدير الإدارة **فوق**
+     ومن معه **تحته** لا جنبه: صفٌّ واحد يجمعهما يقول إنهما في
+     مرتبةٍ واحدة، وهذا خلاف الهيكل. المدير يُعرف بدوره `admin`،
+     وإن لم يكن في المجموعة أحدٌ بهذا الدور فأوّلها — فلا يختفي
+     الصفّ لأجل بياناتٍ ناقصة. */
   const head = people.filter((p) => (p.sectorIds || []).length === 0);
+  const chief = head.find((p) => p.role === "admin") || head[0] || null;
+  const under = head.filter((p) => p !== chief);
 
   async function addSector() {
     setErr("");
@@ -88,6 +94,18 @@ export default function Structure({
   }
 
   const total = people.length;
+
+  /** بطاقة شخص — واحدةٌ لرأس الإدارة ولمن تحته ولموظفي القطاعات */
+  const Prs = ({ p, lead, tag }: { p: Person; lead?: boolean; tag?: string }) => (
+    <span className={`org-p ${lead ? "lead" : ""}`} key={p.id}>
+      <i className="av s">{(p.name || "?").trim().charAt(0)}</i>
+      <span className="who">
+        <em>{p.name}</em>
+        {p.jobTitle && <small>{p.jobTitle}</small>}
+      </span>
+      {tag && <b>{tag}</b>}
+    </span>
+  );
 
   return (
     <div className="org">
@@ -134,18 +152,23 @@ export default function Structure({
                 {t(`${sectors.length} قطاعات`, `${sectors.length} sectors`)}
               </span>
             </div>
-            {head.length > 0 && (
-              <div className="org-people org-head-people">
-                {head.map((p) => (
-                  <span className="org-p" key={p.id}>
-                    <i className="av s">{(p.name || "?").trim().charAt(0)}</i>
-                    <span className="who">
-                      <em>{p.name}</em>
-                      {p.jobTitle && <small>{p.jobTitle}</small>}
-                    </span>
-                  </span>
-                ))}
-              </div>
+            {chief && (
+              <>
+                <div className="org-line sm" />
+                <div className="org-people org-head-people">
+                  <Prs p={chief} lead tag={t("مدير الإدارة", "Director")} />
+                </div>
+              </>
+            )}
+            {under.length > 0 && (
+              <>
+                <div className="org-line sm" />
+                <div className="org-people org-head-people">
+                  {under.map((p) => (
+                    <Prs key={p.id} p={p} />
+                  ))}
+                </div>
+              </>
             )}
           </div>
 
@@ -175,14 +198,12 @@ export default function Structure({
                   ) : (
                     <div className="org-people">
                       {list.map((p) => (
-                        <span className={`org-p ${p.isLead ? "lead" : ""}`} key={p.id}>
-                          <i className="av s">{(p.name || "?").trim().charAt(0)}</i>
-                          <span className="who">
-                            <em>{p.name}</em>
-                            {p.jobTitle && <small>{p.jobTitle}</small>}
-                          </span>
-                          {p.isLead && <b>{t("مدير القطاع", "Lead")}</b>}
-                        </span>
+                        <Prs
+                          key={p.id}
+                          p={p}
+                          lead={p.isLead}
+                          tag={p.isLead ? t("مدير القطاع", "Lead") : undefined}
+                        />
                       ))}
                     </div>
                   )}

@@ -4742,10 +4742,27 @@ table.matrix thead th {
 }
 
 /* مدير القطاع · زر تعديل المستهدفات */
+/* المدراء ومدير الإدارة بمربّعٍ أخضر مصمت كصندوق الإدارة فوقهم —
+   كان أخضر باهتاً لا يكاد يفرّق عن مربّع الموظف */
 .org-p.lead {
-  background: var(--g-50);
-  border: 1px solid var(--g-100);
+  background: linear-gradient(180deg, var(--g-800), var(--g-700));
+  border: 1px solid var(--g-800);
+  color: #fff;
   font-weight: 700;
+  box-shadow: 0 4px 12px rgba(0, 88, 76, .16);
+}
+.org-p.lead .who small { color: rgba(255, 255, 255, .72); }
+.org-p.lead .av { background: rgba(255, 255, 255, .18); color: #fff; }
+/* الشارة على أخضر مصمت: شفّافةٌ بيضاء — وإلا أخضرُ على أخضر */
+.org-p.lead b { background: rgba(255, 255, 255, .2); color: #fff; }
+/* وصلةٌ أقصر بين رأس الإدارة ومن تحته — المسافة الطويلة توحي
+   بمرتبةٍ أبعد مما هي */
+.org-line.sm { height: 14px; }
+/* صفوف الرأس تقع على خلفية الصفحة لا داخل بطاقة قطاع، ولون
+   `--bg2` قريبٌ منها — فبلا حدٍّ يضيع المربّع */
+.org-head-people .org-p:not(.lead) {
+  background: var(--panel);
+  border: 1px solid var(--border);
 }
 .org-p b {
   margin-inline-start: auto;
