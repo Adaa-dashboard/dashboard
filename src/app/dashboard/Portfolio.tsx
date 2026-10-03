@@ -5145,48 +5145,31 @@ export default function Portfolio({
         </div>
       </div>
 
+      {/* المربّعات الأربعة: عنوانٌ ورقم بلا شرحٍ تحتهما — بطلب
+          صاحبة المنصة. وما كان في الشرح من تفصيلٍ (كم مؤشراً رُصد،
+          من أين الرقم) موضعُه النافذة التي يفتحها المربّع. */}
       <div className="kpis">
         {/* أهدافي السنوية بدل «مهامي المفتوحة»: المهام لها بطاقتها
             في الأعلى، وهذا رقمٌ لا يُرى في مكانٍ آخر */}
         <div className="kp clickable" onClick={() => setGoals(true)}>
-          <div className="k">{t("تحقيق أهدافي السنوية", "Annual goals")}</div>
+          <div className="k">{t("نسبة تحقيق الأهداف السنوية", "Annual goals")}</div>
           <div className="v">{goalScore.pct === null ? "—" : `${goalScore.pct}%`}</div>
-          <div className="s">
-            {goalScore.pct === null
-              ? t("لم يُرصد أي مؤشر بعد", "Nothing measured yet")
-              : t(
-                  `${goalScore.have} من ${ANNUAL_GOALS.length} مؤشرات · اضغط للتفصيل`,
-                  `${goalScore.have}/${ANNUAL_GOALS.length} KPIs · details`,
-                )}
-          </div>
         </div>
         <div className="kp clickable" onClick={() => setEnts(true)}>
-          <div className="k">{t("جهاتي", "My entities")}</div>
+          <div className="k">{t("الجهات المسندة لي", "My entities")}</div>
           <div className="v">{entCount}</div>
-          <div className="s">{t("اضغط لإدارة القائمة", "Manage list")}</div>
         </div>
         <div className="kp">
-          <div className="k">{t("نسبة التزامي", "On-time rate")}</div>
+          <div className="k">{t("نسبة الالتزام بمراجعة طلبات التغيير", "Change requests on-time rate")}</div>
           <div className="v">
             {myCommit ? `${myCommit.pct}%` : changes.length ? `${commit}%` : "—"}
           </div>
-          <div className="s">
-            {myCommit
-              ? t(`${myCommit.ok} من ${myCommit.total} ضمن مدّتها`, `${myCommit.ok}/${myCommit.total} on time`)
-              : t("طلبات التغيير", "Change requests")}
-          </div>
         </div>
-        {/* جودة ملاحظات الأداء: لا يُرصد فردياً بعد، فيُعرض رقم
-            الإدارة من مؤشر الخطة التشغيلية ويُقال إنه رقمها هي —
-            لا يُنسب لصاحب المحفظة ما لم يُقَس عليه */}
+        {/* جودة ملاحظات الأداء: لا يُرصد فردياً بعد، فالرقم رقم
+            الإدارة من مؤشر الخطة التشغيلية */}
         <div className="kp">
-          <div className="k">{t("الالتزام بجودة ملاحظات الأداء", "Notes quality")}</div>
+          <div className="k">{t("نسبة الالتزام بجودة ملاحظات الأداء", "Notes quality")}</div>
           <div className="v">{noteQ ? `${noteQ.pct}%` : "—"}</div>
-          <div className="s">
-            {noteQ
-              ? t(`مؤشر الإدارة · ${noteQ.q}`, `Department KPI · ${noteQ.q}`)
-              : t("لم يُرصد بعد", "Not measured yet")}
-          </div>
         </div>
       </div>
 
