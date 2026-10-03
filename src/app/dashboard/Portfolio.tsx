@@ -1191,7 +1191,15 @@ export type MineRow = { id: string; ord: number; data: Rec };
 
 /** بنود جهاتي في الأقسام الثلاثة — تُقرأ مرّةً للصفحة كلها، فتشترك
     فيها البطاقةُ وعدّادُها والشرائحُ الصغيرة ولا تتكرّر الطلبات */
-function useMineWork(reg: RegRow[], meName: string) {
+function useMineWork(
+  reg: RegRow[],
+  meName: string,
+  /** أسماء فريقي — مدير القطاع يرى أعمال قطاعه كاملةً لا جهاته هو.
+      فارغةٌ لغير المدير، فيبقى سلوكه كما كان */
+  teamNames: Set<string> = new Set(),
+  /** الجهة ← نقطة تواصلها من المركز، لنسبة بنود القسم إلى أصحابها */
+  entOwner: Map<string, { name: string }> = new Map(),
+) {
   const [all, setAll] = useState<Record<ReadSec, MineRow[]>>({ natstrat: [], inststrat: [], cx: [], sessions: [] });
   const [loaded, setLoaded] = useState(false);
   const [nonce, setNonce] = useState(0);
@@ -1232,15 +1240,24 @@ function useMineWork(reg: RegRow[], meName: string) {
     return [see, edit];
   }, [reg]);
 
+  /* ما يُعرض في المحفظة: جهاتي، وجهاتُ فريقي إن كنتُ مديره.
+     **القراءة تتّسع والكتابة لا**: `canEdit` باقيةٌ على جهاتي
+     وحدها، فالقاعدة ترفض حفظ بندٍ ليس من جهاتي ولو فُتح الحقل. */
   const mine = useMemo(() => {
+    const lead = teamNames.size > 1;
     const pick = (k: MainSec) =>
       all[k].filter((it) => {
         const c = txt(it.data.consultant).trim();
         if (c && nrm(c) === nrm(meName)) return true;
-        return seeNames.has(nrm(txt(it.data[MAIN_ENT[k]])));
+        const ent = nrm(txt(it.data[MAIN_ENT[k]]));
+        if (seeNames.has(ent)) return true;
+        if (!lead) return false;
+        if (c && teamNames.has(nrm(c))) return true;
+        const own = entOwner.get(ent);
+        return !!own && teamNames.has(nrm(own.name));
       });
     return { natstrat: pick("natstrat"), inststrat: pick("inststrat"), cx: pick("cx") } as Record<MainSec, MineRow[]>;
-  }, [all, seeNames, meName]);
+  }, [all, seeNames, meName, teamNames, entOwner]);
 
   /** هل أحرّر بند هذا القسم؟ — اسمي فيه، أو جهتُه مما أحرّره */
   const canEdit = useCallback(
@@ -4854,7 +4871,14 @@ export default function Portfolio({
   }, []);
   useEffect(() => loadReg(), [loadReg]);
   const regNames = useMemo(() => reg.map((x) => String(x.name || "")), [reg]);
-  const mw = useMineWork(reg, me.name || "");
+  /* مالكُ كل جهة من سجلّ الجهات، وأسماءُ فريقي — يُعرَّفان قبل
+     `useMineWork` لأنها تتّسع بهما لمدير القطاع */
+  const [entOwner, setEntOwner] = useState<Map<string, { name: string }>>(new Map());
+  const teamNames = useMemo(
+    () => new Set([me.name || "", ...team.map((x) => x.name)].map(nrm).filter(Boolean)),
+    [team, me.name],
+  );
+  const mw = useMineWork(reg, me.name || "", teamNames, entOwner);
   /* بيانات المحفظة الإضافية للأعمال الرئيسية — المفتاح `القسم:معرّف البند` */
   const mainx = useMemo(() => {
     const m: Record<string, Rec> = {};
@@ -4894,7 +4918,6 @@ export default function Portfolio({
   /* التزام كل الاستشاريين، ومالكُ كل جهة — يلزمان محفظة المدير
      لتجميع أرقام فريقه */
   const [commitAll, setCommitAll] = useState<CommitRow[]>([]);
-  const [entOwner, setEntOwner] = useState<Map<string, { name: string }>>(new Map());
   const [myChanges, setMyChanges] = useState<MyChange[]>([]);
   useEffect(() => {
     void (async () => {
@@ -4993,27 +5016,16 @@ export default function Portfolio({
      الإدارة بالمنصة كلها. فلا يُعرض للمدير صفرٌ لأنه ليس نقطة
      تواصل جهةٍ بنفسه — عملُه عمل من تحته.
      ============================================================ */
-  const teamNames = useMemo(
-    () => new Set([me.name || "", ...team.map((x) => x.name)].map(nrm).filter(Boolean)),
-    [team, me.name],
-  );
   /** مدير الإدارة: المنصة كلها · مدير قطاع: جهات فريقه · غيرهما: جهاته */
   const goalWho: "all" | "team" | "me" =
     me.role === "admin" ? "all" : team.length ? "team" : "me";
   /** صفوف قسمٍ بحسب النطاق — مالك الجهة من سجلّ الجهات، أو اسم
       الاستشاري المكتوب في الصفّ نفسه */
   const inScope = useCallback(
-    (k: MainSec) => {
-      if (goalWho === "me") return mw.mine[k];
-      if (goalWho === "all") return mw.all[k];
-      return mw.all[k].filter((r) => {
-        const c = txt(r.data.consultant).trim();
-        if (c && teamNames.has(nrm(c))) return true;
-        const own = entOwner.get(nrm(txt(r.data[MAIN_ENT[k]])));
-        return !!own && teamNames.has(nrm(own.name));
-      });
-    },
-    [goalWho, mw.mine, mw.all, teamNames, entOwner],
+    /* `mine` صارت تشمل القطاع لمدير القطاع، فلا تُحسب هنا مرّةً
+       ثانية — ولا يبقى إلا استثناء مدير الإدارة */
+    (k: MainSec) => (goalWho === "all" ? mw.all[k] : mw.mine[k]),
+    [goalWho, mw.mine, mw.all],
   );
 
   const goalRows: GoalRow[] = useMemo(() => {
