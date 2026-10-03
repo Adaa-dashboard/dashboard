@@ -15,7 +15,7 @@ import { publishUndo } from "@/lib/undoBus";
 import { useLogos, logoKey, SESS_SHORT, INST_COLS, INST_SECTORS, CX_COLS, CX_QS, cxStagesOf, SECTION_TITLE } from "./Sections";
 import { OP_OWNERS, OP_STATUSES, opFix, opRoles, opStatus, opTone } from "./OpPlan";
 import { initials, toneOf } from "@/lib/entlogo";
-import { ANNUAL_GOALS, GOALS_WEIGHT, goalsScore, type GoalRow } from "@/lib/goals";
+import { ANNUAL_GOALS, GOALS_WEIGHT, goalsScore, ownAsGoal, type GoalRow, type OwnGoal } from "@/lib/goals";
 import { asset } from "@/lib/base";
 
 /* ============================================================
@@ -177,6 +177,9 @@ type Prefs = {
   /** أرقام الأهداف السنوية التي لا مصدر لها في المنصة — بالمعرّف
       في `ANNUAL_GOALS`. المحسوب آلياً لا يُحفظ هنا فلا يتجمّد. */
   goals?: Record<string, number>;
+  /** مؤشرات يضيفها صاحب المحفظة فوق السبعة المشتركة — للمدير
+      مؤشراتٌ زائدة على مؤشرات موظفيه */
+  ownGoals?: OwnGoal[];
   /** علامة ترحيل الترتيب الافتراضي الجديد */
   v2?: boolean;
   /** علامة ترحيل هيكل «الأعمال الرئيسية» */
@@ -1253,7 +1256,9 @@ function useMineWork(reg: RegRow[], meName: string) {
     setAll((v) => ({ ...v, [k]: v[k].map((x) => (x.id === id ? { ...x, data: { ...x.data, ...p } } : x)) }));
   }, []);
 
-  return { mine, sess: all.sessions, loaded, patch, canEdit, reload: () => setNonce((n) => n + 1) };
+  /* `all` تُصدَّر كذلك: محفظة المدير تجمع مؤشرات فريقه لا جهاته
+     هو، فتحتاج صفوف القسم كلها لا المرشَّحة على اسمه */
+  return { mine, all, sess: all.sessions, loaded, patch, canEdit, reload: () => setNonce((n) => n + 1) };
 }
 
 /** شرائح صغيرة تحت رقم البطاقة — أهمّ ما في القسم بلا فتحه */
@@ -4243,13 +4248,30 @@ function GoalsModal({
   t,
   onClose,
   onSet,
+  own,
+  onOwn,
 }: {
   rows: GoalRow[];
   score: { pct: number | null; have: number; weight: number };
   t: T;
   onClose: () => void;
   onSet: (id: string, v: number | null) => void;
+  /** مؤشرات صاحب المحفظة الزائدة — تُعرف لتُحذف وتُعدَّل */
+  own: OwnGoal[];
+  onOwn: (g: OwnGoal | null, id?: string) => void;
 }) {
+  const mine = new Set(own.map((x) => x.id));
+  const [add, setAdd] = useState(false);
+  const [f, setF] = useState<{ kpi: string; target: string; weight: string; unit: "عدد" | "%" }>({
+    kpi: "", target: "100", weight: "10", unit: "%",
+  });
+  const save = () => {
+    const kpi = f.kpi.trim();
+    if (!kpi) return;
+    onOwn({ id: "own-" + newId(), kpi, target: Math.max(1, num(f.target, 100)), weight: Math.max(0, num(f.weight, 10)), unit: f.unit });
+    setF({ kpi: "", target: "100", weight: "10", unit: "%" });
+    setAdd(false);
+  };
   /* أصناف خاصّة بهذه القائمة: `ok`/`nt` العامّة مستعملةٌ في
      المنصّة لأشياء أخرى، فالاشتراك فيها يجرّ تنسيقها معه */
   const tone = (p: number | null) =>
@@ -4283,6 +4305,17 @@ function GoalsModal({
               <div className="gl-t">
                 <span className="n">{i + 1}. {g.kpi}</span>
                 <span className="w">{t("الوزن", "Weight")} {g.weight}</span>
+                {mine.has(g.id) && (
+                  <button
+                    className="gl-x"
+                    title={t("حذف هذا المؤشر", "Remove")}
+                    onClick={() => {
+                      if (confirm(t("حذف هذا المؤشر من أهدافك؟", "Remove this KPI?"))) onOwn(null, g.id);
+                    }}
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
               <div className="gl-m">
                 <em>
@@ -4316,10 +4349,51 @@ function GoalsModal({
           ))}
         </div>
 
+        {/* المدير له مؤشرات فوق السبعة المشتركة — تُضاف هنا وتدخل
+            الحساب بوزنها، ورقمها يُدخل يدوياً إذ لا مصدر له */}
+        {add ? (
+          <div className="gl-add">
+            <label className="op-note">
+              <span>{t("نصّ المؤشر", "KPI")}</span>
+              <input
+                autoFocus
+                value={f.kpi}
+                placeholder={t("مثال: نسبة إنجاز المشاريع المسندة في الوقت المطلوب", "e.g. On-time delivery")}
+                onChange={(e) => setF({ ...f, kpi: e.target.value })}
+              />
+            </label>
+            <div className="op-f">
+              <label>
+                <span>{t("المستهدف", "Target")}</span>
+                <input type="number" min={1} value={f.target} onChange={(e) => setF({ ...f, target: e.target.value })} />
+              </label>
+              <label>
+                <span>{t("الوزن النسبي", "Weight")}</span>
+                <input type="number" min={0} value={f.weight} onChange={(e) => setF({ ...f, weight: e.target.value })} />
+              </label>
+              <label>
+                <span>{t("الوحدة", "Unit")}</span>
+                <select value={f.unit} onChange={(e) => setF({ ...f, unit: e.target.value as "عدد" | "%" })}>
+                  <option value="%">%</option>
+                  <option value="عدد">{t("عدد", "Count")}</option>
+                </select>
+              </label>
+            </div>
+            <div className="m-f">
+              <button className="btn btn-ghost btn-sm" onClick={() => setAdd(false)}>{t("إلغاء", "Cancel")}</button>
+              <button className="btn btn-sm" disabled={!f.kpi.trim()} onClick={save}>{t("إضافة المؤشر", "Add")}</button>
+            </div>
+          </div>
+        ) : (
+          <button className="gl-addb" onClick={() => setAdd(true)}>
+            + {t("إضافة مؤشر من عندي", "Add my own KPI")}
+          </button>
+        )}
+
         <p className="muted" style={{ fontSize: 11, lineHeight: 1.8 }}>
           {t(
-            "الأهداف نفسها لكل موظفي الإدارة، وأوزانها من نظام الموارد البشرية. وما يُقرأ من المنصة يتحدّث وحده كلّما حدّثت صفحة قسمك — فلا تُدخله هنا.",
-            "Same goals for everyone; platform-read values update themselves.",
+            "السبعة الأولى مشتركة بين موظفي الإدارة وأوزانها من نظام الموارد البشرية، وما يُقرأ منها من المنصة يتحدّث وحده كلّما حُدِّثت صفحة القسم. ومؤشرات المدير تجمع أرقام فريقه كلها، وله أن يضيف فوقها ما يخصّه.",
+            "The first seven are shared; a manager's figures aggregate their team's, and they may add their own KPIs.",
           )}
         </p>
 
@@ -4817,6 +4891,10 @@ export default function Portfolio({
     sla: number | null; workDays: number | null; status: string; firstSeen?: string; closedAt?: string;
   };
   const [myCommit, setMyCommit] = useState<CommitRow | null>(null);
+  /* التزام كل الاستشاريين، ومالكُ كل جهة — يلزمان محفظة المدير
+     لتجميع أرقام فريقه */
+  const [commitAll, setCommitAll] = useState<CommitRow[]>([]);
+  const [entOwner, setEntOwner] = useState<Map<string, { name: string }>>(new Map());
   const [myChanges, setMyChanges] = useState<MyChange[]>([]);
   useEffect(() => {
     void (async () => {
@@ -4826,7 +4904,9 @@ export default function Portfolio({
       ]);
       const list: MyChange[] = Array.isArray(ch.changes) ? ch.changes : [];
       const owners = ownerMap(Array.isArray(en.entities) ? en.entities : []);
+      setEntOwner(owners);
       const rows = commitStats(list, owners);
+      setCommitAll(rows);
       setMyCommit(rows.find((r) => nrm(r.name) === nrm(me.name)) || null);
       setMyChanges(list.filter((c) => nrm(owners.get(nrm(c.owner))?.name || "") === nrm(me.name)));
     })();
@@ -4906,40 +4986,89 @@ export default function Portfolio({
      والمؤشر الذي لم يُرصد يبقى «—» ولا يُحتسب صفراً: الرقم الذي
      لا سند له يُنقص النسبة بلا ذنب، فالأمانة أن يُقال كم رُصد.
      ============================================================ */
+  /* ============================================================
+     نطاق أرقام الأهداف — **مؤشرات الفريق تصبّ في مؤشر مديره**
+     ------------------------------------------------------------
+     الموظف يُقاس بجهاته، والمدير بجهات فريقه كلها مجموعةً، ومدير
+     الإدارة بالمنصة كلها. فلا يُعرض للمدير صفرٌ لأنه ليس نقطة
+     تواصل جهةٍ بنفسه — عملُه عمل من تحته.
+     ============================================================ */
+  const teamNames = useMemo(
+    () => new Set([me.name || "", ...team.map((x) => x.name)].map(nrm).filter(Boolean)),
+    [team, me.name],
+  );
+  /** مدير الإدارة: المنصة كلها · مدير قطاع: جهات فريقه · غيرهما: جهاته */
+  const goalWho: "all" | "team" | "me" =
+    me.role === "admin" ? "all" : team.length ? "team" : "me";
+  /** صفوف قسمٍ بحسب النطاق — مالك الجهة من سجلّ الجهات، أو اسم
+      الاستشاري المكتوب في الصفّ نفسه */
+  const inScope = useCallback(
+    (k: MainSec) => {
+      if (goalWho === "me") return mw.mine[k];
+      if (goalWho === "all") return mw.all[k];
+      return mw.all[k].filter((r) => {
+        const c = txt(r.data.consultant).trim();
+        if (c && teamNames.has(nrm(c))) return true;
+        const own = entOwner.get(nrm(txt(r.data[MAIN_ENT[k]])));
+        return !!own && teamNames.has(nrm(own.name));
+      });
+    },
+    [goalWho, mw.mine, mw.all, teamNames, entOwner],
+  );
+
   const goalRows: GoalRow[] = useMemo(() => {
     const man = prefs.goals || {};
     const cap = (got: number, target: number) =>
       target > 0 ? Math.min(100, Math.round((got / target) * 100)) : null;
 
-    const natDone = mw.mine.natstrat.filter((r) => num(r.data.stage, 1) === 4);
+    const nat = inScope("natstrat");
+    const natDone = nat.filter((r) => num(r.data.stage, 1) === 4);
     const natMeas = natDone.length
       ? Math.round(natDone.reduce((a, r) => a + num(r.data.meas), 0) / natDone.length)
       : null;
-    const instLive = mw.mine.inststrat.filter((r) => txt(r.data.live) === "مفعل").length;
-    const cxDone = mw.mine.cx.filter((r) => num(r.data.counted) === 1).length;
+    const instLive = inScope("inststrat").filter((r) => txt(r.data.live) === "مفعل").length;
+    const cxDone = inScope("cx").filter((r) => num(r.data.counted) === 1).length;
+    /* التزام طلبات التغيير: للمدير مجموعُ فريقه لا رقمه وحده */
+    const cm =
+      goalWho === "me"
+        ? myCommit
+        : (() => {
+            const rows = goalWho === "all" ? commitAll : commitAll.filter((r) => teamNames.has(nrm(r.name)));
+            const tot = rows.reduce((a, r) => a + r.total, 0);
+            const ok = rows.reduce((a, r) => a + r.ok, 0);
+            return tot ? { pct: Math.round((ok / tot) * 100) } : null;
+          })();
+    /** نصّ يقول من أين جُمع الرقم — فلا يُظنّ رقمَ صاحب المحفظة وحده */
+    const whoTxt =
+      goalWho === "all"
+        ? t("على مستوى الإدارة", "Department-wide")
+        : goalWho === "team"
+          ? t("مجموع فريقي", "My team")
+          : "";
+    const wrap = (x: string) => (whoTxt ? `${whoTxt} · ${x}` : x);
 
     const devDone = devplan.filter((r) => txt(r.data.state) === "مكتملة").length;
 
-    return ANNUAL_GOALS.map((g) => {
+    return [...ANNUAL_GOALS, ...(prefs.ownGoals || []).map(ownAsGoal)].map((g) => {
       let got: number | null = null;
       let typed = false;
       let src = g.how;
       switch (g.from) {
         case "inststrat":
           got = mw.loaded ? instLive : null;
-          src = `${t("من صفحة الاستراتيجيات المؤسسية", "From institutional strategies")} · ${g.how}`;
+          src = wrap(`${t("من صفحة الاستراتيجيات المؤسسية", "From institutional strategies")} · ${g.how}`);
           break;
         case "cx":
           got = mw.loaded ? cxDone : null;
-          src = `${t("من صفحة تجربة المستفيد", "From CX page")} · ${g.how}`;
+          src = wrap(`${t("من صفحة تجربة المستفيد", "From CX page")} · ${g.how}`);
           break;
         case "natstrat":
           got = natMeas;
-          src = `${t("من صفحة الاستراتيجيات الوطنية", "From national strategies")} · ${g.how}`;
+          src = wrap(`${t("من صفحة الاستراتيجيات الوطنية", "From national strategies")} · ${g.how}`);
           break;
         case "commit":
-          got = myCommit ? myCommit.pct : null;
-          src = `${t("من جدول طلبات التغيير", "From change requests")} · ${g.how}`;
+          got = cm ? cm.pct : null;
+          src = wrap(`${t("من جدول طلبات التغيير", "From change requests")} · ${g.how}`);
           break;
         case "opplan":
           got = noteQ ? noteQ.pct : null;
@@ -4972,8 +5101,25 @@ export default function Portfolio({
       }
       return { ...g, got, typed, pct: got === null ? null : cap(got, g.target), src };
     });
-  }, [mw.mine, mw.loaded, myCommit, noteQ, prefs.goals, devplan, t]);
+  }, [inScope, goalWho, teamNames, commitAll, mw.loaded, myCommit, noteQ, prefs.goals, prefs.ownGoals, devplan, t]);
   const goalScore = useMemo(() => goalsScore(goalRows), [goalRows]);
+  /** إضافة مؤشرٍ من عند صاحب المحفظة أو حذفه — `null` يحذف */
+  const setOwnGoal = useCallback((g: OwnGoal | null, id?: string) => {
+    setPrefs((old) => {
+      const list = [...(old.ownGoals || [])];
+      const i = list.findIndex((x) => x.id === (g ? g.id : id));
+      if (!g) {
+        if (i >= 0) list.splice(i, 1);
+      } else if (i >= 0) list[i] = g;
+      else list.push(g);
+      const vals = { ...(old.goals || {}) };
+      if (!g && id) delete vals[id];
+      const out = { ...old, ownGoals: list, goals: vals };
+      void saveUserData("portfolio", out);
+      return out;
+    });
+  }, []);
+
   /** رقمٌ يُدخله صاحب المحفظة لمؤشرٍ لا مصدر له */
   const setGoal = useCallback(
     (id: string, v: number | null) => {
@@ -5528,6 +5674,8 @@ export default function Portfolio({
           t={t}
           onClose={() => setGoals(false)}
           onSet={setGoal}
+          own={prefs.ownGoals || []}
+          onOwn={setOwnGoal}
         />
       )}
 

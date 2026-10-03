@@ -118,6 +118,17 @@ export const ANNUAL_GOALS: Goal[] = [
 
 export const GOALS_WEIGHT = ANNUAL_GOALS.reduce((a, g) => a + g.weight, 0);
 
+/** مؤشر يضيفه صاحب المحفظة — للمدير مؤشرات فوق السبعة المشتركة.
+    رقمه يُدخل يدوياً، فلا مصدر له في المنصة بطبيعته. */
+export type OwnGoal = { id: string; kpi: string; target: number; weight: number; unit: "عدد" | "%" };
+
+/** يصير هدفاً كاملاً ليُعرض ويُحسب مع السبعة بلا تفريق */
+export const ownAsGoal = (g: OwnGoal): Goal => ({
+  ...g,
+  from: "manual",
+  how: "مؤشر أضفته بنفسك — رقمه يُدخل يدوياً",
+});
+
 export type GoalRow = Goal & {
   /** المحقّق — null إن لم يُرصد بعد */
   got: number | null;
