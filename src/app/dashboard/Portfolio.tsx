@@ -3304,7 +3304,6 @@ function Tile({
   chips,
   onOpen,
   onHide,
-  onEdit,
   dragProps,
 }: {
   w: WDef;
@@ -3316,23 +3315,12 @@ function Tile({
   chips?: { k: string; v: number }[];
   onOpen: () => void;
   onHide: () => void;
-  onEdit: () => void;
   dragProps: Rec;
 }) {
   return (
     <div className="tile" style={{ ["--c" as string]: w.color }} onClick={onOpen} {...dragProps}>
       <span className="grip" title="اسحب" onClick={(e) => e.stopPropagation()}>
         ⋮⋮
-      </span>
-      <span
-        className="edit"
-        title="تغيير الاسم والأيقونة"
-        onClick={(e) => {
-          e.stopPropagation();
-          onEdit();
-        }}
-      >
-        ✎
       </span>
       <span
         className="hide"
@@ -4406,6 +4394,7 @@ function CustomModal({
   secOrder,
   onClose,
   onChange,
+  onLook,
 }: {
   prefs: Prefs;
   t: T;
@@ -4415,6 +4404,8 @@ function CustomModal({
   secOrder: string[];
   onClose: () => void;
   onChange: (p: Partial<Prefs>) => void;
+  /** تغيير اسم بندٍ أو أيقونته — كان قلماً على البطاقة نفسها */
+  onLook: (key: string) => void;
 }) {
   const moveSec = (i: number, d: number) => {
     const a = [...secOrder];
@@ -4545,20 +4536,32 @@ function CustomModal({
         </div>
 
         <div className="sec3">{t("البنود الظاهرة", "Visible items")}</div>
+        {/* القلم هنا لا على البطاقة: كان ✎ فوق كل عنوان في الصفحة
+            فازدحمت الرؤوس بأيقونتين، وتغييرُ الاسم عملٌ يُفعل مرّةً
+            لا في كل نظرة — فمكانه «تخصيص». وتُسرد بنود المستخدم
+            الخاصّة معها، وإلا تعذّر تسميتها وحذفها بعد نقل القلم. */}
         <div className="pf-arr in-modal">
-          {WIDGETS.map((w) => {
+          {[
+            ...WIDGETS.map((w) => ({ key: w.key, label: w.label })),
+            ...prefs.custom.map((c) => ({ key: c.key, label: c.label })),
+          ].map((w) => {
             const on = !prefs.hidden.includes(w.key);
+            const look = prefs.look?.[w.key];
             return (
-              <span
-                key={w.key}
-                className={`b ${on ? "on" : ""}`}
-                onClick={() =>
-                  onChange({
-                    hidden: on ? [...prefs.hidden, w.key] : prefs.hidden.filter((x) => x !== w.key),
-                  })
-                }
-              >
-                {w.label} {on ? "✓" : "+"}
+              <span key={w.key} className={`b ${on ? "on" : ""}`}>
+                <i
+                  className="t"
+                  onClick={() =>
+                    onChange({
+                      hidden: on ? [...prefs.hidden, w.key] : prefs.hidden.filter((x) => x !== w.key),
+                    })
+                  }
+                >
+                  {look?.label || w.label} {on ? "✓" : "+"}
+                </i>
+                <i className="p" title={t("تغيير الاسم والأيقونة", "Rename / icon")} onClick={() => onLook(w.key)}>
+                  ✎
+                </i>
               </span>
             );
           })}
@@ -5241,9 +5244,6 @@ export default function Portfolio({
           </span>
           <h3>{w.label}</h3>
           {["tasks", "calendar", "notes"].includes(k) ? null : <span className="n">{st.count}</span>}
-          <span className="edit" title={t("تغيير الاسم والأيقونة", "Rename / icon")} onClick={() => setEditLook(k)}>
-            ✎
-          </span>
           <span className="hide" title={t("إخفاء", "Hide")} onClick={() => patch({ hidden: [...prefs.hidden, k] })}>
             ✕
           </span>
@@ -5305,7 +5305,6 @@ export default function Portfolio({
               chips={st.chips}
               onOpen={() => setOpen(k)}
               onHide={() => patch({ hidden: [...prefs.hidden, k] })}
-              onEdit={() => setEditLook(k)}
               dragProps={{}}
             />
           );
@@ -5573,6 +5572,10 @@ export default function Portfolio({
           secOrder={secOrder}
           onClose={() => setCustom(false)}
           onChange={patch}
+          onLook={(k) => {
+            setCustom(false);
+            setEditLook(k);
+          }}
         />
       )}
 

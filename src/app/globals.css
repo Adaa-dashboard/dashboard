@@ -6344,7 +6344,11 @@ table.matrix thead th {
   background: rgba(255, 255, 255, calc(1 - var(--dim, 0.35)));
   backdrop-filter: blur(1px);
 }
-.pf.hasbg > *:not(.pf-bg) {
+/* `:not(.modal-overlay)` ضرورية: المحدِّد أقوى من `.modal-overlay`،
+   فكان يفرض `position:relative` على النافذة المنبثقة نفسها —
+   فتسقط في آخر الصفحة بدل أن تتوسّط الشاشة. ظهر هذا أول ما
+   أضافت المستخدمة خلفية، إذ لا يُضاف الصنف `hasbg` قبلها. */
+.pf.hasbg > *:not(.pf-bg):not(.modal-overlay) {
   position: relative;
   z-index: 1;
 }
@@ -12035,16 +12039,14 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
 /* مربّع أبيض بجرسٍ أخضر — بحجم أزرار الأدوات ولونها معكوساً،
    فيُميَّز بينها دون أن يخرج عنها */
 .bell { position: relative; display: inline-flex; }
-.tl-b.bell-b {
-  background: #fff;
-  color: var(--g-700);
-  border: 1px solid color-mix(in srgb, var(--g-700) 26%, var(--line2));
-}
-.tl-b.bell-b:hover { background: var(--g-100); filter: none; }
-.tl-b.bell-b.on { background: var(--g-100); color: var(--g-800); border-color: var(--g-700); }
+/* الجرس كبقيّة أزرار الشريط: أخضر الهوية وأيقونةٌ بيضاء — كان
+   أبيض وحده فبدا زرّاً غريباً بينها */
 
 .bell-p {
-  position: absolute; top: 44px; inset-inline-start: 0;
+  /* `fixed` والموضع يُحسب في `Bell.tsx`: الزرّ قد يقع في أيّ طرف
+     من الترويسة، فالمحاذاة الثابتة تُقصّ اللوحة على حافة الشاشة.
+     تُحاذى طرفَ الزرّ ثم تُحبس داخل النافذة. */
+  position: fixed;
   width: min(360px, 86vw); max-height: 70vh; overflow: auto;
   background: var(--panel); border: 1px solid var(--border);
   border-radius: 14px; padding: 10px; z-index: 70;
@@ -12241,3 +12243,13 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .dvp-li > em { font-style: normal; font-size: 9.5px; color: var(--muted); white-space: nowrap; }
+
+/* بند «تخصيص محفظتي»: نصٌّ يُظهر ويُخفي، وقلمٌ يسمّي — جزءان في
+   شريحةٍ واحدة، فلا يُفتح باب التسمية بالخطأ عند الإظهار */
+.pf-arr .b { display: inline-flex; align-items: center; gap: 2px; padding: 0; overflow: hidden; }
+.pf-arr .b > i { font-style: normal; padding: 5px 12px; }
+.pf-arr .b > i.p {
+  padding: 5px 9px; font-size: 10.5px; opacity: .6;
+  border-inline-start: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+}
+.pf-arr .b > i.p:hover { opacity: 1; background: rgba(0, 0, 0, .06); }

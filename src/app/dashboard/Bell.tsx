@@ -225,6 +225,32 @@ export default function Bell({
 }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement | null>(null);
+  const btn = useRef<HTMLButtonElement | null>(null);
+
+  /* موضع اللوحة يُقاس ولا يُفترض: الزرّ قد يكون في طرف الشاشة
+     يميناً أو يساراً حسب عرض الترويسة وما فيها، فمحاذاتُه بجهةٍ
+     ثابتة تُخرج نصف اللوحة عن الحافة وتُقصّ. تُحاذى طرفَ الزرّ ثم
+     تُحبس داخل النافذة بثماني بكسلات من كل جانب. */
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const el = btn.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const w = Math.min(360, window.innerWidth * 0.86);
+      const want = document.dir === "rtl" ? r.right - w : r.left;
+      const left = Math.max(8, Math.min(want, window.innerWidth - w - 8));
+      setPos({ top: r.bottom + 8, left });
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -258,6 +284,7 @@ export default function Bell({
   return (
     <div className="bell" ref={wrap}>
       <button
+        ref={btn}
         className={`tl-b bell-b ${open ? "on" : ""}`}
         onClick={() => setOpen((v) => !v)}
         title={t("التنبيهات", "Alerts")}
@@ -272,7 +299,7 @@ export default function Bell({
       </button>
 
       {open && (
-        <div className="bell-p">
+        <div className="bell-p" style={pos ? { top: pos.top, left: pos.left } : { visibility: "hidden" }}>
           <div className="bell-h">
             <b>{t("التنبيهات", "Alerts")}</b>
             <span>{t(`${alerts.length} بنداً`, `${alerts.length} items`)}</span>
