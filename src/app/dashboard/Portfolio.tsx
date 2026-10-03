@@ -706,14 +706,22 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
 }
 
 /* ---------------- ملاحظاتي ---------------- */
+/** أكثر ما يُعرض من الملاحظات في المحفظة */
+const PIN_MAX = 4;
+
 function NotesWidget({ t, onOpen }: { t: T; onOpen: () => void }) {
   const [data, setData] = useState<NotesData>(EMPTY_NOTES);
-  const [all, setAll] = useState(false);
   useEffect(() => {
     void loadUserData<NotesData>("notes", EMPTY_NOTES).then((d) => setData(d || EMPTY_NOTES));
   }, []);
   const sorted = [...(data.notes || [])].sort((a, b) => txt(b.updatedAt).localeCompare(txt(a.updatedAt)));
-  const list = all ? sorted : sorted.slice(0, 5);
+  /* **المثبَّتة وحدها**: المحفظة لوحةُ ما يعني صاحبها الآن، لا
+     أرشيفَ ملاحظاته. وآخرُ ما ثُبِّت أعلاها، وأربعٌ حدّاً — فوقها
+     يصير الصندوق قائمةً تُمرَّر لا لوحةً تُقرأ بلمحة. */
+  const pinned = sorted
+    .filter((n) => !!n.pinnedAt)
+    .sort((a, b) => txt(b.pinnedAt).localeCompare(txt(a.pinnedAt)));
+  const list = pinned.slice(0, PIN_MAX);
   /* الميزة الأقل وضوحاً في المنصة: التاريخ يُقرأ من نص الملاحظة.
      فيُشرح هنا حتى يُكتشف، ويختفي الشرح متى ظهر أثره — أي متى صار
      لملاحظة موعد — فلا يبقى تنبيهاً دائماً لمن عرفه. */
@@ -731,18 +739,30 @@ function NotesWidget({ t, onOpen }: { t: T; onOpen: () => void }) {
       )}
       <div className="nts">
         {list.map((n) => (
-          <div className="nt2" key={n.id}>
+          <div className="nt2 pin" key={n.id}>
             <div className="t">{firstLine(n)}</div>
             <div className="x">{preview(n)}</div>
             <div className="m">{whenAr(n.updatedAt)}</div>
           </div>
         ))}
-        {!list.length && <div className="pf-none">{t("لا توجد ملاحظات بعد.", "No notes yet.")}</div>}
+        {!list.length && (
+          <div className="pf-none">
+            {sorted.length
+              ? t(
+                  "لا ملاحظة مثبَّتة — ثبِّت ما تريد رؤيته هنا بالدبوس 📌 من «ملاحظاتي».",
+                  "Pin a note to see it here.",
+                )
+              : t("لا توجد ملاحظات بعد.", "No notes yet.")}
+          </div>
+        )}
       </div>
-      {sorted.length > 5 && (
-        <button className="moreln" onClick={() => setAll(!all)}>
-          {all ? t("عرض أقل", "Show less") : `${t("عرض ملاحظات أخرى", "More notes")} (${sorted.length - 5})`}
-        </button>
+      {pinned.length > PIN_MAX && (
+        <div className="pf-hint">
+          {t(
+            `مثبَّتٌ ${pinned.length} — تُعرض أحدث ${PIN_MAX}.`,
+            `${pinned.length} pinned — showing the latest ${PIN_MAX}.`,
+          )}
+        </div>
       )}
       <div className="addrow" onClick={onOpen}>
         + {t("ملاحظة جديدة", "New note")}

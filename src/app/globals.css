@@ -12075,3 +12075,11 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
 .bell-i .n { font-size: 11.5px; font-weight: 700; color: var(--ink); line-height: 1.6; overflow-wrap: anywhere; }
 .bell-i.late .n { color: var(--dgr-tx); }
 .bell-i > em { font-style: normal; font-size: 10px; color: var(--muted); line-height: 1.6; overflow-wrap: anywhere; }
+
+/* الملاحظة المثبَّتة في المحفظة — دبّوسٌ صغير يذكّر لماذا هي هنا */
+.pf .nt2.pin { position: relative; }
+.pf .nt2.pin::after {
+  content: "📌";
+  position: absolute; inset-block-start: 8px; inset-inline-start: 10px;
+  font-size: 10px; opacity: .55;
+}
