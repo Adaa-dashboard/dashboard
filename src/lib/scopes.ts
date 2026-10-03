@@ -176,6 +176,7 @@ export const PAGE_ROWS: { title: string; rows: PageRow[] }[] = [
       { view: "structure", label: "الهيكل التنظيمي" },
       { view: "users", label: "المستخدمون والصلاحيات" },
       { view: "sticky", label: "كتابة الملاحظات اللاصقة", note: "القلم في زاوية كل صفحة" },
+      { view: "announce", label: "نشر إعلان", note: "شريط متحرّك يراه الجميع — بمدّة تنتهي وحدها" },
       { view: "audit", label: "سجل النشاط", note: "من عدّل ماذا ومتى" },
     ],
   },
