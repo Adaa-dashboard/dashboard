@@ -15,6 +15,7 @@ import { publishUndo } from "@/lib/undoBus";
 import { useLogos, logoKey, SESS_SHORT, INST_COLS, INST_SECTORS, CX_COLS, CX_QS, cxStagesOf, SECTION_TITLE } from "./Sections";
 import { OP_OWNERS, OP_STATUSES, opFix, opRoles, opStatus, opTone } from "./OpPlan";
 import { initials, toneOf } from "@/lib/entlogo";
+import { ANNUAL_GOALS, GOALS_WEIGHT, goalsScore, type GoalRow } from "@/lib/goals";
 import { asset } from "@/lib/base";
 
 /* ============================================================
@@ -167,6 +168,9 @@ type Prefs = {
   cols?: Record<string, Col[]>;
   /** إخفاء عمود «تاريخ الإدخال» في قسم بعينه — الظهور هو الأصل */
   noStamp?: Record<string, boolean>;
+  /** أرقام الأهداف السنوية التي لا مصدر لها في المنصة — بالمعرّف
+      في `ANNUAL_GOALS`. المحسوب آلياً لا يُحفظ هنا فلا يتجمّد. */
+  goals?: Record<string, number>;
   /** علامة ترحيل الترتيب الافتراضي الجديد */
   v2?: boolean;
   /** علامة ترحيل هيكل «الأعمال الرئيسية» */
@@ -3981,6 +3985,112 @@ const SWATCHES = [
   "#7a5cd1", "#a24160", "#c9a020", "#e07a3a", "#4e615c", "#12211d",
 ];
 
+
+/* ============================================================
+   أهدافي السنوية — سبعة مؤشرات بأوزانها
+   ------------------------------------------------------------
+   الصفّ يعرض المؤشر ومستهدفه ووزنه والمحقّق ونسبته وشريطها، ثم
+   سطراً يقول **من أين جاء الرقم**: من صفحة قسمٍ في المنصة أو
+   بإدخالٍ يدوي. فلا رقمٌ بلا سند، ولا يُظنّ المحسوبُ مكتوباً.
+
+   وما لا مصدر له بعد يُكتب رقمه في خانةٍ داخل صفّه — لا نافذةٍ
+   ثانية: الهدف أمام عينه حين يكتب.
+   ============================================================ */
+function GoalsModal({
+  rows,
+  score,
+  t,
+  onClose,
+  onSet,
+}: {
+  rows: GoalRow[];
+  score: { pct: number | null; have: number; weight: number };
+  t: T;
+  onClose: () => void;
+  onSet: (id: string, v: number | null) => void;
+}) {
+  /* أصناف خاصّة بهذه القائمة: `ok`/`nt` العامّة مستعملةٌ في
+     المنصّة لأشياء أخرى، فالاشتراك فيها يجرّ تنسيقها معه */
+  const tone = (p: number | null) =>
+    p === null ? "gl-nt" : p >= 100 ? "gl-ok" : p >= 60 ? "gl-nw" : "gl-no";
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal wide" onClick={(e) => e.stopPropagation()}>
+        <div className="m-h">
+          <h3>{t("أهدافي السنوية", "My annual goals")}</h3>
+          <button className="mx" onClick={onClose} aria-label="close">✕</button>
+        </div>
+
+        <div className="gl-sum">
+          <div className="gl-big">
+            <b>{score.pct === null ? "—" : `${score.pct}%`}</b>
+            <span>{t("نسبة التحقيق المرجَّحة", "Weighted achievement")}</span>
+          </div>
+          <div className="gl-note">
+            {score.pct === null
+              ? t("لم يُرصد أي مؤشر بعد.", "Nothing measured yet.")
+              : t(
+                  `محسوبة على ${score.have} من ${rows.length} مؤشرات رُصدت، وزنها ${score.weight} من ${GOALS_WEIGHT}. والمؤشر الذي لم يُرصد لا يُحتسب صفراً.`,
+                  `Over ${score.have}/${rows.length} measured KPIs (${score.weight}/${GOALS_WEIGHT} weight).`,
+                )}
+          </div>
+        </div>
+
+        <div className="gl-list">
+          {rows.map((g, i) => (
+            <div className={`gl-i ${tone(g.pct)}`} key={g.id}>
+              <div className="gl-t">
+                <span className="n">{i + 1}. {g.kpi}</span>
+                <span className="w">{t("الوزن", "Weight")} {g.weight}</span>
+              </div>
+              <div className="gl-m">
+                <em>
+                  {t("المستهدف", "Target")} <b>{g.target}{g.unit === "%" ? "%" : ""}</b>
+                </em>
+                <em>
+                  {t("المحقّق", "Achieved")}{" "}
+                  {g.from === "manual" ? (
+                    <input
+                      type="number"
+                      min={0}
+                      max={g.target}
+                      className="gl-in"
+                      value={g.got === null ? "" : g.got}
+                      placeholder="—"
+                      onChange={(e) =>
+                        onSet(g.id, e.target.value.trim() === "" ? null : Math.max(0, num(e.target.value)))
+                      }
+                    />
+                  ) : (
+                    <b>{g.got === null ? "—" : `${g.got}${g.unit === "%" ? "%" : ""}`}</b>
+                  )}
+                </em>
+                <em className="p">{g.pct === null ? "—" : `${g.pct}%`}</em>
+              </div>
+              <div className="gl-bar">
+                <i style={{ width: `${g.pct ?? 0}%` }} />
+              </div>
+              <div className="gl-src">{g.src}</div>
+            </div>
+          ))}
+        </div>
+
+        <p className="muted" style={{ fontSize: 11, lineHeight: 1.8 }}>
+          {t(
+            "الأهداف نفسها لكل موظفي الإدارة، وأوزانها من نظام الموارد البشرية. وما يُقرأ من المنصة يتحدّث وحده كلّما حدّثت صفحة قسمك — فلا تُدخله هنا.",
+            "Same goals for everyone; platform-read values update themselves.",
+          )}
+        </p>
+
+        <div className="m-f">
+          <button className="btn btn-ghost" onClick={onClose}>{t("إغلاق", "Close")}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 function CustomModal({
   prefs,
   t,
@@ -4269,7 +4379,9 @@ export default function Portfolio({
   const [open, setOpen] = useState<WKey | null>(null);
   const [drag, setDrag] = useState<WKey | null>(null);
   const [imp, setImp] = useState<string | null>(null);
-  const [taskCount, setTaskCount] = useState<number | null>(null);
+  /* العدّاد يُستعمل في بطاقة المهام نفسها — والمربّع صار للأهداف */
+  const [, setTaskCount] = useState<number | null>(null);
+  const [goals, setGoals] = useState(false);
   const [addW, setAddW] = useState<string | null>(null);
   const [addSec, setAddSec] = useState(false);
   const [editJoin, setEditJoin] = useState(false);
@@ -4523,6 +4635,76 @@ export default function Portfolio({
     const q: number[] = Array.isArray(r.data.q) ? r.data.q : [];
     return !q[curQ - 1];
   }).length;
+
+  /* ============================================================
+     أهدافي السنوية — تُقرأ من المنصة نفسها
+     ------------------------------------------------------------
+     ما حدّثته في صفحة قسمي يصل إلى هدفي من غير إدخالٍ ثانٍ:
+     جهةٌ صار قياسها مفعّلاً في «الاستراتيجيات المؤسسية» تُعدّ في
+     مؤشرها، وقابلية القياس متوسطُ ما سجّلته لاستراتيجياتي
+     المعتمدة. وما لا مصدر له بعد يُدخَل رقمه ويُحفظ في تفضيلاتي.
+
+     والمؤشر الذي لم يُرصد يبقى «—» ولا يُحتسب صفراً: الرقم الذي
+     لا سند له يُنقص النسبة بلا ذنب، فالأمانة أن يُقال كم رُصد.
+     ============================================================ */
+  const goalRows: GoalRow[] = useMemo(() => {
+    const man = prefs.goals || {};
+    const cap = (got: number, target: number) =>
+      target > 0 ? Math.min(100, Math.round((got / target) * 100)) : null;
+
+    const natDone = mw.mine.natstrat.filter((r) => num(r.data.stage, 1) === 4);
+    const natMeas = natDone.length
+      ? Math.round(natDone.reduce((a, r) => a + num(r.data.meas), 0) / natDone.length)
+      : null;
+    const instLive = mw.mine.inststrat.filter((r) => txt(r.data.live) === "مفعل").length;
+    const cxDone = mw.mine.cx.filter((r) => num(r.data.counted) === 1).length;
+
+    return ANNUAL_GOALS.map((g) => {
+      let got: number | null = null;
+      let src = g.how;
+      switch (g.from) {
+        case "inststrat":
+          got = mw.loaded ? instLive : null;
+          src = `${t("من صفحة الاستراتيجيات المؤسسية", "From institutional strategies")} · ${g.how}`;
+          break;
+        case "cx":
+          got = mw.loaded ? cxDone : null;
+          src = `${t("من صفحة تجربة المستفيد", "From CX page")} · ${g.how}`;
+          break;
+        case "natstrat":
+          got = natMeas;
+          src = `${t("من صفحة الاستراتيجيات الوطنية", "From national strategies")} · ${g.how}`;
+          break;
+        case "commit":
+          got = myCommit ? myCommit.pct : null;
+          src = `${t("من جدول طلبات التغيير", "From change requests")} · ${g.how}`;
+          break;
+        case "opplan":
+          got = noteQ ? noteQ.pct : null;
+          src = noteQ ? `${t("من الخطة التشغيلية", "From the operational plan")} · ${noteQ.q}` : g.how;
+          break;
+        default:
+          got = man[g.id] === undefined ? null : num(man[g.id]);
+          src = g.how;
+      }
+      return { ...g, got, pct: got === null ? null : cap(got, g.target), src };
+    });
+  }, [mw.mine, mw.loaded, myCommit, noteQ, prefs.goals, t]);
+  const goalScore = useMemo(() => goalsScore(goalRows), [goalRows]);
+  /** رقمٌ يُدخله صاحب المحفظة لمؤشرٍ لا مصدر له */
+  const setGoal = useCallback(
+    (id: string, v: number | null) => {
+      setPrefs((old) => {
+        const m = { ...(old.goals || {}) };
+        if (v === null) delete m[id];
+        else m[id] = v;
+        const out = { ...old, goals: m };
+        void saveUserData("portfolio", out);
+        return out;
+      });
+    },
+    [],
+  );
 
   function stat(k: WKey): { count: number; pct: number; sub: string; warn?: string; chips?: { k: string; v: number }[] } {
     const rows = dataOf(k);
@@ -4912,10 +5094,19 @@ export default function Portfolio({
       </div>
 
       <div className="kpis">
-        <div className="kp">
-          <div className="k">{t("مهامي المفتوحة", "Open tasks")}</div>
-          <div className="v">{taskCount === null ? "—" : taskCount}</div>
-          <div className="s">{t("المسندة لي والذاتية", "Assigned & self")}</div>
+        {/* أهدافي السنوية بدل «مهامي المفتوحة»: المهام لها بطاقتها
+            في الأعلى، وهذا رقمٌ لا يُرى في مكانٍ آخر */}
+        <div className="kp clickable" onClick={() => setGoals(true)}>
+          <div className="k">{t("تحقيق أهدافي السنوية", "Annual goals")}</div>
+          <div className="v">{goalScore.pct === null ? "—" : `${goalScore.pct}%`}</div>
+          <div className="s">
+            {goalScore.pct === null
+              ? t("لم يُرصد أي مؤشر بعد", "Nothing measured yet")
+              : t(
+                  `${goalScore.have} من ${ANNUAL_GOALS.length} مؤشرات · اضغط للتفصيل`,
+                  `${goalScore.have}/${ANNUAL_GOALS.length} KPIs · details`,
+                )}
+          </div>
         </div>
         <div className="kp clickable" onClick={() => setEnts(true)}>
           <div className="k">{t("جهاتي", "My entities")}</div>
@@ -5029,6 +5220,16 @@ export default function Portfolio({
           onDelete={(id) => {
             if (confirm(t("حذف الجهة وكل ما يتعلق بها في محفظتك؟", "Delete entity?"))) void pf.remove("entities", id);
           }}
+        />
+      )}
+
+      {goals && (
+        <GoalsModal
+          rows={goalRows}
+          score={goalScore}
+          t={t}
+          onClose={() => setGoals(false)}
+          onSet={setGoal}
         />
       )}
 
