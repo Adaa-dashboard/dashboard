@@ -12056,8 +12056,16 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
 /* مربّع أبيض بجرسٍ أخضر — بحجم أزرار الأدوات ولونها معكوساً،
    فيُميَّز بينها دون أن يخرج عنها */
 .bell { position: relative; display: inline-flex; }
-/* الجرس كبقيّة أزرار الشريط: أخضر الهوية وأيقونةٌ بيضاء — كان
-   أبيض وحده فبدا زرّاً غريباً بينها */
+/* الجرس وحده أبيض بجرسٍ أخضر — **مقصودٌ لا سهو**: اختلافُه عن
+   أخواته هو ما يجعله يُلمح، وهو الزرّ الذي يُقصد عند التنبيه.
+   أُعيد بطلب صاحبة المنصة بعد توحيدٍ أضاع تمييزه. */
+.tl-b.bell-b {
+  background: #fff;
+  color: var(--g-700);
+  border: 1px solid color-mix(in srgb, var(--g-700) 26%, var(--line2));
+}
+.tl-b.bell-b:hover { background: var(--g-100); filter: none; }
+.tl-b.bell-b.on { background: var(--g-100); color: var(--g-800); border-color: var(--g-700); }
 
 .bell-p {
   /* `fixed` والموضع يُحسب في `Bell.tsx`: الزرّ قد يقع في أيّ طرف
