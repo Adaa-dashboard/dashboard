@@ -695,7 +695,7 @@ export default function Dashboard({ me }: { me: Me }) {
                 </svg>
               </button>
             )}
-            <Tools t={t} meId={me.id} />
+            <Tools t={t} meId={me.id} meName={me.name || ""} onGo={(x) => setTab(x)} />
           </div>
 
           {/* شريط الإعلانات فوق كل صفحة — للقراءة، والنشر من القلم */}

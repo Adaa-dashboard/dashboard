@@ -5,6 +5,7 @@ import { apiFetch } from "@/lib/api";
 import Notes, { EMPTY_NOTES, firstLine, type NotesData } from "./Notes";
 import { loadUserData } from "@/lib/userdata";
 import { IconCalc, IconCalendar, IconNote } from "./icons";
+import Bell, { useBell } from "./Bell";
 
 /* ============================================================
    أدوات سريعة في زاوية الترويسة: حاسبة · تقويم · ملاحظات.
@@ -399,13 +400,44 @@ export function Cal({ t, meId }: { t: (ar: string, en: string) => string; meId: 
 }
 
 /* ---------------- الشريط ---------------- */
-export default function Tools({ t, meId }: { t: (ar: string, en: string) => string; meId: string }) {
+export default function Tools({
+  t,
+  meId,
+  meName = "",
+  onGo,
+}: {
+  t: (ar: string, en: string) => string;
+  meId: string;
+  meName?: string;
+  /** فتح التبويب الذي يعالج التنبيه */
+  onGo?: (tab: string) => void;
+}) {
   const [open, setOpen] = useState<"" | "calc" | "cal">("");
   const [notes, setNotes] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   // عدّاد على زر التقويم حتى يُرى التنبيه بلا فتحه
   const { evs, reload: reloadEvents } = useEvents(meId);
   const alertCount = useMemo(() => alertsOf(evs).length, [evs]);
+  /* جرس التنبيهات — ما يخصّ صاحب الحساب ويحتاج تصرّفاً.
+     مواعيد التقويم تُضاف إليه من هنا: المهام يجمعها الجرس بنفسه،
+     فلا يبقى منها إلا ما كُتب في التقويم موعداً */
+  const bell = useBell(meId, meName);
+  const calAlerts = useMemo(
+    () =>
+      alertsOf(evs)
+        .filter((e) => e.sort === "note")
+        .map((e) => ({
+          id: "c" + e.id,
+          kind: (e.tone === "late" ? "late" : e.tone === "soon" ? "soon" : "today") as
+            | "late" | "soon" | "today",
+          group: "مواعيد التقويم",
+          title: e.title,
+          sub: `${e.date}${e.time ? ` · ${e.time}` : ""}`,
+          days: null,
+        })),
+    [evs],
+  );
+  const allAlerts = useMemo(() => [...calAlerts, ...bell.alerts], [calAlerts, bell.alerts]);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -424,6 +456,7 @@ export default function Tools({ t, meId }: { t: (ar: string, en: string) => stri
 
   return (
     <div className="tools" ref={wrap}>
+      <Bell alerts={allAlerts} unread={bell.unread + calAlerts.length} markSeen={bell.markSeen} t={t} onGo={onGo} />
       <button
         className={`tl-b ${open === "calc" ? "on" : ""}`}
         onClick={() => setOpen(open === "calc" ? "" : "calc")}

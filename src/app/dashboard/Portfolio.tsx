@@ -4477,6 +4477,27 @@ export default function Portfolio({
 
   const lateChanges = changes.filter((r) => txt(r.data.status) === "متأخر").length;
   const commit = changes.length ? Math.round(((changes.length - lateChanges) / changes.length) * 100) : 0;
+
+  /* «نسبة التقارير الممتثلة لمعايير جودة الملاحظات» في الخطة
+     التشغيلية — آخر ربعٍ رُصد فيه فعليّ */
+  const [noteQ, setNoteQ] = useState<{ pct: number; q: string } | null>(null);
+  useEffect(() => {
+    void apiFetch("/api/items?section=opplan")
+      .then((r) => r.json())
+      .then((d) => {
+        const rows = (Array.isArray(d.items) ? d.items : []) as { data: Rec }[];
+        const it = rows.find((x) => /جودة\s*الملاحظات|جودة ملاحظات/.test(txt(x.data.name)));
+        if (!it) return setNoteQ(null);
+        const QN = ["الربع الأول", "الربع الثاني", "الربع الثالث", "الربع الرابع"];
+        for (let i = 4; i >= 1; i--) {
+          const v = it.data[`q${i}a`];
+          if (v !== undefined && v !== null && String(v).trim() !== "")
+            return setNoteQ({ pct: Math.round(num(v)), q: QN[i - 1] });
+        }
+        setNoteQ(null);
+      })
+      .catch(() => setNoteQ(null));
+  }, []);
   const curQ = Math.floor(new Date().getMonth() / 3) + 1;
   const qLate = entities.filter((r) => {
     const q: number[] = Array.isArray(r.data.q) ? r.data.q : [];
@@ -4890,6 +4911,18 @@ export default function Portfolio({
             {myCommit
               ? t(`${myCommit.ok} من ${myCommit.total} ضمن مدّتها`, `${myCommit.ok}/${myCommit.total} on time`)
               : t("طلبات التغيير", "Change requests")}
+          </div>
+        </div>
+        {/* جودة ملاحظات الأداء: لا يُرصد فردياً بعد، فيُعرض رقم
+            الإدارة من مؤشر الخطة التشغيلية ويُقال إنه رقمها هي —
+            لا يُنسب لصاحب المحفظة ما لم يُقَس عليه */}
+        <div className="kp">
+          <div className="k">{t("الالتزام بجودة ملاحظات الأداء", "Notes quality")}</div>
+          <div className="v">{noteQ ? `${noteQ.pct}%` : "—"}</div>
+          <div className="s">
+            {noteQ
+              ? t(`مؤشر الإدارة · ${noteQ.q}`, `Department KPI · ${noteQ.q}`)
+              : t("لم يُرصد بعد", "Not measured yet")}
           </div>
         </div>
       </div>
