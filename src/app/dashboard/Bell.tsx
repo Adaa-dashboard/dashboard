@@ -69,9 +69,17 @@ type TaskRow = {
 type ChangeRow = { code?: string; owner?: string; item?: string; sla?: number | null; workDays?: number | null };
 type Tick = { id: string; body: string; tone: string; byName: string };
 
-export function useBell(meId: string, meName: string) {
-  const [alerts, setAlerts] = useState<Alert[]>([]);
+export function useBell(meId: string, meName: string, extra: Alert[] = []) {
+  const [base, setBase] = useState<Alert[]>([]);
   const [seen, setSeen] = useState<string[]>([]);
+
+  /* مواعيد التقويم تُمرَّر من الشريط وتُدمج هنا — لا تُعدّ خارج
+     الجرس: العدّاد الذي يُحسب في مكانٍ و«المقروء» في مكانٍ آخر
+     لا ينقص أبداً مهما فُتحت اللوحة */
+  const alerts = useMemo(
+    () => [...extra, ...base].sort((a, b) => RANK[a.kind] - RANK[b.kind] || (a.days ?? 99) - (b.days ?? 99)),
+    [extra, base],
+  );
 
   useEffect(() => {
     try {
@@ -177,8 +185,7 @@ export function useBell(meId: string, meName: string) {
       });
     }
 
-    out.sort((a, b) => RANK[a.kind] - RANK[b.kind] || (a.days ?? 99) - (b.days ?? 99));
-    setAlerts(out);
+    setBase(out);
   }, [meId]);
 
   useEffect(() => {

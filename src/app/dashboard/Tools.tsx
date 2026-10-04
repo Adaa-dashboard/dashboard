@@ -241,14 +241,31 @@ export function useEvents(meId: string) {
   return { evs, reload: load };
 }
 
-/** ما يستحق تنبيهاً: متأخر · يقترب خلال ثلاثة أيام · موعد اليوم أو غداً */
+/** ما رآه صاحبه من مواعيد التقويم — في متصفّحه وحده */
+const CAL_SEEN = "adaa_cal_seen";
+/** كم قبل الموعد يبدأ التذكير — نصف ساعة */
+export const LEAD_MIN = 30;
+/** وكم يبقى بعده حتى يختفي — ساعتان، فمن انشغل لا يفقده */
+const KEEP_MIN = 120;
+
+/* ما يستحق تنبيهاً:
+     · مهمةٌ متأخرة أو يقترب موعدها خلال ثلاثة أيام
+     · **موعدٌ في التقويم قبل نصف ساعة من وقته** لا من ساعة إضافته:
+       التنبيه الذي يظهر مع الإدخال خبرٌ يعرفه صاحبه، فيصير رقماً
+       لا يُقرأ. وبلا وقتٍ محدَّد يبقى تنبيه يومه كلّه إذ لا سبيل
+       إلى أدقّ من ذلك. */
 export function alertsOf(evs: Ev[]): Ev[] {
   const now = todayStr();
+  const ms = Date.now();
   return evs.filter((e) => {
     if (e.tone === "done") return false;
     const d = dayDiff(e.date, now);
-    if (e.sort === "note") return d >= 0 && d <= 1;
-    return d <= 3;
+    if (e.sort !== "note") return d <= 3;
+    if (d !== 0) return false;
+    if (!e.time) return true;
+    const at = new Date(`${e.date}T${e.time}:00`).getTime();
+    if (!Number.isFinite(at)) return true;
+    return at - ms <= LEAD_MIN * 60000 && ms - at <= KEEP_MIN * 60000;
   });
 }
 
@@ -415,16 +432,48 @@ export default function Tools({
   const [open, setOpen] = useState<"" | "calc" | "cal">("");
   const [notes, setNotes] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
-  // عدّاد على زر التقويم حتى يُرى التنبيه بلا فتحه
   const { evs, reload: reloadEvents } = useEvents(meId);
-  const alertCount = useMemo(() => alertsOf(evs).length, [evs]);
+
+  /* التنبيه يبدأ قبل الموعد بنصف ساعة، وذلك وقتٌ يمرّ بلا حدثٍ
+     يُعيد الرسم — فدقّةٌ كل دقيقة تُظهره في حينه */
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => !document.hidden && setTick((n) => n + 1), 60000);
+    return () => clearInterval(id);
+  }, []);
+  const calList = useMemo(() => alertsOf(evs), [evs, tick]);
+
+  /* عدّاد التقويم يَنقص بالفتح: ما رآه صاحبه يُعلَّم في متصفحه،
+     فلا يبقى رقمٌ أحمر على ما قُرئ */
+  const [calSeen, setCalSeen] = useState<string[]>([]);
+  useEffect(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem(CAL_SEEN) || "[]");
+      if (Array.isArray(v)) setCalSeen(v.map(String));
+    } catch {
+      /* متصفّحٌ يمنع التخزين — يبقى العدّاد، ولا ضرر */
+    }
+  }, []);
+  const alertCount = useMemo(
+    () => calList.filter((e) => !calSeen.includes(e.id)).length,
+    [calList, calSeen],
+  );
+  useEffect(() => {
+    if (open !== "cal" || !alertCount) return;
+    const ids = calList.map((e) => e.id);
+    setCalSeen(ids);
+    try {
+      localStorage.setItem(CAL_SEEN, JSON.stringify(ids));
+    } catch {
+      /* لا يُخزَّن — يُعاد العدّ في الزيارة القادمة */
+    }
+  }, [open, alertCount, calList]);
   /* جرس التنبيهات — ما يخصّ صاحب الحساب ويحتاج تصرّفاً.
      مواعيد التقويم تُضاف إليه من هنا: المهام يجمعها الجرس بنفسه،
      فلا يبقى منها إلا ما كُتب في التقويم موعداً */
-  const bell = useBell(meId, meName);
   const calAlerts = useMemo(
     () =>
-      alertsOf(evs)
+      calList
         .filter((e) => e.sort === "note")
         .map((e) => ({
           id: "c" + e.id,
@@ -435,9 +484,10 @@ export default function Tools({
           sub: `${e.date}${e.time ? ` · ${e.time}` : ""}`,
           days: null,
         })),
-    [evs],
+    [calList],
   );
-  const allAlerts = useMemo(() => [...calAlerts, ...bell.alerts], [calAlerts, bell.alerts]);
+  /* تُمرَّر إلى الجرس ليملك قائمتها وعدّادها معاً — لا تُعدّ خارجه */
+  const bell = useBell(meId, meName, calAlerts);
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -456,7 +506,7 @@ export default function Tools({
 
   return (
     <div className="tools" ref={wrap}>
-      <Bell alerts={allAlerts} unread={bell.unread + calAlerts.length} markSeen={bell.markSeen} t={t} onGo={onGo} />
+      <Bell alerts={bell.alerts} unread={bell.unread} markSeen={bell.markSeen} t={t} onGo={onGo} />
       <button
         className={`tl-b ${open === "calc" ? "on" : ""}`}
         onClick={() => setOpen(open === "calc" ? "" : "calc")}
