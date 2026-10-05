@@ -327,12 +327,12 @@ function OpXlsx({
 
   return (
     <div className="op-xl">
-      <button className="btn btn-ghost btn-sm" onClick={down}>
+      <button className="btn btn-sm" onClick={down}>
         ⬇️ {t("تنزيل إكسل", "Download Excel")}
       </button>
       {canEdit && (
         <>
-          <button className="btn btn-ghost btn-sm" onClick={() => file.current?.click()}>
+          <button className="btn btn-sm" onClick={() => file.current?.click()}>
             ⬆️ {t("رفع إكسل", "Upload Excel")}
           </button>
           <input
