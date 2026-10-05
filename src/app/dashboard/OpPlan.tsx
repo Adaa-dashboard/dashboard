@@ -19,16 +19,15 @@ import { IconDown, IconUp } from "./icons";
 import { writeXlsx, readXlsxSheets } from "@/lib/sheet";
 import {
   OP_STATUSES, quarters, onTrack, opStatus, opPct,
-  xlRows, xlParse, type XlRow, type XlPlan,
+  xlBook, xlParseBook, type XlRow, type XlPlan,
 } from "@/lib/opxl";
 
 /* المنطق في `lib/opxl` ليُختبر بلا React ولا شبكة، والصفحة تعرضه.
    ويُعاد تصديره هنا ليبقى مستوردوه على ما ألفوه */
 export { OP_STATUSES, opStatus, opPct };
 
-/** الصفوف تُغلَّف ملفاً — بناؤها في `lib/opxl` */
-const xlExport = (rows: XlRow[]) =>
-  writeXlsx([{ name: "الخطة التشغيلية", rows: xlRows(rows) }]);
+/** الكتاب يُغلَّف ملفاً — بناؤه في `lib/opxl` */
+const xlExport = (rows: XlRow[], owners: string[]) => writeXlsx(xlBook(rows, owners));
 
 type T = (ar: string, en: string) => string;
 type Rec = Record<string, unknown>;
@@ -189,7 +188,7 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
             لا كل شيء، فما تراه هو ما تُنزّله. و**التنزيل لمن يقرأ**:
             أخذُ نسخةٍ لا يغيّر شيئاً، وإنما الرفع هو الذي يحتاج
             صلاحية التحرير */}
-        <OpXlsx rows={shown} t={t} canEdit={canEdit} onDone={reload} />
+        <OpXlsx rows={shown} owners={owners} t={t} canEdit={canEdit} onDone={reload} />
       </div>
 
       {/* المحافظ — الضغط يفلتر الأعمدة الثلاثة على صاحبها */}
@@ -262,9 +261,11 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
 }
 
 function OpXlsx({
-  rows, t, canEdit, onDone,
+  rows, owners, t, canEdit, onDone,
 }: {
   rows: XlRow[];
+  /** ترتيب المحافظ — ورقةٌ لكل واحدة بالترتيب نفسه */
+  owners: string[];
   t: T;
   /** الرفع لمن يحرّر الخطة وحده — والتنزيل للجميع */
   canEdit: boolean;
@@ -276,7 +277,7 @@ function OpXlsx({
   const [msg, setMsg] = useState("");
 
   function down() {
-    const url = URL.createObjectURL(xlExport(rows));
+    const url = URL.createObjectURL(xlExport(rows, owners));
     const a = document.createElement("a");
     a.href = url;
     a.download = `الخطة-التشغيلية-${new Date().toISOString().slice(0, 10)}.xlsx`;
@@ -289,9 +290,8 @@ function OpXlsx({
     setMsg("");
     try {
       const sheets = await readXlsxSheets(await f.arrayBuffer());
-      const sh = sheets.find((x) => x.rows.length > 1) || sheets[0];
-      if (!sh || !sh.rows.length) throw new Error("فارغ");
-      const p = xlParse(sh.rows, rows);
+      if (!sheets.length) throw new Error("فارغ");
+      const p = xlParseBook(sheets, rows);
       if (!p.put.length) {
         setMsg(t(`لا جديد في الملف — ${p.same} بنداً كما هي.`, "Nothing changed."));
         return;
