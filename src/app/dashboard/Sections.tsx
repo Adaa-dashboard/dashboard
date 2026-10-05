@@ -657,6 +657,7 @@ function Toolbar({
   setFilter,
   options,
   onExport,
+  upload,
   allLabel,
   t,
 }: {
@@ -667,6 +668,9 @@ function Toolbar({
   /** نصّاً، أو {v: القيمة, l: النص المعروض} حين يُعرض معه عدد */
   options: (string | { v: string; l: string })[];
   onExport: () => void;
+  /** زرّ رفع الملف — يقف بجانب زرّ التنزيل لا في سطرٍ فوقه،
+      فالعملان على الملف نفسه وموضعهما واحد */
+  upload?: ReactNode;
   /** نص الخيار الأول — «كل الحالات» ما لم يُمرَّر غيره */
   allLabel?: string;
   t: T;
@@ -696,6 +700,7 @@ function Toolbar({
       <button className="btn btn-sm" onClick={onExport}>
         ⬇️ {t("تنزيل إكسل", "Download Excel")}
       </button>
+      {upload}
     </div>
   );
 }
@@ -1251,12 +1256,6 @@ function SessionsPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
 
   return (
     <>
-      {canEdit && (
-        <div className="sx-tools">
-          <SessImport items={items} t={t} onDone={() => void reload()} />
-        </div>
-      )}
-
       <Toolbar
         q={q}
         setQ={setQ}
@@ -1265,6 +1264,7 @@ function SessionsPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
         options={OPTS}
         allLabel={t("الكل", "All")}
         onExport={exportXl}
+        upload={canEdit ? <SessImport items={items} t={t} onDone={() => void reload()} /> : null}
         t={t}
       />
 
@@ -1747,13 +1747,11 @@ function NationalPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
 
   return (
     <>
-      {canEdit && (
-        <div className="sx-tools">
-          <NatImport items={items} t={t} onDone={() => void reload()} />
-        </div>
-      )}
-
-      <Toolbar q={q} setQ={setQ} filter="" setFilter={() => {}} options={[]} onExport={exportXl} t={t} />
+      <Toolbar
+        q={q} setQ={setQ} filter="" setFilter={() => {}} options={[]} onExport={exportXl}
+        upload={canEdit ? <NatImport items={items} t={t} onDone={() => void reload()} /> : null}
+        t={t}
+      />
 
       <div className="stabs">
         {[4, 3, 2, 1].map((st) => {
@@ -2997,12 +2995,10 @@ export function CxPage({ t, canEdit }: { t: T; canEdit: boolean }) {
 
   return (
     <>
-      {canEdit && (
+      {/* بلا بيانات لا شريط أدوات، فيبقى زرّ الرفع وحده هنا */}
+      {canEdit && !st.rows.length && (
         <div className="sx-tools">
           <CxImport t={t} onDone={() => void reload()} />
-          {st.updated && (
-            <span className="sx-count">{`${t("آخر رفع", "Last upload")}: ${st.updated}`}</span>
-          )}
         </div>
       )}
 
@@ -3132,7 +3128,20 @@ export function CxPage({ t, canEdit }: { t: T; canEdit: boolean }) {
             </div>
           </div>
 
-          <Toolbar q={q} setQ={setQ} filter={f} setFilter={setF} options={INST_SECTORS} onExport={exportXl} t={t} />
+          <Toolbar
+            q={q} setQ={setQ} filter={f} setFilter={setF} options={INST_SECTORS} onExport={exportXl}
+            upload={
+              canEdit ? (
+                <>
+                  <CxImport t={t} onDone={() => void reload()} />
+                  {st.updated && (
+                    <span className="sx-count">{`${t("آخر رفع", "Last upload")}: ${st.updated}`}</span>
+                  )}
+                </>
+              ) : null
+            }
+            t={t}
+          />
 
           <div className="iw-bar">
             <span className="iw-tog">
