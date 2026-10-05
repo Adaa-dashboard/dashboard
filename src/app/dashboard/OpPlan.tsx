@@ -11,9 +11,23 @@
    ولذلك `owner` حقلٌ مستقلّ عن `sponsor` لا يُشتقّ منه.
    ============================================================ */
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useItems, type Item, SECTION_TITLE } from "./Sections";
 import { nrm } from "@/lib/commit";
+import { apiFetch } from "@/lib/api";
+import { writeXlsx, readXlsxSheets } from "@/lib/sheet";
+import {
+  OP_STATUSES, quarters, onTrack, opStatus, opPct,
+  xlRows, xlParse, type XlRow, type XlPlan,
+} from "@/lib/opxl";
+
+/* المنطق في `lib/opxl` ليُختبر بلا React ولا شبكة، والصفحة تعرضه.
+   ويُعاد تصديره هنا ليبقى مستوردوه على ما ألفوه */
+export { OP_STATUSES, opStatus, opPct };
+
+/** الصفوف تُغلَّف ملفاً — بناؤها في `lib/opxl` */
+const xlExport = (rows: XlRow[]) =>
+  writeXlsx([{ name: "الخطة التشغيلية", rows: xlRows(rows) }]);
 
 type T = (ar: string, en: string) => string;
 type Rec = Record<string, unknown>;
@@ -50,7 +64,6 @@ const KIND_LABEL: Record<string, [string, string]> = {
 const LEVELS = ["", "مستوى أول", "مستوى ثانٍ", "مستوى ثالث"];
 const INIT_TYPES = ["استراتيجية", "تشغيلية"];
 /** الحالات الأربع المعتمدة — لا «جديدة» ولا «مستمرة» بعد اليوم */
-export const OP_STATUSES = ["على المسار", "متأخرة", "مكتملة", "لم تبدأ"];
 const ST_TONE: Record<string, string> = {
   مكتملة: "ok",
   "على المسار": "nw",
@@ -65,27 +78,6 @@ const short = (n: string) => {
 };
 /** آخر كلمة من الاسم — تكفي للتمييز في الشرائح الضيّقة */
 const last = (n: string) => n.trim().split(/\s+/).slice(-1)[0] || n;
-
-/* ---------- حالة المؤشر: آخر ربعٍ فيه فعلي، مقارناً بمستهدفه ---------- */
-type QCell = { t: number | null; a: number | null };
-function quarters(d: Rec): QCell[] {
-  return [1, 2, 3, 4].map((i) => ({
-    t: has(d[`q${i}t`]) ? num(d[`q${i}t`]) : null,
-    a: has(d[`q${i}a`]) ? num(d[`q${i}a`]) : null,
-  }));
-}
-/** آخر ربعٍ أُدخل فيه فعليّ — هو ما يُحكم به على المؤشر */
-function lastQ(qs: QCell[]) {
-  for (let i = qs.length - 1; i >= 0; i--) if (qs[i].a !== null) return { i, ...qs[i] };
-  return null;
-}
-/** على المسار إن بلغ فعليُّه مستهدفَ ربعه — وبلا مستهدفٍ لا حكم */
-function onTrack(d: Rec): boolean | null {
-  const q = lastQ(quarters(d));
-  if (!q || q.a === null) return null;
-  if (q.t === null) return null;
-  return q.a >= q.t;
-}
 
 /* ---------- أسماء قديمة بقيت في المخزون ---------- */
 /* بندٌ محفوظ باسمٍ قديم يصنع **محفظةً ثانية** للشخص نفسه: واحدة
@@ -152,20 +144,10 @@ export function agoOf(iso?: string): { txt: string; stale: boolean } | null {
   return { txt: w, stale: days > 10 };
 }
 
-/** الحالة المعروضة: المُدخَلة يدوياً، وإلا تُشتقّ للمؤشر من آخر ربعٍ فيه فعلي */
-export function opStatus(d: Rec): string {
-  const s = txt(d.status).trim();
-  if (s) return s;
-  if (txt(d.kind) !== "kpi") return "";
-  const ok = onTrack(d);
-  if (ok === true) return "على المسار";
-  if (ok === false) return "متأخرة";
-  return lastQ(quarters(d)) ? "على المسار" : "لم تبدأ";
-}
 export const opTone = (s: string) => ST_TONE[s] || "nt";
 
 export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
-  const { items, loaded, save, remove } = useItems("opplan");
+  const { items, loaded, save, remove, reload } = useItems("opplan");
   const [own, setOwn] = useState("");
   const [edit, setEdit] = useState<Item | null>(null);
 
@@ -202,6 +184,9 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
             `${owners.length} portfolios`,
           )}
         </span>
+        {/* الملف يحمل الخطة كما هي على الشاشة — المعروض بعد الفلتر
+            لا كل شيء، فما تراه هو ما تُنزّله */}
+        {canEdit && <OpXlsx rows={shown} t={t} onDone={reload} />}
       </div>
 
       {/* المحافظ — الضغط يفلتر الأعمدة الثلاثة على صاحبها */}
@@ -273,6 +258,127 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
   );
 }
 
+function OpXlsx({ rows, t, onDone }: { rows: XlRow[]; t: T; onDone: () => void }) {
+  const file = useRef<HTMLInputElement | null>(null);
+  const [plan, setPlan] = useState<XlPlan | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  function down() {
+    const url = URL.createObjectURL(xlExport(rows));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `الخطة-التشغيلية-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+
+  async function pick(f: File | null | undefined) {
+    if (!f) return;
+    setMsg("");
+    try {
+      const sheets = await readXlsxSheets(await f.arrayBuffer());
+      const sh = sheets.find((x) => x.rows.length > 1) || sheets[0];
+      if (!sh || !sh.rows.length) throw new Error("فارغ");
+      const p = xlParse(sh.rows, rows);
+      if (!p.put.length) {
+        setMsg(t(`لا جديد في الملف — ${p.same} بنداً كما هي.`, "Nothing changed."));
+        return;
+      }
+      setPlan(p);
+    } catch {
+      setMsg(t("تعذّرت قراءة الملف — يُحفظ من إكسل بصيغة xlsx.", "Could not read the file."));
+    }
+  }
+
+  async function run() {
+    if (!plan) return;
+    setBusy(true);
+    let bad = 0;
+    for (const x of plan.put) {
+      const r = await apiFetch("/api/items", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ section: "opplan", id: x.id, data: x.data, ord: x.ord }),
+      }).catch(() => null);
+      if (!r || !r.ok) bad += 1;
+    }
+    setBusy(false);
+    setPlan(null);
+    setMsg(
+      bad
+        ? t(`حُفظ ${plan.put.length - bad} وتعذّر ${bad}.`, `Saved ${plan.put.length - bad}, failed ${bad}.`)
+        : t(`حُدِّث ${plan.put.length} بنداً.`, `Updated ${plan.put.length}.`),
+    );
+    onDone();
+  }
+
+  return (
+    <div className="op-xl">
+      <button className="btn btn-ghost btn-sm" onClick={down}>
+        ⬇️ {t("تنزيل إكسل", "Download Excel")}
+      </button>
+      <button className="btn btn-ghost btn-sm" onClick={() => file.current?.click()}>
+        ⬆️ {t("رفع إكسل", "Upload Excel")}
+      </button>
+      <input
+        ref={file}
+        type="file"
+        accept=".xlsx"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          void pick(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
+      {msg && <span className="op-xmsg">{msg}</span>}
+
+      {plan && (
+        <div className="modal-overlay" onClick={() => setPlan(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="m-h">
+              <h3>{t("تحديث الخطة من الملف", "Update from file")}</h3>
+              <button className="mx" onClick={() => setPlan(null)} aria-label="close">✕</button>
+            </div>
+            <div className="op-xsum">
+              <b>{plan.put.filter((x) => !x.add).length}</b> {t("بنداً سيُحدَّث", "updated")} ·{" "}
+              <b>{plan.put.filter((x) => x.add).length}</b> {t("بنداً جديداً", "new")} ·{" "}
+              <b>{plan.same}</b> {t("بلا تغيير", "unchanged")}
+            </div>
+            <div className="op-xlist">
+              {plan.put.slice(0, 40).map((x) => (
+                <div className="r" key={x.id}>
+                  <i className={x.add ? "add" : ""} />
+                  <span>{x.name}</span>
+                  <em>{x.add ? t("جديد", "new") : t("تحديث", "update")}</em>
+                </div>
+              ))}
+              {plan.put.length > 40 && (
+                <div className="r more">{t(`و${plan.put.length - 40} غيرها…`, "…")}</div>
+              )}
+            </div>
+            {plan.skipped.length > 0 && (
+              <div className="op-err">{plan.skipped.slice(0, 5).join(" · ")}</div>
+            )}
+            <p className="muted" style={{ fontSize: 11, lineHeight: 1.8 }}>
+              {t(
+                "الرفع لا يحذف شيئاً: بندٌ غائبٌ عن الملف يبقى كما هو في المنصة. والمطابقة بعمود «المعرّف»، فإن حُذف فبـ«المحفظة + البند».",
+                "Upload never deletes; rows are matched by id, else by portfolio + item.",
+              )}
+            </p>
+            <div className="m-f">
+              <button className="btn btn-ghost" onClick={() => setPlan(null)}>{t("إلغاء", "Cancel")}</button>
+              <button className="btn" disabled={busy} onClick={() => void run()}>
+                {busy ? t("يُحدَّث…", "Updating…") : t("تحديث الخطة", "Update")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ---------------- بطاقة بند ---------------- */
 function OpCard({
   r, canEdit, t, onEdit,
@@ -334,6 +440,14 @@ function OpCard({
             </div>
           )}
         </>
+      )}
+      {kind !== "kpi" && has(d.pct) && (
+        <div className="op-pct">
+          <span className="tr">
+            <i style={{ width: `${Math.max(0, Math.min(100, num(d.pct)))}%` }} />
+          </span>
+          <b>{Math.max(0, Math.min(100, num(d.pct)))}٪</b>
+        </div>
       )}
       {(has(d.start) || has(d.end)) && (
         <div className="op-dt">
@@ -446,6 +560,15 @@ function OpEdit({
                   <option key={x} value={x}>{x}</option>
                 ))}
               </select>
+            </label>
+          )}
+          {/* المبادرة والمكسب السريع بلا أرباع، فنسبة تقدّمهما
+              تُكتب باليد — والمؤشر تُحسب من آخر فعليٍّ على مستهدفه */}
+          {kind !== "kpi" && (
+            <label>
+              <span>{t("نسبة التقدم ٪", "Progress %")}</span>
+              <input type="number" min={0} max={100} value={has(f.pct) ? num(f.pct) : ""}
+                     onChange={(e) => numOrDel("pct", e.target.value)} />
             </label>
           )}
           <label>
