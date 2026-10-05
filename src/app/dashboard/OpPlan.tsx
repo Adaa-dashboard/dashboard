@@ -294,23 +294,25 @@ function OpXlsx({ rows, t, onDone }: { rows: XlRow[]; t: T; onDone: () => void }
   async function run() {
     if (!plan) return;
     setBusy(true);
-    let bad = 0;
-    for (const x of plan.put) {
-      const r = await apiFetch("/api/items", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ section: "opplan", id: x.id, data: x.data, ord: x.ord }),
-      }).catch(() => null);
-      if (!r || !r.ok) bad += 1;
-    }
+    /* دفعةٌ واحدة لا طلبٌ لكل بند: ثلاثون طلباً متتابعاً تُبطئ
+       وتترك الخطة نصفَ محدَّثة إن انقطع الاتصال في وسطها */
+    const r = await apiFetch("/api/items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        section: "opplan",
+        items: plan.put.map((x) => ({ id: x.id, ord: x.ord, data: x.data })),
+      }),
+    }).catch(() => null);
+    const okAll = !!r && r.ok;
     setBusy(false);
     setPlan(null);
     setMsg(
-      bad
-        ? t(`حُفظ ${plan.put.length - bad} وتعذّر ${bad}.`, `Saved ${plan.put.length - bad}, failed ${bad}.`)
-        : t(`حُدِّث ${plan.put.length} بنداً.`, `Updated ${plan.put.length}.`),
+      okAll
+        ? t(`حُدِّث ${plan.put.length} بنداً.`, `Updated ${plan.put.length}.`)
+        : t("تعذّر الحفظ — تحقّق من صلاحيتك على الخطة.", "Save failed."),
     );
-    onDone();
+    if (okAll) onDone();
   }
 
   return (
