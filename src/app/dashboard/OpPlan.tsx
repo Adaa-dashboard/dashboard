@@ -185,8 +185,10 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
           )}
         </span>
         {/* الملف يحمل الخطة كما هي على الشاشة — المعروض بعد الفلتر
-            لا كل شيء، فما تراه هو ما تُنزّله */}
-        {canEdit && <OpXlsx rows={shown} t={t} onDone={reload} />}
+            لا كل شيء، فما تراه هو ما تُنزّله. و**التنزيل لمن يقرأ**:
+            أخذُ نسخةٍ لا يغيّر شيئاً، وإنما الرفع هو الذي يحتاج
+            صلاحية التحرير */}
+        <OpXlsx rows={shown} t={t} canEdit={canEdit} onDone={reload} />
       </div>
 
       {/* المحافظ — الضغط يفلتر الأعمدة الثلاثة على صاحبها */}
@@ -258,7 +260,15 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
   );
 }
 
-function OpXlsx({ rows, t, onDone }: { rows: XlRow[]; t: T; onDone: () => void }) {
+function OpXlsx({
+  rows, t, canEdit, onDone,
+}: {
+  rows: XlRow[];
+  t: T;
+  /** الرفع لمن يحرّر الخطة وحده — والتنزيل للجميع */
+  canEdit: boolean;
+  onDone: () => void;
+}) {
   const file = useRef<HTMLInputElement | null>(null);
   const [plan, setPlan] = useState<XlPlan | null>(null);
   const [busy, setBusy] = useState(false);
@@ -320,19 +330,23 @@ function OpXlsx({ rows, t, onDone }: { rows: XlRow[]; t: T; onDone: () => void }
       <button className="btn btn-ghost btn-sm" onClick={down}>
         ⬇️ {t("تنزيل إكسل", "Download Excel")}
       </button>
-      <button className="btn btn-ghost btn-sm" onClick={() => file.current?.click()}>
-        ⬆️ {t("رفع إكسل", "Upload Excel")}
-      </button>
-      <input
-        ref={file}
-        type="file"
-        accept=".xlsx"
-        style={{ display: "none" }}
-        onChange={(e) => {
-          void pick(e.target.files?.[0]);
-          e.target.value = "";
-        }}
-      />
+      {canEdit && (
+        <>
+          <button className="btn btn-ghost btn-sm" onClick={() => file.current?.click()}>
+            ⬆️ {t("رفع إكسل", "Upload Excel")}
+          </button>
+          <input
+            ref={file}
+            type="file"
+            accept=".xlsx"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              void pick(e.target.files?.[0]);
+              e.target.value = "";
+            }}
+          />
+        </>
+      )}
       {msg && <span className="op-xmsg">{msg}</span>}
 
       {plan && (

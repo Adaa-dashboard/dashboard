@@ -11456,7 +11456,14 @@ input.cell-date {
 /* ============================================================
    الخطة التشغيلية — محافظ المدراء الخمس
    ============================================================ */
-.op-head { margin-bottom: 14px; }
+/* العنوان وعدّاده في جهة، وأزرار الإكسل في الأخرى — وكان بلوكاً
+   فنزلت الأزرار تحته بلا محاذاة */
+.op-head {
+  display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.op-head > h2 { flex: 1 0 auto; }
+.op-head > span { flex: 1 1 100%; order: 3; }
 .op-head h2 {
   font-family: "Noto Kufi Arabic", sans-serif;
   font-size: 17px; font-weight: 800; color: var(--g-900); margin: 0 0 3px;
