@@ -15,6 +15,7 @@ import { useMemo, useRef, useState } from "react";
 import { useItems, type Item, SECTION_TITLE } from "./Sections";
 import { nrm } from "@/lib/commit";
 import { apiFetch } from "@/lib/api";
+import { IconDown, IconUp } from "./icons";
 import { writeXlsx, readXlsxSheets } from "@/lib/sheet";
 import {
   OP_STATUSES, quarters, onTrack, opStatus, opPct,
@@ -328,12 +329,12 @@ function OpXlsx({
   return (
     <div className="op-xl">
       <button className="btn btn-sm" onClick={down}>
-        ⬇️ {t("تنزيل إكسل", "Download Excel")}
+        <IconDown size={15} /> {t("تنزيل إكسل", "Download Excel")}
       </button>
       {canEdit && (
         <>
           <button className="btn btn-sm" onClick={() => file.current?.click()}>
-            ⬆️ {t("رفع إكسل", "Upload Excel")}
+            <IconUp size={15} /> {t("رفع إكسل", "Upload Excel")}
           </button>
           <input
             ref={file}

@@ -166,6 +166,12 @@ export const IconCheck3 = nav(
   '<path d="M10 6.6h10M10 12h10M10 17.4h10"/><path d="M4 6.2l1.4 1.4L7.6 5M4 11.6l1.4 1.4L7.6 10.4M4 17l1.4 1.4 2.2-2.6"/>',
 );
 
+/* سهما الملف — **رسمٌ لا رمز تعبيري**: ⬆️ و⬇️ يرسمهما النظام
+   بألوانه هو (أزرق على ويندوز)، فلا يتبعان لون الزرّ. وهذان
+   بـ`currentColor` فيبيضّان على الأخضر ويسودّان حيث يُطبع */
+export const IconDown = nav('<path d="M12 4v12"/><path d="M6.6 11.2L12 16.6l5.4-5.4"/><path d="M4.5 20h15"/>');
+export const IconUp = nav('<path d="M12 20V8"/><path d="M6.6 12.8L12 7.4l5.4 5.4"/><path d="M4.5 4h15"/>');
+
 export const IconFolder = nav(
   '<path d="M3.4 7.6a2 2 0 0 1 2-2h3.4l2 2.2h7.8a2 2 0 0 1 2 2v8.6a2 2 0 0 1-2 2H5.4a2 2 0 0 1-2-2z"/><path d="M3.4 11.4h17.2"/>',
 );

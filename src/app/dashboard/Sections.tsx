@@ -7,7 +7,7 @@ import { writeXlsx, readXlsxSheets, readPptxSlides } from "@/lib/sheet";
 import { asset } from "@/lib/base";
 import { publishUndo } from "@/lib/undoBus";
 import { initials, toneOf } from "@/lib/entlogo";
-import { IconGear } from "./icons";
+import { IconGear, IconDown, IconUp } from "./icons";
 import SectionSettings from "./SectionSettings";
 
 /* ============================================================
@@ -698,7 +698,7 @@ function Toolbar({
       {/* صندوق الإكسل واحدٌ في المنصة كلها: أخضر مصمت وسهمٌ يقول
           أهو تنزيلٌ أم رفع — وكان هذا شفّافاً وذاك مصمتاً */}
       <button className="btn btn-sm" onClick={onExport}>
-        ⬇️ {t("تنزيل إكسل", "Download Excel")}
+        <IconDown size={15} /> {t("تنزيل إكسل", "Download Excel")}
       </button>
       {upload}
     </div>
@@ -1162,7 +1162,7 @@ function SessImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => v
   return (
     <span className="seedb">
       <button className="btn btn-sm" onClick={() => ref.current?.click()}>
-        ⬆️ {t("رفع ملف البيانات", "Upload data file")}
+        <IconUp size={15} /> {t("رفع ملف البيانات", "Upload data file")}
       </button>
       <input ref={ref} type="file" accept=".xlsx,.pptx" hidden onChange={pick} />
       {msg && <em>{msg}</em>}
@@ -1702,7 +1702,7 @@ function NatImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => vo
   return (
     <span className="seedb">
       <button className="btn btn-sm" onClick={() => ref.current?.click()}>
-        ⬆️ {t("رفع ملف البيانات", "Upload data file")}
+        <IconUp size={15} /> {t("رفع ملف البيانات", "Upload data file")}
       </button>
       <input ref={ref} type="file" accept=".xlsx,.pptx" hidden onChange={pick} />
       {msg && <em>{msg}</em>}
@@ -2941,7 +2941,7 @@ function CxImport({ t, onDone }: { t: T; onDone: () => void }) {
   return (
     <span className="seedb">
       <button className="btn btn-sm" onClick={() => ref.current?.click()}>
-        ⬆️ {t("رفع ملف المتابعة", "Upload tracker")}
+        <IconUp size={15} /> {t("رفع ملف المتابعة", "Upload tracker")}
       </button>
       <input ref={ref} type="file" accept=".xlsx" hidden onChange={pick} />
       {msg && <em>{msg}</em>}
