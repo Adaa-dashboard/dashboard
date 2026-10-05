@@ -11471,38 +11471,56 @@ input.cell-date {
 .op-head h2 b { color: var(--g-600); }
 .op-head > span { font-size: 11.5px; color: var(--muted); }
 
-.op-pf { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 14px; }
+/* بطاقات المحافظ: **قياسٌ واحد ولونٌ واحد** — كانت بيضاء بلون
+   لكل صاحب محفظة، فبدت خمس هويّات لا إدارةً واحدة. و`1fr` في
+   `grid-auto-rows` تسوّي الارتفاع مهما طال اسمٌ أو قصر. */
+.op-pf {
+  display: grid; grid-template-columns: repeat(5, 1fr); grid-auto-rows: 1fr;
+  gap: 10px; margin-bottom: 14px;
+}
 @media (max-width: 1100px) { .op-pf { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 720px) { .op-pf { grid-template-columns: repeat(2, 1fr); } }
 .op-pf .c {
-  --c: var(--g-700);
-  display: block; text-align: start; cursor: pointer;
-  border: 1px solid var(--border); border-radius: 14px;
-  background: var(--panel); padding: 11px 12px;
-  font: inherit; transition: transform .12s, border-color .12s, box-shadow .12s;
+  display: flex; flex-direction: column; height: 100%;
+  border: 1px solid var(--g-800); border-radius: 14px;
+  background: linear-gradient(150deg, var(--g-800), var(--g-600));
+  padding: 11px 12px; color: #fff;
+  transition: transform .12s, box-shadow .12s;
 }
-.op-pf .c:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--c) 34%, var(--border)); }
-.op-pf .c.on { border-color: var(--c); box-shadow: 0 0 0 2px color-mix(in srgb, var(--c) 22%, transparent); }
+.op-pf .c:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0, 88, 76, .22); }
+/* المختارة بطوقٍ ذهبي — الأخضر على الأخضر لا يُرى */
+.op-pf .c.on { box-shadow: 0 0 0 2px var(--gold); }
+.op-pf .hd {
+  flex: 1; display: block; text-align: start; cursor: pointer;
+  background: none; border: none; padding: 0; color: inherit; font: inherit;
+}
 .op-pf .av {
   width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
   font-family: "Noto Kufi Arabic", sans-serif; font-size: 11px; font-weight: 800;
   margin-bottom: 7px;
-  background: color-mix(in srgb, var(--c) 13%, transparent); color: var(--c);
+  background: rgba(255, 255, 255, .18); color: #fff;
 }
 .op-pf .nm {
   display: block; font-family: "Noto Kufi Arabic", sans-serif;
-  font-size: 12px; font-weight: 800; color: var(--g-900); margin-bottom: 1px;
+  font-size: 12px; font-weight: 800; color: #fff; margin-bottom: 1px;
 }
-.op-pf .rl { display: block; font-size: 10px; color: var(--muted); margin-bottom: 8px; }
-.op-pf .n3 { display: flex; gap: 4px; flex-wrap: wrap; }
-.op-pf .n3 > span {
-  font-size: 9.5px; font-weight: 700; color: var(--ink-2);
-  background: var(--soft); border: 1px solid var(--border);
-  border-radius: 7px; padding: 2px 6px;
+.op-pf .rl { display: block; font-size: 10px; color: rgba(255, 255, 255, .72); margin-bottom: 8px; }
+/* الشرائح الثلاث في **سطرٍ واحد**: `nowrap` وأسماءٌ مختصرة،
+   فـ«المكاسب السريعة» وحدها تملأ السطر */
+.op-pf .n3 { display: flex; gap: 4px; flex-wrap: nowrap; }
+.op-pf .n3 > button {
+  flex: 1; min-width: 0; cursor: pointer; font: inherit;
+  font-size: 9px; font-weight: 700; color: rgba(255, 255, 255, .88);
+  background: rgba(255, 255, 255, .14); border: 1px solid rgba(255, 255, 255, .2);
+  border-radius: 7px; padding: 3px 2px; text-align: center; white-space: nowrap;
 }
-.op-pf .n3 b { font-family: "Noto Kufi Arabic", sans-serif; font-size: 10.5px; color: var(--c); }
+.op-pf .n3 > button:hover { background: rgba(255, 255, 255, .26); }
+.op-pf .n3 > button.on { background: var(--gold); border-color: var(--gold); color: #3a2c00; }
+.op-pf .n3 b { font-family: "Noto Kufi Arabic", sans-serif; font-size: 10.5px; color: #fff; }
+.op-pf .n3 > button.on b { color: #3a2c00; }
 
-.op-filt { display: flex; align-items: center; gap: 9px; font-size: 11px; color: var(--muted); margin-bottom: 12px; }
+.op-filt { display: flex; align-items: center; gap: 9px; font-size: 11px; color: var(--muted); margin-bottom: 12px; flex-wrap: wrap; }
+.op-filt > b { font-size: 10.5px; font-weight: 800; color: var(--g-800); background: var(--tint); border-radius: 20px; padding: 2px 10px; }
 .op-filt button {
   font: inherit; font-size: 10.5px; font-weight: 800; cursor: pointer;
   color: var(--g-700); background: var(--tint); border: 1px solid var(--tint-bd);
@@ -11510,6 +11528,8 @@ input.cell-date {
 }
 
 .op-3 { display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 12px; align-items: start; }
+/* نوعٌ واحد معروض ⇒ عمودٌ يملأ العرض */
+.op-3.one { grid-template-columns: 1fr; }
 @media (max-width: 1000px) { .op-3 { grid-template-columns: 1fr; } }
 .op-col {
   --c: var(--g-700);
@@ -11522,6 +11542,9 @@ input.cell-date {
 }
 .op-col > h3 i { width: 8px; height: 8px; border-radius: 3px; background: var(--c); }
 .op-col > h3 b { margin-inline-start: auto; font-size: 11px; color: var(--c); }
+/* العنوان يُضغط: يُفرد نوعه وحده أو يعيد الثلاثة */
+.op-col > h3.pick { cursor: pointer; border-radius: 8px; padding: 3px 5px; margin-inline: -5px; }
+.op-col > h3.pick:hover { background: color-mix(in srgb, var(--c) 10%, transparent); }
 .op-none { font-size: 10.5px; color: var(--muted); padding: 4px 2px; }
 
 .op-it {

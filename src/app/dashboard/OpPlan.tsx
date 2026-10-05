@@ -61,6 +61,9 @@ const KIND_LABEL: Record<string, [string, string]> = {
   init: ["المبادرات", "Initiatives"],
   win: ["المكاسب السريعة", "Quick wins"],
 };
+/** مختصرٌ لشرائح البطاقة — «المكاسب السريعة» لا تسع في صفٍّ واحد */
+const KIND_SHORT: Record<string, string> = { kpi: "مؤشرات", init: "مبادرات", win: "مكاسب" };
+const KINDS = ["kpi", "init", "win"] as const;
 const LEVELS = ["", "مستوى أول", "مستوى ثانٍ", "مستوى ثالث"];
 const INIT_TYPES = ["استراتيجية", "تشغيلية"];
 /** الحالات الأربع المعتمدة — لا «جديدة» ولا «مستمرة» بعد اليوم */
@@ -149,6 +152,9 @@ export const opTone = (s: string) => ST_TONE[s] || "nt";
 export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
   const { items, loaded, save, remove, reload } = useItems("opplan");
   const [own, setOwn] = useState("");
+  /* نوعٌ واحد معروض، أو الثلاثة. يُختار من شريحة البطاقة أو من
+     عنوان العمود — فمن أراد مؤشرات محفظةٍ وحدها رآها وحدها */
+  const [kind, setKind] = useState<"" | (typeof KINDS)[number]>("");
   const [edit, setEdit] = useState<Item | null>(null);
 
   const rows = useMemo(() => items.map((x) => ({ ...x, data: opFix(x.data as Rec) })), [items]);
@@ -193,39 +199,61 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
 
       {/* المحافظ — الضغط يفلتر الأعمدة الثلاثة على صاحبها */}
       <div className="op-pf">
+        {/* البطاقة `div` لا `button`: فيها أزرارٌ أربعة — الاسم
+            يختار المحفظة، وكلُّ شريحةٍ تختارها ونوعَها معاً.
+            والزرّ داخل الزرّ لا يصحّ في HTML */}
         {owners.map((o) => (
-          <button
-            key={o}
-            className={`c ${own === o ? "on" : ""}`}
-            style={{ ["--c" as string]: OWNER_COLOR[o] || "#4e615c" }}
-            onClick={() => setOwn(own === o ? "" : o)}
-          >
-            <span className="av">{short(o)}</span>
-            <span className="nm">{o}</span>
-            <span className="rl">
-              {o === OP_OWNERS[0] ? t("مدير الإدارة", "Director") : t("مدير قطاع", "Sector manager")}
-            </span>
+          <div key={o} className={`c ${own === o ? "on" : ""}`}>
+            <button className="hd" onClick={() => setOwn(own === o ? "" : o)}>
+              <span className="av">{short(o)}</span>
+              <span className="nm">{o}</span>
+              <span className="rl">
+                {o === OP_OWNERS[0] ? t("مدير الإدارة", "Director") : t("مدير قطاع", "Sector manager")}
+              </span>
+            </button>
             <span className="n3">
-              {(["kpi", "init", "win"] as const).map((k) => (
-                <span key={k}>
-                  {t(KIND_LABEL[k][0], KIND_LABEL[k][1])} <b>{cnt(o, k)}</b>
-                </span>
+              {KINDS.map((k) => (
+                <button
+                  key={k}
+                  className={own === o && kind === k ? "on" : ""}
+                  title={t(`${KIND_LABEL[k][0]} — ${o}`, KIND_LABEL[k][1])}
+                  onClick={() => {
+                    const same = own === o && kind === k;
+                    setOwn(same ? "" : o);
+                    setKind(same ? "" : k);
+                  }}
+                >
+                  {KIND_SHORT[k]} <b>{cnt(o, k)}</b>
+                </button>
               ))}
             </span>
-          </button>
+          </div>
         ))}
       </div>
-      {own && (
+      {(own || kind) && (
         <div className="op-filt">
-          {t(`معروضة محفظة: ${own}`, `Portfolio: ${own}`)}
-          <button onClick={() => setOwn("")}>{t("عرض الجميع", "Show all")}</button>
+          {own ? t(`معروضة محفظة: ${own}`, `Portfolio: ${own}`) : t("كل المحافظ", "All portfolios")}
+          {kind && <b>{t(KIND_LABEL[kind][0], KIND_LABEL[kind][1])}</b>}
+          <button
+            onClick={() => {
+              setOwn("");
+              setKind("");
+            }}
+          >
+            {t("عرض الجميع", "Show all")}
+          </button>
         </div>
       )}
 
-      <div className="op-3">
-        {(["kpi", "init", "win"] as const).map((k) => (
+      {/* نوعٌ مختار ⇒ عمودٌ واحد يملأ العرض */}
+      <div className={`op-3 ${kind ? "one" : ""}`}>
+        {KINDS.filter((k) => !kind || k === kind).map((k) => (
           <div className="op-col" key={k} style={{ ["--c" as string]: KIND_COLOR[k] }}>
-            <h3>
+            <h3
+              className="pick"
+              title={kind ? t("عرض الأنواع الثلاثة", "Show all three") : t("عرض هذا النوع وحده", "Show only this")}
+              onClick={() => setKind(kind === k ? "" : k)}
+            >
               <i />
               {t(KIND_LABEL[k][0], KIND_LABEL[k][1])}
               <b>{of(k).length}</b>
