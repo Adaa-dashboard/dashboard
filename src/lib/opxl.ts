@@ -92,19 +92,13 @@ export const XL_KPI_COLS = [
 /** أعمدة المبادرات والمكاسب السريعة — واحدةٌ لهما، فهما سواء */
 export const XL_INIT_COLS = [
   "المعرّف", "البند", "الراعي", "المسؤول", "نوع المبادرة",
-  "البداية", "النهاية", "نسبة التقدم ٪", "الحالة", "آخر تحديث", "حالة المساهمة",
+  "البداية", "النهاية", "الحالة", "آخر تحديث", "حالة المساهمة",
 ];
 const colsOf = (kind: string) => (kind === "kpi" ? XL_KPI_COLS : XL_INIT_COLS);
 
-/** نسبة تقدّم البند: المؤشر تُحسب من آخر فعليٍّ على مستهدفه
-    العام، وغيرُه رقمٌ يُكتب بيده إذ لا أرباع له */
-export function opPct(d: Rec): number | null {
-  if (txt(d.kind) !== "kpi") return has(d.pct) ? Math.max(0, Math.min(100, num(d.pct))) : null;
-  const q = lastQ(quarters(d));
-  const tgt = has(d.yearTarget) ? num(d.yearTarget) : null;
-  if (!q || q.a === null || !tgt) return null;
-  return Math.max(0, Math.min(100, Math.round((q.a / tgt) * 100)));
-}
+/* «نسبة التقدم» أُزيلت بطلب صاحبة المنصة: المبادرة والمكسب
+   السريع بلا أرباع، فلا سبيل إلى حسابها، ورقمٌ يُكتب بالتقدير
+   يُقرأ كأنه مقيس. والمؤشر حالُه تُقرأ من أرباعه. */
 /** الحالة المحسوبة وحدها — بها نعرف هل كتب المستخدم حالةً أم تركها تلقائية */
 const autoStatus = (d: Rec) => opStatus({ ...d, status: "" });
 
@@ -131,7 +125,7 @@ function initRow(r: XlRow): Cell[] {
   const d = r.data;
   return [
     r.id, txt(d.name), txt(d.sponsor), txt(d.assignee), txt(d.itype),
-    txt(d.start), txt(d.end), opPct(d), opStatus(d), dayOf(r.updatedAt), txt(d.note),
+    txt(d.start), txt(d.end), opStatus(d), dayOf(r.updatedAt), txt(d.note),
   ];
 }
 
@@ -255,7 +249,6 @@ export function xlParseBook(sheets: { name: string; rows: string[][] }[], rows: 
           setT("itype", cell("نوع المبادرة"));
           setT("start", cell("البداية"));
           setT("end", cell("النهاية"));
-          setN("pct", cell("نسبة التقدم ٪"));
         }
         /* «آخر تحديث» تكتبه القاعدة عند الحفظ، فما في الملف خبرٌ
            يُقرأ لا قيمةٌ تُكتب — ولو قُبل لكذب التاريخ */

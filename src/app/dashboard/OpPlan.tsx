@@ -18,13 +18,13 @@ import { apiFetch } from "@/lib/api";
 import { IconDown, IconUp } from "./icons";
 import { writeXlsx, readXlsxSheets } from "@/lib/sheet";
 import {
-  OP_STATUSES, quarters, onTrack, opStatus, opPct,
+  OP_STATUSES, quarters, onTrack, opStatus,
   xlBook, xlParseBook, type XlRow, type XlPlan,
 } from "@/lib/opxl";
 
 /* المنطق في `lib/opxl` ليُختبر بلا React ولا شبكة، والصفحة تعرضه.
    ويُعاد تصديره هنا ليبقى مستوردوه على ما ألفوه */
-export { OP_STATUSES, opStatus, opPct };
+export { OP_STATUSES, opStatus };
 
 /** الكتاب يُغلَّف ملفاً — بناؤه في `lib/opxl` */
 const xlExport = (rows: XlRow[], owners: string[]) => writeXlsx(xlBook(rows, owners));
@@ -458,14 +458,6 @@ function OpCard({
           )}
         </>
       )}
-      {kind !== "kpi" && has(d.pct) && (
-        <div className="op-pct">
-          <span className="tr">
-            <i style={{ width: `${Math.max(0, Math.min(100, num(d.pct)))}%` }} />
-          </span>
-          <b>{Math.max(0, Math.min(100, num(d.pct)))}٪</b>
-        </div>
-      )}
       {(has(d.start) || has(d.end)) && (
         <div className="op-dt">
           <span>{t("البداية", "Start")} <b>{txt(d.start) || "—"}</b></span>
@@ -577,15 +569,6 @@ function OpEdit({
                   <option key={x} value={x}>{x}</option>
                 ))}
               </select>
-            </label>
-          )}
-          {/* المبادرة والمكسب السريع بلا أرباع، فنسبة تقدّمهما
-              تُكتب باليد — والمؤشر تُحسب من آخر فعليٍّ على مستهدفه */}
-          {kind !== "kpi" && (
-            <label>
-              <span>{t("نسبة التقدم ٪", "Progress %")}</span>
-              <input type="number" min={0} max={100} value={has(f.pct) ? num(f.pct) : ""}
-                     onChange={(e) => numOrDel("pct", e.target.value)} />
             </label>
           )}
           <label>

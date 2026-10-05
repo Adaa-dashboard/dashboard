@@ -12340,14 +12340,3 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
 .op-xlist .r > em { font-style: normal; font-size: 9.5px; color: var(--muted); }
 .op-xlist .r.more { color: var(--muted); font-size: 10.5px; justify-content: center; }
 
-/* نسبة تقدّم المبادرة والمكسب السريع — مسارٌ وملؤه ورقمه.
-   لونه لون العمود (`--c`)، فالمبادرة بنفسجية والمكسب ذهبي */
-.op-pct { display: flex; align-items: center; gap: 8px; margin-top: 7px; }
-.op-pct .tr {
-  flex: 1; height: 5px; border-radius: 20px; background: var(--line2); overflow: hidden;
-}
-.op-pct .tr > i {
-  display: block; height: 100%; border-radius: 20px;
-  background: var(--c, var(--g-700)); min-width: 2px;
-}
-.op-pct > b { font-size: 10.5px; font-weight: 800; color: var(--ink-2); white-space: nowrap; }
