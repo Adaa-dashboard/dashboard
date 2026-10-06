@@ -11,7 +11,7 @@
    ولذلك `owner` حقلٌ مستقلّ عن `sponsor` لا يُشتقّ منه.
    ============================================================ */
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useItems, type Item, SECTION_TITLE } from "./Sections";
 import { nrm } from "@/lib/commit";
 import { apiFetch } from "@/lib/api";
@@ -155,6 +155,22 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
   /* نوعٌ واحد معروض، أو الثلاثة. يُختار من شريحة البطاقة أو من
      عنوان العمود — فمن أراد مؤشرات محفظةٍ وحدها رآها وحدها */
   const [kind, setKind] = useState<"" | (typeof KINDS)[number]>("");
+  /* صورة صاحب المحفظة إن رفعها في محفظته — تُطابَق بالاسم بعد
+     التطبيع، فاختلاف الهمزة لا يُسقطها. وبلا صورةٍ يبقى الحرفان */
+  const [photo, setPhoto] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    void apiFetch("/api/people")
+      .then((r) => r.json())
+      .then((d) => {
+        const m = new Map<string, string>();
+        for (const u of (Array.isArray(d.people) ? d.people : []) as Rec[]) {
+          const url = txt(u.photoUrl);
+          if (url && txt(u.name)) m.set(nrm(opName(u.name)), url);
+        }
+        setPhoto(m);
+      })
+      .catch(() => {});
+  }, []);
   const [edit, setEdit] = useState<Item | null>(null);
 
   const rows = useMemo(() => items.map((x) => ({ ...x, data: opFix(x.data as Rec) })), [items]);
@@ -205,7 +221,14 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
         {owners.map((o) => (
           <div key={o} className={`c ${own === o ? "on" : ""}`}>
             <button className="hd" onClick={() => setOwn(own === o ? "" : o)}>
-              <span className="av">{short(o)}</span>
+              <span className="av">
+                {photo.get(nrm(o)) ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={photo.get(nrm(o))} alt="" />
+                ) : (
+                  short(o)
+                )}
+              </span>
               <span className="nm">{o}</span>
               <span className="rl">
                 {o === OP_OWNERS[0] ? t("مدير الإدارة", "Director") : t("مدير قطاع", "Sector manager")}
