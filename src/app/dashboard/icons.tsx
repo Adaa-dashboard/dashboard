@@ -175,3 +175,8 @@ export const IconUp = nav('<path d="M12 20V8"/><path d="M6.6 12.8L12 7.4l5.4 5.4
 export const IconFolder = nav(
   '<path d="M3.4 7.6a2 2 0 0 1 2-2h3.4l2 2.2h7.8a2 2 0 0 1 2 2v8.6a2 2 0 0 1-2 2H5.4a2 2 0 0 1-2-2z"/><path d="M3.4 11.4h17.2"/>',
 );
+
+/* «مزيد» في شريط الجوال — ثلاث نقاط أفقية */
+export const IconDots = nav(
+  '<circle cx="5.6" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="18.4" cy="12" r="1.6" fill="currentColor" stroke="none"/>',
+);

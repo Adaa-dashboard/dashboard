@@ -66,6 +66,7 @@ import {
   IconLayers,
   IconTree,
   IconCheck3,
+  IconDots,
 } from "./icons";
 import OpPlan, { OpPlanCard } from "./OpPlan";
 import WeeklyPanel from "./WeeklyPanel";
@@ -835,21 +836,17 @@ export default function Dashboard({ me }: { me: Me }) {
           {/* **أيقوناتٌ مرسومة لا رموزاً تعبيرية**: 🗂 يرسمه النظام
               بألوانه فيخرج أصفر على الشريط الأخضر، وهذه تتبع لون
               النصّ فتبيضّ معه — وهي عين أيقونات الشريط الجانبي */}
-          {can("overview") && <TabBtn id="overview" icon={<IconOverview size={20} />} label={["الرئيسية", "Home"]} />}
+          {/* ثلاثة مقاصد ثمّ «مزيد» — لا خمسة أزرار متزاحمة: الشريط
+              للأكثر طَرْقاً، وكلُّ ما عداه خلف النقاط الثلاث */}
+          {can("overview") && <TabBtn id="overview" icon={<IconOverview size={20} />} label={["نظرة عامة", "Overview"]} />}
           <TabBtn id="mypage" icon={<IconFolder size={20} />} label={["محفظتي", "Portfolio"]} />
-          {can("details") && <TabBtn id="details" icon={<IconKpi size={20} />} label={["مؤشرات", "KPIs"]} />}
-          {/* التكاليف والمهام لمن يُسند ويتابع — وبقيةُ الفريق يرون
-              مهامهم داخل محفظتهم، وبقية الصفحات في ورقة الإعدادات */}
-          {can("tasks") && (isAdmin || me.isLead || can("tasks:all")) && (
-            <TabBtn id="tasks" icon={<IconCheck3 size={20} />} label={["التكاليف", "Tasks"]} />
-          )}
           <button
             className={`tab-btn ${sheet ? "active" : ""}`}
             onClick={() => setSheet(true)}
-            aria-label={t("الإعدادات", "Settings")}
+            aria-label={t("مزيد", "More")}
           >
-            <span className="ic"><IconSettings size={20} /></span>
-            <span className="lb">{t("الإعدادات", "Settings")}</span>
+            <span className="ic"><IconDots size={20} /></span>
+            <span className="lb">{t("مزيد", "More")}</span>
           </button>
         </nav>
       </div>
@@ -885,6 +882,11 @@ export default function Dashboard({ me }: { me: Me }) {
             )}
             {can("opplan") && <SheetItem id="opplan" icon={<IconLayers />} label={["الخطة التشغيلية", "Operational plan"]} />}
             {can("details") && <SheetItem id="details" icon={<IconKpi />} label={["المؤشرات التفصيلية", "KPI Details"]} />}
+            {/* التكاليف والمهام لمن يُسند ويتابع — وبقيةُ الفريق يرون
+                مهامهم داخل محفظتهم */}
+            {can("tasks") && (isAdmin || me.isLead || can("tasks:all")) && (
+              <SheetItem id="tasks" icon={<IconCheck3 />} label={["التكاليف والمهام", "Tasks"]} />
+            )}
             <div className="sheet-h">{t("المزيد", "More")}</div>
             {can("weekly") && (isAdmin || me.isLead) && (
               <SheetItem id="report" icon={<IconAward />} label={["الإنجاز الأسبوعي", "Weekly Achievement"]} />
