@@ -466,7 +466,7 @@ begin
     ch := ch || ('الاسم: ' || old.display_name || ' ← ' || new.display_name); end if;
   if new.username is distinct from old.username then
     ch := ch || ('اسم الدخول: ' || coalesce(old.username,'—') || ' ← ' || coalesce(new.username,'—')); end if;
-  if new.phone is distinct from old.phone then ch := ch || 'الجوال'; end if;
+  if new.phone is distinct from old.phone then ch := ch || 'الجوال'::text; end if;
   if coalesce(new.job_title,'') is distinct from coalesce(old.job_title,'') then
     ch := ch || ('المسمّى: ' || coalesce(nullif(new.job_title,''),'—')); end if;
   if new.role is distinct from old.role then
@@ -475,8 +475,8 @@ begin
     ch := ch || (case when new.is_lead then 'صار مدير قطاع' else 'لم يعد مدير قطاع' end); end if;
   if new.active is distinct from old.active then
     ch := ch || (case when new.active then 'أُعيد تفعيله' else 'أُوقف الحساب' end); end if;
-  if new.sector_ids is distinct from old.sector_ids then ch := ch || 'القطاعات'; end if;
-  if new.photo_url is distinct from old.photo_url then ch := ch || 'الصورة'; end if;
+  if new.sector_ids is distinct from old.sector_ids then ch := ch || 'القطاعات'::text; end if;
+  if new.photo_url is distinct from old.photo_url then ch := ch || 'الصورة'::text; end if;
 
   if coalesce(new.pass_hash,'') is distinct from coalesce(old.pass_hash,'') then
     v_first_pw := coalesce(old.pass_hash,'') = '' and coalesce(new.pass_hash,'') <> '';
