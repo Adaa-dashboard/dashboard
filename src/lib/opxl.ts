@@ -82,19 +82,34 @@ export const XL_SECTIONS: { kind: string; title: string }[] = [
   { kind: "init", title: "المبادرات" },
   { kind: "win", title: "المكاسب السريعة" },
 ];
+/** عمود اسم البند يختلف باسمه في كل جدول — كما في قالب المستخدمة */
+const NAME_COL: Record<string, string> = {
+  kpi: "اسم المؤشر", init: "اسم المبادرة", win: "البند",
+};
+/** كل ما قد يُسمّى به عمود الاسم — فيُقرأ القالب القديم والجديد */
+const NAME_ANY = ["اسم المؤشر", "اسم المبادرة", "اسم المكسب", "البند"];
+
 /** أعمدة جدول المؤشرات — أرباعه ثمانية، ولا تواريخ له */
 export const XL_KPI_COLS = [
-  "المعرّف", "البند", "الراعي", "المسؤول", "المستوى", "الوحدة", "المستهدف العام",
+  "المعرّف", NAME_COL.kpi, "الراعي", "المسؤول", "المستوى", "الوحدة", "المستهدف العام",
   "Q1 مستهدف", "Q1 فعلي", "Q2 مستهدف", "Q2 فعلي",
   "Q3 مستهدف", "Q3 فعلي", "Q4 مستهدف", "Q4 فعلي",
   "الحالة", "حالة المساهمة",
 ];
 /** أعمدة المبادرات والمكاسب السريعة — واحدةٌ لهما، فهما سواء */
 export const XL_INIT_COLS = [
-  "المعرّف", "البند", "الراعي", "المسؤول", "نوع المبادرة",
+  "المعرّف", NAME_COL.init, "الراعي", "المسؤول", "نوع المبادرة",
   "البداية", "النهاية", "الحالة", "آخر تحديث", "حالة المساهمة",
 ];
-const colsOf = (kind: string) => (kind === "kpi" ? XL_KPI_COLS : XL_INIT_COLS);
+const colsOf = (kind: string) =>
+  kind === "kpi" ? XL_KPI_COLS : XL_INIT_COLS.map((c, i) => (i === 1 ? NAME_COL[kind] : c));
+
+/* أعرض الأعمدة بالمحارف — من قالب المستخدمة، إلا عمودَي الاسم
+   وحالة المساهمة فوُسِّعا: قالبُها كان فارغاً، وبالبيانات الحقيقية
+   يُقتطع الاسم الطويل في خمسة عشر محرفاً */
+const W_KPI = [10, 46, 13, 18, 10, 9, 13, 11, 10, 11, 10, 11, 10, 11, 10, 11, 40];
+const W_INIT = [10, 46, 13, 18, 12, 14, 14, 11, 12, 40];
+const widthOf = (kind: string) => (kind === "kpi" ? W_KPI : W_INIT);
 
 /* «نسبة التقدم» أُزيلت بطلب صاحبة المنصة: المبادرة والمكسب
    السريع بلا أرباع، فلا سبيل إلى حسابها، ورقمٌ يُكتب بالتقدير
@@ -104,6 +119,7 @@ const autoStatus = (d: Rec) => opStatus({ ...d, status: "" });
 
 export type XlRow = { id: string; ord: number; data: Rec; updatedAt?: string };
 type Cell = string | number | null;
+type CellOut = Cell | { v: Cell; s?: "hd" | "c" };
 
 /** تاريخٌ قصير يُقرأ: 2026-10-05 */
 const dayOf = (iso?: string) => (iso && iso.length >= 10 ? iso.slice(0, 10) : "");
@@ -129,33 +145,66 @@ function initRow(r: XlRow): Cell[] {
   ];
 }
 
-/** ورقةٌ لكل محفظة — صدرٌ باسمها ثم الجداول الثلاثة */
-export function xlSheet(owner: string, rows: XlRow[]): Cell[][] {
-  const out: Cell[][] = [[XL_OWNER, owner], []];
+/** حرف العمود: 0 ⇒ A */
+const colLetter = (i: number) => {
+  let n = i, out = "";
+  do { out = String.fromCharCode(65 + (n % 26)) + out; n = Math.floor(n / 26) - 1; } while (n >= 0);
+  return out;
+};
+
+export type XlSheetOut = {
+  name: string;
+  rows: CellOut[][];
+  cols: number[];
+  merges: string[];
+  heights: Record<number, number>;
+  rtl: boolean;
+};
+
+/** ورقةٌ لكل محفظة — صدرٌ باسمها ثم الجداول الثلاثة، على شكل
+    القالب المعتمد: عنوان الجدول مدموجٌ بعدده بين قوسين، ورأسٌ
+    أخضر، وخلايا متوسَّطة */
+export function xlSheet(owner: string, rows: XlRow[]): XlSheetOut {
+  const out: CellOut[][] = [];
+  const merges: string[] = [];
+  const heights: Record<number, number> = {};
+  const hd = (v: string | number) => ({ v, s: "hd" as const });
+
+  out.push([hd(XL_OWNER), hd(owner)]);
+  out.push([]);
   for (const sec of XL_SECTIONS) {
     const list = rows.filter((r) => txt(r.data.kind) === sec.kind);
-    out.push([sec.title, list.length]);
-    out.push(colsOf(sec.kind));
-    for (const r of list) out.push(sec.kind === "kpi" ? kpiRow(r) : initRow(r));
+    const cols = colsOf(sec.kind);
+    /* العنوان يمتدّ على عرض جدوله، فيُكتب في خلاياه كلها ليمتدّ
+       اللون معه ثم تُدمج — والمدموجة التي لا تُنمَّط تبقى بيضاء */
+    const titleRow = out.length + 1;
+    heights[titleRow] = 29;
+    out.push(cols.map((_, i) => (i === 0 ? hd(`${sec.title} (${list.length})`) : hd(""))));
+    merges.push(`A${titleRow}:${colLetter(cols.length - 1)}${titleRow}`);
+    out.push(cols.map((c) => hd(c)));
+    for (const r of list) {
+      const cells = sec.kind === "kpi" ? kpiRow(r) : initRow(r);
+      out.push(cells.map((v) => ({ v, s: "c" as const })));
+    }
     /* سطرٌ فارغ يفصل الجداول — وهو نفسه ما يُنهي الجدول عند القراءة */
     out.push([]);
   }
-  return out;
+  return { name: owner || "بلا محفظة", rows: out, cols: widthOf("kpi"), merges, heights, rtl: true };
 }
 
 /** الكتاب كاملاً: ورقةٌ لكل محفظة بترتيب ظهورها في الصفحة */
-export function xlBook(rows: XlRow[], owners: string[]): { name: string; rows: Cell[][] }[] {
+export function xlBook(rows: XlRow[], owners: string[]): XlSheetOut[] {
   const seen = owners.filter((o) => o);
   for (const r of rows) {
     const o = txt(r.data.owner).trim();
     if (o && !seen.includes(o)) seen.push(o);
   }
   const book = seen
-    .map((o) => ({ name: o, rows: xlSheet(o, rows.filter((r) => txt(r.data.owner).trim() === o)) }))
-    .filter((sh) => rows.some((r) => txt(r.data.owner).trim() === sh.name));
+    .filter((o) => rows.some((r) => txt(r.data.owner).trim() === o))
+    .map((o) => xlSheet(o, rows.filter((r) => txt(r.data.owner).trim() === o)));
   /* بندٌ بلا محفظة لا يسقط من الملف — له ورقته حتى يُسنَد */
   const orphan = rows.filter((r) => !txt(r.data.owner).trim());
-  if (orphan.length) book.push({ name: "بلا محفظة", rows: xlSheet("", orphan) });
+  if (orphan.length) book.push(xlSheet("", orphan));
   return book;
 }
 
@@ -191,7 +240,9 @@ export function xlParseBook(sheets: { name: string; rows: string[][] }[], rows: 
 
     let i = 0;
     while (i < grid.length) {
-      const first = txt(grid[i]?.[0]).trim();
+      /* العنوان يحمل عدده بين قوسين — «المؤشرات (6)» — والعدد
+         محسوبٌ لا مُدخَل، فيُطرح قبل المطابقة */
+      const first = txt(grid[i]?.[0]).replace(/\s*\(.*?\)\s*$/, "").trim();
       const sec = XL_SECTIONS.find((x) => nrm(x.title) === nrm(first));
       if (!sec) {
         i += 1;
@@ -200,8 +251,11 @@ export function xlParseBook(sheets: { name: string; rows: string[][] }[], rows: 
       const head = (grid[i + 1] || []).map((x) => nrm(txt(x)));
       const col = Object.fromEntries(colsOf(sec.kind).map((c) => [c, head.indexOf(nrm(c))])) as
         Record<string, number>;
-      if (col["البند"] < 0) {
-        plan.skipped.push(`${sh.name}: جدول «${sec.title}» بلا عمود «البند»`);
+      /* عمود الاسم يُسمّى باسم جدوله («اسم المؤشر» · «اسم المبادرة»)
+         أو «البند» في الملفات الأقدم — فأيُّها وُجد كفى */
+      const nameAt = NAME_ANY.map((c) => head.indexOf(nrm(c))).find((x) => x >= 0) ?? -1;
+      if (nameAt < 0) {
+        plan.skipped.push(`${sh.name}: جدول «${sec.title}» بلا عمود لاسم البند`);
         i += 2;
         continue;
       }
@@ -210,9 +264,13 @@ export function xlParseBook(sheets: { name: string; rows: string[][] }[], rows: 
         const row = grid[i] || [];
         if (blank(row)) break;
         /* عنوان الجدول التالي ينهي هذا الجدول ولو لم يسبقه فراغ */
-        if (XL_SECTIONS.some((x) => nrm(x.title) === nrm(txt(row[0]).trim()))) break;
+        if (
+          XL_SECTIONS.some(
+            (x) => nrm(x.title) === nrm(txt(row[0]).replace(/\s*\(.*?\)\s*$/, "").trim()),
+          )
+        ) break;
         const cell = (c: string) => txt(col[c] >= 0 ? row[col[c]] : "").trim();
-        const name = cell("البند");
+        const name = txt(row[nameAt]).trim();
         if (!name) {
           plan.skipped.push(`${sh.name} · ${sec.title}: سطر ${i + 1} بلا اسم بند`);
           continue;

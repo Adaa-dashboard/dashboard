@@ -89,15 +89,19 @@ function colOf(ref: string): number {
   return Math.max(0, n - 1);
 }
 
+/* الصفّ يُوضع بموضعه من `r` لا بترتيب ظهوره: **إكسل لا يكتب
+   الصفوف الفارغة أصلاً**، فدفعُها بالتتابع يزحف بالجدول كلّه
+   صفّاً إلى أعلى — ويضيع بذلك العنوانُ الذي يفصل جدولاً عن جدول. */
 function sheetRows(xml: string, shared: string[]): string[][] {
   const rows: string[][] = [];
-  const rowRe = /<row[^>]*>([\s\S]*?)<\/row>/g;
+  const rowRe = /<row([^>]*)>([\s\S]*?)<\/row>/g;
   let r: RegExpExecArray | null;
   while ((r = rowRe.exec(xml))) {
+    const at = Number(/\br="(\d+)"/.exec(r[1])?.[1] || 0);
     const cells: string[] = [];
     const cRe = /<c\s([^>]*?)(\/>|>([\s\S]*?)<\/c>)/g;
     let c: RegExpExecArray | null;
-    while ((c = cRe.exec(r[1]))) {
+    while ((c = cRe.exec(r[2]))) {
       const attrs = c[1];
       const inner = c[3] || "";
       const ref = /r="([A-Za-z]+)\d+"/.exec(attrs)?.[1] || "";
@@ -113,7 +117,9 @@ function sheetRows(xml: string, shared: string[]): string[][] {
       while (cells.length < idx) cells.push("");
       cells[idx] = v.trim();
     }
-    rows.push(cells);
+    const at0 = at > 0 ? at - 1 : rows.length;
+    while (rows.length < at0) rows.push([]);
+    rows[at0] = cells;
   }
   return rows;
 }
@@ -231,7 +237,22 @@ export function readDelimited(text: string): string[][] {
    CompressionStream وقد لا يكون متاحاً في كل متصفح، والملف المخزَّن
    يفتحه إكسل تماماً كالمضغوط.
    ============================================================ */
-export type SheetOut = { name: string; rows: (string | number | null | undefined)[][] };
+/** خليةٌ بقيمتها، أو بقيمةٍ ونمط: `hd` ترويسة خضراء · `c` متوسَّطة */
+export type CellOut =
+  | string | number | null | undefined
+  | { v: string | number | null | undefined; s?: "hd" | "c" };
+export type SheetOut = {
+  name: string;
+  rows: CellOut[][];
+  /** عرض الأعمدة بالمحارف، بترتيبها */
+  cols?: number[];
+  /** مديات مدموجة مثل «A3:Q3» */
+  merges?: string[];
+  /** ارتفاع صفوفٍ بعينها — المفتاح رقم الصف من ١ */
+  heights?: Record<number, number>;
+  /** ورقةٌ تُقرأ من اليمين — للعربية */
+  rtl?: boolean;
+};
 
 export type ZipEntry = { name: string; data: Uint8Array };
 
@@ -324,25 +345,49 @@ function colLetter(i: number): string {
   return s;
 }
 
-function sheetXml(rows: SheetOut["rows"]): string {
-  const body = rows
+/** رقم النمط في `STYLES_XML`: ١ ترويسة · ٢ خليةٌ متوسَّطة */
+const S_ID: Record<string, number> = { hd: 1, c: 2 };
+
+function sheetXml(sh: SheetOut): string {
+  const body = sh.rows
     .map((row, ri) => {
       const cells = row
-        .map((v, ci) => {
+        .map((raw, ci) => {
+          const obj = raw && typeof raw === "object" ? raw : { v: raw as string | number | null };
+          const v = obj.v;
           const ref = `${colLetter(ci)}${ri + 1}`;
-          if (v === null || v === undefined || v === "") return "";
-          if (typeof v === "number" && Number.isFinite(v)) return `<c r="${ref}"><v>${v}</v></c>`;
-          const style = ri === 0 ? ' s="1"' : "";
-          return `<c r="${ref}" t="inlineStr"${style}><is><t xml:space="preserve">${esc(String(v))}</t></is></c>`;
+          /* النمط يُكتب ولو خلت الخليّة: التلوين يمتدّ على المدى
+             المدموج وعلى بقيّة صفّ الترويسة، وإلا بقي نصفه أبيض */
+          const sid = obj.s ? S_ID[obj.s] : ri === 0 && !("s" in obj) ? 1 : 0;
+          const st = sid ? ` s="${sid}"` : "";
+          if (v === null || v === undefined || v === "") return st ? `<c r="${ref}"${st}/>` : "";
+          if (typeof v === "number" && Number.isFinite(v)) return `<c r="${ref}"${st}><v>${v}</v></c>`;
+          return `<c r="${ref}" t="inlineStr"${st}><is><t xml:space="preserve">${esc(String(v))}</t></is></c>`;
         })
         .join("");
-      return `<row r="${ri + 1}">${cells}</row>`;
+      const h = sh.heights?.[ri + 1];
+      const ha = h ? ` ht="${h}" customHeight="1"` : "";
+      return `<row r="${ri + 1}"${ha}>${cells}</row>`;
     })
     .join("");
+  const view = sh.rtl ? '<sheetViews><sheetView rightToLeft="1" workbookViewId="0"/></sheetViews>' : "";
+  const cols = sh.cols?.length
+    ? "<cols>" +
+      sh.cols
+        .map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`)
+        .join("") +
+      "</cols>"
+    : "";
+  const merges = sh.merges?.length
+    ? `<mergeCells count="${sh.merges.length}">` +
+      sh.merges.map((r) => `<mergeCell ref="${esc(r)}"/>`).join("") +
+      "</mergeCells>"
+    : "";
   return (
     '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
-    `<sheetData>${body}</sheetData></worksheet>`
+    view + cols +
+    `<sheetData>${body}</sheetData>${merges}</worksheet>`
   );
 }
 
@@ -356,8 +401,13 @@ const STYLES_XML =
   '<fill><patternFill patternType="solid"><fgColor rgb="FF00584C"/><bgColor indexed="64"/></patternFill></fill></fills>' +
   '<borders count="1"><border/></borders>' +
   '<cellStyleXfs count="1"><xf/></cellStyleXfs>' +
-  '<cellXfs count="2"><xf xfId="0"/>' +
-  '<xf xfId="0" fontId="1" fillId="2" applyFont="1" applyFill="1"/></cellXfs>' +
+  '<cellXfs count="3"><xf xfId="0"/>' +
+  /* ١ ترويسة: أخضر الهوية بخطٍّ أبيض عريض، متوسَّطة وملتفّة */
+  '<xf xfId="0" fontId="1" fillId="2" applyFont="1" applyFill="1" applyAlignment="1">' +
+  '<alignment horizontal="center" vertical="center" wrapText="1"/></xf>' +
+  /* ٢ خليةُ بيانات: متوسَّطة وملتفّة، فالنصّ الطويل يُقرأ */
+  '<xf xfId="0" applyAlignment="1">' +
+  '<alignment horizontal="center" vertical="center" wrapText="1"/></xf></cellXfs>' +
   "</styleSheet>";
 
 /** يبني ملف xlsx متعدّد الأوراق ويُرجعه Blob جاهزاً للتنزيل */
@@ -416,7 +466,7 @@ export function writeXlsx(sheets: SheetOut[]): Blob {
       "</Relationships>"
   );
   push("xl/styles.xml", STYLES_XML);
-  sheets.forEach((s, i) => push(`xl/worksheets/sheet${i + 1}.xml`, sheetXml(s.rows)));
+  sheets.forEach((s, i) => push(`xl/worksheets/sheet${i + 1}.xml`, sheetXml(s)));
 
   return zipStored(files, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 }
