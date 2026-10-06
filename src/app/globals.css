@@ -3103,10 +3103,25 @@ table.matrix thead th {
     color: var(--ink);
     cursor: pointer;
   }
+  /* أيقونة بند الورقة — بلون نصّه، فتتبعه في العادي والمختار */
+  .sheet-item .si {
+    display: inline-flex;
+    width: 20px;
+    flex: none;
+    color: var(--g-700);
+  }
   .sheet-item.active {
     background: var(--g-50);
     color: var(--gt-800);
     font-weight: 700;
+  }
+  .sheet-item.active .si { color: var(--gt-800); }
+  /* أيقونة الشريط السفلي ترث لون الزرّ، فتبيضّ على الأخضر
+     وتخضرّ على الحبّة البيضاء حين يُختار */
+  .tab-btn .ic {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
   .sheet-item.danger {
     color: #d34a4a;

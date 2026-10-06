@@ -514,7 +514,7 @@ export default function Dashboard({ me }: { me: Me }) {
       </button>
     );
   }
-  function TabBtn({ id, icon, label }: { id: string; icon: string; label: [string, string] }) {
+  function TabBtn({ id, icon, label }: { id: string; icon: ReactElement; label: [string, string] }) {
     return (
       <button className={`tab-btn ${tab === id ? "active" : ""}`} onClick={() => setTab(id)}>
         <span className="ic">{icon}</span>
@@ -522,7 +522,9 @@ export default function Dashboard({ me }: { me: Me }) {
       </button>
     );
   }
-  function SheetItem({ id, label }: { id: string; label: [string, string] }) {
+  /* بنود الورقة تحمل أيقونات الشريط الجانبي نفسها: الجوال نسخةٌ
+     من المنصة لا منصّةٌ أخرى، فما تغيّر في الشريط يتغيّر هنا */
+  function SheetItem({ id, label, icon }: { id: string; label: [string, string]; icon?: ReactElement }) {
     return (
       <button
         className={`sheet-item ${tab === id ? "active" : ""}`}
@@ -531,6 +533,7 @@ export default function Dashboard({ me }: { me: Me }) {
           setSheet(false);
         }}
       >
+        {icon && <span className="si">{icon}</span>}
         {t(label[0], label[1])}
       </button>
     );
@@ -829,20 +832,23 @@ export default function Dashboard({ me }: { me: Me }) {
 
         {/* شريط التنقّل السفلي — يظهر على الجوال وحده بدل القائمة الجانبية */}
         <nav className="tabbar" aria-label={t("التنقل", "Navigation")}>
-          {can("overview") && <TabBtn id="overview" icon="◱" label={["الرئيسية", "Home"]} />}
-          <TabBtn id="mypage" icon="🗂" label={["محفظتي", "Portfolio"]} />
-          {can("details") && <TabBtn id="details" icon="◎" label={["مؤشرات", "KPIs"]} />}
+          {/* **أيقوناتٌ مرسومة لا رموزاً تعبيرية**: 🗂 يرسمه النظام
+              بألوانه فيخرج أصفر على الشريط الأخضر، وهذه تتبع لون
+              النصّ فتبيضّ معه — وهي عين أيقونات الشريط الجانبي */}
+          {can("overview") && <TabBtn id="overview" icon={<IconOverview size={20} />} label={["الرئيسية", "Home"]} />}
+          <TabBtn id="mypage" icon={<IconFolder size={20} />} label={["محفظتي", "Portfolio"]} />
+          {can("details") && <TabBtn id="details" icon={<IconKpi size={20} />} label={["مؤشرات", "KPIs"]} />}
           {/* التكاليف والمهام لمن يُسند ويتابع — وبقيةُ الفريق يرون
               مهامهم داخل محفظتهم، وبقية الصفحات في ورقة الإعدادات */}
           {can("tasks") && (isAdmin || me.isLead || can("tasks:all")) && (
-            <TabBtn id="tasks" icon="✓" label={["التكاليف", "Tasks"]} />
+            <TabBtn id="tasks" icon={<IconCheck3 size={20} />} label={["التكاليف", "Tasks"]} />
           )}
           <button
             className={`tab-btn ${sheet ? "active" : ""}`}
             onClick={() => setSheet(true)}
             aria-label={t("الإعدادات", "Settings")}
           >
-            <span className="ic">⚙</span>
+            <span className="ic"><IconSettings size={20} /></span>
             <span className="lb">{t("الإعدادات", "Settings")}</span>
           </button>
         </nav>
@@ -870,19 +876,21 @@ export default function Dashboard({ me }: { me: Me }) {
             </div>
             {/* الترتيب نفسه الذي في الشريط الجانبي، مسطَّحاً:
                 على الجوال ورقةٌ تُمرَّر، فالانسدال فيها عائق لا تنظيم */}
-            <SheetItem id="mypage" label={["محفظتي", "My portfolio"]} />
+            <SheetItem id="mypage" icon={<IconFolder />} label={["محفظتي", "My portfolio"]} />
             <div className="sheet-h">{t("الأعمال الرئيسية", "Core work")}</div>
-            {SECTION_NAV.map(([key]) =>
-              can(key) ? <SheetItem key={key} id={key} label={SECTION_NAV_TITLE[key] ?? SECTION_TITLE[key]} /> : null,
+            {SECTION_NAV.map(([key, Ic]) =>
+              can(key) ? (
+                <SheetItem key={key} id={key} icon={<Ic />} label={SECTION_NAV_TITLE[key] ?? SECTION_TITLE[key]} />
+              ) : null,
             )}
-            {can("opplan") && <SheetItem id="opplan" label={["الخطة التشغيلية", "Operational plan"]} />}
-            {can("details") && <SheetItem id="details" label={["المؤشرات التفصيلية", "KPI Details"]} />}
+            {can("opplan") && <SheetItem id="opplan" icon={<IconLayers />} label={["الخطة التشغيلية", "Operational plan"]} />}
+            {can("details") && <SheetItem id="details" icon={<IconKpi />} label={["المؤشرات التفصيلية", "KPI Details"]} />}
             <div className="sheet-h">{t("المزيد", "More")}</div>
             {can("weekly") && (isAdmin || me.isLead) && (
-              <SheetItem id="report" label={["الإنجاز الأسبوعي", "Weekly Achievement"]} />
+              <SheetItem id="report" icon={<IconAward />} label={["الإنجاز الأسبوعي", "Weekly Achievement"]} />
             )}
-            {can("structure") && <SheetItem id="structure" label={["الهيكل التنظيمي", "Org chart"]} />}
-            {can("entities") && <SheetItem id="entities" label={["الجهات ونقاط التواصل", "Entities"]} />}
+            {can("structure") && <SheetItem id="structure" icon={<IconTree />} label={["الهيكل التنظيمي", "Org chart"]} />}
+            {can("entities") && <SheetItem id="entities" icon={<IconBank />} label={["الجهات ونقاط التواصل", "Entities"]} />}
             {can("users") && <SheetItem id="users" label={["المستخدمون والصلاحيات", "Users & Roles"]} />}
             {can("audit") && <SheetItem id="audit" label={["سجل النشاط", "Activity log"]} />}
             {can("docs") && <SheetItem id="docs" label={["منهجيات أداء", "Methodologies"]} />}
