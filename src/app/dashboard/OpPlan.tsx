@@ -14,6 +14,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { useItems, type Item } from "./Sections";
 import { nrm } from "@/lib/commit";
+import { DEFAULT_BANDS } from "@/lib/calc";
 import { apiFetch } from "@/lib/api";
 import { IconDown, IconUp, IconKpi, IconBulb, IconBolt, IconTarget, IconLayers } from "./icons";
 import { writeXlsx, readXlsxSheets } from "@/lib/sheet";
@@ -206,14 +207,19 @@ const KIND_ICON: Record<string, (p: { size?: number }) => ReactElement> = {
   init: IconBulb,
   win: IconBolt,
 };
-/* الحالات الأربع بألوانها — أخضر للمكتمل وأزرق لما يسير وأحمر
-   للمتأخر، على التصميم الذي اعتمدته صاحبة المنصة. ورماديٌّ لما لم
-   يبدأ: لا يُسقَط من الحلقة وإلا لم يجمع مجموعُها الكلّ */
+/* **ألوان الحالات من لوحة «حالة المؤشرات» نفسها** (`DEFAULT_BANDS`)
+   فلا تتكلّم الصفحتان لغتين: الأخضر وفق المسار والأحمر متعثّر.
+   و«مكتملة» أخضرُ أغمق من «على المسار» — فالحالتان كلتاهما خير،
+   ويفرّقهما الدرجة لا اللون. و«لم تبدأ» رماديٌّ كـ«لا قياس»: لا
+   يُسقَط من الحلقة وإلا لم يجمع مجموعُها الكلّ */
+const BAND: Record<string, string> = Object.fromEntries(
+  DEFAULT_BANDS.map((b) => [b.label, b.color]),
+);
 const ST_COLOR: Record<string, string> = {
-  مكتملة: "#1f9d55",
-  "على المسار": "#3b82f6",
-  متأخرة: "#e0564f",
-  "لم تبدأ": "#b7c2bf",
+  مكتملة: "#15803d",
+  "على المسار": BAND["وفق المسار"] ?? "#22c55e",
+  متأخرة: BAND["متعثر"] ?? "#ef4444",
+  "لم تبدأ": "#a8b3b0",
 };
 /** بندٌ بلا حالةٍ مُدخَلة لم يبدأ — فلا يسقط من الحلقة */
 const stOf = (d: Rec) => opStatus(d) || "لم تبدأ";
