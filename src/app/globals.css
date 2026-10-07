@@ -12445,6 +12445,17 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
 .opc-b { display: flex; height: 11px; border-radius: 999px; overflow: hidden; background: var(--soft); min-width: 110px; }
 .opc-b > span { display: block; }
 .opc-k { font-size: 9.5px; font-weight: 800; border-radius: 999px; padding: 2px 8px; display: inline-block; margin-inline-end: 4px; }
+/* توزيع بنود الموظف على الأنواع الثلاثة — عدٌّ بجوار الشريط */
+.opc-tb td.kk { white-space: nowrap; width: 1%; }
+.opc-tb td.kk .k {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 9.5px; font-weight: 700; border-radius: 999px;
+  padding: 2px 8px; margin-inline-end: 4px;
+  color: var(--c); background: color-mix(in srgb, var(--c) 11%, transparent);
+}
+.opc-tb td.kk .k b { font-family: "Noto Kufi Arabic", sans-serif; font-size: 10.5px; font-weight: 800; }
+/* الصفر يبقى مكانه فتصطفّ الأعمدة، ويبهت فلا يزاحم ما له عدد */
+.opc-tb td.kk .k.z { color: var(--muted); background: var(--soft); }
 .opc-k.sp { color: #5b3ea8; background: rgba(122, 92, 209, .14); }
 .opc-k.as { color: var(--g-800); background: var(--g-100); }
 .op-more {
@@ -12535,6 +12546,10 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
 @media (max-width: 1100px) {
   .opd-r3 { grid-template-columns: 1fr; }
   .opd-pf5 { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 900px) {
+  .opc-tb td.kk .k { padding: 2px 6px; }
+  .opc-tb td.kk .k.z { display: none; }
 }
 @media (max-width: 620px) {
   .opd-pf5 { grid-template-columns: repeat(2, 1fr); }

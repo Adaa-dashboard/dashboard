@@ -481,6 +481,7 @@ function OpPeople({
             <tr>
               <th>{t("الموظف", "Person")}</th>
               <th>{t("البنود", "Items")}</th>
+              <th>{t("التوزيع", "By kind")}</th>
               <th>{t("عدد", "N")}</th>
               <th>{t("نسبة", "%")}</th>
               <th>{t("الأدوار", "Roles")}</th>
@@ -499,6 +500,20 @@ function OpPeople({
                       )}
                       {mx > e.items && <span style={{ flex: mx - e.items }} />}
                     </span>
+                  </td>
+                  {/* كم مؤشراً وكم مبادرةً وكم مكسباً — الشريط يُري
+                      النسبة والخانة تُري العدد */}
+                  <td className="kk">
+                    {KINDS.map((k) => (
+                      <span
+                        key={k}
+                        className={`k ${e.k[k] ? "" : "z"}`}
+                        style={{ ["--c" as string]: KIND_COLOR[k] }}
+                        title={t(KIND_LABEL[k][0], KIND_LABEL[k][1])}
+                      >
+                        {KIND_SHORT[k]} <b>{e.k[k] || 0}</b>
+                      </span>
+                    ))}
                   </td>
                   <td className="p">{e.items}</td>
                   <td className="p">{pct(e.items)}%</td>
