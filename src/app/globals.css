@@ -12426,13 +12426,6 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
 .opd-pf5 .nm { display: block; font-size: 11px; font-weight: 700; color: var(--g-800); margin-top: 8px; }
 .opd-pf5 .sb { display: block; font-size: 9.5px; color: var(--muted); margin-top: 3px; }
 
-.opd-late { display: flex; flex-direction: column; gap: 7px; }
-.opd-late .r {
-  display: flex; gap: 9px; align-items: baseline; font-size: 11px; line-height: 1.6;
-  padding: 9px 11px; border-radius: 11px; background: var(--dgr-bg); color: var(--dgr-tx);
-}
-.opd-late em { font-style: normal; font-size: 9.5px; opacity: .85; white-space: nowrap; }
-
 /* **شريط الإضافة في ذيل العمود** لا زرٌّ في رأس الصفحة: النوع يصير
    معلوماً من العمود، فنافذة الإضافة لا تسأل عنه */
 .op-add {

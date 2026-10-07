@@ -302,13 +302,10 @@ function OpKind({
 }
 
 function OpDash({
-  rows, owners, t, onPick, onKind,
+  rows, t, onKind,
 }: {
   rows: { id: string; ord: number; data: Rec }[];
-  owners: string[];
   t: T;
-  /** الضغط على محفظة ينقل إلى تبويب المحافظ مفلترًا عليها */
-  onPick: (o: string) => void;
   /** الضغط على بطاقة نوعٍ ينقل إلى تبويب المحافظ على ذلك النوع */
   onKind: (k: (typeof KINDS)[number]) => void;
 }) {
@@ -316,10 +313,7 @@ function OpDash({
   const pct = (n: number) => (tot ? Math.round((1000 * n) / tot) / 10 : 0);
   /* السلّمان يلتقيان في أربع درجات — وإلا لزم الشريطَ ثماني شرائح */
   const sc = (x: string) => rows.filter((r) => toneOf(stOf(r.data)) === x).length;
-  const late = rows.filter((r) => toneOf(stOf(r.data)) === "bad");
   const ofKind = (k: string) => rows.filter((r) => txt(r.data.kind) === k);
-  const kinds = (rs: typeof rows) =>
-    KINDS.map((k) => ({ v: rs.filter((r) => txt(r.data.kind) === k).length, c: KIND_COLOR[k] }));
 
   if (!tot) return <div className="op-none">{t("لا توجد بنود في الخطة بعد", "The plan is empty")}</div>;
 
@@ -369,41 +363,6 @@ function OpDash({
         </div>
       </div>
 
-      <div className="opd-box opd-mb">
-        <h4>{t("المحافظ — حجم كل محفظة وتركيبتها", "Portfolios")}</h4>
-        <div className="opd-pf5">
-          {owners.map((o) => {
-            const rs = rows.filter((r) => txt(r.data.owner) === o);
-            return (
-              <button className="p" key={o} onClick={() => onPick(o)}
-                      title={t(`عرض محفظة ${o}`, `Open ${o}`)}>
-                <Donut size={108} w={13} mid={String(rs.length)} sub={t("بنداً", "items")} parts={kinds(rs)} />
-                <span className="nm">{o}</span>
-                <span className="sb">{Math.round(pct(rs.length))}% {t("من الخطة", "of the plan")}</span>
-              </button>
-            );
-          })}
-        </div>
-        <div className="opd-lg inl">
-          {KINDS.map((k) => (
-            <span key={k}><i style={{ background: KIND_COLOR[k] }} />{t(KIND_LABEL[k][0], KIND_LABEL[k][1])}</span>
-          ))}
-        </div>
-      </div>
-
-      {late.length > 0 && (
-        <div className="opd-box">
-          <h4>{t(`تحتاج انتباهاً — ${late.length} متعثرة`, `Needs attention — ${late.length}`)}</h4>
-          <div className="opd-late">
-            {late.map((r) => (
-              <div className="r" key={r.id}>
-                <span>{txt(r.data.name)}</span>
-                <em>{stOf(r.data)} · {txt(r.data.owner)}</em>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </>
   );
 }
@@ -415,12 +374,15 @@ function OpDash({
    ذُكر فيه — فمجموع النسب يتجاوز 100% بطبيعته، إذ للبند راعٍ
    ومسؤولون. */
 function OpPeople({
-  rows, people, t,
+  rows, people, owners, t, onPick,
 }: {
   rows: { id: string; data: Rec }[];
   /** كل موظفي المنصة — فالجدول على كل موظف لا على من ذُكر في الخطة وحده */
   people: { name: string; isLead: boolean }[];
+  owners: string[];
   t: T;
+  /** الضغط على محفظة ينقل إلى تبويب المحافظ مفلترًا عليها */
+  onPick: (o: string) => void;
 }) {
   /* مدراء المحافظ رعاةٌ بلا مسؤوليةٍ مباشرة، فجمعُ الدورين يضعهم في
      الصدارة — والمربع يفصل المسؤولية وحدها لمن أراد المنفّذ */
@@ -448,6 +410,34 @@ function OpPeople({
 
   return (
     <>
+      {/* المحافظ هنا لا في الداش بورد: حجمُ المحفظة مساهمةُ صاحبها،
+          فموضعها مع بقية المساهمات */}
+      <div className="opd-box opd-mb">
+        <h4>{t("المحافظ — حجم كل محفظة وتركيبتها", "Portfolios")}</h4>
+        <div className="opd-pf5">
+          {owners.map((o) => {
+            const rs = rows.filter((r) => txt(r.data.owner) === o);
+            return (
+              <button className="p" key={o} onClick={() => onPick(o)}
+                      title={t(`عرض محفظة ${o}`, `Open ${o}`)}>
+                <Donut size={108} w={13} mid={String(rs.length)} sub={t("بنداً", "items")}
+                       parts={KINDS.map((k) => ({
+                         v: rs.filter((r) => txt(r.data.kind) === k).length,
+                         c: KIND_COLOR[k],
+                       }))} />
+                <span className="nm">{o}</span>
+                <span className="sb">{pct(rs.length)}% {t("من الخطة", "of the plan")}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="opd-lg inl">
+          {KINDS.map((k) => (
+            <span key={k}><i style={{ background: KIND_COLOR[k] }} />{t(KIND_LABEL[k][0], KIND_LABEL[k][1])}</span>
+          ))}
+        </div>
+      </div>
+
       <div className="opd-box opd-mb">
         <h4>{t("أكثر خمسة إسهاماً", "Top five")}</h4>
         <div className="opd-pf5">
@@ -568,6 +558,11 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
   const [add, setAdd] = useState<Item | null>(null);
   /* الصفحة ثلاثة تبويبات، وتُفتح على الداش بورد — بطلب صاحبة المنصة */
   const [view, setView] = useState<"dash" | "pf" | "ppl">("dash");
+  /* سُحبت الصلاحية والتبويب مفتوح ⇒ يعود إلى الداش بورد، فلا تبقى
+     صفحةٌ معروضةً بلا مربّعٍ يدلّ عليها */
+  useEffect(() => {
+    if (!canEdit && view === "ppl") setView("dash");
+  }, [canEdit, view]);
 
   const rows = useMemo(() => items.map((x) => ({ ...x, data: opFix(x.data as Rec) })), [items]);
   const byOwner = useMemo(() => {
@@ -620,9 +615,15 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
           <button className={`chip ${view === "pf" ? "on" : ""}`} onClick={() => setView("pf")}>
             {t("المحافظ", "Portfolios")}
           </button>
-          <button className={`chip ${view === "ppl" ? "on" : ""}`} onClick={() => setView("ppl")}>
-            {t("نسبة المساهمات", "Contribution")}
-          </button>
+          {/* **لا يراه ولا عنوانَه إلا من يحرّر الخطة** — وهم الأربعة
+              أصحاب `opplan:edit`. والواجهة تجميلية كما في بقية
+              المنصة: البنود نفسها يقرؤها كل من يملك `opplan`، وإنما
+              هذا إخفاءُ عرضٍ لا حاجزُ بيانات */}
+          {canEdit && (
+            <button className={`chip ${view === "ppl" ? "on" : ""}`} onClick={() => setView("ppl")}>
+              {t("نسبة المساهمات", "Contribution")}
+            </button>
+          )}
         </div>
         <div className="gr" />
         {/* الملف يحمل الخطة كما هي على الشاشة — المعروض بعد الفلتر
@@ -635,13 +636,7 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
       {view === "dash" && (
         <OpDash
           rows={rows}
-          owners={owners}
           t={t}
-          onPick={(o) => {
-            setOwn(o);
-            setKind("");
-            setView("pf");
-          }}
           onKind={(k) => {
             setOwn("");
             setKind(k);
@@ -649,7 +644,21 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
           }}
         />
       )}
-      {view === "ppl" && <OpPeople rows={rows} people={people} t={t} />}
+      {/* المساهمات لمن يحرّر الخطة وحده — والشرط هنا كما هو على
+          المربّع، فلا يُفتح التبويب بتغيير الحالة في المتصفح */}
+      {view === "ppl" && canEdit && (
+        <OpPeople
+          rows={rows}
+          people={people}
+          owners={owners}
+          t={t}
+          onPick={(o) => {
+            setOwn(o);
+            setKind("");
+            setView("pf");
+          }}
+        />
+      )}
 
       {view === "pf" && (
        <>
