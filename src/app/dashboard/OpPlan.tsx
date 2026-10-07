@@ -19,13 +19,14 @@ import { apiFetch } from "@/lib/api";
 import { IconDown, IconUp, IconKpi, IconBulb, IconBolt, IconTarget, IconLayers } from "./icons";
 import { writeXlsx, readXlsxSheets } from "@/lib/sheet";
 import {
-  OP_STATUSES, quarters, onTrack, opStatus, opShares, opNames,
+  OP_STATUSES, KPI_STATUSES, ALL_STATUSES, statusesOf, toneOf, TONE_LABEL, NO_MEASURE,
+  quarters, onTrack, opStatus, opShares, opNames,
   xlBook, xlParseBook, type XlRow, type XlPlan,
 } from "@/lib/opxl";
 
 /* المنطق في `lib/opxl` ليُختبر بلا React ولا شبكة، والصفحة تعرضه.
    ويُعاد تصديره هنا ليبقى مستوردوه على ما ألفوه */
-export { OP_STATUSES, opStatus };
+export { OP_STATUSES, ALL_STATUSES, statusesOf, opStatus };
 
 /** الكتاب يُغلَّف ملفاً — بناؤه في `lib/opxl` */
 const xlExport = (rows: XlRow[], owners: string[]) => writeXlsx(xlBook(rows, owners));
@@ -75,6 +76,12 @@ const LEVELS = ["", "مستوى أول", "مستوى ثانٍ", "مستوى ثا
 const INIT_TYPES = ["استراتيجية", "تشغيلية"];
 /** الحالات الأربع المعتمدة — لا «جديدة» ولا «مستمرة» بعد اليوم */
 const ST_TONE: Record<string, string> = {
+  /* سلّم المؤشرات */
+  "وفق المسار": "ok",
+  "متعثر جزئيًا": "go",
+  متعثر: "no",
+  "لا يقاس": "nt",
+  /* سلّم المبادرات والمكاسب */
   مكتملة: "ok",
   "على المسار": "nw",
   متأخرة: "no",
@@ -221,14 +228,31 @@ const KIND_ICON: Record<string, (p: { size?: number }) => ReactElement> = {
 const BAND: Record<string, string> = Object.fromEntries(
   DEFAULT_BANDS.map((b) => [b.label, b.color]),
 );
+const GREY = "#a8b3b0";
 const ST_COLOR: Record<string, string> = {
+  /* سلّم المؤشرات — ألوانه من `DEFAULT_BANDS` حرفياً */
+  "وفق المسار": BAND["وفق المسار"] ?? "#22c55e",
+  "متعثر جزئيًا": BAND["متعثر جزئيًا"] ?? "#f59e0b",
+  متعثر: BAND["متعثر"] ?? "#ef4444",
+  "لا يقاس": GREY,
+  /* سلّم المبادرات والمكاسب — «مكتملة» أخضرُ أغمق تمييزاً لها عمّا
+     هو على المسار، فالحالتان كلتاهما خير ويفرّقهما الدرجة لا اللون */
   مكتملة: "#15803d",
   "على المسار": BAND["وفق المسار"] ?? "#22c55e",
   متأخرة: BAND["متعثر"] ?? "#ef4444",
-  "لم تبدأ": "#a8b3b0",
+  "لم تبدأ": GREY,
 };
+/** لون كل درجة في الشريط الإجمالي */
+const TONE_COLOR: Record<string, string> = {
+  ok: BAND["وفق المسار"] ?? "#22c55e",
+  warn: BAND["متعثر جزئيًا"] ?? "#f59e0b",
+  bad: BAND["متعثر"] ?? "#ef4444",
+  none: GREY,
+};
+const TONES = ["ok", "warn", "bad", "none"] as const;
 /** بندٌ بلا حالةٍ مُدخَلة لم يبدأ — فلا يسقط من الحلقة */
-const stOf = (d: Rec) => opStatus(d) || "لم تبدأ";
+/* بندٌ بلا حالةٍ مُدخَلة لم يبدأ — فلا يسقط من الحلقة */
+const stOf = (d: Rec) => opStatus(d) || (txt(d.kind) === "kpi" ? NO_MEASURE : "لم تبدأ");
 
 /* ---------------- تبويب ١: الداش بورد ---------------- */
 /* بطاقةُ نوعٍ واحد: عدده الكليّ، ثم حالاته الأربع عدداً وحلقةً.
@@ -244,6 +268,8 @@ function OpKind({
 }) {
   const Ic = KIND_ICON[k];
   const n = rows.length;
+  /* المؤشر لا «يكتمل»، فسلّمه غير سلّم المبادرات والمكاسب */
+  const sts = statusesOf(k);
   const sc = (x: string) => rows.filter((r) => stOf(r.data) === x).length;
   return (
     <button className="opk" style={{ ["--c" as string]: KIND_COLOR[k] }} onClick={onOpen}
@@ -257,7 +283,7 @@ function OpKind({
       <span className="nl">{t(`إجمالي ${KIND_LABEL[k][0]}`, `Total ${KIND_LABEL[k][1]}`)}</span>
       <span className="bd">
         <span className="lg">
-          {OP_STATUSES.map((x) => (
+          {sts.map((x) => (
             <span key={x}>
               <em>{x}</em>
               <i style={{ background: ST_COLOR[x] }} />
@@ -266,7 +292,7 @@ function OpKind({
           ))}
         </span>
         <span className="dw">
-          <Donut size={96} w={12} parts={OP_STATUSES.map((x) => ({ v: sc(x), c: ST_COLOR[x] }))} />
+          <Donut size={96} w={12} parts={sts.map((x) => ({ v: sc(x), c: ST_COLOR[x] }))} />
           {/* الرمز في قلب الحلقة — خارج الـsvg فلا يدور مع دورانها */}
           <span className="mid" aria-hidden><Ic size={22} /></span>
         </span>
@@ -288,8 +314,9 @@ function OpDash({
 }) {
   const tot = rows.length;
   const pct = (n: number) => (tot ? Math.round((1000 * n) / tot) / 10 : 0);
-  const sc = (x: string) => rows.filter((r) => stOf(r.data) === x).length;
-  const late = rows.filter((r) => stOf(r.data) === "متأخرة");
+  /* السلّمان يلتقيان في أربع درجات — وإلا لزم الشريطَ ثماني شرائح */
+  const sc = (x: string) => rows.filter((r) => toneOf(stOf(r.data)) === x).length;
+  const late = rows.filter((r) => toneOf(stOf(r.data)) === "bad");
   const ofKind = (k: string) => rows.filter((r) => txt(r.data.kind) === k);
   const kinds = (rs: typeof rows) =>
     KINDS.map((k) => ({ v: rs.filter((r) => txt(r.data.kind) === k).length, c: KIND_COLOR[k] }));
@@ -313,9 +340,9 @@ function OpDash({
         <div className="bd">
           <div>
             <div className="bar">
-              {OP_STATUSES.map((x) =>
+              {TONES.map((x) =>
                 sc(x) ? (
-                  <span key={x} style={{ flex: sc(x), background: ST_COLOR[x] }}>
+                  <span key={x} style={{ flex: sc(x), background: TONE_COLOR[x] }}>
                     {/* النسبة تُكتب داخل الشريحة ما دامت تسعها */}
                     {pct(sc(x)) >= 5 ? `${pct(sc(x))}%` : ""}
                   </span>
@@ -323,9 +350,9 @@ function OpDash({
               )}
             </div>
             <div className="lg3">
-              {OP_STATUSES.map((x) => (
+              {TONES.map((x) => (
                 <span key={x}>
-                  <em><i style={{ background: ST_COLOR[x] }} />{x}</em>
+                  <em><i style={{ background: TONE_COLOR[x] }} />{TONE_LABEL[x]}</em>
                   <b>{sc(x)}</b>
                   <u>{pct(sc(x))}%</u>
                 </span>
@@ -366,12 +393,12 @@ function OpDash({
 
       {late.length > 0 && (
         <div className="opd-box">
-          <h4>{t(`تحتاج انتباهاً — ${late.length} متأخرة`, `Needs attention — ${late.length} late`)}</h4>
+          <h4>{t(`تحتاج انتباهاً — ${late.length} متعثرة`, `Needs attention — ${late.length}`)}</h4>
           <div className="opd-late">
             {late.map((r) => (
               <div className="r" key={r.id}>
                 <span>{txt(r.data.name)}</span>
-                <em>{txt(r.data.owner)}</em>
+                <em>{stOf(r.data)} · {txt(r.data.owner)}</em>
               </div>
             ))}
           </div>
@@ -1079,7 +1106,7 @@ function OpEdit({
               <option value="">
                 {kind === "kpi" ? t("تلقائي من الأرباع", "Auto") : t("— اختر —", "— pick —")}
               </option>
-              {OP_STATUSES.map((x) => (
+              {statusesOf(kind).map((x) => (
                 <option key={x} value={x}>{x}</option>
               ))}
             </select>

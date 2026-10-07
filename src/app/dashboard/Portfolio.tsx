@@ -13,7 +13,7 @@ import { IconGear } from "./icons";
 import MyEntities, { contribsOf, sumOf } from "./Entities";
 import { publishUndo } from "@/lib/undoBus";
 import { useLogos, logoKey, SESS_SHORT, INST_COLS, INST_SECTORS, CX_COLS, CX_QS, cxStagesOf, SECTION_TITLE } from "./Sections";
-import { OP_OWNERS, OP_STATUSES, opFix, opRoles, opStatus, opTone } from "./OpPlan";
+import { OP_OWNERS, ALL_STATUSES, statusesOf, opFix, opRoles, opStatus, opTone } from "./OpPlan";
 import { initials, toneOf } from "@/lib/entlogo";
 import { ANNUAL_GOALS, GOALS_WEIGHT, goalsScore, ownAsGoal, type GoalRow, type OwnGoal } from "@/lib/goals";
 import { asset } from "@/lib/base";
@@ -2809,8 +2809,11 @@ function Contrib({ rows, meName, t }: { rows: Row[]; meName: string; t: T }) {
             </span>
           ))}
         </div>
+        {/* سلّمان: المؤشر يُقاس (وفق المسار · متعثر …) والمبادرة
+            تُنجَز (مكتملة · على المسار …). فتُعرض الحالة التي لها
+            بندٌ فعلاً، وإلا امتلأ الشريط بأصفارٍ من سلّمٍ لا يخصّه */}
         <div className="brk st">
-          {OP_STATUSES.map((st) => (
+          {ALL_STATUSES.filter((st) => nSt(st) > 0).map((st) => (
             <span className={`r ${opTone(st)}`} key={st}>
               {st} <b>{nSt(st)}</b>
             </span>
@@ -3009,7 +3012,7 @@ function AddContrib({
           <label>
             <span>{t("الحالة", "Status")}</span>
             <select value={txt(f.status)} onChange={(e) => set("status", e.target.value)}>
-              {OP_STATUSES.map((x) => (
+              {statusesOf(kind).map((x: string) => (
                 <option key={x} value={x}>{x}</option>
               ))}
             </select>
@@ -3177,7 +3180,7 @@ function ContribEdit({
               <option value="">
                 {isKpi ? t("تلقائي من الأرباع", "Auto") : t("— اختر —", "— pick —")}
               </option>
-              {OP_STATUSES.map((x) => (
+              {statusesOf(kind).map((x: string) => (
                 <option key={x} value={x}>{x}</option>
               ))}
             </select>

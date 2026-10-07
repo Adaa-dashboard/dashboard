@@ -6,6 +6,8 @@
    وهي أخطر ما فيها، إذ ترجع من ملفٍ حرّره بشرٌ في إكسل.
    ============================================================ */
 
+import { DEFAULT_BANDS } from "./calc";
+
 export type Rec = Record<string, unknown>;
 
 const txt = (v: unknown) => (v === null || v === undefined ? "" : String(v));
@@ -19,7 +21,63 @@ const nrm = (v: string) =>
   String(v || "").replace(/[أإآ]/g, "ا").replace(/ة/g, "ه").replace(/ى/g, "ي")
     .replace(/[\u064B-\u0652]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
 
+/** حالات المبادرات والمكاسب — تُدخل يدوياً */
 export const OP_STATUSES = ["على المسار", "متأخرة", "مكتملة", "لم تبدأ"];
+/* **حالة المؤشر على سلّم «حالة المؤشرات» نفسه** — بطلب صاحبة
+   المنصة. والمؤشر لا «يكتمل»: يُقاس فيكون وفق المسار أو متعثّراً،
+   أو لا يُقاس. ولذلك كانت «مكتملة» صفراً دائماً في بطاقته. */
+export const KPI_STATUSES = ["وفق المسار", "متعثر جزئيًا", "متعثر", "لا يقاس"];
+export const NO_MEASURE = "لا يقاس";
+/** ما يُقبل في خانة الحالة عند رفع الإكسل — السلّمان معاً */
+export const ALL_STATUSES = [...KPI_STATUSES, ...OP_STATUSES];
+/** حالات النوع الواحد — بها تُرسم بطاقته وتُملأ قائمة تعديله */
+export const statusesOf = (kind: string) => (kind === "kpi" ? KPI_STATUSES : OP_STATUSES);
+
+/* حالةٌ مخزَّنة بالسلّم الآخر — من قبل التغيير، أو من ملف إكسل
+   حرّره أحدهم. لو تُركت كما هي لسقطت من بطاقة نوعها: حلقةٌ مجموعها
+   أقلّ من العدد المكتوب فوقها، بلا أن يقول أحدٌ شيئاً. فتُترجَم. */
+const TO_KPI: Record<string, string> = {
+  "على المسار": "وفق المسار",
+  مكتملة: "وفق المسار",
+  متأخرة: "متعثر",
+  "لم تبدأ": NO_MEASURE,
+};
+const TO_OP: Record<string, string> = {
+  "وفق المسار": "على المسار",
+  "متعثر جزئيًا": "متأخرة",
+  متعثر: "متأخرة",
+  "لا يقاس": "لم تبدأ",
+};
+/** الحالة مردودةً إلى سلّم نوعها — فما يُعدّ هو ما يُعرض */
+export function statusIn(kind: string, st: string): string {
+  if (!st) return st;
+  const own = statusesOf(kind);
+  if (own.includes(st)) return st;
+  return (kind === "kpi" ? TO_KPI[st] : TO_OP[st]) ?? st;
+}
+
+/* السلّمان يلتقيان في أربع درجات: ما يسير · ما تعثّر جزئياً · ما
+   تعثّر · ما لا يُقاس. وبها يُرسم شريط الحالة الإجمالية، وإلا لزم
+   ثماني شرائح لا يقرؤها أحد. */
+export type OpTone = "ok" | "warn" | "bad" | "none";
+export const OP_TONE: Record<string, OpTone> = {
+  "وفق المسار": "ok",
+  مكتملة: "ok",
+  "على المسار": "ok",
+  "متعثر جزئيًا": "warn",
+  متعثر: "bad",
+  متأخرة: "bad",
+  "لا يقاس": "none",
+  "لم تبدأ": "none",
+};
+export const toneOf = (st: string): OpTone => OP_TONE[st] ?? "none";
+/** عنوان كل درجة في الشريط الإجمالي — بلغة سلّم المؤشرات */
+export const TONE_LABEL: Record<OpTone, string> = {
+  ok: "وفق المسار",
+  warn: "متعثر جزئيًا",
+  bad: "متعثر",
+  none: "لا يقاس",
+};
 
 /* ---------- حالة المؤشر: آخر ربعٍ فيه فعلي، مقارناً بمستهدفه ---------- */
 export type QCell = { t: number | null; a: number | null };
@@ -43,15 +101,33 @@ export function onTrack(d: Rec): boolean | null {
 }
 
 
-/** الحالة المعروضة: المُدخَلة يدوياً، وإلا تُشتقّ للمؤشر من آخر ربعٍ فيه فعلي */
+/** نسبة إنجاز المؤشر: فعليُّ آخر ربعٍ أُدخل ÷ مستهدف ذلك الربع.
+    وبلا مستهدفٍ للربع لا نسبة — فالمقارنة بمستهدفٍ سنويّ تضليل. */
+export function kpiPct(d: Rec): number | null {
+  const q = lastQ(quarters(d));
+  if (!q || q.a === null || q.t === null || q.t === 0) return null;
+  return (q.a / q.t) * 100;
+}
+
+/* حدود الحالات من `DEFAULT_BANDS` — لوحة «حالة المؤشرات» نفسها،
+   فلو غُيِّرت الحدود يوماً تبعتها الخطة ولم تتخلّف */
+const BANDS = [...DEFAULT_BANDS].sort((a, b) => b.from - a.from);
+
+/** حالة المؤشر وحده — على سلّم البنود الثلاثة، و«لا يقاس» بلا نسبة */
+export function kpiStatus(d: Rec): string {
+  const p = kpiPct(d);
+  if (p === null) return NO_MEASURE;
+  return BANDS.find((b) => p >= b.from)?.label ?? BANDS[BANDS.length - 1].label;
+}
+
+/** الحالة المعروضة: المُدخَلة يدوياً، وإلا تُحسب للمؤشر من نسبته.
+    وتُردّ دائماً إلى سلّم نوعها */
 export function opStatus(d: Rec): string {
+  const kind = txt(d.kind);
   const s = txt(d.status).trim();
-  if (s) return s;
-  if (txt(d.kind) !== "kpi") return "";
-  const ok = onTrack(d);
-  if (ok === true) return "على المسار";
-  if (ok === false) return "متأخرة";
-  return lastQ(quarters(d)) ? "على المسار" : "لم تبدأ";
+  if (s) return statusIn(kind, s);
+  if (kind !== "kpi") return "";
+  return kpiStatus(d);
 }
 
 /* ============================================================
@@ -320,7 +396,7 @@ export function xlParseBook(sheets: { name: string; rows: string[][] }[], rows: 
         const wasAuto = !hit || !txt(hit.data.status).trim();
         const shown = hit ? opStatus(hit.data) : "";
         if (!st || st === autoStatus(d) || (wasAuto && st === shown)) delete d.status;
-        else if (OP_STATUSES.includes(st)) d.status = st;
+        else if (ALL_STATUSES.includes(st)) d.status = st;
 
         if (hit && JSON.stringify(hit.data) === JSON.stringify(d)) {
           plan.same += 1;
