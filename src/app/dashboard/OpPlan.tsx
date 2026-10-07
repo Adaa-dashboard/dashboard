@@ -229,15 +229,17 @@ const BAND: Record<string, string> = Object.fromEntries(
   DEFAULT_BANDS.map((b) => [b.label, b.color]),
 );
 const GREY = "#a8b3b0";
+/** كحليُّ «مكتملة» — في الحلقة والشريط معاً، فلا يفترق اللونان */
+const NAVY = "#1e3a6b";
 const ST_COLOR: Record<string, string> = {
   /* سلّم المؤشرات — ألوانه من `DEFAULT_BANDS` حرفياً */
   "وفق المسار": BAND["وفق المسار"] ?? "#22c55e",
   "متعثر جزئيًا": BAND["متعثر جزئيًا"] ?? "#f59e0b",
   متعثر: BAND["متعثر"] ?? "#ef4444",
   "لا يقاس": GREY,
-  /* سلّم المبادرات والمكاسب — «مكتملة» أخضرُ أغمق تمييزاً لها عمّا
-     هو على المسار، فالحالتان كلتاهما خير ويفرّقهما الدرجة لا اللون */
-  مكتملة: "#15803d",
+  /* سلّم المبادرات والمكاسب — و«مكتملة» كحليّة لا خضراء: المنجَز
+     غير ما هو سائرٌ بعد، وهو عين لونها في الشريط الإجمالي */
+  مكتملة: NAVY,
   "على المسار": BAND["وفق المسار"] ?? "#22c55e",
   متأخرة: BAND["متعثر"] ?? "#ef4444",
   "لم تبدأ": GREY,
@@ -245,7 +247,7 @@ const ST_COLOR: Record<string, string> = {
 /** لون كل درجة في الشريط الإجمالي — و«مكتملة» كحليٌّ بطلب صاحبة
     المنصة، فلا يلتبس المنجَز بما هو سائرٌ بعد */
 const TONE_COLOR: Record<string, string> = {
-  done: "#1e3a6b",
+  done: NAVY,
   ok: BAND["وفق المسار"] ?? "#22c55e",
   warn: BAND["متعثر جزئيًا"] ?? "#f59e0b",
   bad: BAND["متعثر"] ?? "#ef4444",
@@ -435,25 +437,6 @@ function OpPeople({
         <div className="opd-lg inl">
           {KINDS.map((k) => (
             <span key={k}><i style={{ background: KIND_COLOR[k] }} />{t(KIND_LABEL[k][0], KIND_LABEL[k][1])}</span>
-          ))}
-        </div>
-      </div>
-
-      <div className="opd-box opd-mb">
-        <h4>{t("أكثر خمسة إسهاماً", "Top five")}</h4>
-        <div className="opd-pf5">
-          {list.slice(0, 5).map((e) => (
-            <div className="p" key={e.name}>
-              <Donut
-                size={108} w={13} mid={`${pct(e.items)}%`} sub={t(`${e.items} بنداً`, `${e.items} items`)}
-                parts={[...KINDS.map((k) => ({ v: e.k[k] || 0, c: KIND_COLOR[k] })), { v: tot - e.items, c: "#eef3f2" }]}
-              />
-              <span className="nm">{e.name}</span>
-              <span className="sb">
-                {[e.sponsor ? t(`راعٍ ${e.sponsor}`, `sponsor ${e.sponsor}`) : "",
-                  e.assignee ? t(`مسؤول ${e.assignee}`, `owner ${e.assignee}`) : ""].filter(Boolean).join(" · ")}
-              </span>
-            </div>
           ))}
         </div>
       </div>
