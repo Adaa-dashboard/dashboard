@@ -11,11 +11,11 @@
    ولذلك `owner` حقلٌ مستقلّ عن `sponsor` لا يُشتقّ منه.
    ============================================================ */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { useItems, type Item } from "./Sections";
 import { nrm } from "@/lib/commit";
 import { apiFetch } from "@/lib/api";
-import { IconDown, IconUp } from "./icons";
+import { IconDown, IconUp, IconKpi, IconBulb, IconBolt, IconTarget, IconLayers } from "./icons";
 import { writeXlsx, readXlsxSheets } from "@/lib/sheet";
 import {
   OP_STATUSES, quarters, onTrack, opStatus,
@@ -200,71 +200,132 @@ function Donut({
   );
 }
 
-/** الحالات الأربع بألوانها — نفس ترتيب `OP_STATUSES` في الحلقة */
+/** رمز كل نوع في بطاقته */
+const KIND_ICON: Record<string, (p: { size?: number }) => ReactElement> = {
+  kpi: IconKpi,
+  init: IconBulb,
+  win: IconBolt,
+};
+/* الحالات الأربع بألوانها — أخضر للمكتمل وأزرق لما يسير وأحمر
+   للمتأخر، على التصميم الذي اعتمدته صاحبة المنصة. ورماديٌّ لما لم
+   يبدأ: لا يُسقَط من الحلقة وإلا لم يجمع مجموعُها الكلّ */
 const ST_COLOR: Record<string, string> = {
-  "على المسار": "#1a9d5c",
-  مكتملة: "#00584c",
-  متأخرة: "#c0392b",
-  "لم تبدأ": "#aab6b3",
+  مكتملة: "#1f9d55",
+  "على المسار": "#3b82f6",
+  متأخرة: "#e0564f",
+  "لم تبدأ": "#b7c2bf",
 };
 /** بندٌ بلا حالةٍ مُدخَلة لم يبدأ — فلا يسقط من الحلقة */
 const stOf = (d: Rec) => opStatus(d) || "لم تبدأ";
 
 /* ---------------- تبويب ١: الداش بورد ---------------- */
+/* بطاقةُ نوعٍ واحد: عدده الكليّ، ثم حالاته الأربع عدداً وحلقةً.
+   والبطاقة كلها زرّ — يفتح تبويب المحافظ على هذا النوع وحده،
+   وهو ما يعنيه السهم في زاويتها. */
+function OpKind({
+  k, rows, t, onOpen,
+}: {
+  k: (typeof KINDS)[number];
+  rows: { data: Rec }[];
+  t: T;
+  onOpen: () => void;
+}) {
+  const Ic = KIND_ICON[k];
+  const n = rows.length;
+  const sc = (x: string) => rows.filter((r) => stOf(r.data) === x).length;
+  return (
+    <button className="opk" style={{ ["--c" as string]: KIND_COLOR[k] }} onClick={onOpen}
+            title={t(`عرض ${KIND_LABEL[k][0]} وحدها`, `Show only ${KIND_LABEL[k][1]}`)}>
+      <span className="h">
+        <span className="go" aria-hidden>‹</span>
+        <span className="t">{t(KIND_LABEL[k][0], KIND_LABEL[k][1])}</span>
+        <span className="ic"><Ic size={20} /></span>
+      </span>
+      <span className="n">{n}</span>
+      <span className="nl">{t(`إجمالي ${KIND_LABEL[k][0]}`, `Total ${KIND_LABEL[k][1]}`)}</span>
+      <span className="bd">
+        <span className="lg">
+          {OP_STATUSES.map((x) => (
+            <span key={x}>
+              <em>{x}</em>
+              <i style={{ background: ST_COLOR[x] }} />
+              <b>{sc(x)}</b>
+            </span>
+          ))}
+        </span>
+        <span className="dw">
+          <Donut size={96} w={12} parts={OP_STATUSES.map((x) => ({ v: sc(x), c: ST_COLOR[x] }))} />
+          {/* الرمز في قلب الحلقة — خارج الـsvg فلا يدور مع دورانها */}
+          <span className="mid" aria-hidden><Ic size={22} /></span>
+        </span>
+      </span>
+    </button>
+  );
+}
+
 function OpDash({
-  rows, owners, t, onPick,
+  rows, owners, t, onPick, onKind,
 }: {
   rows: { id: string; ord: number; data: Rec }[];
   owners: string[];
   t: T;
   /** الضغط على محفظة ينقل إلى تبويب المحافظ مفلترًا عليها */
   onPick: (o: string) => void;
+  /** الضغط على بطاقة نوعٍ ينقل إلى تبويب المحافظ على ذلك النوع */
+  onKind: (k: (typeof KINDS)[number]) => void;
 }) {
   const tot = rows.length;
-  const pct = (n: number) => (tot ? Math.round((100 * n) / tot) : 0);
-  const kc = (k: string) => rows.filter((r) => txt(r.data.kind) === k).length;
+  const pct = (n: number) => (tot ? Math.round((1000 * n) / tot) / 10 : 0);
   const sc = (x: string) => rows.filter((r) => stOf(r.data) === x).length;
   const late = rows.filter((r) => stOf(r.data) === "متأخرة");
-  const good = sc("على المسار") + sc("مكتملة");
-  const byOwner = (o: string) => rows.filter((r) => txt(r.data.owner) === o);
-
-  const kinds = (rs: typeof rows) => KINDS.map((k) => ({ v: rs.filter((r) => txt(r.data.kind) === k).length, c: KIND_COLOR[k] }));
+  const ofKind = (k: string) => rows.filter((r) => txt(r.data.kind) === k);
+  const kinds = (rs: typeof rows) =>
+    KINDS.map((k) => ({ v: rs.filter((r) => txt(r.data.kind) === k).length, c: KIND_COLOR[k] }));
 
   if (!tot) return <div className="op-none">{t("لا توجد بنود في الخطة بعد", "The plan is empty")}</div>;
 
   return (
     <>
-      <div className="opd-r3">
-        <div className="opd-box">
-          <h4>{t("حالة بنود الخطة", "Status")}</h4>
-          <Donut size={160} w={18} mid={String(tot)} sub={t("بنداً", "items")}
-                 parts={OP_STATUSES.map((x) => ({ v: sc(x), c: ST_COLOR[x] }))} />
-          <div className="opd-lg">
-            {OP_STATUSES.map((x) => (
-              <span key={x}><i style={{ background: ST_COLOR[x] }} />{x}<b>{sc(x)}</b><em>{pct(sc(x))}%</em></span>
-            ))}
-          </div>
-        </div>
+      {/* المؤشرات أولاً ثم المبادرات ثم المكاسب — ترتيب `KINDS` نفسه */}
+      <div className="opk-3">
+        {KINDS.map((k) => (
+          <OpKind key={k} k={k} rows={ofKind(k)} t={t} onOpen={() => onKind(k)} />
+        ))}
+      </div>
 
-        <div className="opd-box">
-          <h4>{t("تركيبة الخطة", "Composition")}</h4>
-          <Donut size={160} w={18} mid={String(tot)} sub={t("بنداً", "items")} parts={kinds(rows)} />
-          <div className="opd-lg">
-            {KINDS.map((k) => (
-              <span key={k}><i style={{ background: KIND_COLOR[k] }} />{t(KIND_LABEL[k][0], KIND_LABEL[k][1])}
-                <b>{kc(k)}</b><em>{pct(kc(k))}%</em></span>
-            ))}
-          </div>
+      <div className="opo opd-mb">
+        <div className="h">
+          <span className="ic"><IconTarget size={19} /></span>
+          <h4>{t("الحالة الإجمالية للخطة التشغيلية", "Overall status")}</h4>
         </div>
-
-        <div className="opd-box">
-          <h4>{t("سلامة الخطة", "Health")}</h4>
-          <Donut size={160} w={18} mid={`${pct(good)}%`} sub={t("على المسار أو مكتملة", "On track or done")}
-                 parts={[{ v: good, c: "#1a9d5c" }, { v: tot - good, c: "#e3ebe9" }]} />
-          <div className="opd-lg">
-            <span><i style={{ background: "#1a9d5c" }} />{t("سائرة كما يجب", "On track")}<b>{good}</b><em>{pct(good)}%</em></span>
-            <span><i style={{ background: ST_COLOR["متأخرة"] }} />{t("متأخرة", "Late")}<b>{sc("متأخرة")}</b><em>{pct(sc("متأخرة"))}%</em></span>
-            <span><i style={{ background: ST_COLOR["لم تبدأ"] }} />{t("لم تبدأ", "Not started")}<b>{sc("لم تبدأ")}</b><em>{pct(sc("لم تبدأ"))}%</em></span>
+        <div className="bd">
+          <div>
+            <div className="bar">
+              {OP_STATUSES.map((x) =>
+                sc(x) ? (
+                  <span key={x} style={{ flex: sc(x), background: ST_COLOR[x] }}>
+                    {/* النسبة تُكتب داخل الشريحة ما دامت تسعها */}
+                    {pct(sc(x)) >= 5 ? `${pct(sc(x))}%` : ""}
+                  </span>
+                ) : null,
+              )}
+            </div>
+            <div className="lg3">
+              {OP_STATUSES.map((x) => (
+                <span key={x}>
+                  <em><i style={{ background: ST_COLOR[x] }} />{x}</em>
+                  <b>{sc(x)}</b>
+                  <u>{pct(sc(x))}%</u>
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="tot">
+            <span className="l">{t("إجمالي عناصر الخطة التشغيلية", "Total plan items")}</span>
+            <span className="r">
+              <b>{tot}</b>
+              <IconLayers size={22} />
+            </span>
           </div>
         </div>
       </div>
@@ -273,13 +334,13 @@ function OpDash({
         <h4>{t("المحافظ — حجم كل محفظة وتركيبتها", "Portfolios")}</h4>
         <div className="opd-pf5">
           {owners.map((o) => {
-            const rs = byOwner(o);
+            const rs = rows.filter((r) => txt(r.data.owner) === o);
             return (
               <button className="p" key={o} onClick={() => onPick(o)}
                       title={t(`عرض محفظة ${o}`, `Open ${o}`)}>
                 <Donut size={108} w={13} mid={String(rs.length)} sub={t("بنداً", "items")} parts={kinds(rs)} />
                 <span className="nm">{o}</span>
-                <span className="sb">{pct(rs.length)}% {t("من الخطة", "of the plan")}</span>
+                <span className="sb">{Math.round(pct(rs.length))}% {t("من الخطة", "of the plan")}</span>
               </button>
             );
           })}
@@ -307,6 +368,7 @@ function OpDash({
     </>
   );
 }
+
 
 /* ---------------- تبويب ٣: نسبة المساهمات ---------------- */
 /* **مساهمةٌ بالعدد لا بالإنجاز**: كم بنداً للموظف فيه دورٌ مُسمّى.
@@ -533,6 +595,11 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
           onPick={(o) => {
             setOwn(o);
             setKind("");
+            setView("pf");
+          }}
+          onKind={(k) => {
+            setOwn("");
+            setKind(k);
             setView("pf");
           }}
         />

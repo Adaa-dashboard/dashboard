@@ -12460,6 +12460,81 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
   font: inherit; font-size: 11px; font-weight: 700; color: var(--g-800); cursor: pointer;
 }
 
+
+/* ---- بطاقة نوعٍ في داش بورد الخطة: عدده ثم حالاته عدداً وحلقةً ---- */
+/* ملاحظة: `--ink` مستعملٌ في المنصة في 49 موضعاً وهو **غير معرَّف**
+   أصلاً، فيسقط كلٌّ منها على اللون الموروث. فهذه الأسطر تستعمل
+   `--text` المعرَّف — وتصحيحُ الـ49 شغلٌ آخر لا يُدسّ هنا. */
+.opk-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; }
+.opk {
+  display: block; width: 100%; text-align: start; font: inherit; cursor: pointer;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 18px;
+  padding: 16px 18px; transition: box-shadow .15s, transform .15s;
+}
+.opk:hover { box-shadow: 0 8px 22px rgba(0, 88, 76, .12); transform: translateY(-2px); }
+.opk .h { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.opk .h .t { flex: 1; font-size: 13px; font-weight: 800; color: var(--text); }
+.opk .h .ic {
+  width: 42px; height: 42px; border-radius: 14px; flex: none;
+  display: grid; place-items: center;
+  color: var(--c); background: color-mix(in srgb, var(--c) 12%, transparent);
+}
+.opk .h .go { font-size: 17px; color: var(--muted); line-height: 1; }
+.opk .n {
+  display: block; font-family: "Noto Kufi Arabic", sans-serif;
+  font-size: 34px; font-weight: 800; color: var(--text); line-height: 1;
+}
+.opk .nl { display: block; font-size: 11px; color: var(--muted); margin-top: 6px; }
+.opk .bd {
+  display: flex; align-items: center; gap: 10px;
+  border-top: 1px solid var(--border); margin-top: 14px; padding-top: 14px;
+}
+.opk .lg { flex: 1; display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+/* ثلاثة أعمدة: الاسم يملأ، ثم النقطة في عمودٍ ثابت فتصطفّ، ثم العدد */
+.opk .lg > span { display: grid; grid-template-columns: 1fr 10px 26px; align-items: center; gap: 8px; }
+.opk .lg em { font-style: normal; font-size: 11.5px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.opk .lg i { width: 9px; height: 9px; border-radius: 50%; }
+.opk .lg b { font-family: "Noto Kufi Arabic", sans-serif; font-size: 13px; font-weight: 800; color: var(--text); text-align: end; }
+.opk .dw { position: relative; flex: none; display: grid; place-items: center; }
+/* الرمز في قلب الحلقة — خارج الـsvg فلا يدور مع دورانها */
+.opk .dw .mid { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ink-2); pointer-events: none; }
+
+/* ---- شريط الحالة الإجمالية ---- */
+.opo { background: var(--panel); border: 1px solid var(--border); border-radius: 18px; padding: 16px 18px; }
+.opo > .h { display: flex; align-items: center; gap: 9px; margin-bottom: 14px; }
+.opo > .h h4 { margin: 0; font-size: 13px; font-weight: 800; color: var(--text); }
+.opo > .h .ic {
+  width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center;
+  color: var(--g-700); background: var(--tint);
+}
+/* الشريط أولاً ثم صندوق الإجمالي — فيقع الصندوق يساراً كما في التصميم */
+.opo .bd { display: grid; grid-template-columns: 1fr 230px; gap: 18px; align-items: center; }
+.opo .tot { background: var(--soft); border-radius: 14px; padding: 14px 16px; }
+.opo .tot .l { display: block; font-size: 11px; color: var(--muted); }
+.opo .tot .r { display: flex; align-items: center; gap: 12px; margin-top: 8px; color: var(--muted); }
+.opo .tot b {
+  font-family: "Noto Kufi Arabic", sans-serif; font-size: 34px; font-weight: 800;
+  color: var(--text); line-height: 1; flex: 1;
+}
+.opo .bar { display: flex; height: 42px; border-radius: 11px; overflow: hidden; }
+.opo .bar > span {
+  display: grid; place-items: center; min-width: 0;
+  color: #fff; font-family: "Noto Kufi Arabic", sans-serif; font-size: 12.5px; font-weight: 800;
+}
+.opo .lg3 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 14px; }
+.opo .lg3 > span { display: flex; flex-direction: column; gap: 5px; padding-inline-start: 12px; border-inline-start: 1px solid var(--border); }
+.opo .lg3 > span:last-child { border-inline-start: none; }
+.opo .lg3 em { font-style: normal; display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--ink-2); }
+.opo .lg3 i { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.opo .lg3 b { font-family: "Noto Kufi Arabic", sans-serif; font-size: 22px; font-weight: 800; color: var(--text); line-height: 1; }
+.opo .lg3 u { text-decoration: none; font-size: 11px; color: var(--muted); }
+
+@media (max-width: 1100px) {
+  .opk-3 { grid-template-columns: 1fr; }
+  .opo .bd { grid-template-columns: 1fr; }
+  .opo .lg3 { grid-template-columns: repeat(2, 1fr); }
+}
+
 @media (max-width: 1100px) {
   .opd-r3 { grid-template-columns: 1fr; }
   .opd-pf5 { grid-template-columns: repeat(3, 1fr); }

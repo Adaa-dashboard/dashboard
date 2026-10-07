@@ -180,3 +180,12 @@ export const IconFolder = nav(
 export const IconDots = nav(
   '<circle cx="5.6" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="18.4" cy="12" r="1.6" fill="currentColor" stroke="none"/>',
 );
+
+/* بطاقات داش بورد الخطة التشغيلية — رمزٌ لكل نوع */
+export const IconBulb = nav(
+  '<path d="M9.2 17.2a6.2 6.2 0 1 1 5.6 0"/><path d="M9.6 17.4h4.8"/><path d="M10.4 20.4h3.2"/>',
+);
+export const IconBolt = nav('<path d="M13.4 2.8L5.6 13.4h5.2l-.6 7.8 7.8-10.6h-5.2z"/>');
+export const IconTarget = nav(
+  '<circle cx="12" cy="12" r="8.4"/><circle cx="12" cy="12" r="4.4"/><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/>',
+);
