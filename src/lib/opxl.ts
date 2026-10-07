@@ -363,11 +363,16 @@ export type OpShare = {
   k: Record<string, number>;
 };
 
-/** خانةٌ قد تحمل أكثر من اسم: «أ · ب» أو «أ، ب» */
+/* خانةٌ قد تحمل أكثر من اسم. والفاصل ليس «·» وحده: الخانة يكتبها
+   بشرٌ في إكسل أو في الصفحة، فيضع أحدهم نقطةً عادية أو فاصلةً
+   منقوطة. فظلّت «فارس السحيباني . سلطانه العرجاني» سطراً واحداً
+   في جدول المساهمات كأنها شخصٌ باسمٍ طويل.
+   والجزء بحرفٍ واحد يسقط، فلا تصير «م. العتيق» شخصين. */
+const OP_SEP = /[·•.,،؛;/\\|+&\n]+/;
 export const opNames = (v: unknown) =>
-  txt(v).split(/[·,،/|]+/).map((x) => x.trim()).filter(Boolean);
+  txt(v).split(OP_SEP).map((x) => x.trim()).filter((x) => x.length > 1);
 
-/** أسماءٌ جماعية في خانات الخطة — تُحلّ إلى أصحابها */
+/** أسماءٌ جماعية معروفة — تُحلّ إلى أصحابها */
 export const OP_GROUPS: Record<string, "leads" | "all"> = {
   "مدراء القطاعات": "leads",
   "مديري القطاعات": "leads",
@@ -380,6 +385,13 @@ export const OP_GROUPS: Record<string, "leads" | "all"> = {
 const GROUP_KEY: Record<string, "leads" | "all"> = Object.fromEntries(
   Object.entries(OP_GROUPS).map(([k, v]) => [nrm(k), v]),
 );
+/* وما بدأ بـ«فريق» أو «لجنة» أو «مدراء» ولم يكن في القائمة فجماعةٌ
+   لا نعرف أصحابها — مثل «فريق المشروع الاستشاري»، وهم من خارج
+   المركز أصلاً. يسقط ولا يبقى سطراً في جدول الموظفين. */
+/* `\b` لا يصلح هنا: حدُّ الكلمة في JS معرَّفٌ على `\w` اللاتيني،
+   فلا حدَّ بين «ق» ومسافة — فكان الشرط لا يتحقّق أبداً. والنظرُ
+   الأمامي إلى مسافةٍ أو نهاية يصنع ما أُريد، ولا يسقط «فرح الشمري». */
+const GROUP_ANY = /^(ال)?(فريق|فرق|فرقه|لجنه|مجموعه|مدراء|مديري|اداره)(?=\s|$)/;
 
 /**
  * صفٌّ لكل موظف — ولو بلا بند، فهذا معنى «على كل موظف».
@@ -395,9 +407,10 @@ export function opShares(
   const leads = people.filter((x) => x.isLead).map((x) => x.name);
   const everyone = people.map((x) => x.name);
   const spread = (n: string): string[] => {
-    const g = GROUP_KEY[nrm(n)];
-    if (!g) return [n];
-    return g === "leads" ? leads : everyone;
+    const key = nrm(n);
+    const g = GROUP_KEY[key];
+    if (g) return g === "leads" ? leads : everyone;
+    return GROUP_ANY.test(key) ? [] : [n];
   };
 
   const m = new Map<string, OpShare>();

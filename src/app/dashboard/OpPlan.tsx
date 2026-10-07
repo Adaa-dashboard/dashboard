@@ -19,7 +19,7 @@ import { apiFetch } from "@/lib/api";
 import { IconDown, IconUp, IconKpi, IconBulb, IconBolt, IconTarget, IconLayers } from "./icons";
 import { writeXlsx, readXlsxSheets } from "@/lib/sheet";
 import {
-  OP_STATUSES, quarters, onTrack, opStatus, opShares,
+  OP_STATUSES, quarters, onTrack, opStatus, opShares, opNames,
   xlBook, xlParseBook, type XlRow, type XlPlan,
 } from "@/lib/opxl";
 
@@ -96,16 +96,23 @@ const last = (n: string) => n.trim().split(/\s+/).slice(-1)[0] || n;
    فتُصحَّح الأسماء عند العرض، ويُصحَّح المخزون نفسه بملف
    perf-opplan-rename.sql — والاثنان معاً: الواجهة تصلح فوراً
    والقاعدة تصلح دائماً. */
-const NAME_ALIAS: Record<string, string> = { "معاذ البقاص": "معاذ الهقاص" };
+const NAME_ALIAS: Record<string, string> = {
+  "معاذ البقاص": "معاذ الهقاص",
+  /* حسابه في المنصة «عبدالعزيز بن عون»، وفي الخطة «عبدالعزيز العون»
+     — فظهر سطرين في جدول المساهمات. والصحيح «بن عون» */
+  "عبدالعزيز العون": "عبدالعزيز بن عون",
+};
 export const opName = (v: unknown) => {
   const x = txt(v).trim();
   return NAME_ALIAS[x] ?? x;
 };
-/** خانةٌ قد تحمل عدة أسماء — يُصحَّح كلٌّ منها على حدة */
+/** خانةٌ قد تحمل عدة أسماء — يُصحَّح كلٌّ منها على حدة.
+    والتقسيم بـ`opNames` نفسها التي يحسب بها جدول المساهمات، فلا
+    يفترق ما تراه عمّا يُحسب */
 const fixList = (v: unknown) => {
   const x = txt(v).trim();
   if (!x) return x;
-  const parts = x.split(/[·,،|]+/).map((p) => p.trim()).filter(Boolean);
+  const parts = opNames(x);
   return parts.length > 1 ? parts.map(opName).join(" · ") : opName(x);
 };
 /** نسخةٌ من بيانات البند بأسماءٍ مصحَّحة — تُستعمل في العرض والمطابقة */
@@ -121,8 +128,7 @@ export function opFix(d: Rec): Rec {
 
 /* ---------- «مَن يخصّه البند» ---------- */
 /** خانةٌ قد تحمل أكثر من اسم: «أ · ب» أو «أ، ب» */
-const namesOf = (v: unknown) =>
-  txt(v).split(/[·,،/|]+/).map((x) => x.trim()).filter(Boolean);
+const namesOf = opNames;
 
 /** أدوار الشخص في البند — فارغة إن لم يكن له فيه شيء */
 export function opRoles(d: Rec, me: string): string[] {
