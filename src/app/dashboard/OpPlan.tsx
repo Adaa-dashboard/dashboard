@@ -12,7 +12,7 @@
    ============================================================ */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useItems, type Item, SECTION_TITLE } from "./Sections";
+import { useItems, type Item } from "./Sections";
 import { nrm } from "@/lib/commit";
 import { apiFetch } from "@/lib/api";
 import { IconDown, IconUp } from "./icons";
@@ -64,6 +64,12 @@ const KIND_LABEL: Record<string, [string, string]> = {
 /** مختصرٌ لشرائح البطاقة — «المكاسب السريعة» لا تسع في صفٍّ واحد */
 const KIND_SHORT: Record<string, string> = { kpi: "مؤشرات", init: "مبادرات", win: "مكاسب" };
 const KINDS = ["kpi", "init", "win"] as const;
+/** نصّ شريط الإضافة في ذيل كل عمود */
+const ADD_LABEL: Record<string, string> = {
+  kpi: "إضافة مؤشر",
+  init: "إضافة مبادرة",
+  win: "إضافة مكسب سريع",
+};
 const LEVELS = ["", "مستوى أول", "مستوى ثانٍ", "مستوى ثالث"];
 const INIT_TYPES = ["استراتيجية", "تشغيلية"];
 /** الحالات الأربع المعتمدة — لا «جديدة» ولا «مستمرة» بعد اليوم */
@@ -149,6 +155,284 @@ export function agoOf(iso?: string): { txt: string; stale: boolean } | null {
 
 export const opTone = (s: string) => ST_TONE[s] || "nt";
 
+/* ---------------- حلقةٌ مجزّأة ---------------- */
+/* الداش بورد دوائرُ لا أشرطة — بطلب صاحبة المنصة. والحلقة ترسم
+   نفسها بـ`stroke-dasharray` على دائرةٍ واحدة: كل جزءٍ قوسٌ طوله
+   حصّته، و`stroke-dashoffset` يدفعه إلى مكانه. لا مكتبة رسوم. */
+function Donut({
+  parts, size = 150, w = 17, mid, sub,
+}: {
+  parts: { v: number; c: string }[];
+  size?: number;
+  w?: number;
+  mid?: string;
+  sub?: string;
+}) {
+  const r = (size - w) / 2;
+  const cx = size / 2;
+  const C = 2 * Math.PI * r;
+  const sum = parts.reduce((a, x) => a + x.v, 0) || 1;
+  let off = 0;
+  const arcs = parts.map((x, i) => {
+    if (x.v <= 0) return null;
+    const ln = (C * x.v) / sum;
+    const at = off;
+    off += ln;
+    /* فجوةٌ صغيرة بين الأقواس تفصلها للعين — وتُقتطع من القوس نفسه
+       لا تُزاد عليه، وإلا زاد مجموع الأقواس عن محيط الدائرة */
+    return (
+      <circle
+        key={i} cx={cx} cy={cx} r={r} fill="none" stroke={x.c} strokeWidth={w} strokeLinecap="round"
+        strokeDasharray={`${Math.max(ln - 2.2, 0.1)} ${C - Math.max(ln - 2.2, 0.1)}`}
+        strokeDashoffset={-at}
+      />
+    );
+  });
+  return (
+    <svg className="dn" viewBox={`0 0 ${size} ${size}`} width={size} height={size} aria-hidden>
+      <g transform={`rotate(-90 ${cx} ${cx})`}>
+        <circle cx={cx} cy={cx} r={r} fill="none" stroke="var(--soft)" strokeWidth={w} />
+        {arcs}
+      </g>
+      {mid && <text x={cx} y={cx - 2} textAnchor="middle" className="dn-n">{mid}</text>}
+      {sub && <text x={cx} y={cx + 16} textAnchor="middle" className="dn-s">{sub}</text>}
+    </svg>
+  );
+}
+
+/** الحالات الأربع بألوانها — نفس ترتيب `OP_STATUSES` في الحلقة */
+const ST_COLOR: Record<string, string> = {
+  "على المسار": "#1a9d5c",
+  مكتملة: "#00584c",
+  متأخرة: "#c0392b",
+  "لم تبدأ": "#aab6b3",
+};
+/** بندٌ بلا حالةٍ مُدخَلة لم يبدأ — فلا يسقط من الحلقة */
+const stOf = (d: Rec) => opStatus(d) || "لم تبدأ";
+
+/* ---------------- تبويب ١: الداش بورد ---------------- */
+function OpDash({
+  rows, owners, t, onPick,
+}: {
+  rows: { id: string; ord: number; data: Rec }[];
+  owners: string[];
+  t: T;
+  /** الضغط على محفظة ينقل إلى تبويب المحافظ مفلترًا عليها */
+  onPick: (o: string) => void;
+}) {
+  const tot = rows.length;
+  const pct = (n: number) => (tot ? Math.round((100 * n) / tot) : 0);
+  const kc = (k: string) => rows.filter((r) => txt(r.data.kind) === k).length;
+  const sc = (x: string) => rows.filter((r) => stOf(r.data) === x).length;
+  const late = rows.filter((r) => stOf(r.data) === "متأخرة");
+  const good = sc("على المسار") + sc("مكتملة");
+  const byOwner = (o: string) => rows.filter((r) => txt(r.data.owner) === o);
+
+  const kinds = (rs: typeof rows) => KINDS.map((k) => ({ v: rs.filter((r) => txt(r.data.kind) === k).length, c: KIND_COLOR[k] }));
+
+  if (!tot) return <div className="op-none">{t("لا توجد بنود في الخطة بعد", "The plan is empty")}</div>;
+
+  return (
+    <>
+      <div className="opd-r3">
+        <div className="opd-box">
+          <h4>{t("حالة بنود الخطة", "Status")}</h4>
+          <Donut size={160} w={18} mid={String(tot)} sub={t("بنداً", "items")}
+                 parts={OP_STATUSES.map((x) => ({ v: sc(x), c: ST_COLOR[x] }))} />
+          <div className="opd-lg">
+            {OP_STATUSES.map((x) => (
+              <span key={x}><i style={{ background: ST_COLOR[x] }} />{x}<b>{sc(x)}</b><em>{pct(sc(x))}%</em></span>
+            ))}
+          </div>
+        </div>
+
+        <div className="opd-box">
+          <h4>{t("تركيبة الخطة", "Composition")}</h4>
+          <Donut size={160} w={18} mid={String(tot)} sub={t("بنداً", "items")} parts={kinds(rows)} />
+          <div className="opd-lg">
+            {KINDS.map((k) => (
+              <span key={k}><i style={{ background: KIND_COLOR[k] }} />{t(KIND_LABEL[k][0], KIND_LABEL[k][1])}
+                <b>{kc(k)}</b><em>{pct(kc(k))}%</em></span>
+            ))}
+          </div>
+        </div>
+
+        <div className="opd-box">
+          <h4>{t("سلامة الخطة", "Health")}</h4>
+          <Donut size={160} w={18} mid={`${pct(good)}%`} sub={t("على المسار أو مكتملة", "On track or done")}
+                 parts={[{ v: good, c: "#1a9d5c" }, { v: tot - good, c: "#e3ebe9" }]} />
+          <div className="opd-lg">
+            <span><i style={{ background: "#1a9d5c" }} />{t("سائرة كما يجب", "On track")}<b>{good}</b><em>{pct(good)}%</em></span>
+            <span><i style={{ background: ST_COLOR["متأخرة"] }} />{t("متأخرة", "Late")}<b>{sc("متأخرة")}</b><em>{pct(sc("متأخرة"))}%</em></span>
+            <span><i style={{ background: ST_COLOR["لم تبدأ"] }} />{t("لم تبدأ", "Not started")}<b>{sc("لم تبدأ")}</b><em>{pct(sc("لم تبدأ"))}%</em></span>
+          </div>
+        </div>
+      </div>
+
+      <div className="opd-box opd-mb">
+        <h4>{t("المحافظ — حجم كل محفظة وتركيبتها", "Portfolios")}</h4>
+        <div className="opd-pf5">
+          {owners.map((o) => {
+            const rs = byOwner(o);
+            return (
+              <button className="p" key={o} onClick={() => onPick(o)}
+                      title={t(`عرض محفظة ${o}`, `Open ${o}`)}>
+                <Donut size={108} w={13} mid={String(rs.length)} sub={t("بنداً", "items")} parts={kinds(rs)} />
+                <span className="nm">{o}</span>
+                <span className="sb">{pct(rs.length)}% {t("من الخطة", "of the plan")}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="opd-lg inl">
+          {KINDS.map((k) => (
+            <span key={k}><i style={{ background: KIND_COLOR[k] }} />{t(KIND_LABEL[k][0], KIND_LABEL[k][1])}</span>
+          ))}
+        </div>
+      </div>
+
+      {late.length > 0 && (
+        <div className="opd-box">
+          <h4>{t(`تحتاج انتباهاً — ${late.length} متأخرة`, `Needs attention — ${late.length} late`)}</h4>
+          <div className="opd-late">
+            {late.map((r) => (
+              <div className="r" key={r.id}>
+                <span>{txt(r.data.name)}</span>
+                <em>{txt(r.data.owner)}</em>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ---------------- تبويب ٣: نسبة المساهمات ---------------- */
+/* **مساهمةٌ بالعدد لا بالإنجاز**: كم بنداً للموظف فيه دورٌ مُسمّى.
+   والبند يُحسب مرةً واحدة له مهما تعدّدت أدواره فيه، ويُحسب لكل من
+   ذُكر فيه — فمجموع النسب يتجاوز 100% بطبيعته، إذ للبند راعٍ
+   ومسؤولون. */
+function OpPeople({ rows, t }: { rows: { id: string; data: Rec }[]; t: T }) {
+  /* مدراء المحافظ رعاةٌ بلا مسؤوليةٍ مباشرة، فجمعُ الدورين يضعهم في
+     الصدارة — والمربع يفصل المسؤولية وحدها لمن أراد المنفّذ */
+  const [both, setBoth] = useState(true);
+  const [all, setAll] = useState(false);
+
+  const tot = rows.length;
+  const list = useMemo(() => {
+    const m = new Map<string, { name: string; items: number; sponsor: number; assignee: number; k: Record<string, number> }>();
+    const fields = both ? (["sponsor", "assignee"] as const) : (["assignee"] as const);
+    for (const r of rows) {
+      const kind = txt(r.data.kind);
+      const seen = new Set<string>();
+      for (const f of fields) {
+        for (const n of namesOf(r.data[f])) {
+          const key = nrm(opName(n));
+          if (!key) continue;
+          const e = m.get(key) || { name: opName(n), items: 0, sponsor: 0, assignee: 0, k: { kpi: 0, init: 0, win: 0 } };
+          e[f] += 1;
+          if (!seen.has(key)) {
+            e.items += 1;
+            e.k[kind] = (e.k[kind] || 0) + 1;
+            seen.add(key);
+          }
+          m.set(key, e);
+        }
+      }
+    }
+    return [...m.values()].sort((a, b) => b.items - a.items || a.name.localeCompare(b.name, "ar"));
+  }, [rows, both]);
+
+  const pct = (n: number) => (tot ? Math.round((100 * n) / tot) : 0);
+  const shown = all ? list : list.slice(0, 14);
+
+  if (!tot) return <div className="op-none">{t("لا توجد بنود في الخطة بعد", "The plan is empty")}</div>;
+
+  return (
+    <>
+      <div className="opd-box opd-mb">
+        <h4>{t("أكثر خمسة إسهاماً", "Top five")}</h4>
+        <div className="opd-pf5">
+          {list.slice(0, 5).map((e) => (
+            <div className="p" key={e.name}>
+              <Donut
+                size={108} w={13} mid={`${pct(e.items)}%`} sub={t(`${e.items} بنداً`, `${e.items} items`)}
+                parts={[...KINDS.map((k) => ({ v: e.k[k] || 0, c: KIND_COLOR[k] })), { v: tot - e.items, c: "#eef3f2" }]}
+              />
+              <span className="nm">{e.name}</span>
+              <span className="sb">
+                {[e.sponsor ? t(`راعٍ ${e.sponsor}`, `sponsor ${e.sponsor}`) : "",
+                  e.assignee ? t(`مسؤول ${e.assignee}`, `owner ${e.assignee}`) : ""].filter(Boolean).join(" · ")}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="opd-box">
+        <div className="opd-hd">
+          <h4>{t("نسبة مساهمة كل موظف في الخطة التشغيلية", "Contribution per person")}</h4>
+          <div className="chips">
+            <button className={`chip sm ${both ? "on" : ""}`} onClick={() => setBoth(true)}>
+              {t("راعٍ + مسؤول", "Sponsor + owner")}
+            </button>
+            <button className={`chip sm ${!both ? "on" : ""}`} onClick={() => setBoth(false)}>
+              {t("المسؤولية فقط", "Owner only")}
+            </button>
+          </div>
+        </div>
+        <p className="opc-note">
+          {t(
+            `النسبة = عدد بنود الخطة التي للموظف فيها دورٌ مُسمّى ÷ ${tot} بنداً. البند يُحسب مرةً واحدة لكل شخص مهما تعدّدت أدواره فيه، ويُحسب لكل من ذُكر فيه — فمجموع النسب يتجاوز 100% بطبيعته. وهي مساهمةٌ بالعدد لا بالإنجاز.`,
+            `Share of the ${tot} plan items where the person holds a named role. Totals exceed 100% by design.`,
+          )}
+        </p>
+        <table className="opc-tb">
+          <thead>
+            <tr>
+              <th>{t("الموظف", "Person")}</th>
+              <th>{t("البنود", "Items")}</th>
+              <th>{t("عدد", "N")}</th>
+              <th>{t("نسبة", "%")}</th>
+              <th>{t("الأدوار", "Roles")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((e) => {
+              const mx = list[0]?.items || 1;
+              return (
+                <tr key={e.name}>
+                  <td className="nm">{e.name}</td>
+                  <td>
+                    <span className="opc-b">
+                      {KINDS.map((k) =>
+                        e.k[k] ? <span key={k} style={{ flex: e.k[k], background: KIND_COLOR[k] }} /> : null,
+                      )}
+                      {mx > e.items && <span style={{ flex: mx - e.items }} />}
+                    </span>
+                  </td>
+                  <td className="p">{e.items}</td>
+                  <td className="p">{pct(e.items)}%</td>
+                  <td>
+                    {e.sponsor > 0 && <span className="opc-k sp">{t(`راعٍ ${e.sponsor}`, `sponsor ${e.sponsor}`)}</span>}
+                    {e.assignee > 0 && <span className="opc-k as">{t(`مسؤول ${e.assignee}`, `owner ${e.assignee}`)}</span>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {list.length > 14 && (
+          <button className="op-more" onClick={() => setAll((x) => !x)}>
+            {all ? t("عرض أعلى 14", "Show top 14") : t(`عرض الجميع (${list.length})`, `Show all (${list.length})`)}
+          </button>
+        )}
+      </div>
+    </>
+  );
+}
+
 export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
   const { items, loaded, save, remove, reload } = useItems("opplan");
   const [own, setOwn] = useState("");
@@ -172,6 +456,11 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
       .catch(() => {});
   }, []);
   const [edit, setEdit] = useState<Item | null>(null);
+  /* بندٌ جديد لم يُحفَظ بعد — نفس نافذة التعديل، والفرق أن الحذف
+     يُخفى والعنوان يقول «إضافة» */
+  const [add, setAdd] = useState<Item | null>(null);
+  /* الصفحة ثلاثة تبويبات، وتُفتح على الداش بورد — بطلب صاحبة المنصة */
+  const [view, setView] = useState<"dash" | "pf" | "ppl">("dash");
 
   const rows = useMemo(() => items.map((x) => ({ ...x, data: opFix(x.data as Rec) })), [items]);
   const byOwner = useMemo(() => {
@@ -190,6 +479,22 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
   );
   const owners = [...OP_OWNERS, ...extra];
 
+  /* بندٌ فارغ بنوع عموده ومحفظة المعروضة — معرّفه من الوقت والعشوائي
+     كبقية المنصة، وترتيبه بعد آخر بند فلا يزاحم محفوظاً */
+  const newItem = (k: string): Item => ({
+    id: "op-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+    ord: rows.reduce((a, r) => Math.max(a, r.ord), 0) + 1,
+    data: {
+      kind: k,
+      owner: own || owners[0] || "",
+      name: "",
+      sponsor: "",
+      assignee: "",
+      ...(k === "kpi" ? { level: 1, unit: "%" } : {}),
+      ...(k === "init" ? { itype: INIT_TYPES[0] } : {}),
+    },
+  });
+
   const shown = own ? rows.filter((r) => txt(r.data.owner) === own) : rows;
   const of = (k: string) => shown.filter((r) => txt(r.data.kind) === k);
   const cnt = (o: string, k: string) => (byOwner[o] || []).filter((r) => txt(r.data.kind) === k).length;
@@ -198,19 +503,49 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
 
   return (
     <div className="op">
-      <div className="op-head">
-        <h2>{t(SECTION_TITLE.opplan[0], SECTION_TITLE.opplan[1])} <b>2026م</b></h2>
-        <span>
-          {t(
-            `${owners.length} محافظ · ${of("kpi").length} مؤشراً · ${of("init").length} مبادرة · ${of("win").length} مكاسب سريعة`,
-            `${owners.length} portfolios`,
-          )}
-        </span>
+      {/* عنوان الصفحة في شريط المنصة الأعلى (TITLES.opplan)، ومكانَه
+          هنا المربعات الثلاثة — بطلب صاحبة المنصة */}
+      <div className="op-bar">
+        <div className="chips">
+          <button className={`chip ${view === "dash" ? "on" : ""}`} onClick={() => setView("dash")}>
+            {t("الخطة التشغيلية", "Operational plan")}
+          </button>
+          <button className={`chip ${view === "pf" ? "on" : ""}`} onClick={() => setView("pf")}>
+            {t("المحافظ", "Portfolios")}
+          </button>
+          <button className={`chip ${view === "ppl" ? "on" : ""}`} onClick={() => setView("ppl")}>
+            {t("نسبة المساهمات", "Contribution")}
+          </button>
+        </div>
+        <div className="gr" />
         {/* الملف يحمل الخطة كما هي على الشاشة — المعروض بعد الفلتر
             لا كل شيء، فما تراه هو ما تُنزّله. و**التنزيل لمن يقرأ**:
             أخذُ نسخةٍ لا يغيّر شيئاً، وإنما الرفع هو الذي يحتاج
             صلاحية التحرير */}
-        <OpXlsx rows={shown} owners={owners} t={t} canEdit={canEdit} onDone={reload} />
+        {view === "pf" && <OpXlsx rows={shown} owners={owners} t={t} canEdit={canEdit} onDone={reload} />}
+      </div>
+
+      {view === "dash" && (
+        <OpDash
+          rows={rows}
+          owners={owners}
+          t={t}
+          onPick={(o) => {
+            setOwn(o);
+            setKind("");
+            setView("pf");
+          }}
+        />
+      )}
+      {view === "ppl" && <OpPeople rows={rows} t={t} />}
+
+      {view === "pf" && (
+       <>
+      <div className="op-sub">
+        {t(
+          `${owners.length} محافظ · ${of("kpi").length} مؤشراً · ${of("init").length} مبادرة · ${of("win").length} مكاسب سريعة`,
+          `${owners.length} portfolios`,
+        )}
       </div>
 
       {/* المحافظ — الضغط يفلتر الأعمدة الثلاثة على صاحبها */}
@@ -285,9 +620,34 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
               <OpCard key={r.id} r={r} canEdit={canEdit} t={t} onEdit={() => setEdit(r)} />
             ))}
             {!of(k).length && <div className="op-none">{t("لا توجد بنود", "Nothing here")}</div>}
+            {/* الإضافة من ذيل العمود لا من رأس الصفحة: النوع يصير
+                معلوماً من العمود نفسه، فلا تُسأل عنه النافذة */}
+            {canEdit && (
+              <button className="op-add" onClick={() => setAdd(newItem(k))}>
+                ＋ {t(ADD_LABEL[k], KIND_LABEL[k][1])}
+              </button>
+            )}
           </div>
         ))}
       </div>
+       </>
+      )}
+
+      {add && (
+        <OpEdit
+          it={add}
+          isNew
+          t={t}
+          owners={owners}
+          onClose={() => setAdd(null)}
+          onSave={async (d) => {
+            const err = await save(add.id, d, add.ord);
+            if (!err) setAdd(null);
+            return err;
+          }}
+          onDelete={async () => null}
+        />
+      )}
 
       {edit && (
         <OpEdit
@@ -535,7 +895,7 @@ function OpCard({
 
 /* ---------------- نافذة التعديل ---------------- */
 function OpEdit({
-  it, t, owners, onClose, onSave, onDelete,
+  it, t, owners, onClose, onSave, onDelete, isNew,
 }: {
   it: Item;
   t: T;
@@ -544,6 +904,8 @@ function OpEdit({
   onSave: (d: Rec) => Promise<string | null>;
   /** حذف بندٍ سقط من الخطة — التراجع يعيده من شريط ↩ */
   onDelete: () => Promise<string | null>;
+  /** بندٌ لم يُحفَظ بعد: لا حذف، والعنوان يقول «إضافة» */
+  isNew?: boolean;
 }) {
   const [f, setF] = useState<Rec>({ ...(it.data as Rec) });
   const [busy, setBusy] = useState(false);
@@ -562,7 +924,11 @@ function OpEdit({
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal wide" onClick={(e) => e.stopPropagation()}>
         <div className="m-h">
-          <h3>{t("تعديل بند الخطة", "Edit item")}</h3>
+          <h3>
+            {isNew
+              ? t(`${ADD_LABEL[kind] ?? "إضافة بند"} إلى الخطة`, "Add to the plan")
+              : t("تعديل بند الخطة", "Edit item")}
+          </h3>
           <button className="mx" onClick={onClose} aria-label="close">✕</button>
         </div>
 
@@ -686,6 +1052,7 @@ function OpEdit({
         <div className="m-f">
           <button
             className="btn btn-del"
+            hidden={isNew}
             disabled={busy}
             onClick={async () => {
               if (!confirm(t(`حذف «${txt(it.data.name)}» من الخطة؟`, "Delete this item?"))) return;
@@ -702,13 +1069,17 @@ function OpEdit({
             className="btn"
             disabled={busy}
             onClick={async () => {
+              if (!txt(f.name).trim()) {
+                setErr(t("اكتب اسم البند أولاً", "Name is required"));
+                return;
+              }
               setBusy(true);
               const e = await onSave(f);
               setBusy(false);
               if (e) setErr(e);
             }}
           >
-            {t("حفظ", "Save")}
+            {isNew ? t("إضافة البند", "Add") : t("حفظ", "Save")}
           </button>
         </div>
       </div>

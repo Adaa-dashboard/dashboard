@@ -12381,3 +12381,90 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
 .op-xlist .r > em { font-style: normal; font-size: 9.5px; color: var(--muted); }
 .op-xlist .r.more { color: var(--muted); font-size: 10.5px; justify-content: center; }
 
+
+/* ============================================================
+   الخطة التشغيلية — الشريط والداش بورد وشريط الإضافة
+   ------------------------------------------------------------
+   العنوان صعد إلى شريط المنصة (TITLES.opplan)، ومكانَه هنا
+   المربعات الثلاثة. والداش بورد **دوائر لا أشرطة** بطلب صاحبة
+   المنصة — فالحلقة تقول النسبة والعدد في موضعٍ واحد.
+   ============================================================ */
+.op-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.op-bar .gr { flex: 1; }
+.op-sub { font-size: 11.5px; color: var(--muted); margin-bottom: 12px; }
+.chip.sm { padding: 5px 12px; font-size: 11px; border-radius: 10px; }
+
+.opd-box {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 16px; padding: 15px 18px;
+}
+.opd-box > h4 { font-size: 12px; font-weight: 800; color: var(--g-800); margin: 0 0 12px; }
+.opd-mb { margin-bottom: 12px; }
+.opd-hd { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.opd-hd > h4 { margin: 0; flex: 1; font-size: 12px; font-weight: 800; color: var(--g-800); }
+.opd-r3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; }
+
+.dn { display: block; margin: 0 auto; }
+.dn-n { font-family: "Noto Kufi Arabic", sans-serif; font-size: 27px; font-weight: 800; fill: var(--g-800); }
+.dn-s { font-size: 10px; fill: var(--muted); }
+
+.opd-lg { display: flex; flex-direction: column; gap: 7px; margin-top: 14px; }
+.opd-lg.inl { flex-direction: row; gap: 16px; flex-wrap: wrap; justify-content: center; margin-top: 12px; }
+.opd-lg > span { font-size: 11px; display: flex; align-items: center; gap: 7px; color: var(--ink-2); }
+.opd-lg i { width: 10px; height: 10px; border-radius: 4px; flex: none; }
+.opd-lg b { font-family: "Noto Kufi Arabic", sans-serif; font-weight: 800; margin-inline-start: auto; color: var(--g-800); }
+.opd-lg em { font-style: normal; font-size: 10px; color: var(--muted); width: 36px; text-align: end; }
+.opd-lg.inl b, .opd-lg.inl em { margin: 0; width: auto; }
+
+.opd-pf5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+.opd-pf5 .p {
+  text-align: center; background: none; border: none; font: inherit;
+  padding: 6px 2px; border-radius: 14px; cursor: pointer;
+}
+.opd-pf5 div.p { cursor: default; }
+.opd-pf5 button.p:hover { background: var(--soft); }
+.opd-pf5 .nm { display: block; font-size: 11px; font-weight: 700; color: var(--g-800); margin-top: 8px; }
+.opd-pf5 .sb { display: block; font-size: 9.5px; color: var(--muted); margin-top: 3px; }
+
+.opd-late { display: flex; flex-direction: column; gap: 7px; }
+.opd-late .r {
+  display: flex; gap: 9px; align-items: baseline; font-size: 11px; line-height: 1.6;
+  padding: 9px 11px; border-radius: 11px; background: var(--dgr-bg); color: var(--dgr-tx);
+}
+.opd-late em { font-style: normal; font-size: 9.5px; opacity: .85; white-space: nowrap; }
+
+/* **شريط الإضافة في ذيل العمود** لا زرٌّ في رأس الصفحة: النوع يصير
+   معلوماً من العمود، فنافذة الإضافة لا تسأل عنه */
+.op-add {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; margin-top: 8px; padding: 11px; border-radius: 12px;
+  border: 1px dashed var(--border); background: var(--soft);
+  font: inherit; font-size: 11.5px; font-weight: 700; color: var(--muted); cursor: pointer;
+}
+.op-add:hover { background: var(--tint); color: var(--g-800); border-color: var(--g-600); }
+
+.opc-note { font-size: 10.5px; color: var(--muted); margin: 0 0 12px; line-height: 1.7; }
+.opc-tb { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+.opc-tb th { font-size: 10px; color: var(--muted); font-weight: 700; text-align: start; padding: 0 8px 8px; }
+.opc-tb td { padding: 7px 8px; border-top: 1px solid var(--border); vertical-align: middle; }
+.opc-tb td.nm { font-weight: 700; color: var(--g-800); white-space: nowrap; }
+.opc-tb td.p { font-family: "Noto Kufi Arabic", sans-serif; font-weight: 800; color: var(--g-700); width: 48px; text-align: end; }
+.opc-b { display: flex; height: 11px; border-radius: 999px; overflow: hidden; background: var(--soft); min-width: 110px; }
+.opc-b > span { display: block; }
+.opc-k { font-size: 9.5px; font-weight: 800; border-radius: 999px; padding: 2px 8px; display: inline-block; margin-inline-end: 4px; }
+.opc-k.sp { color: #5b3ea8; background: rgba(122, 92, 209, .14); }
+.opc-k.as { color: var(--g-800); background: var(--g-100); }
+.op-more {
+  display: block; width: 100%; margin-top: 10px; padding: 8px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--soft);
+  font: inherit; font-size: 11px; font-weight: 700; color: var(--g-800); cursor: pointer;
+}
+
+@media (max-width: 1100px) {
+  .opd-r3 { grid-template-columns: 1fr; }
+  .opd-pf5 { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 620px) {
+  .opd-pf5 { grid-template-columns: repeat(2, 1fr); }
+  .opc-tb th:last-child, .opc-tb td:last-child { display: none; }
+}

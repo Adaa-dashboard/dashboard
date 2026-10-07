@@ -484,6 +484,9 @@ export default function Dashboard({ me }: { me: Me }) {
     entities: ["الجهات ونقاط التواصل", "Entities & contacts"],
     structure: ["الهيكل التنظيمي", "Org chart"],
     users: ["المستخدمون والصلاحيات", "Users & Roles"],
+    /* كان ساقطاً، فيقع العنوان على القيمة الاحتياطية «نظرة عامة»
+       ويكتبها الشريط فوق صفحة الخطة التشغيلية */
+    opplan: ["الخطة التشغيلية لإدارة عمليات الأداء 2026م", "Operational plan 2026"],
     sessions: SECTION_TITLE.sessions,
     natstrat: SECTION_TITLE.natstrat,
     inststrat: SECTION_TITLE.inststrat,
