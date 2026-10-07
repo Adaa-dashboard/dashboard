@@ -18,7 +18,7 @@ import { apiFetch } from "@/lib/api";
 import { IconDown, IconUp, IconKpi, IconBulb, IconBolt, IconTarget, IconLayers } from "./icons";
 import { writeXlsx, readXlsxSheets } from "@/lib/sheet";
 import {
-  OP_STATUSES, quarters, onTrack, opStatus,
+  OP_STATUSES, quarters, onTrack, opStatus, opShares,
   xlBook, xlParseBook, type XlRow, type XlPlan,
 } from "@/lib/opxl";
 
@@ -375,39 +375,35 @@ function OpDash({
    والبند يُحسب مرةً واحدة له مهما تعدّدت أدواره فيه، ويُحسب لكل من
    ذُكر فيه — فمجموع النسب يتجاوز 100% بطبيعته، إذ للبند راعٍ
    ومسؤولون. */
-function OpPeople({ rows, t }: { rows: { id: string; data: Rec }[]; t: T }) {
+function OpPeople({
+  rows, people, t,
+}: {
+  rows: { id: string; data: Rec }[];
+  /** كل موظفي المنصة — فالجدول على كل موظف لا على من ذُكر في الخطة وحده */
+  people: { name: string; isLead: boolean }[];
+  t: T;
+}) {
   /* مدراء المحافظ رعاةٌ بلا مسؤوليةٍ مباشرة، فجمعُ الدورين يضعهم في
      الصدارة — والمربع يفصل المسؤولية وحدها لمن أراد المنفّذ */
   const [both, setBoth] = useState(true);
-  const [all, setAll] = useState(false);
+  /* الجدول على كل موظف، ومن لا بند له يُطوى خلف زرٍّ حتى لا يطول
+     الجدول بأصفارٍ تحجب من يعمل */
+  const [zeros, setZeros] = useState(false);
 
   const tot = rows.length;
-  const list = useMemo(() => {
-    const m = new Map<string, { name: string; items: number; sponsor: number; assignee: number; k: Record<string, number> }>();
-    const fields = both ? (["sponsor", "assignee"] as const) : (["assignee"] as const);
-    for (const r of rows) {
-      const kind = txt(r.data.kind);
-      const seen = new Set<string>();
-      for (const f of fields) {
-        for (const n of namesOf(r.data[f])) {
-          const key = nrm(opName(n));
-          if (!key) continue;
-          const e = m.get(key) || { name: opName(n), items: 0, sponsor: 0, assignee: 0, k: { kpi: 0, init: 0, win: 0 } };
-          e[f] += 1;
-          if (!seen.has(key)) {
-            e.items += 1;
-            e.k[kind] = (e.k[kind] || 0) + 1;
-            seen.add(key);
-          }
-          m.set(key, e);
-        }
-      }
-    }
-    return [...m.values()].sort((a, b) => b.items - a.items || a.name.localeCompare(b.name, "ar"));
-  }, [rows, both]);
+  /* «مدراء القطاعات» يُحلّ إلى من عُلِّم `is_lead`. وإن لم يُعلَّم أحد
+     سقط البند فلم يصل أحداً — فالبديل أصحابُ المحافظ الأربعة، وهم
+     مدراء القطاعات بالتعريف (والأول مدير الإدارة فيُستثنى) */
+  const ppl = useMemo(() => {
+    if (people.some((x) => x.isLead)) return people;
+    const leads = new Set(OP_OWNERS.slice(1).map((o) => nrm(o)));
+    return people.map((x) => ({ ...x, isLead: leads.has(nrm(x.name)) }));
+  }, [people]);
+  const list = useMemo(() => opShares(rows, ppl, both, opName), [rows, ppl, both]);
 
   const pct = (n: number) => (tot ? Math.round((100 * n) / tot) : 0);
-  const shown = all ? list : list.slice(0, 14);
+  const none = list.filter((e) => !e.items).length;
+  const shown = zeros ? list : list.filter((e) => e.items > 0);
 
   if (!tot) return <div className="op-none">{t("لا توجد بنود في الخطة بعد", "The plan is empty")}</div>;
 
@@ -446,7 +442,7 @@ function OpPeople({ rows, t }: { rows: { id: string; data: Rec }[]; t: T }) {
         </div>
         <p className="opc-note">
           {t(
-            `النسبة = عدد بنود الخطة التي للموظف فيها دورٌ مُسمّى ÷ ${tot} بنداً. البند يُحسب مرةً واحدة لكل شخص مهما تعدّدت أدواره فيه، ويُحسب لكل من ذُكر فيه — فمجموع النسب يتجاوز 100% بطبيعته. وهي مساهمةٌ بالعدد لا بالإنجاز.`,
+            `النسبة = عدد بنود الخطة التي للموظف فيها دورٌ مُسمّى ÷ ${tot} بنداً. البند يُحسب مرةً واحدة لكل شخص مهما تعدّدت أدواره فيه، ويُحسب لكل من ذُكر فيه — فمجموع النسب يتجاوز 100% بطبيعته. وهي مساهمةٌ بالعدد لا بالإنجاز. والاسم الجماعي («مدراء القطاعات» · «الفريق المركزي») لا يظهر صفّاً، بل يُحسب بنده لكل واحدٍ من أصحابه.`,
             `Share of the ${tot} plan items where the person holds a named role. Totals exceed 100% by design.`,
           )}
         </p>
@@ -485,9 +481,11 @@ function OpPeople({ rows, t }: { rows: { id: string; data: Rec }[]; t: T }) {
             })}
           </tbody>
         </table>
-        {list.length > 14 && (
-          <button className="op-more" onClick={() => setAll((x) => !x)}>
-            {all ? t("عرض أعلى 14", "Show top 14") : t(`عرض الجميع (${list.length})`, `Show all (${list.length})`)}
+        {none > 0 && (
+          <button className="op-more" onClick={() => setZeros((x) => !x)}>
+            {zeros
+              ? t("إخفاء من لا بند له", "Hide people with no items")
+              : t(`عرض من لا بند له في الخطة (${none})`, `Show ${none} with no items`)}
           </button>
         )}
       </div>
@@ -504,16 +502,24 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
   /* صورة صاحب المحفظة إن رفعها في محفظته — تُطابَق بالاسم بعد
      التطبيع، فاختلاف الهمزة لا يُسقطها. وبلا صورةٍ يبقى الحرفان */
   const [photo, setPhoto] = useState<Map<string, string>>(new Map());
+  /* وتُستعمل القائمة نفسها في «نسبة المساهمات»: الجدول على كل موظف
+     لا على من ذُكر في الخطة وحده، و`isLead` يحلّ «مدراء القطاعات» */
+  const [people, setPeople] = useState<{ name: string; isLead: boolean }[]>([]);
   useEffect(() => {
     void apiFetch("/api/people")
       .then((r) => r.json())
       .then((d) => {
         const m = new Map<string, string>();
+        const ppl: { name: string; isLead: boolean }[] = [];
         for (const u of (Array.isArray(d.people) ? d.people : []) as Rec[]) {
           const url = txt(u.photoUrl);
-          if (url && txt(u.name)) m.set(nrm(opName(u.name)), url);
+          const name = opName(txt(u.name));
+          if (!name) continue;
+          if (url) m.set(nrm(name), url);
+          ppl.push({ name, isLead: u.isLead === true });
         }
         setPhoto(m);
+        setPeople(ppl);
       })
       .catch(() => {});
   }, []);
@@ -604,7 +610,7 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
           }}
         />
       )}
-      {view === "ppl" && <OpPeople rows={rows} t={t} />}
+      {view === "ppl" && <OpPeople rows={rows} people={people} t={t} />}
 
       {view === "pf" && (
        <>

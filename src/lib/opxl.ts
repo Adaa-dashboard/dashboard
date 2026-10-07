@@ -338,3 +338,97 @@ export function xlParseBook(sheets: { name: string; rows: string[][] }[], rows: 
   }
   return plan;
 }
+
+/* ============================================================
+   نسبة مساهمة كل موظف
+   ------------------------------------------------------------
+   **مساهمةٌ بالعدد لا بالإنجاز**: كم بنداً للموظف فيه دورٌ مُسمّى.
+   البند يُحسب مرةً واحدة لكل شخص مهما تعدّدت أدواره فيه، ويُحسب لكل
+   من ذُكر فيه — فمجموع النسب يتجاوز 100% بطبيعته، إذ للبند راعٍ
+   ومسؤولون.
+
+   و**الاسم الجماعي ليس موظفاً**: «مدراء القطاعات» و«الفريق المركزي»
+   كانا يظهران صفّاً كأنهما شخص. يُحلّان إلى أصحابهما ويُحسب البند
+   لكلٍّ منهم — وما لم يُعرف له أصحاب يسقط ولا يبقى صفّاً وهمياً.
+
+   وهنا لا في الصفحة ليُختبر بلا React ولا شبكة.
+   ============================================================ */
+
+export type OpPerson = { name: string; isLead: boolean };
+export type OpShare = {
+  name: string;
+  items: number;
+  sponsor: number;
+  assignee: number;
+  k: Record<string, number>;
+};
+
+/** خانةٌ قد تحمل أكثر من اسم: «أ · ب» أو «أ، ب» */
+export const opNames = (v: unknown) =>
+  txt(v).split(/[·,،/|]+/).map((x) => x.trim()).filter(Boolean);
+
+/** أسماءٌ جماعية في خانات الخطة — تُحلّ إلى أصحابها */
+export const OP_GROUPS: Record<string, "leads" | "all"> = {
+  "مدراء القطاعات": "leads",
+  "مديري القطاعات": "leads",
+  "مدراء المحافظ": "leads",
+  "الفريق المركزي": "all",
+  "فريق العمل": "all",
+  الفريق: "all",
+  "فريق الإدارة": "all",
+};
+const GROUP_KEY: Record<string, "leads" | "all"> = Object.fromEntries(
+  Object.entries(OP_GROUPS).map(([k, v]) => [nrm(k), v]),
+);
+
+/**
+ * صفٌّ لكل موظف — ولو بلا بند، فهذا معنى «على كل موظف».
+ * @param both احسب الرعاية مع المسؤولية، أو المسؤولية وحدها
+ */
+export function opShares(
+  rows: { data: Rec }[],
+  people: OpPerson[],
+  both: boolean,
+  /** تصحيح الأسماء القديمة — تمرّره الصفحة، وبدونه يُؤخذ الاسم كما هو */
+  fix: (n: string) => string = (n) => n,
+): OpShare[] {
+  const leads = people.filter((x) => x.isLead).map((x) => x.name);
+  const everyone = people.map((x) => x.name);
+  const spread = (n: string): string[] => {
+    const g = GROUP_KEY[nrm(n)];
+    if (!g) return [n];
+    return g === "leads" ? leads : everyone;
+  };
+
+  const m = new Map<string, OpShare>();
+  const touch = (n: string) => {
+    const name = fix(n);
+    const key = nrm(name);
+    const e = m.get(key) || { name, items: 0, sponsor: 0, assignee: 0, k: { kpi: 0, init: 0, win: 0 } };
+    m.set(key, e);
+    return e;
+  };
+  for (const x of people) if (x.name.trim()) touch(x.name);
+
+  const fields = both ? (["sponsor", "assignee"] as const) : (["assignee"] as const);
+  for (const r of rows) {
+    const kind = txt(r.data.kind);
+    const seen = new Set<string>();
+    for (const f of fields) {
+      for (const raw of opNames(r.data[f])) {
+        for (const n of spread(raw)) {
+          const key = nrm(fix(n));
+          if (!key) continue;
+          const e = touch(n);
+          e[f] += 1;
+          if (!seen.has(key)) {
+            e.items += 1;
+            e.k[kind] = (e.k[kind] || 0) + 1;
+            seen.add(key);
+          }
+        }
+      }
+    }
+  }
+  return [...m.values()].sort((a, b) => b.items - a.items || a.name.localeCompare(b.name, "ar"));
+}
