@@ -56,13 +56,15 @@ export function statusIn(kind: string, st: string): string {
   return (kind === "kpi" ? TO_KPI[st] : TO_OP[st]) ?? st;
 }
 
-/* السلّمان يلتقيان في أربع درجات: ما يسير · ما تعثّر جزئياً · ما
-   تعثّر · ما لا يُقاس. وبها يُرسم شريط الحالة الإجمالية، وإلا لزم
-   ثماني شرائح لا يقرؤها أحد. */
-export type OpTone = "ok" | "warn" | "bad" | "none";
+/* السلّمان يلتقيان في خمس درجات: ما اكتمل · ما يسير · ما تعثّر
+   جزئياً · ما تعثّر · ما لا يُقاس. وبها يُرسم شريط الحالة الإجمالية،
+   وإلا لزمه ثماني شرائح لا يقرؤها أحد.
+   و**«مكتملة» درجةٌ قائمة بذاتها** — بطلب صاحبة المنصة: كانت تندرج
+   تحت «وفق المسار» فيختفي المنجَز في الشريط وهو أهمّ ما فيه. */
+export type OpTone = "done" | "ok" | "warn" | "bad" | "none";
 export const OP_TONE: Record<string, OpTone> = {
+  مكتملة: "done",
   "وفق المسار": "ok",
-  مكتملة: "ok",
   "على المسار": "ok",
   "متعثر جزئيًا": "warn",
   متعثر: "bad",
@@ -71,8 +73,11 @@ export const OP_TONE: Record<string, OpTone> = {
   "لم تبدأ": "none",
 };
 export const toneOf = (st: string): OpTone => OP_TONE[st] ?? "none";
+/** درجات الشريط من الأحسن إلى الأسوأ */
+export const OP_TONES: OpTone[] = ["done", "ok", "warn", "bad", "none"];
 /** عنوان كل درجة في الشريط الإجمالي — بلغة سلّم المؤشرات */
 export const TONE_LABEL: Record<OpTone, string> = {
+  done: "مكتملة",
   ok: "وفق المسار",
   warn: "متعثر جزئيًا",
   bad: "متعثر",

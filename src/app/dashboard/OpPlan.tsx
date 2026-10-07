@@ -19,7 +19,7 @@ import { apiFetch } from "@/lib/api";
 import { IconDown, IconUp, IconKpi, IconBulb, IconBolt, IconTarget, IconLayers } from "./icons";
 import { writeXlsx, readXlsxSheets } from "@/lib/sheet";
 import {
-  OP_STATUSES, KPI_STATUSES, ALL_STATUSES, statusesOf, toneOf, TONE_LABEL, NO_MEASURE,
+  OP_STATUSES, KPI_STATUSES, ALL_STATUSES, statusesOf, toneOf, TONE_LABEL, OP_TONES, NO_MEASURE,
   quarters, onTrack, opStatus, opShares, opNames,
   xlBook, xlParseBook, type XlRow, type XlPlan,
 } from "@/lib/opxl";
@@ -242,14 +242,15 @@ const ST_COLOR: Record<string, string> = {
   متأخرة: BAND["متعثر"] ?? "#ef4444",
   "لم تبدأ": GREY,
 };
-/** لون كل درجة في الشريط الإجمالي */
+/** لون كل درجة في الشريط الإجمالي — و«مكتملة» كحليٌّ بطلب صاحبة
+    المنصة، فلا يلتبس المنجَز بما هو سائرٌ بعد */
 const TONE_COLOR: Record<string, string> = {
+  done: "#1e3a6b",
   ok: BAND["وفق المسار"] ?? "#22c55e",
   warn: BAND["متعثر جزئيًا"] ?? "#f59e0b",
   bad: BAND["متعثر"] ?? "#ef4444",
   none: GREY,
 };
-const TONES = ["ok", "warn", "bad", "none"] as const;
 /** بندٌ بلا حالةٍ مُدخَلة لم يبدأ — فلا يسقط من الحلقة */
 /* بندٌ بلا حالةٍ مُدخَلة لم يبدأ — فلا يسقط من الحلقة */
 const stOf = (d: Rec) => opStatus(d) || (txt(d.kind) === "kpi" ? NO_MEASURE : "لم تبدأ");
@@ -334,7 +335,7 @@ function OpDash({
         <div className="bd">
           <div>
             <div className="bar">
-              {TONES.map((x) =>
+              {OP_TONES.map((x) =>
                 sc(x) ? (
                   <span key={x} style={{ flex: sc(x), background: TONE_COLOR[x] }}>
                     {/* النسبة تُكتب داخل الشريحة ما دامت تسعها */}
@@ -344,7 +345,7 @@ function OpDash({
               )}
             </div>
             <div className="lg3">
-              {TONES.map((x) => (
+              {OP_TONES.map((x) => (
                 <span key={x}>
                   <em><i style={{ background: TONE_COLOR[x] }} />{TONE_LABEL[x]}</em>
                   <b>{sc(x)}</b>
