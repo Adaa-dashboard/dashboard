@@ -12458,6 +12458,23 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
 .opc-tb td.kk .k.z { color: var(--muted); background: var(--soft); }
 .opc-k.sp { color: #5b3ea8; background: rgba(122, 92, 209, .14); }
 .opc-k.as { color: var(--g-800); background: var(--g-100); }
+.opc-k.ct { color: #8a5a00; background: rgba(224, 151, 26, .16); }
+
+/* كل رقمٍ يُراجَع: الصفّ يُفتح فتظهر بنوده واحداً واحداً */
+.opc-tb tr.cl { cursor: pointer; }
+.opc-tb tr.cl:hover > td { background: var(--soft); }
+.opc-tb tr.cl.on > td { background: var(--tint); }
+.opc-tb tr.det > td { padding: 0 8px 10px; border-top: none; }
+.opc-det { display: flex; flex-direction: column; gap: 4px; }
+.opc-det .r {
+  display: flex; align-items: baseline; gap: 8px; font-size: 11px; line-height: 1.6;
+  background: var(--soft); border-radius: 9px; padding: 6px 10px;
+}
+.opc-det .r > i { width: 8px; height: 8px; border-radius: 3px; flex: none; align-self: center; }
+.opc-det .r > .n { flex: 1; overflow-wrap: anywhere; }
+.opc-det .r > em { font-style: normal; font-size: 9.5px; font-weight: 800; color: var(--g-800); white-space: nowrap; }
+.opc-det .r > u { text-decoration: none; font-size: 9.5px; color: var(--muted); white-space: nowrap; }
+.opc-det .r.none { color: var(--muted); justify-content: center; }
 .op-more {
   display: block; width: 100%; margin-top: 10px; padding: 8px; border-radius: 10px;
   border: 1px solid var(--border); background: var(--soft);

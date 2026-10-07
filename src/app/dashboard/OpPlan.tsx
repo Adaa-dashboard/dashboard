@@ -11,7 +11,7 @@
    ولذلك `owner` حقلٌ مستقلّ عن `sponsor` لا يُشتقّ منه.
    ============================================================ */
 
-import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { useItems, type Item } from "./Sections";
 import { nrm } from "@/lib/commit";
 import { DEFAULT_BANDS } from "@/lib/calc";
@@ -393,6 +393,9 @@ function OpPeople({
   /* الجدول على كل موظف، ومن لا بند له يُطوى خلف زرٍّ حتى لا يطول
      الجدول بأصفارٍ تحجب من يعمل */
   const [zeros, setZeros] = useState(false);
+  /* **كل رقمٍ يُراجَع**: الضغط على صفٍّ يفتح بنوده بأسمائها وأدواره
+     فيها — فالخلاف على العدد يُحسم بالنظر لا بالظنّ */
+  const [open, setOpen] = useState("");
 
   const tot = rows.length;
   /* «مدراء القطاعات» يُحلّ إلى من عُلِّم `is_lead`. وإن لم يُعلَّم أحد
@@ -446,16 +449,16 @@ function OpPeople({
           <h4>{t("نسبة مساهمة كل موظف في الخطة التشغيلية", "Contribution per person")}</h4>
           <div className="chips">
             <button className={`chip sm ${both ? "on" : ""}`} onClick={() => setBoth(true)}>
-              {t("راعٍ + مسؤول", "Sponsor + owner")}
+              {t("كل الأدوار", "All roles")}
             </button>
             <button className={`chip sm ${!both ? "on" : ""}`} onClick={() => setBoth(false)}>
-              {t("المسؤولية فقط", "Owner only")}
+              {t("التنفيذ فقط", "Delivery only")}
             </button>
           </div>
         </div>
         <p className="opc-note">
           {t(
-            `النسبة = عدد بنود الخطة التي للموظف فيها دورٌ مُسمّى ÷ ${tot} بنداً. البند يُحسب مرةً واحدة لكل شخص مهما تعدّدت أدواره فيه، ويُحسب لكل من ذُكر فيه — فمجموع النسب يتجاوز 100% بطبيعته. وهي مساهمةٌ بالعدد لا بالإنجاز. والاسم الجماعي («مدراء القطاعات» · «الفريق المركزي») لا يظهر صفّاً، بل يُحسب بنده لكل واحدٍ من أصحابه.`,
+            `الأدوار ثلاثة: راعٍ · مسؤول · مساهمة أضافها صاحبها من محفظته. و«التنفيذ فقط» يُسقط الرعاية ويُبقي المسؤولية والمساهمة. النسبة = عدد بنود الخطة التي للموظف فيها دورٌ ÷ ${tot} بنداً؛ والبند يُحسب مرةً واحدة لكل شخص مهما تعدّدت أدواره فيه، ويُحسب لكل من ذُكر فيه — فمجموع النسب يتجاوز 100% بطبيعته. وهي مساهمةٌ بالعدد لا بالإنجاز. والاسم الجماعي («مدراء القطاعات» · «الفريق المركزي») لا يظهر صفّاً بل يُحسب بنده لكل واحدٍ من أصحابه. **اضغط أي صفٍّ لترى بنوده واحداً واحداً.**`,
             `Share of the ${tot} plan items where the person holds a named role. Totals exceed 100% by design.`,
           )}
         </p>
@@ -473,8 +476,10 @@ function OpPeople({
           <tbody>
             {shown.map((e) => {
               const mx = list[0]?.items || 1;
+              const on = open === e.name;
               return (
-                <tr key={e.name}>
+                <Fragment key={e.name}>
+                <tr className={`cl ${on ? "on" : ""}`} onClick={() => setOpen(on ? "" : e.name)}>
                   <td className="nm">{e.name}</td>
                   <td>
                     <span className="opc-b">
@@ -503,8 +508,31 @@ function OpPeople({
                   <td>
                     {e.sponsor > 0 && <span className="opc-k sp">{t(`راعٍ ${e.sponsor}`, `sponsor ${e.sponsor}`)}</span>}
                     {e.assignee > 0 && <span className="opc-k as">{t(`مسؤول ${e.assignee}`, `owner ${e.assignee}`)}</span>}
+                    {e.contributor > 0 && (
+                      <span className="opc-k ct">{t(`مساهمة ${e.contributor}`, `own ${e.contributor}`)}</span>
+                    )}
                   </td>
                 </tr>
+                {on && (
+                  <tr className="det">
+                    <td colSpan={6}>
+                      <div className="opc-det">
+                        {e.hits.map((h, i) => (
+                          <div className="r" key={h.id || i}>
+                            <i style={{ background: KIND_COLOR[h.kind] ?? GREY }} />
+                            <span className="n">{h.name || t("(بلا اسم)", "(untitled)")}</span>
+                            <em>{h.roles.join(" · ")}</em>
+                            {h.via && <u>{t(`عبر «${h.via}»`, `via ${h.via}`)}</u>}
+                          </div>
+                        ))}
+                        {!e.hits.length && (
+                          <div className="r none">{t("لا بند له في الخطة", "No items")}</div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               );
             })}
           </tbody>

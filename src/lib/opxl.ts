@@ -436,12 +436,28 @@ export function xlParseBook(sheets: { name: string; rows: string[][] }[], rows: 
    ============================================================ */
 
 export type OpPerson = { name: string; isLead: boolean };
+/** بندٌ واحد مع دور الشخص فيه — به تُراجَع كل خانةٍ في الجدول */
+export type OpHit = {
+  id: string;
+  name: string;
+  kind: string;
+  /** راعٍ · مسؤول · مساهمة */
+  roles: string[];
+  /** وصل الدورُ باسمٍ جماعي؟ فيُقال أيُّه، ولا يبقى الرقم بلا تفسير */
+  via?: string;
+};
 export type OpShare = {
   name: string;
   items: number;
   sponsor: number;
   assignee: number;
+  /** **مساهمة أضافها صاحبها من محفظته** — `contributor` تكتبها
+      القاعدة باسم من أضافها فلا تُنتحَل. كانت لا تُعدّ هنا إطلاقاً،
+      فبنودُ الموظف التي أضافها عن نفسه لم تكن تظهر في نصيبه. */
+  contributor: number;
   k: Record<string, number>;
+  /** بنودُه بأدواره فيها — للمراجعة */
+  hits: OpHit[];
 };
 
 /* خانةٌ قد تحمل أكثر من اسم. والفاصل ليس «·» وحده: الخانة يكتبها
@@ -474,12 +490,19 @@ const GROUP_KEY: Record<string, "leads" | "all"> = Object.fromEntries(
    الأمامي إلى مسافةٍ أو نهاية يصنع ما أُريد، ولا يسقط «فرح الشمري». */
 const GROUP_ANY = /^(ال)?(فريق|فرق|فرقه|لجنه|مجموعه|مدراء|مديري|اداره)(?=\s|$)/;
 
+/** الأدوار الثلاثة وأسماؤها كما تُعرض */
+const ROLE_AR: Record<string, string> = {
+  sponsor: "راعٍ",
+  assignee: "مسؤول",
+  contributor: "مساهمة",
+};
+
 /**
  * صفٌّ لكل موظف — ولو بلا بند، فهذا معنى «على كل موظف».
- * @param both احسب الرعاية مع المسؤولية، أو المسؤولية وحدها
+ * @param both الرعاية مع التنفيذ، أو التنفيذ وحده (مسؤول + مساهمة)
  */
 export function opShares(
-  rows: { data: Rec }[],
+  rows: { id?: string; data: Rec }[],
   people: OpPerson[],
   both: boolean,
   /** تصحيح الأسماء القديمة — تمرّره الصفحة، وبدونه يُؤخذ الاسم كما هو */
@@ -487,38 +510,58 @@ export function opShares(
 ): OpShare[] {
   const leads = people.filter((x) => x.isLead).map((x) => x.name);
   const everyone = people.map((x) => x.name);
-  const spread = (n: string): string[] => {
+  /** الاسم الجماعي يُحلّ إلى أصحابه، ويُقال عبر أيِّه وصل */
+  const spread = (n: string): { name: string; via?: string }[] => {
     const key = nrm(n);
     const g = GROUP_KEY[key];
-    if (g) return g === "leads" ? leads : everyone;
-    return GROUP_ANY.test(key) ? [] : [n];
+    if (g) return (g === "leads" ? leads : everyone).map((x) => ({ name: x, via: n }));
+    return GROUP_ANY.test(key) ? [] : [{ name: n }];
   };
 
   const m = new Map<string, OpShare>();
   const touch = (n: string) => {
     const name = fix(n);
     const key = nrm(name);
-    const e = m.get(key) || { name, items: 0, sponsor: 0, assignee: 0, k: { kpi: 0, init: 0, win: 0 } };
+    const e =
+      m.get(key) ||
+      { name, items: 0, sponsor: 0, assignee: 0, contributor: 0, k: { kpi: 0, init: 0, win: 0 }, hits: [] };
     m.set(key, e);
     return e;
   };
   for (const x of people) if (x.name.trim()) touch(x.name);
 
-  const fields = both ? (["sponsor", "assignee"] as const) : (["assignee"] as const);
+  /* **`contributor` تُعدّ دائماً**: هي مساهمةُ الموظف التي أضافها عن
+     نفسه من محفظته، وهي تنفيذٌ لا رعاية — فتُحسب في الوضعين. */
+  const fields = both
+    ? (["sponsor", "assignee", "contributor"] as const)
+    : (["assignee", "contributor"] as const);
+
   for (const r of rows) {
     const kind = txt(r.data.kind);
-    const seen = new Set<string>();
+    const seen = new Map<string, OpHit>();
     for (const f of fields) {
       for (const raw of opNames(r.data[f])) {
-        for (const n of spread(raw)) {
+        for (const { name: n, via } of spread(raw)) {
           const key = nrm(fix(n));
           if (!key) continue;
           const e = touch(n);
           e[f] += 1;
-          if (!seen.has(key)) {
+          const hit = seen.get(key);
+          if (hit) {
+            if (!hit.roles.includes(ROLE_AR[f])) hit.roles.push(ROLE_AR[f]);
+            if (via && !hit.via) hit.via = via;
+          } else {
+            const h: OpHit = {
+              id: txt(r.id),
+              name: txt(r.data.name),
+              kind,
+              roles: [ROLE_AR[f]],
+              ...(via ? { via } : {}),
+            };
+            seen.set(key, h);
+            e.hits.push(h);
             e.items += 1;
             e.k[kind] = (e.k[kind] || 0) + 1;
-            seen.add(key);
           }
         }
       }
