@@ -12572,3 +12572,45 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
   .opd-pf5 { grid-template-columns: repeat(2, 1fr); }
   .opc-tb th:last-child, .opc-tb td:last-child { display: none; }
 }
+
+/* ============================================================
+   التحديث الدوري — شريط من لم يحدّث
+   ------------------------------------------------------------
+   على هيئة شريط المراجعة في صفحة الجهات: مستطيلاتٌ حمراء بأسماء
+   من لم يحدّث، وفي صدر كلٍّ منها ✕ صغيرة تحذفه من هذه الدورة.
+   ============================================================ */
+.cyc { margin-bottom: 12px; }
+.cyc-h { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.cyc-when { font-size: 11px; color: var(--muted); }
+.cyc-when b { color: var(--g-800); font-weight: 800; }
+.cyc-end {
+  border: 1px solid var(--border); background: var(--panel); border-radius: 9px;
+  padding: 4px 10px; font: inherit; font-size: 10.5px; font-weight: 700;
+  color: var(--muted); cursor: pointer;
+}
+.cyc-end:hover { color: var(--dgr-tx); border-color: var(--dgr-bd); }
+.cyc-err { font-size: 11px; color: var(--dgr-tx); background: var(--dgr-bg); border-radius: 9px; padding: 7px 11px; }
+.cyc-bar {
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  background: var(--dgr-bg); border: 1px solid var(--dgr-bd);
+  border-radius: 14px; padding: 10px 12px;
+}
+.cyc-bar > b { font-size: 11px; font-weight: 800; color: var(--dgr-tx); margin-inline-end: 4px; }
+.cyc-bar .x {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--panel); border: 1px solid var(--dgr-bd); border-radius: 999px;
+  padding: 4px 11px; font-size: 11px; font-weight: 700; color: var(--dgr-tx);
+}
+.cyc-bar .x i { font-style: normal; font-size: 9.5px; font-weight: 800; opacity: .75; }
+/* ✕ في صدر المستطيل — أي على يساره في صفحةٍ عربية */
+.cyc-bar .x .rm {
+  order: 99; border: none; background: none; cursor: pointer;
+  font: inherit; font-size: 11px; line-height: 1; color: var(--dgr-tx);
+  opacity: .55; padding: 0 0 0 1px;
+}
+.cyc-bar .x .rm:hover { opacity: 1; }
+.cyc-ok {
+  font-size: 11px; font-weight: 700; color: var(--ok-tx);
+  background: var(--ok-bg); border: 1px solid var(--ok-bd);
+  border-radius: 14px; padding: 9px 12px;
+}

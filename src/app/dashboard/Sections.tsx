@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { CycleBar, CYCLE_CFG } from "./Cycle";
 import { writeXlsx, readXlsxSheets, readPptxSlides } from "@/lib/sheet";
 import { asset } from "@/lib/base";
 import { publishUndo } from "@/lib/undoBus";
@@ -3385,7 +3386,9 @@ export function SectionPage({
   const [gear, setGear] = useState(false);
   const [nonce, setNonce] = useState(0);
   /* معرّفات ما هو محمَّل فعلاً — ليعرف زر التحميل ما ينقص */
-  const { items } = useItems(section, section !== "outputs");
+  /* البنود تُحمَّل للأقسام كلها: شريط «التحديث الدوري» يقرأ منها
+     من حدّث ومن لم يحدّث */
+  const { items } = useItems(section);
   const have = useMemo(() => new Set(items.map((x) => x.id)), [items]);
 
   const gearBtn = canEdit ? (
@@ -3409,10 +3412,16 @@ export function SectionPage({
     />
   ) : null;
 
+  /* شريط الدورة فوق الصفحة — يراه الجميع، ويحرّكه صاحب الصلاحية */
+  const cycleBar = CYCLE_CFG[section] ? (
+    <CycleBar section={section} rows={items} canEdit={canEdit} t={t} />
+  ) : null;
+
   if (section === "outputs")
     return (
       <div>
         {gearBtn && <div className="sx-tools">{gearBtn}</div>}
+        {cycleBar}
         <Outputs t={t} />
         {gearModal}
       </div>
@@ -3436,6 +3445,7 @@ export function SectionPage({
           {gearBtn}
         </div>
       )}
+      {cycleBar}
       {section === "sessions" && <SessionsPage t={t} canEdit={canEdit} />}
       {section === "natstrat" && <NationalPage t={t} canEdit={canEdit} />}
       {section === "inststrat" && <InstPage t={t} canEdit={canEdit} />}

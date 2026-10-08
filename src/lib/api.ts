@@ -322,6 +322,34 @@ export async function apiFetch(path: string, init: Init = {}) {
       return ok({ ok: true });
     }
 
+    /* ---------------- دورة التحديث الدوري ----------------
+       سطرٌ في `perf_settings` بمفتاح `cycle:<القسم>`. القراءة لكل
+       مسجَّل، والكتابة لمن يملك `<القسم>:edit` — والحارس سياسةُ
+       RLS لا هذا السطر، فلا فحص هنا. */
+    if (p === "/api/cycle" && method === "GET") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const sec = q.get("section") || "";
+      if (!sec) return err("لا يوجد قسم", 400);
+      const { data } = await s.from("perf_settings").select("value").eq("key", `cycle:${sec}`).maybeSingle();
+      return ok({ cycle: data?.value ?? null });
+    }
+    if (p === "/api/cycle" && (method === "PUT" || method === "POST")) {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const sec = str(body.section);
+      if (!sec) return err("لا يوجد قسم", 400);
+      /* `startedBy` يُختم هنا لا من الواجهة، فلا يُنسب فتحُ الدورة
+         إلى غير من فتحها */
+      const val = body.value as Record<string, unknown> | null;
+      const stamped = val ? { ...val, startedBy: me.name || me.username || "" } : null;
+      const { error } = await s
+        .from("perf_settings")
+        .upsert([{ key: `cycle:${sec}`, value: stamped }], { onConflict: "key" });
+      if (error) return err(error.message, 403);
+      return ok({ ok: true });
+    }
+
     /* ---------------- القياسات ---------------- */
     if (p === "/api/measurements" && method === "GET") {
       let qq = s.from("perf_measurements").select("*");
