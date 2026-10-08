@@ -7,6 +7,7 @@
    ============================================================ */
 
 import { DEFAULT_BANDS } from "./calc";
+import { TEAMS } from "./teams";
 
 export type Rec = Record<string, unknown>;
 
@@ -469,19 +470,16 @@ const OP_SEP = /[·•.,،؛;/\\|+&\n]+/;
 export const opNames = (v: unknown) =>
   txt(v).split(OP_SEP).map((x) => x.trim()).filter((x) => x.length > 1);
 
-/** أسماءٌ جماعية معروفة — تُحلّ إلى أصحابها */
-export const OP_GROUPS: Record<string, "leads" | "all"> = {
-  "مدراء القطاعات": "leads",
-  "مديري القطاعات": "leads",
-  "مدراء المحافظ": "leads",
-  "الفريق المركزي": "all",
-  "فريق العمل": "all",
-  الفريق: "all",
-  "فريق الإدارة": "all",
-};
-const GROUP_KEY: Record<string, "leads" | "all"> = Object.fromEntries(
-  Object.entries(OP_GROUPS).map(([k, v]) => [nrm(k), v]),
+/* **اسم الفريق يُحلّ إلى أعضائه هم**، لا إلى كل موظفي المنصة.
+   كان «الفريق المركزي» يُحلّ إلى الجميع، فنُسب بندُه إلى من لا شأن
+   له به — ومن ذلك أن لمى المبدل حُسب لها وهي ليست منه. والقائمة في
+   `lib/teams`، موضعاً واحداً تقرأ منه الصلاحيات والمساهمات معاً. */
+const TEAM_KEY: Record<string, string[]> = Object.fromEntries(
+  TEAMS.map((x) => [nrm(x.name), x.members]),
 );
+/** أسماءٌ جماعية لا فريقَ لها بقائمة — تُحلّ إلى مدراء القطاعات */
+export const OP_LEAD_GROUPS = ["مدراء القطاعات", "مديري القطاعات", "مدراء المحافظ"];
+const LEAD_KEY = new Set(OP_LEAD_GROUPS.map(nrm));
 /* وما بدأ بـ«فريق» أو «لجنة» أو «مدراء» ولم يكن في القائمة فجماعةٌ
    لا نعرف أصحابها — مثل «فريق المشروع الاستشاري»، وهم من خارج
    المركز أصلاً. يسقط ولا يبقى سطراً في جدول الموظفين. */
@@ -509,12 +507,12 @@ export function opShares(
   fix: (n: string) => string = (n) => n,
 ): OpShare[] {
   const leads = people.filter((x) => x.isLead).map((x) => x.name);
-  const everyone = people.map((x) => x.name);
   /** الاسم الجماعي يُحلّ إلى أصحابه، ويُقال عبر أيِّه وصل */
   const spread = (n: string): { name: string; via?: string }[] => {
     const key = nrm(n);
-    const g = GROUP_KEY[key];
-    if (g) return (g === "leads" ? leads : everyone).map((x) => ({ name: x, via: n }));
+    const team = TEAM_KEY[key];
+    if (team) return team.map((x) => ({ name: x, via: n }));
+    if (LEAD_KEY.has(key)) return leads.map((x) => ({ name: x, via: n }));
     return GROUP_ANY.test(key) ? [] : [{ name: n }];
   };
 
