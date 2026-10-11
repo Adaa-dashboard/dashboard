@@ -1,5 +1,5 @@
 -- ============================================================
---  بيانات الربع الثاني 2025 — جودة ملاحظات الأداء
+--  بيانات الربع الثاني 2026 — جودة ملاحظات الأداء
 --  ------------------------------------------------------------
 --  يُشغَّل من SQL Editor مرة واحدة. idempotent: تشغيله مرّتين
 --  كتشغيله مرّة (`on conflict do update`).
@@ -22,20 +22,20 @@
 -- ============================================================
 
 insert into public.perf_items (section, id, ord, data) values
- ('notesq', 'nq-q2-s1', 11, '{"quarter": "الربع الثاني 2025", "sector": "المالي والاقتصادي", "total": 69, "pct": 93, "p1": 90, "p2": 96, "p3": 98, "p4": 91}'::jsonb),
- ('notesq', 'nq-q2-s2', 12, '{"quarter": "الربع الثاني 2025", "sector": "الشؤون الحكومية", "total": 114, "pct": 90, "p1": 90, "p2": 96, "p3": 98, "p4": 91}'::jsonb),
- ('notesq', 'nq-q2-s3', 13, '{"quarter": "الربع الثاني 2025", "sector": "الخدمات الاجتماعية", "total": 69, "pct": 83, "p1": 90, "p2": 96, "p3": 98, "p4": 91}'::jsonb),
- ('notesq', 'nq-q2-s4', 14, '{"quarter": "الربع الثاني 2025", "sector": "البنية التحتية", "total": 306, "pct": 70, "p1": 90, "p2": 96, "p3": 98, "p4": 91}'::jsonb),
- ('notesq', 'nq-q2-o1', 101, '{"row": "obs", "quarter": "الربع الثاني 2025", "criterion": "وصف التحدي", "text": "تكرار التعثر غير مطابق", "pct": 57}'::jsonb),
- ('notesq', 'nq-q2-o2', 102, '{"row": "obs", "quarter": "الربع الثاني 2025", "criterion": "وصف التحدي", "text": "لم يتم ذكر مرات التعثر", "pct": 26}'::jsonb),
- ('notesq', 'nq-q2-o3', 103, '{"row": "obs", "quarter": "الربع الثاني 2025", "criterion": "وصف التحدي", "text": "تحسين صياغة / أخطاء إملائية / التحدي غير واضح", "pct": 17}'::jsonb),
- ('notesq', 'nq-q2-o4', 104, '{"row": "obs", "quarter": "الربع الثاني 2025", "criterion": "تصنيف التحدي", "text": "لا يتطابق التصنيف مع التحدي", "pct": 89}'::jsonb),
- ('notesq', 'nq-q2-o5', 105, '{"row": "obs", "quarter": "الربع الثاني 2025", "criterion": "تصنيف التحدي", "text": "لون التحدي لا يطابق التصنيف", "pct": 11}'::jsonb),
- ('notesq', 'nq-q2-o6', 106, '{"row": "obs", "quarter": "الربع الثاني 2025", "criterion": "الإجراء التصحيحي", "text": "الإجراء التصحيحي لا يعالج التحدي المذكور", "pct": 39}'::jsonb),
- ('notesq', 'nq-q2-o7', 107, '{"row": "obs", "quarter": "الربع الثاني 2025", "criterion": "الإجراء التصحيحي", "text": "خطأ إملائي", "pct": 28}'::jsonb),
- ('notesq', 'nq-q2-o8', 108, '{"row": "obs", "quarter": "الربع الثاني 2025", "criterion": "الإجراء التصحيحي", "text": "لم يتم كتابة اجراء تصحيحي", "pct": 11}'::jsonb),
- ('notesq', 'nq-q2-o9', 109, '{"row": "obs", "quarter": "الربع الثاني 2025", "criterion": "تاريخ الإجراء التصحيحي", "text": "تاريخ الإجراء التصحيحي قديم والحالة على المسار", "pct": 63}'::jsonb),
- ('notesq', 'nq-q2-o10', 110, '{"row": "obs", "quarter": "الربع الثاني 2025", "criterion": "تاريخ الإجراء التصحيحي", "text": "تاريخ الإجراء التصحيحي مستقبلي والحالة متأخر", "pct": 37}'::jsonb)
+ ('notesq', 'nq-q2-s1', 11, '{"quarter": "الربع الثاني 2026", "sector": "المالي والاقتصادي", "total": 69, "pct": 93, "p1": 90, "p2": 96, "p3": 98, "p4": 91}'::jsonb),
+ ('notesq', 'nq-q2-s2', 12, '{"quarter": "الربع الثاني 2026", "sector": "الشؤون الحكومية", "total": 114, "pct": 90, "p1": 90, "p2": 96, "p3": 98, "p4": 91}'::jsonb),
+ ('notesq', 'nq-q2-s3', 13, '{"quarter": "الربع الثاني 2026", "sector": "الخدمات الاجتماعية", "total": 69, "pct": 83, "p1": 90, "p2": 96, "p3": 98, "p4": 91}'::jsonb),
+ ('notesq', 'nq-q2-s4', 14, '{"quarter": "الربع الثاني 2026", "sector": "البنية التحتية", "total": 306, "pct": 70, "p1": 90, "p2": 96, "p3": 98, "p4": 91}'::jsonb),
+ ('notesq', 'nq-q2-o1', 101, '{"row": "obs", "quarter": "الربع الثاني 2026", "criterion": "وصف التحدي", "text": "تكرار التعثر غير مطابق", "pct": 57}'::jsonb),
+ ('notesq', 'nq-q2-o2', 102, '{"row": "obs", "quarter": "الربع الثاني 2026", "criterion": "وصف التحدي", "text": "لم يتم ذكر مرات التعثر", "pct": 26}'::jsonb),
+ ('notesq', 'nq-q2-o3', 103, '{"row": "obs", "quarter": "الربع الثاني 2026", "criterion": "وصف التحدي", "text": "تحسين صياغة / أخطاء إملائية / التحدي غير واضح", "pct": 17}'::jsonb),
+ ('notesq', 'nq-q2-o4', 104, '{"row": "obs", "quarter": "الربع الثاني 2026", "criterion": "تصنيف التحدي", "text": "لا يتطابق التصنيف مع التحدي", "pct": 89}'::jsonb),
+ ('notesq', 'nq-q2-o5', 105, '{"row": "obs", "quarter": "الربع الثاني 2026", "criterion": "تصنيف التحدي", "text": "لون التحدي لا يطابق التصنيف", "pct": 11}'::jsonb),
+ ('notesq', 'nq-q2-o6', 106, '{"row": "obs", "quarter": "الربع الثاني 2026", "criterion": "الإجراء التصحيحي", "text": "الإجراء التصحيحي لا يعالج التحدي المذكور", "pct": 39}'::jsonb),
+ ('notesq', 'nq-q2-o7', 107, '{"row": "obs", "quarter": "الربع الثاني 2026", "criterion": "الإجراء التصحيحي", "text": "خطأ إملائي", "pct": 28}'::jsonb),
+ ('notesq', 'nq-q2-o8', 108, '{"row": "obs", "quarter": "الربع الثاني 2026", "criterion": "الإجراء التصحيحي", "text": "لم يتم كتابة اجراء تصحيحي", "pct": 11}'::jsonb),
+ ('notesq', 'nq-q2-o9', 109, '{"row": "obs", "quarter": "الربع الثاني 2026", "criterion": "تاريخ الإجراء التصحيحي", "text": "تاريخ الإجراء التصحيحي قديم والحالة على المسار", "pct": 63}'::jsonb),
+ ('notesq', 'nq-q2-o10', 110, '{"row": "obs", "quarter": "الربع الثاني 2026", "criterion": "تاريخ الإجراء التصحيحي", "text": "تاريخ الإجراء التصحيحي مستقبلي والحالة متأخر", "pct": 37}'::jsonb)
 on conflict (section, id) do update set data = excluded.data, ord = excluded.ord;
 
 -- تحقّق: ما أُدرج، والنسبة المرجّحة
@@ -45,7 +45,7 @@ select count(*) filter (where data->>'row' is null)  as "صفوف القطاعا
        round(sum((data->>'total')::numeric * (data->>'pct')::numeric)
              / nullif(sum((data->>'total')::numeric), 0))  as "نسبة الإدارة ٪"
   from public.perf_items
- where section = 'notesq' and data->>'quarter' = 'الربع الثاني 2025';
+ where section = 'notesq' and data->>'quarter' = 'الربع الثاني 2026';
 
 -- ------------------------------------------------------------
 --  جدول الجهات — 101 جهة بنسبها المنشورة في العرض
@@ -67,7 +67,7 @@ insert into public.perf_items (section, id, ord, data)
 select 'notesq',
        'nq-q2-e' || lpad((row_number() over (order by n desc, e))::text, 3, '0'),
        200 + (row_number() over (order by n desc, e))::int,
-       jsonb_build_object('row', 'ent', 'quarter', 'الربع الثاني 2025',
+       jsonb_build_object('row', 'ent', 'quarter', 'الربع الثاني 2026',
                           'entity', e, 'total', n, 'pct', p)
   from (values
   ('وزارة البيئة والمياه والزراعة', 112, 94),
@@ -182,4 +182,4 @@ select count(*)                                           as "عدد الجها�
        count(*) filter (where (data->>'pct')::int >= 90)  as "بلغت 90% فأكثر"
   from public.perf_items
  where section = 'notesq' and data->>'row' = 'ent'
-   and data->>'quarter' = 'الربع الثاني 2025';
+   and data->>'quarter' = 'الربع الثاني 2026';

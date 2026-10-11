@@ -1,5 +1,5 @@
 -- ============================================================
---  تحقّق من أرقام «جودة ملاحظات الأداء» — الربع الثاني 2025
+--  تحقّق من أرقام «جودة ملاحظات الأداء» — الربع الثاني 2026
 --  ------------------------------------------------------------
 --  **استعلامٌ واحد**: محرّر Supabase يعرض نتيجة آخر جملةٍ وحدها،
 --  فجُمعت الفحوص الاثنا عشر في جدولٍ واحد بعمود «مطابق».
@@ -12,7 +12,7 @@
 
 with q as (
   select data from public.perf_items
-   where section = 'notesq' and data->>'quarter' = 'الربع الثاني 2025'
+   where section = 'notesq' and data->>'quarter' = 'الربع الثاني 2026'
 ), sec as (select * from q where data->>'row' is null),
    ent as (select * from q where data->>'row' = 'ent'),
    obs as (select * from q where data->>'row' = 'obs'),
