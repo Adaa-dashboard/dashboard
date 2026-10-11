@@ -8,7 +8,8 @@
 
      · مهمةٌ أو تكليفٌ أُسند إليه — متأخرٌ أو قاربت مدّته
      · موعدٌ في تقويمه خلال أيام
-     · طلبات تغيير على جهاته — جديدةٌ أو تجاوزت مدّتها
+     · طلبات التغيير على جهاته — سطرٌ لكل طلب بالرمز واسم
+       المبادرة أو المؤشر: ما ورد حديثاً وما قاربت مدّته وما تجاوزها
      · مراجعةُ جهات التواصل المستحقّة عليه هذا الربع
      · إعلانٌ نُشر ولم يره بعد
      · فترةُ تحديثٍ دوريّ فُتحت على قسمٍ فيه جهاته
@@ -55,7 +56,9 @@ function arDays(n: number): string {
   const d = Math.abs(n);
   if (d === 0) return "اليوم";
   if (d === 1) return "يوم واحد";
-  if (d === 2) return "يومان";
+  /* «متأخر يومين» و«خلال يومين» — الموضعان كلاهما بعد حرفٍ
+     أو فعلٍ، فالصيغة منصوبة لا مرفوعة («يومان») */
+  if (d === 2) return "يومين";
   if (d <= 10) return `${d} أيام`;
   return `${d} يوماً`;
 }
@@ -69,7 +72,15 @@ type TaskRow = {
   id: string; title: string; dueDate?: string; state?: string; kind?: string;
   assigneeId?: string; createdById?: string;
 };
-type ChangeRow = { code?: string; owner?: string; item?: string; sla?: number | null; workDays?: number | null };
+type CrAlertRow = {
+  code?: string; owner?: string; itemName?: string; program?: string;
+  sla?: number | null; workDays?: number | null;
+  status?: string; firstSeen?: string;
+};
+/** الطلب «وارد حديثاً» يومين من أول ظهوره في الملف */
+const CR_NEW_DAYS = 2;
+/** أكثر ما يُعرض من الطلبات سطراً سطراً، وما زاد يُجمع في سطر */
+const CR_MAX = 12;
 type Tick = { id: string; body: string; tone: string; byName: string };
 
 export function useBell(meId: string, meName: string, extra: Alert[] = []) {
@@ -135,32 +146,54 @@ export function useBell(meId: string, meName: string, extra: Alert[] = []) {
       });
     }
 
-    /* ٢) طلبات التغيير على جهاتي — ما تجاوز مدّته وما قارب */
-    const crs = ((Array.isArray(ch.changes) ? ch.changes : []) as (ChangeRow & { status?: string })[])
+    /* ٢) طلبات التغيير على جهاتي — **طلباً طلباً لا عدداً مجملاً**
+       ------------------------------------------------------------
+       بطلب صاحبة المنصة: متى رُفع ملف منصة الرؤية جاء كلَّ موظفٍ
+       ما على جهاته، والتنبيه يحمل **الرمز واسم المبادرة أو
+       المؤشر** — فيُعرف الطلب من سطره بلا فتح الجدول.
+
+       والوارد حديثاً يُعدّ في العدّاد الأحمر يومين ثم يهدأ إلى
+       خبرٍ ما لم تقترب مدّته: فالرفع اليومي لا يُبقي العدّاد
+       مرتفعاً أبداً. */
+    const crs = ((Array.isArray(ch.changes) ? ch.changes : []) as CrAlertRow[])
       .filter((c) => c.status === "open" && mineNames.has(nrm(c.owner || "")));
-    const late = crs.filter((c) => c.sla != null && c.workDays != null && Number(c.workDays) >= Number(c.sla));
-    const near = crs.filter(
-      (c) => c.sla != null && c.workDays != null &&
-        Number(c.workDays) < Number(c.sla) && Number(c.sla) - Number(c.workDays) <= 2,
-    );
-    if (late.length)
-      out.push({
-        id: "cr-late",
-        kind: "late",
+    const crRows: Alert[] = crs.map((c) => {
+      const left =
+        c.sla != null && c.workDays != null ? Number(c.sla) - Number(c.workDays) : null;
+      /* كم مضى على وروده في الملف */
+      const age = c.firstSeen ? dayDiff(now, String(c.firstSeen).slice(0, 10)) : 99;
+      const fresh = age >= 0 && age <= CR_NEW_DAYS;
+      const kind: Alert["kind"] =
+        left != null && left <= 0 ? "late" : left != null && left <= 2 ? "soon" : fresh ? "today" : "info";
+      const name = String(c.itemName || "").trim() || String(c.program || "").trim();
+      return {
+        id: "cr-" + String(c.code || ""),
+        kind,
         group: "طلبات التغيير",
-        title: `${late.length} طلباً تجاوز مدّته`,
-        sub: [...new Set(late.map((c) => String(c.owner || "")))].slice(0, 3).join(" · ") || "جهاتك",
-        days: -1,
+        /* الرمز لاتيني داخل سطرٍ عربي: يُعزل بـ FSI/PDI وإلّا
+           تنقّلت شرطتُه وأرقامه إلى غير موضعها */
+        title: [String(c.code || "") && `\u2068${c.code}\u2069`, name]
+          .filter(Boolean)
+          .join(" — "),
+        sub: [String(c.owner || ""), left != null ? whenTxt(left) : "", fresh ? "ورد حديثاً" : ""]
+          .filter(Boolean)
+          .join(" · "),
+        days: left,
         tab: "changes",
-      });
-    if (near.length)
+      };
+    });
+    /* الأكثر إلحاحاً أولاً، والبقيّة في سطرٍ واحد — لئلّا تغرق
+       اللوحة بعشرات الطلبات فتُخفي ما سواها */
+    crRows.sort((x, y) => RANK[x.kind] - RANK[y.kind] || (x.days ?? 99) - (y.days ?? 99));
+    out.push(...crRows.slice(0, CR_MAX));
+    if (crRows.length > CR_MAX)
       out.push({
-        id: "cr-near",
-        kind: "soon",
+        id: "cr-more",
+        kind: "info",
         group: "طلبات التغيير",
-        title: `${near.length} طلباً تقترب مدّته`,
-        sub: [...new Set(near.map((c) => String(c.owner || "")))].slice(0, 3).join(" · ") || "جهاتك",
-        days: 2,
+        title: `و${crRows.length - CR_MAX} طلباً آخر على جهاتك`,
+        sub: "الجدول في صفحة مراجعة طلبات التغيير",
+        days: null,
         tab: "changes",
       });
 
