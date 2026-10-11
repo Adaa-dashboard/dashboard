@@ -10638,7 +10638,7 @@ input.cell-date {
   margin: 18px 2px 8px;
 }
 .cr-h h3 { margin: 0; font-size: 13.5px; font-weight: 800; color: var(--gt-900); }
-.cr-h > span { font-size: 11px; color: var(--muted); }
+/* بلا شرحٍ بجانب العنوان — الأعمدة تقول أرباعها تحتها */
 .cr-h .chips { margin-inline-start: auto; }
 /* مربّعا النوع فوق أعمدة القطاعات: رؤية 2030 · الاستراتيجيات
    الوطنية. الضغط يقلب الأعمدة إلى نسب النوع، والضغط ثانيةً

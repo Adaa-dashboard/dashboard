@@ -753,7 +753,6 @@ export default function Changes({
         <>
           <div className="cr-h">
             <h3>{t("نسبة الالتزام على مستوى الأرباع", "Compliance by quarter")}</h3>
-            <span>{t("المستهدف 100% · مرجّحة بعدد الطلبات", "Target 100%")}</span>
           </div>
           <div className="nq-line cr-line">
             {crLast(quarters, 4).map((q) => {
@@ -800,7 +799,6 @@ export default function Changes({
         <>
           <div className="cr-h">
             <h3>{t("نسبة الالتزام لكل قطاع", "Compliance by sector")}</h3>
-            <span>{`${curSecQ} ${t("مقارنةً بـ", "vs")} ${crPrevQ(curSecQ)}`}</span>
             {secQs.length > 1 && (
               <span className="chips">
                 {secQs.map((q) => (
