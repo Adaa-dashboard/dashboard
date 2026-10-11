@@ -2472,7 +2472,15 @@ function instSteps(d: Rec, t: T) {
   ];
 }
 
-function InstEntity({ it, t, onEdit }: { it: Item; t: T; onEdit?: () => void }) {
+function InstEntity({
+  it, t, onEdit, canEdit, remove,
+}: {
+  it: Item;
+  t: T;
+  onEdit?: () => void;
+  canEdit?: boolean;
+  remove?: (id: string) => Promise<string | null>;
+}) {
   const d = it.data;
   const ph = txt(d.phase);
   return (
@@ -2480,6 +2488,9 @@ function InstEntity({ it, t, onEdit }: { it: Item; t: T; onEdit?: () => void }) 
       <div className="iw-h">
         <b>{txt(d.owner) || "—"}</b>
         <span className={`iw-ph ${ph === "Phase 1" ? "p1" : ""}`}>{ph || "—"}</span>
+        {/* نفس موضع ✕ في بقية البطاقات — فالحذف لا يتنقّل من صفحةٍ
+            لأخرى. والجدول في هذه الصفحة له ✕ في آخر عمود كما كان */}
+        <DelCard it={it} name={txt(d.owner)} canEdit={canEdit} remove={remove} t={t} />
       </div>
       <div className="iw-who">
         <span>
@@ -2604,7 +2615,14 @@ function InstPage({ t, canEdit, add, gear }: SecPageProps) {
             return (
               <div className="iw-grid">
                 {list.map((it) => (
-                  <InstEntity key={it.id} it={it} t={t} onEdit={canEdit ? () => setEdit(it) : undefined} />
+                  <InstEntity
+                    key={it.id}
+                    it={it}
+                    t={t}
+                    onEdit={canEdit ? () => setEdit(it) : undefined}
+                    canEdit={canEdit}
+                    remove={remove}
+                  />
                 ))}
               </div>
             );
