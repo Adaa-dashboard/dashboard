@@ -3799,7 +3799,7 @@ function NotesQPage({ t, canEdit, add, gear }: SecPageProps) {
           {tab === "sector" ? (
             /* عمودان لكل قطاع: الربع المعروض وما قبله — بنفس تجسيم
                أعمدة المؤشرات في «نظرة عامة» وأنحف منها */
-            <div className="nq-card nq-sec">
+            <div className="nq-sec">
               <div className="nqk">
                 {secCols.map((x) => (
                   <div className="g" key={x.name}>
@@ -3824,13 +3824,8 @@ function NotesQPage({ t, canEdit, add, gear }: SecPageProps) {
                   </div>
                 ))}
               </div>
-              <div className="nq-tot2">
-                <span>{t("الإجمالي", "Total")}</span>
-                <span>
-                  <NqPct pct={all.pct} />
-                  <em>{t(`${AR(all.n)} عنصراً`, `${all.n} items`)}</em>
-                </span>
-              </div>
+              {/* شريط «الإجمالي» أُزيل بطلب صاحبة المنصة — الرقم نفسه
+                  في الدائرة أعلى الصفحة */}
             </div>
           ) : (
             <div className="tbl-wrap">
