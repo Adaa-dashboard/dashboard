@@ -6,7 +6,7 @@ import { apiFetch } from "@/lib/api";
 import { CycleBar, CYCLE_CFG } from "./Cycle";
 import {
   nqTally, nqCriteria, nqGroup, nqQuarters, nqQOrder, nqObs, nqOfQuarter,
-  nqKeyOf, nqNrm, nqCheck, nqBand, nqEntities, NQ_BANDS, NQ_CKEYS,
+  nqKeyOf, nqNrm, nqCheck, nqBand, nqEntities, NQ_BANDS, NQ_CKEYS, type NQStat,
 } from "@/lib/notesq";
 import { writeXlsx, readXlsxSheets, readPptxSlides } from "@/lib/sheet";
 import { asset } from "@/lib/base";
@@ -3552,6 +3552,17 @@ const NQ_TONE: Record<string, string> = {
 /** تدرّج أعمدة المعايير — من درجات الهوية بترتيبها */
 const NQ_BAR = ["var(--g-400)", "var(--g-600)", "var(--g-800)", "var(--g-700)"];
 
+/** اسم الربع الذي قبله — ليُسمّى العمود الفارغ باسمه لا بـ«السابق» */
+const NQ_QN = ["الربع الأول", "الربع الثاني", "الربع الثالث", "الربع الرابع"];
+function prevName(q: string): string {
+  const o = nqQOrder(q);
+  const n = o % 10;
+  const y = Math.floor(o / 10);
+  if (n >= 2) return `${NQ_QN[n - 2]}${y ? ` ${AR(y)}` : ""}`;
+  if (n === 1 && y) return `${NQ_QN[3]} ${AR(y - 1)}`;
+  return "";
+}
+
 /** خانة نسبة ملوَّنة بنطاقها */
 function NqPct({ pct }: { pct: number }) {
   const b = nqBand(pct);
@@ -3623,12 +3634,11 @@ const NQ_COLS: ICol[] = [
 ];
 
 function NotesQPage({ t, canEdit, add, gear }: SecPageProps) {
-  const { items, loaded, save, remove, reload, undo, undoTop, dismissUndo } = useItems("notesq");
+  const { items, loaded, reload, undo, undoTop, dismissUndo } = useItems("notesq");
   const [pick, setPick] = useState("");
-  const [tab, setTab] = useState<"sector" | "entity" | "data">("sector");
+  const [tab, setTab] = useState<"sector" | "entity">("sector");
   const [q, setQ] = useState("");
   const [f, setF] = useState("");
-  const [draft, setDraft] = useState<Record<string, Rec>>({});
 
   const qs = useMemo(() => nqQuarters(items), [items]);
   /* الافتراضي آخر ربعٍ مرفوع — هو ما يُسأل عنه */
@@ -3640,25 +3650,36 @@ function NotesQPage({ t, canEdit, add, gear }: SecPageProps) {
   const obs = useMemo(() => nqObs(qRows), [qRows]);
   const bySec = useMemo(() => nqGroup(qRows, "sector"), [qRows]);
   const byEnt = useMemo(() => nqEntities(qRows), [qRows]);
-  const delta = qs.find((x) => nqNrm(x.q) === nqNrm(cur))?.delta ?? null;
+  const curIdx = qs.findIndex((x) => nqNrm(x.q) === nqNrm(cur));
+  const delta = qs[curIdx]?.delta ?? null;
 
-  /* جدول البيانات الخام — بعد البحث وفلتر القطاع */
-  const raw = useMemo(
-    () =>
-      qRows.filter((r) => {
-        const d = (r as Item).data;
-        if (f && txt(d.sector) !== f) return false;
-        return !q || `${txt(d.entity)} ${txt(d.name)}`.includes(q);
-      }) as Item[],
-    [qRows, q, f],
+  /* **القطاعات عمودان لكل قطاع**: الربع المعروض وما قبله — بطلب
+     صاحبة المنصة. والربع الذي لم يُرفع عمودٌ مخطَّط بـ«—» فلا تبقى
+     فجوةٌ تُربك القراءة. */
+  const prevQ = curIdx > 0 ? qs[curIdx - 1].q : prevName(cur);
+  const bySecPrev = useMemo(
+    () => (curIdx > 0 ? nqGroup(nqOfQuarter(items, qs[curIdx - 1].q), "sector") : []),
+    [items, qs, curIdx],
   );
+  /* القطاعات بترتيب نسبة الربع المعروض، ومعها ما ظهر في السابق وحده */
+  const secCols = useMemo(() => {
+    type Col = { name: string; now: NQStat | null; was: NQStat | null };
+    const prev = new Map(bySecPrev.map((x) => [nqNrm(x.name), x.stat]));
+    const out: Col[] = bySec.map((x) => ({ name: x.name, now: x.stat, was: prev.get(nqNrm(x.name)) || null }));
+    /* قطاعٌ كان في الربع السابق ولم يَرِد في المعروض يبقى ظاهراً،
+       وإلا بدا كأنه لم يكن */
+    for (const x of bySecPrev)
+      if (!out.some((y) => nqNrm(y.name) === nqNrm(x.name)))
+        out.push({ name: x.name, now: null, was: x.stat });
+    /* البحث وفلتر القطاع يعملان على ما يُعرض: الأعمدة في تبويب
+       القطاعات، والأسماء في تبويب الجهات */
+    return out.filter((x) => (!f || x.name === f) && (!q || x.name.includes(q)));
+  }, [bySec, bySecPrev, f, q]);
 
-  const val = (it: Item, k: string) => txt(draft[it.id]?.[k] ?? it.data[k]);
-  async function put(it: Item, k: string, v: string) {
-    const data = { ...it.data, ...(draft[it.id] || {}), [k]: v };
-    setDraft((old) => ({ ...old, [it.id]: { ...(old[it.id] || {}), [k]: v } }));
-    await save(it.id, data, it.ord);
-  }
+  const entRows = useMemo(
+    () => byEnt.filter((x) => !q || x.name.includes(q)),
+    [byEnt, q],
+  );
 
   function exportXl() {
     const head = ["الربع", ...NQ_COLS.map((c) => c.label)];
@@ -3756,114 +3777,70 @@ function NotesQPage({ t, canEdit, add, gear }: SecPageProps) {
             </div>
           </div>
 
+          {/* تبويب «البيانات» أُزيل بطلب صاحبة المنصة — والتصحيح
+              يصير برفع ملف إكسل */}
           <div className="chips" style={{ margin: "14px 0 10px" }}>
-            {([["sector", "القطاعات"], ["entity", "الجهات"], ["data", "البيانات"]] as const).map(([k, lb]) => (
+            {([["sector", "القطاعات"], ["entity", "الجهات"]] as const).map(([k, lb]) => (
               <button key={k} className={`chip sm ${tab === k ? "on" : ""}`} onClick={() => setTab(k)}>
                 {lb}
               </button>
             ))}
           </div>
 
-          {tab !== "data" ? (
+          {tab === "sector" ? (
+            /* عمودان لكل قطاع: الربع المعروض وما قبله — بنفس تجسيم
+               أعمدة المؤشرات في «نظرة عامة» وأنحف منها */
+            <div className="nq-card nq-sec">
+              <div className="nqk">
+                {secCols.map((x) => (
+                  <div className="g" key={x.name}>
+                    <div className="gb">
+                      {[{ q: prevQ, st: x.was }, { q: cur, st: x.now }].map((b, i) => (
+                        <div className={`c ${b.st ? "" : "na"}`} key={i} title={`${x.name} — ${b.q}`}>
+                          <div className="bw" style={b.st ? { height: `${Math.max(2, b.st.pct)}%` } : undefined}>
+                            <span className="v">{b.st ? `${AR(b.st.pct)}%` : "—"}</span>
+                            <span
+                              className="bar"
+                              style={b.st ? { background: NQ_TONE[nqBand(b.st.pct).tone] } : undefined}
+                            />
+                          </div>
+                          <span className="q">{b.q || "—"}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="lb">
+                      {x.name}
+                      <em>{t(`${AR((x.now || x.was)!.n)} عنصراً`, `${(x.now || x.was)!.n}`)}</em>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="nq-tot2">
+                <span>{t("الإجمالي", "Total")}</span>
+                <span>
+                  <NqPct pct={all.pct} />
+                  <em>{t(`${AR(all.n)} عنصراً`, `${all.n} items`)}</em>
+                </span>
+              </div>
+            </div>
+          ) : (
             <div className="tbl-wrap">
               <table className="sx-tbl nq-tbl">
                 <thead>
                   <tr>
-                    <th>{tab === "sector" ? t("القطاع", "Sector") : t("اسم الجهة", "Entity")}</th>
+                    <th>{t("اسم الجهة", "Entity")}</th>
                     <th className="c">{t("نسبة الالتزام", "Compliance")}</th>
                     <th className="c">{t("عدد العناصر المتعثرة", "Elements")}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(tab === "sector" ? bySec : byEnt).map((x) => (
+                  {entRows.map((x) => (
                     <tr key={x.name}>
                       <td>{x.name}</td>
                       <td className="c"><NqPct pct={x.stat.pct} /></td>
                       <td className="c">{AR(x.stat.n)}</td>
                     </tr>
                   ))}
-                  {/* **لا صفَّ إجمالي في تبويب الجهات**: نسبةُ الجهة
-                      كما تُنشر في العرض متوسطُ معاييرها الأربعة، بينما
-                      الإجمالي نسبةُ العناصر المستوفية للأربعة كلِّها —
-                      فمجموعٌ تحتها يناقض ما فوقها (94% مقابل 79%). */}
-                  {tab === "sector" && (
-                    <tr className="nq-tot">
-                      <td>{t("الإجمالي", "Total")}</td>
-                      <td className="c"><NqPct pct={all.pct} /></td>
-                      <td className="c">{AR(all.n)}</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="tbl-wrap">
-              <table className="sx-tbl inst">
-                <thead>
-                  <tr>
-                    <th className="c num">#</th>
-                    {NQ_COLS.map((c) => (
-                      <th key={c.k} style={{ minWidth: c.w }}>{c.label}</th>
-                    ))}
-                    {canEdit && <th className="c" />}
-                  </tr>
-                </thead>
-                <tbody>
-                  {raw.map((it, n) => (
-                    <tr key={it.id}>
-                      <td className="c num">{AR(n + 1)}</td>
-                      {NQ_COLS.map((c) => (
-                        <td key={c.k} className="cell" style={{ minWidth: c.w }}>
-                          {!canEdit ? (
-                            val(it, c.k) || "—"
-                          ) : c.opts ? (
-                            <select value={val(it, c.k)} onChange={(e) => void put(it, c.k, e.target.value)}>
-                              {c.opts.map((op) => (
-                                <option key={op} value={op}>{op || "—"}</option>
-                              ))}
-                            </select>
-                          ) : NQ_CKEYS.includes(c.k) ? (
-                            /* المعايير مربّعُ اختيار — فالقيمة المحفوظة علامةٌ
-                               واحدة لا نصوصاً متفرّقة */
-                            <input
-                              type="checkbox"
-                              checked={nqCheck(it.data[c.k]) === 1}
-                              onChange={(e) => void put(it, c.k, e.target.checked ? "✅" : "")}
-                            />
-                          ) : (
-                            <input
-                              value={val(it, c.k)}
-                              onChange={(e) =>
-                                setDraft((old) => ({ ...old, [it.id]: { ...(old[it.id] || {}), [c.k]: e.target.value } }))
-                              }
-                              onBlur={(e) => {
-                                if (e.target.value !== txt(it.data[c.k])) void put(it, c.k, e.target.value);
-                              }}
-                            />
-                          )}
-                        </td>
-                      ))}
-                      {canEdit && (
-                        <td className="c">
-                          <button
-                            className="rowx"
-                            title={t("حذف الصف", "Delete row")}
-                            onClick={() => {
-                              if (!confirm(t(`حذف صف «${txt(it.data.entity)}»؟`, "Delete row?"))) return;
-                              void remove(it.id);
-                            }}
-                          >
-                            ✕
-                          </button>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                  {!raw.length && (
-                    <tr><td colSpan={NQ_COLS.length + 2} className="c">
-                      {t("لا توجد نتائج", "No results")}
-                    </td></tr>
-                  )}
                 </tbody>
               </table>
             </div>

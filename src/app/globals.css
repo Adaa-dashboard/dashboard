@@ -12785,6 +12785,77 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
 
 .nq-tbl tbody tr.nq-tot { background: var(--soft); font-weight: 800; }
 
+/* ---------- القطاعات أعمدةً: ربعان لكل قطاع ----------
+   بنفس تجسيم أعمدة المؤشرات في «نظرة عامة» (سطحٌ علويٌّ أفتح وجانبٌ
+   أغمق بميل ٤٥°) وأنحف منها، لأن لكل قطاع عمودين لا عموداً.
+   و`background: inherit` تأخذ لون العمود نفسه مهما تغيّر، فلا لون
+   ثالث يُدار يدوياً. */
+.nq-sec { padding: 16px 18px 12px; }
+.nqk {
+  display: flex;
+  align-items: flex-end;
+  /* مسافة واسعة بين القطاعات وضيّقة داخل القطاع الواحد — فلا
+     يختلط قطاعٌ بجاره وتُقرأ أعمدتُه معاً */
+  gap: 30px;
+  height: 215px;
+  padding: 10px 2px 0;
+  border-bottom: 1px solid var(--border);
+}
+.nqk .g { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; height: 100%; }
+.nqk .gb {
+  flex: 1; min-height: 0; width: 100%;
+  display: flex; align-items: flex-end; justify-content: center; gap: 7px;
+  box-sizing: border-box;
+  /* مكان النسبة فوق أطول عمود، ومعها سُمك السطح العلوي */
+  padding-top: 22px;
+}
+.nqk .c {
+  flex: 1; max-width: 30px;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%;
+}
+.nqk .bw { position: relative; width: 100%; min-height: 3px; display: flex; align-items: flex-end; }
+.nqk .v {
+  position: absolute; bottom: 100%; inset-inline: 0; margin-bottom: 9px; text-align: center;
+  font-size: 10.5px; font-weight: 800; color: var(--text); white-space: nowrap;
+}
+.nqk .bar { position: relative; width: 100%; height: 100%; border-radius: 3px 3px 2px 2px; }
+.nqk .c:not(.na) .bar::before,
+.nqk .c:not(.na) .bar::after { content: ""; position: absolute; background: inherit; pointer-events: none; }
+.nqk .c:not(.na) .bar::before {
+  inset-inline: 0; top: -6px; height: 6px;
+  transform: skewX(-45deg); transform-origin: bottom left;
+  filter: brightness(1.24); border-radius: 2px 2px 0 0;
+}
+.nqk .c:not(.na) .bar::after {
+  width: 6px; top: 0; bottom: 0; right: -6px;
+  transform: skewY(-45deg); transform-origin: left top;
+  filter: brightness(0.76);
+}
+/* ربعٌ لم يُرفع: عمودٌ مخطَّط قصير بـ«—» لا فراغ */
+.nqk .c.na .bw { height: 10px; }
+.nqk .c.na .v { color: var(--muted); }
+.nqk .c.na .bar {
+  background: repeating-linear-gradient(45deg, var(--soft), var(--soft) 5px, var(--border) 5px, var(--border) 10px);
+}
+.nqk .q {
+  font-size: 9.5px; color: var(--muted); margin-top: 5px; text-align: center;
+  line-height: 1.35; overflow-wrap: anywhere;
+}
+.nqk .lb {
+  flex: 0 0 auto; font-size: 11px; font-weight: 700; color: var(--ink-2);
+  text-align: center; line-height: 1.4; overflow-wrap: anywhere;
+}
+.nqk .lb em { display: block; font-style: normal; font-size: 10px; font-weight: 400; color: var(--muted); }
+.nq-tot2 {
+  display: flex; justify-content: space-between; align-items: center; padding: 10px 2px 0;
+  font-family: "Noto Kufi Arabic", sans-serif; font-size: 12.5px; font-weight: 800; color: var(--g-900);
+}
+.nq-tot2 em { font-style: normal; font-size: 11.5px; font-weight: 400; color: var(--ink-2); margin-inline-start: 8px; }
+@media (max-width: 820px) {
+  .nqk { gap: 16px; height: 190px; }
+  .nqk .q { font-size: 9px; }
+}
+
 /* أبرز المشاهدات — أربع بطاقات في صف واحد برؤوس خضراء */
 .nq-h {
   margin: 18px 0 8px;
