@@ -1236,7 +1236,6 @@ export function OpPlanCard({ t }: { t: T }) {
   if (!loaded || !rows.length) return null;
 
   const of = (k: string) => rows.filter((d) => txt(d.kind) === k);
-  const perOwner = OP_OWNERS.map((o) => ({ o, n: rows.filter((d) => txt(d.owner) === o).length }));
 
   return (
     /* العنوان و«المزيد من التفاصيل» في رأس القسم بنظرة عامة — كبقيّة
@@ -1270,7 +1269,9 @@ export function OpPlanCard({ t }: { t: T }) {
                   sub={t("بنداً", "items")}
                 />
               </span>
-              <span className="lg row">
+              {/* صنفٌ خاصٌّ بهذه البطاقة لا `lg` الصفحة: ذاك عمودٌ
+                  بثلاثة أعمدةِ شبكة، ووراثتُه هنا تجرّ قواعده كلها */}
+              <span className="opv-lg">
                 {sts.map((x) => (
                   <span key={x}>
                     <i style={{ background: ST_COLOR[x] }} />
@@ -1282,17 +1283,6 @@ export function OpPlanCard({ t }: { t: T }) {
             </div>
           );
         })}
-      </div>
-      <div className="pp">
-        {perOwner.map(({ o, n }) => (
-          <span className="p" key={o}>
-            <i style={{ background: (OWNER_COLOR[o] || "#4e615c") + "1f", color: OWNER_COLOR[o] || "#4e615c" }}>
-              {short(o)}
-            </i>
-            <span>{last(o)}</span>
-            <em>{n}</em>
-          </span>
-        ))}
       </div>
     </div>
   );
