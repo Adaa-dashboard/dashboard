@@ -1089,6 +1089,9 @@ table.matrix thead th {
    هيكل اللوحة — قائمة جانبية خضراء + محتوى أبيض
    ============================================================ */
 .shell {
+  /* عرض الشريط الجانبي متغيّراً: يقرؤه القلم الثابت فيقف عند حافة
+     الصفحة البيضاء لا فوق الشريط الأخضر. و`:has` تلتقط طيّه */
+  --rail-w: 200px;
   display: flex;
   min-height: 100vh;
   /* لوحة المحتوى تملأ ارتفاع الإطار، والشريط وحده شريحة مُزاحة داخله */
@@ -4936,6 +4939,7 @@ table.matrix thead th {
 .rail.col {
   flex: 0 0 70px;
 }
+.shell:has(.rail.col) { --rail-w: 70px; }
 .rail.col .rail-in {
   padding-inline: 11px;
 }
@@ -9992,18 +9996,26 @@ input.cell-date {
    ما تحته، و`pointer-events` تمنعه من حجب ما خلفه. */
 .stk-dock {
   position: fixed;
-  /* خطُّ الرصيف، والقلم يعلوه بكامل ارتفاعه (translateY(-100%)) —
-     فيستقرّ فوق زرّ المساعد الذكي مباشرةً */
-  inset-block-end: 70px;
-  inset-inline-end: 22px;
+  /* خطُّ الرصيف، والقلم يعلوه بكامل ارتفاعه (translateY(-100%))،
+     فيستوي أسفلُه مع زرّ المساعد الذكي في الطرف المقابل */
+  inset-block-end: 22px;
+  /* طرفُ الصفحة البيضاء لا الشاشة: الشريط الأخضر على جهة البداية،
+     فيُزاح القلم بعرضه */
+  inset-inline-start: calc(var(--rail-w, 200px) + 22px);
+  inset-inline-end: auto;
   height: 0; z-index: 46;
   display: flex; align-items: flex-end; gap: 10px;
   pointer-events: none;
 }
-/* الجوال: الشريط السفلي يرفع الزرّين معاً — وهذه القاعدة **بعد**
-   الأساسية لا قبلها، فمتساويتا الترجيح وآخرهما يغلب */
+/* دون 900px يصير الشريط صفّاً أعلى الصفحة، فالعرض كلّه أبيض:
+   يعود القلم إلى حافة الشاشة. والقاعدة **بعد** الأساسية لا قبلها،
+   فمتساويتا الترجيح وآخرهما يغلب */
+@media (max-width: 900px) {
+  .stk-dock { inset-inline-start: 22px; }
+}
+/* الشريط السفلي على الجوال يرفع الزرّين معاً */
 @media (max-width: 860px) {
-  .stk-dock { inset-block-end: calc(126px + env(safe-area-inset-bottom)); }
+  .stk-dock { inset-block-end: calc(78px + env(safe-area-inset-bottom)); }
 }
 .stk-dock > * { pointer-events: auto; transform: translateY(-100%); }
 
@@ -12143,10 +12155,10 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
 /* القلم وقائمته في حاويةٍ واحدة: القائمة تُوضع بالنسبة إلى القلم
    نفسه لا إلى الرصيف — فالرصيف بارتفاع صفر ويرفع أبناءه بتحويل */
 .stk-pw { position: relative; display: flex; }
-/* القائمة تُفتح من طرف القلم الداخلي: الزرّ في زاوية الشاشة،
-   فلو تدلّت من طرفه الآخر خرجت عن الحافة */
+/* القائمة تتدلّى نحو داخل الصفحة: القلم على طرفها، فلو فُتحت
+   نحو الطرف خرجت عن الحافة */
 .stk-menu {
-  position: absolute; bottom: 100%; margin-bottom: 9px; inset-inline-end: 0;
+  position: absolute; bottom: 100%; margin-bottom: 9px; inset-inline-start: 0;
   display: flex; flex-direction: column; gap: 2px; min-width: 232px;
   background: var(--panel); border: 1px solid var(--border);
   border-radius: 13px; padding: 5px;
