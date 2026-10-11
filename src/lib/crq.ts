@@ -166,9 +166,24 @@ export type CrPeriod = {
   stat: CrStat;
   /** الفرق عن الفترة السابقة — `null` لأوّلها */
   delta: number | null;
-  /** مصدر الرقم: مُدخَلٌ في المنصة أم محسوبٌ من الملف اليومي */
-  src: "stored" | "live";
+  /**
+   * مصدر الرقم: مُدخَلٌ في المنصة · محسوبٌ من الملف اليومي ·
+   * أو `gap` فترةٌ بينهما لم يُغلق فيها طلبٌ واحد.
+   */
+  src: "stored" | "live" | "gap";
 };
+
+/** رقمُ الفترة المتسلسل — به تُعرف الفجوات بين فترتين */
+const seq = (label: string, kind: "q" | "m") =>
+  kind === "q"
+    ? Math.floor(crQOrder(label) / 10) * 4 + (crQOrder(label) % 10) - 1
+    : Math.floor(crMOrder(label) / 100) * 12 + (crMOrder(label) % 100) - 1;
+
+/** اسم الفترة من رقمها المتسلسل */
+const nameOfSeq = (n: number, kind: "q" | "m") =>
+  kind === "q"
+    ? `الربع ${Q_WORDS[n % 4]} ${Math.floor(n / 4)}`
+    : `${AR_MONTHS[n % 12]} ${Math.floor(n / 12)}`;
 
 /**
  * الفترات مرتّبةً زمنياً: المُدخَل أولاً ثم ما حسبناه من الطلبات
@@ -209,11 +224,34 @@ function periods(
     out.set(k, { label: g.label, stat, delta: null, src: "live" });
   }
 
-  const list = [...out.values()].sort((a, b) => order(a.label) - order(b.label));
-  return list.map((x, i) => ({
-    ...x,
-    delta: i === 0 ? null : x.stat.pct - list[i - 1].stat.pct,
-  }));
+  const found = [...out.values()].sort((a, b) => order(a.label) - order(b.label));
+
+  /* **الفترة الخالية تظهر بصفر ولا تختفي** — بطلب صاحبة المنصة:
+     شهرٌ لم يُغلق فيه طلبٌ كان يُحذف من الخطّ، فيقفز يونيو إلى
+     سبتمبر ويبدو أنّهما متجاوران. */
+  const list: CrPeriod[] = [];
+  for (const x of found) {
+    const last = list[list.length - 1];
+    if (last) {
+      for (let n = seq(last.label, kind) + 1; n < seq(x.label, kind); n++)
+        list.push({
+          label: nameOfSeq(n, kind),
+          stat: { n: 0, ok: 0, pct: 0 },
+          delta: null,
+          src: "gap",
+        });
+    }
+    list.push(x);
+  }
+
+  /* الفرق يقارن بآخر فترةٍ **فيها طلبات** — فالفجوة ليست هبوطاً
+     إلى الصفر، ولو حُسبت كذلك لأظهرت تراجعاً لم يقع */
+  let prev: number | null = null;
+  return list.map((x) => {
+    const delta = x.src === "gap" || prev === null ? null : x.stat.pct - prev;
+    if (x.src !== "gap") prev = x.stat.pct;
+    return { ...x, delta };
+  });
 }
 
 export const crQuarters = (stored: CrRow[], live: CrLite[]) => periods(stored, live, "q");

@@ -570,10 +570,13 @@ export default function Changes({
       {!page && monthLine.length > 0 && (
         <div className="nq-line cr-line">
           {monthLine.map((m) => {
+            /* شهرٌ بلا طلبات: يظهر بصفرٍ ودائرةٍ جوفاء ولا يُقرأ
+               هبوطاً — فلا طلبَ أُغلق فيه أصلاً */
+            const gap = m.src === "gap";
             const tone = crBand(m.stat.pct).tone;
             return (
-              <div className={`nq-q on ${tone}`} key={m.label}>
-                <b style={{ color: CR_TONE[tone] }}>
+              <div className={`nq-q ${gap ? "" : `on ${tone}`}`} key={m.label}>
+                <b style={gap ? undefined : { color: CR_TONE[tone] }}>
                   {m.stat.pct}%
                   {m.delta != null && m.delta !== 0 && (
                     <span className={`nq-dl ${m.delta < 0 ? "dn" : "up"}`}>
@@ -581,9 +584,9 @@ export default function Changes({
                     </span>
                   )}
                 </b>
-                <i style={{ borderColor: CR_TONE[tone] }} />
+                <i style={gap ? undefined : { borderColor: CR_TONE[tone] }} />
                 <span>{m.label}</span>
-                <em>{t(arReq(m.stat.n), `${m.stat.n} requests`)}</em>
+                <em>{gap ? t("لا طلبات", "No requests") : t(arReq(m.stat.n), `${m.stat.n} requests`)}</em>
               </div>
             );
           })}
@@ -737,18 +740,21 @@ export default function Changes({
           </div>
           <div className="nq-line cr-line">
             {crLast(quarters, 4).map((q) => {
+              const gap = q.src === "gap";
               const tone = crBand(q.stat.pct).tone;
               return (
                 <div
-                  className={`nq-q on ${tone}`}
+                  className={`nq-q ${gap ? "" : `on ${tone}`}`}
                   key={q.label}
                   title={
-                    q.src === "stored"
-                      ? t("نسبة مُدخَلة في المنصة", "Entered value")
-                      : t("محسوبة من الطلبات المُغلقة في الملف اليومي", "Computed")
+                    gap
+                      ? t("لم يُغلق فيه طلب", "No requests closed")
+                      : q.src === "stored"
+                        ? t("نسبة مُدخَلة في المنصة", "Entered value")
+                        : t("محسوبة من الطلبات المُغلقة في الملف اليومي", "Computed")
                   }
                 >
-                  <b style={{ color: CR_TONE[tone] }}>
+                  <b style={gap ? undefined : { color: CR_TONE[tone] }}>
                     {q.stat.pct}%
                     {q.delta != null && q.delta !== 0 && (
                       <span className={`nq-dl ${q.delta < 0 ? "dn" : "up"}`}>
@@ -756,9 +762,9 @@ export default function Changes({
                       </span>
                     )}
                   </b>
-                  <i style={{ borderColor: CR_TONE[tone] }} />
+                  <i style={gap ? undefined : { borderColor: CR_TONE[tone] }} />
                   <span>{q.label}</span>
-                  <em>{t(arReq(q.stat.n), `${q.stat.n} requests`)}</em>
+                  <em>{gap ? t("لا طلبات", "No requests") : t(arReq(q.stat.n), `${q.stat.n} requests`)}</em>
                 </div>
               );
             })}
