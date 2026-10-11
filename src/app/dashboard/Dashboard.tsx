@@ -1501,9 +1501,16 @@ function Overview({
       </Sec>
 
       {hasScope(me.scopes, "changes") && (
-        <Sec id="changes" title={t("طلبات التغيير", "Change requests")}>
+        <Sec
+          id="changes"
+          title={t("طلبات التغيير", "Change requests")}
+          extra={<MoreLink k="changes" />}
+        >
+          {/* موجزٌ لا صفحةً ثانية: المنصّة وخطُّ الأشهر. الجدول
+              وأزرار الرفع في «مراجعة طلبات التغيير» وحدها */}
           <Changes
             t={t}
+            mode="overview"
             canEdit={hasScope(me.scopes, "changes:upload")}
             canLink={hasScope(me.scopes, "changes:upload") || hasScope(me.scopes, "entities:edit")}
           />

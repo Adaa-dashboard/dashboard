@@ -10625,6 +10625,29 @@ input.cell-date {
 }
 .cr-rest { margin-top: 10px; font-size: 11px; color: var(--muted); }
 
+/* ------------------------------------------------------------
+   طلبات التغيير: خطّ الفترات وأعمدة القطاعات
+   الأصناف مستعارةٌ من جودة ملاحظات الأداء (`.nq-line` و`.nqk`)
+   عمداً — الشكل واحد في الصفحتين، فنسخُ القواعد باسمٍ ثانٍ يعني
+   تعديلين لكل تغيير. وهنا ما يخصّ هذه الصفحة وحدها.
+   ------------------------------------------------------------ */
+.cr-line { margin-bottom: 16px; }
+/* رأسُ بندٍ داخل الصفحة: عنوانٌ وشرحٌ هادئ وشرائح الأرباع */
+.cr-h {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  margin: 18px 2px 8px;
+}
+.cr-h h3 { margin: 0; font-size: 13.5px; font-weight: 800; color: var(--gt-900); }
+.cr-h > span { font-size: 11px; color: var(--muted); }
+.cr-h .chips { margin-inline-start: auto; }
+/* تفصيل رؤية 2030 مقابل الاستراتيجيات الوطنية تحت الأعمدة */
+.cr-split {
+  display: flex; flex-wrap: wrap; gap: 6px 16px;
+  margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line2);
+  font-size: 10.5px; color: var(--muted);
+}
+.cr-split b { color: var(--ink-2); font-weight: 700; }
+
 /* «نظرة عامة» تعرض بنود الشهر — سطرٌ يقول كم بقي في الصفحة */
 .tb-scope {
   font-size: 11.5px; color: var(--muted); margin: -4px 0 12px;

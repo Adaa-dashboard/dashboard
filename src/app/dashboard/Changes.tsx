@@ -4,6 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { asset } from "@/lib/base";
 import { commitStats, ownerMap, nrm } from "@/lib/commit";
+import {
+  crQuarters, crMonths, crSectors, crLast, crPrevQ, crBand, CR_TONE,
+  type CrRow,
+} from "@/lib/crq";
 import { readDelimited, readXlsx } from "@/lib/sheet";
 
 /* ============================================================
@@ -138,13 +142,22 @@ export default function Changes({
   t,
   canEdit,
   canLink = false,
+  mode = "page",
 }: {
   t: (ar: string, en: string) => string;
   /** الرفع لمن يسحب الملف من المنصة · والبقية يقرؤون ويصدّرون */
   canEdit: boolean;
   /** مطابقة أسماء الجهات: لمن يحرّر الجهات أو يرفع الملف */
   canLink?: boolean;
+  /**
+   * `overview` موجزٌ في «نظرة عامة»: المنصّة وخطُّ الأشهر وحدهما.
+   * `page` الصفحة الكاملة: الشريط فالمنصّة فالجدول فالأرباع
+   * فالقطاعات. كان المكوّن يُعرض كاملاً في الموضعين، فيتكرّر
+   * الجدول وأزرار الرفع في صفحتين.
+   */
+  mode?: "overview" | "page";
 }) {
+  const page = mode === "page";
   const [items, setItems] = useState<Change[]>([]);
   const [loaded, setLoaded] = useState(false);
   // الافتراضي: الطلبات المفتوحة. الشرائح الثلاث تفلتر داخلها فقط.
@@ -186,6 +199,47 @@ export default function Changes({
     setItems(r.changes || []);
     setLoaded(true);
   }, []);
+
+  /* النِّسب المُدخَلة: أرباعٌ وأشهرٌ وقطاعاتٌ مضت قبل أن تدخل
+     المنصة، محفوظةٌ في `perf_items` تحت القسم نفسه. تُقرأ ولا
+     تُعدَّل من هنا — وما بعدها يُحسب من الملف اليومي. */
+  const [agg, setAgg] = useState<CrRow[]>([]);
+  useEffect(() => {
+    let on = true;
+    void apiFetch("/api/items?section=changes")
+      .then((x) => x.json())
+      .then((d) => {
+        if (on && Array.isArray(d.items)) setAgg(d.items as CrRow[]);
+      })
+      .catch(() => {});
+    return () => {
+      on = false;
+    };
+  }, []);
+
+  const quarters = useMemo(() => crQuarters(agg, items), [agg, items]);
+  const months = useMemo(() => crMonths(agg, items), [agg, items]);
+  /* خطُّ «نظرة عامة» أربعةُ أشهرٍ أخيرة — متابعةٌ لا أرشيف */
+  const monthLine = useMemo(() => crLast(months, 4), [months]);
+
+  /* القطاعات: الربع المختار، وافتراضُه آخر ربعٍ أُدخلت قطاعاته */
+  const secQs = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const r of agg)
+      if (String(r.data?.row || "") === "sec") {
+        const q = String(r.data?.quarter || "").trim();
+        if (q) seen.set(q, q);
+      }
+    return [...seen.values()].sort(
+      (a, b) => quarters.findIndex((x) => x.label === a) - quarters.findIndex((x) => x.label === b),
+    );
+  }, [agg, quarters]);
+  const [secQ, setSecQ] = useState("");
+  const curSecQ = secQ || secQs[secQs.length - 1] || "";
+  const sectors = useMemo(
+    () => (curSecQ ? crSectors(agg, curSecQ, crPrevQ(curSecQ)) : []),
+    [agg, curSecQ],
+  );
 
   useEffect(() => {
     load();
@@ -384,7 +438,7 @@ export default function Changes({
 
   return (
     <div className="cr">
-      {canLink && unmatched.length > 0 && (
+      {page && canLink && unmatched.length > 0 && (
         <div className="cr-unmatched">
           <b>
             {t(
@@ -404,7 +458,7 @@ export default function Changes({
         </div>
       )}
 
-      {fixing && (
+      {page && fixing && (
         <div className="modal-overlay" onClick={() => setFixing(false)}>
           <div className="modal" style={{ maxWidth: 680 }} onClick={(e) => e.stopPropagation()}>
             <div className="m-h">
@@ -456,45 +510,9 @@ export default function Changes({
         </div>
       )}
 
-      {tops.length > 0 && (
-        <div className="card cr-top">
-          <div className="card-top">
-            <h3>{t("أعلى الاستشاريين التزاماً", "Most on-time consultants")}</h3>
-            <span className="muted" style={{ fontSize: 11 }}>
-              {t("إغلاق الطلبات ضمن مدّتها", "Requests closed within SLA")}
-            </span>
-          </div>
-          <div className="cr-podium">
-            {tops.slice(0, 5).map((x, i) => (
-              <div
-                className="cr-p"
-                key={x.name}
-                style={{ ["--c" as string]: RANK[i].c }}
-                title={t(
-                  `${x.ok} من ${x.total} ضمن مدّتها (${x.raw}%) — والنسبة الظاهرة مرجَّحة بعدد الطلبات`,
-                  `${x.ok} of ${x.total} on time`,
-                )}
-              >
-                {/* شعار أداء شفافاً خلف البطاقة بدل الزخرفة */}
-                <img className="mark" src={asset("/adaa-mark.png")} alt="" aria-hidden />
-                <span className="av2">
-                  {x.photo ? <img src={x.photo} alt="" /> : (x.name || "?").trim().charAt(0)}
-                </span>
-                <b>{x.name}</b>
-                <em>{x.pct}%</em>
-                <span className="rk">{t(arReq(x.total), `${x.total} requests`)}</span>
-              </div>
-            ))}
-          </div>
-          {tops.length > 5 && (
-            <div className="cr-rest">
-              {t("ثم:", "Then:")}{" "}
-              {tops.slice(5, 10).map((x) => `${x.name} ${x.pct}%`).join(" · ")}
-            </div>
-          )}
-        </div>
-      )}
-
+      {/* شريط الأدوات في صدر الصفحة — ولا يظهر في «نظرة عامة»:
+          الرفع والنسخ والتصدير عملُ الصفحة لا الموجز */}
+      {page && (
       <div className="cr-bar">
         <span className="pills">
           {CHIPS.map((c) => (
@@ -537,10 +555,86 @@ export default function Changes({
           </>
         )}
       </div>
+      )}
 
-      {err && <div className="alert alert-error">{err}</div>}
-      {msg && <div className="alert alert-ok">{msg}</div>}
+      {tops.length > 0 && (
+        <div className="card cr-top">
+          <div className="card-top">
+            <h3>{t("أعلى الاستشاريين التزاماً", "Most on-time consultants")}</h3>
+            <span className="muted" style={{ fontSize: 11 }}>
+              {t("إغلاق الطلبات ضمن مدّتها", "Requests closed within SLA")}
+            </span>
+          </div>
+          <div className="cr-podium">
+            {tops.slice(0, 5).map((x, i) => (
+              <div
+                className="cr-p"
+                key={x.name}
+                style={{ ["--c" as string]: RANK[i].c }}
+                title={t(
+                  `${x.ok} من ${x.total} ضمن مدّتها (${x.raw}%) — والنسبة الظاهرة مرجَّحة بعدد الطلبات`,
+                  `${x.ok} of ${x.total} on time`,
+                )}
+              >
+                {/* شعار أداء شفافاً خلف البطاقة بدل الزخرفة */}
+                <img className="mark" src={asset("/adaa-mark.png")} alt="" aria-hidden />
+                <span className="av2">
+                  {x.photo ? <img src={x.photo} alt="" /> : (x.name || "?").trim().charAt(0)}
+                </span>
+                <b>{x.name}</b>
+                <em>{x.pct}%</em>
+                <span className="rk">{t(arReq(x.total), `${x.total} requests`)}</span>
+              </div>
+            ))}
+          </div>
+          {tops.length > 5 && (
+            <div className="cr-rest">
+              {t("ثم:", "Then:")}{" "}
+              {tops.slice(5, 10).map((x) => `${x.name} ${x.pct}%`).join(" · ")}
+            </div>
+          )}
+        </div>
+      )}
 
+
+      {/* بلا طلباتٍ بعد: سطرٌ واحد في «نظرة عامة» بدل قسمٍ فارغ */}
+      {!page && loaded && !items.length && (
+        <div className="sx-none">
+          {t("تظهر هنا فور رفع ملف المتابعة اليومي.", "They appear once the daily file is uploaded.")}
+        </div>
+      )}
+
+      {/* ------- خطّ الأشهر: «نظرة عامة» وحدها -------
+          نسبة الالتزام العامة لكل شهر — المُدخَل منها كما أُدخل،
+          وما بعده محسوبٌ من الطلبات المُغلقة في الملف اليومي */}
+      {!page && monthLine.length > 0 && (
+        <div className="nq-line cr-line">
+          {monthLine.map((m) => {
+            const tone = crBand(m.stat.pct).tone;
+            return (
+              <div className={`nq-q on ${tone}`} key={m.label}>
+                <b style={{ color: CR_TONE[tone] }}>
+                  {m.stat.pct}%
+                  {m.delta != null && m.delta !== 0 && (
+                    <span className={`nq-dl ${m.delta < 0 ? "dn" : "up"}`}>
+                      {m.delta < 0 ? "▼" : "▲"} {Math.abs(m.delta)}%
+                    </span>
+                  )}
+                </b>
+                <i style={{ borderColor: CR_TONE[tone] }} />
+                <span>{m.label}</span>
+                <em>{t(arReq(m.stat.n), `${m.stat.n} requests`)}</em>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {page && err && <div className="alert alert-error">{err}</div>}
+      {page && msg && <div className="alert alert-ok">{msg}</div>}
+
+      {page && (
+        <>
       {!loaded ? (
         <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>
       ) : !items.length ? (
@@ -631,8 +725,130 @@ export default function Changes({
             : t(`عرض الكل (${shown.length - 3} أخرى) ▾`, `Show all (${shown.length - 3} more) ▾`)}
         </div>
       )}
+        </>
+      )}
 
-      {pasting && (
+      {/* ------- ③ نسبة الالتزام على مستوى الأرباع ------- */}
+      {page && quarters.length > 0 && (
+        <>
+          <div className="cr-h">
+            <h3>{t("نسبة الالتزام على مستوى الأرباع", "Compliance by quarter")}</h3>
+            <span>{t("المستهدف 100% · مرجّحة بعدد الطلبات", "Target 100%")}</span>
+          </div>
+          <div className="nq-line cr-line">
+            {crLast(quarters, 4).map((q) => {
+              const tone = crBand(q.stat.pct).tone;
+              return (
+                <div
+                  className={`nq-q on ${tone}`}
+                  key={q.label}
+                  title={
+                    q.src === "stored"
+                      ? t("نسبة مُدخَلة في المنصة", "Entered value")
+                      : t("محسوبة من الطلبات المُغلقة في الملف اليومي", "Computed")
+                  }
+                >
+                  <b style={{ color: CR_TONE[tone] }}>
+                    {q.stat.pct}%
+                    {q.delta != null && q.delta !== 0 && (
+                      <span className={`nq-dl ${q.delta < 0 ? "dn" : "up"}`}>
+                        {q.delta < 0 ? "▼" : "▲"} {Math.abs(q.delta)}%
+                      </span>
+                    )}
+                  </b>
+                  <i style={{ borderColor: CR_TONE[tone] }} />
+                  <span>{q.label}</span>
+                  <em>{t(arReq(q.stat.n), `${q.stat.n} requests`)}</em>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {/* ------- ④ نسبة الالتزام لكل قطاع -------
+          عمودان لكل قطاع: الربع المعروض وما قبله — كصفحة جودة
+          ملاحظات الأداء. والقطاع يأتي من الصفوف المُدخَلة، فملفُ
+          الطلبات لا يحمل قطاعاً. */}
+      {page && sectors.length > 0 && (
+        <>
+          <div className="cr-h">
+            <h3>{t("نسبة الالتزام لكل قطاع", "Compliance by sector")}</h3>
+            <span>
+              {`${curSecQ} ${t("مقارنةً بـ", "vs")} ${crPrevQ(curSecQ)}`}
+            </span>
+            {secQs.length > 1 && (
+              <span className="chips">
+                {secQs.map((q) => (
+                  <button
+                    key={q}
+                    className={`chip sm ${q === curSecQ ? "on" : ""}`}
+                    onClick={() => setSecQ(q)}
+                  >
+                    {q}
+                  </button>
+                ))}
+              </span>
+            )}
+          </div>
+          <div className="nq-sec">
+            <div className="nqk">
+              {sectors.map((x) => {
+                const tone = crBand(x.stat.pct).tone;
+                const d = x.was ? x.stat.pct - x.was.pct : null;
+                return (
+                  <div className="g" key={x.name}>
+                    <div className="gb">
+                      {/* السابق أولاً فالحالي — فيُقرأ الاتجاه يميناً */}
+                      <div className={`c ${x.was ? "" : "na"}`}>
+                        <div className="bw" style={{ height: x.was ? `${Math.max(3, x.was.pct)}%` : undefined }}>
+                          <span className="v">{x.was ? `${x.was.pct}%` : "—"}</span>
+                          <span className="bar" style={{ background: x.was ? "var(--g-400)" : undefined }} />
+                        </div>
+                        <span className="q">{crPrevQ(curSecQ)}</span>
+                      </div>
+                      <div className={`c ${x.stat.n ? "" : "na"}`}>
+                        <div className="bw" style={{ height: x.stat.n ? `${Math.max(3, x.stat.pct)}%` : undefined }}>
+                          <span className="v">{x.stat.n ? `${x.stat.pct}%` : "—"}</span>
+                          <span className="bar" style={{ background: x.stat.n ? CR_TONE[tone] : undefined }} />
+                        </div>
+                        <span className="q">{curSecQ}</span>
+                      </div>
+                    </div>
+                    <div className="lb">
+                      {x.name}
+                      <em>
+                        {t(arReq(x.stat.n), `${x.stat.n}`)}
+                        {d != null && d !== 0 && (
+                          <span className={`nq-dl ${d < 0 ? "dn" : "up"}`}>
+                            {" · "}
+                            {d < 0 ? "▼" : "▲"} {Math.abs(d)}%
+                          </span>
+                        )}
+                      </em>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {sectors.some((x) => x.v30 != null || x.nat != null) && (
+              <div className="cr-split">
+                {sectors
+                  .filter((x) => x.v30 != null || x.nat != null)
+                  .map((x) => (
+                    <span key={x.name}>
+                      <b>{x.name}</b>
+                      {x.v30 != null && ` · ${t("رؤية 2030", "Vision 2030")} ${x.v30}%`}
+                      {x.nat != null && ` · ${t("الاستراتيجيات الوطنية", "National")} ${x.nat}%`}
+                    </span>
+                  ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {page && pasting && (
         <div className="modal-overlay" onClick={() => setPasting(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="m-h">
