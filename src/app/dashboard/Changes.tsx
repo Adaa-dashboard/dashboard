@@ -244,6 +244,12 @@ export default function Changes({
     [agg, curSecQ],
   );
 
+  /* هل للربع السابق أرقامٌ أصلاً في النوع المعروض؟ */
+  const hasPrev = useMemo(
+    () => sectors.some((x) => crPick(x.was, kind) !== null),
+    [sectors, kind],
+  );
+
   /* المربّعان ونسبةُ كلٍّ منهما على مستوى الربع — مرجَّحةً بعدد
      طلباته، فمجموعهما الموزون يساوي نسبة الربع نفسها */
   const kinds = useMemo(() => {
@@ -844,9 +850,11 @@ export default function Changes({
                 return (
                   <div className="g" key={x.name}>
                     <div className="gb">
-                      {/* السابق أولاً فالحالي — فيُقرأ الاتجاه يميناً */}
+                      {/* السابق أولاً فالحالي — فيُقرأ الاتجاه يميناً.
+                          وربعٌ لا رقم فيه لأي قطاع يُطوى عمودُه كلّه:
+                          عمودٌ مخطَّطٌ بـ«—» بجانب كل قطاع ضجيجٌ لا خبر */}
                       {[
-                        { q: crPrevQ(curSecQ), v: was, c: "var(--g-400)" },
+                        ...(hasPrev ? [{ q: crPrevQ(curSecQ), v: was, c: "var(--g-400)" }] : []),
                         { q: curSecQ, v: now, c: CR_TONE[tone] },
                       ].map((b, i) => (
                         <div className={`c ${b.v ? "" : "na"}`} key={i} title={`${x.name} — ${b.q}`}>
