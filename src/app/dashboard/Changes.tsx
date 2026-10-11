@@ -557,6 +557,39 @@ export default function Changes({
       </div>
       )}
 
+      {/* بلا طلباتٍ بعد: سطرٌ واحد في «نظرة عامة» بدل قسمٍ فارغ */}
+      {!page && loaded && !items.length && (
+        <div className="sx-none">
+          {t("تظهر هنا فور رفع ملف المتابعة اليومي.", "They appear once the daily file is uploaded.")}
+        </div>
+      )}
+
+      {/* ------- خطّ الأشهر: «نظرة عامة» وحدها -------
+          نسبة الالتزام العامة لكل شهر — المُدخَل منها كما أُدخل،
+          وما بعده محسوبٌ من الطلبات المُغلقة في الملف اليومي */}
+      {!page && monthLine.length > 0 && (
+        <div className="nq-line cr-line">
+          {monthLine.map((m) => {
+            const tone = crBand(m.stat.pct).tone;
+            return (
+              <div className={`nq-q on ${tone}`} key={m.label}>
+                <b style={{ color: CR_TONE[tone] }}>
+                  {m.stat.pct}%
+                  {m.delta != null && m.delta !== 0 && (
+                    <span className={`nq-dl ${m.delta < 0 ? "dn" : "up"}`}>
+                      {m.delta < 0 ? "▼" : "▲"} {Math.abs(m.delta)}%
+                    </span>
+                  )}
+                </b>
+                <i style={{ borderColor: CR_TONE[tone] }} />
+                <span>{m.label}</span>
+                <em>{t(arReq(m.stat.n), `${m.stat.n} requests`)}</em>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {tops.length > 0 && (
         <div className="card cr-top">
           <div className="card-top">
@@ -596,39 +629,6 @@ export default function Changes({
         </div>
       )}
 
-
-      {/* بلا طلباتٍ بعد: سطرٌ واحد في «نظرة عامة» بدل قسمٍ فارغ */}
-      {!page && loaded && !items.length && (
-        <div className="sx-none">
-          {t("تظهر هنا فور رفع ملف المتابعة اليومي.", "They appear once the daily file is uploaded.")}
-        </div>
-      )}
-
-      {/* ------- خطّ الأشهر: «نظرة عامة» وحدها -------
-          نسبة الالتزام العامة لكل شهر — المُدخَل منها كما أُدخل،
-          وما بعده محسوبٌ من الطلبات المُغلقة في الملف اليومي */}
-      {!page && monthLine.length > 0 && (
-        <div className="nq-line cr-line">
-          {monthLine.map((m) => {
-            const tone = crBand(m.stat.pct).tone;
-            return (
-              <div className={`nq-q on ${tone}`} key={m.label}>
-                <b style={{ color: CR_TONE[tone] }}>
-                  {m.stat.pct}%
-                  {m.delta != null && m.delta !== 0 && (
-                    <span className={`nq-dl ${m.delta < 0 ? "dn" : "up"}`}>
-                      {m.delta < 0 ? "▼" : "▲"} {Math.abs(m.delta)}%
-                    </span>
-                  )}
-                </b>
-                <i style={{ borderColor: CR_TONE[tone] }} />
-                <span>{m.label}</span>
-                <em>{t(arReq(m.stat.n), `${m.stat.n} requests`)}</em>
-              </div>
-            );
-          })}
-        </div>
-      )}
 
       {page && err && <div className="alert alert-error">{err}</div>}
       {page && msg && <div className="alert alert-ok">{msg}</div>}
