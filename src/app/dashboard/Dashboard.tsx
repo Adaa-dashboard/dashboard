@@ -180,25 +180,6 @@ function tgtEff(refData: RefData, key: string, q: number): number | null {
 /* صلاحية كل صفحة — تُستعمل لاستعادة الصفحة المفتوحة بعد تحديث
    المتصفح: الصفحة المحفوظة لا تُفتح إن سُحبت صلاحيتها بعدها.
    «محفظتي» ليست هنا لأنها لكل موظف بلا صلاحية. */
-const TAB_SCOPE: Record<string, Scope> = {
-  overview: "overview",
-  details: "details",
-  tasks: "tasks",
-  report: "weekly",
-  structure: "structure",
-  entities: "entities",
-  users: "users",
-  audit: "audit",
-  docs: "docs",
-  sessions: "sessions",
-  natstrat: "natstrat",
-  inststrat: "inststrat",
-  outputs: "outputs",
-  cx: "cx",
-  opplan: "opplan",
-  projects: "projects",
-};
-
 /* المؤشر الذي له صفحة تحسبه — يُقرأ منها بدل الإدخال اليدوي.
    المطابقة بكلمةٍ من نصّ المؤشر نفسه لا بمعرّفه، فلا يتعطّل إن
    أُعيدت تسميته أو أُضيف مؤشر بنفس المعنى. */
@@ -272,6 +253,25 @@ const SECTION_NAV: [SectionKey & Scope, (p: { size?: number }) => ReactElement][
 
 /** تبويبات الأقسام — صفحاتُها محجوبةٌ بصلاحية القسم نفسه */
 const SECTION_TABS = new Set<string>(SECTION_NAV.map(([k]) => k));
+
+/* صلاحيةُ كل صفحة — تحدّد ما يُفتح للحساب وما يُستعاد بعد تحديث
+   المتصفح. **وأقسامُها تُشتقّ من `SECTION_NAV` لا تُكتب يدوياً**:
+   قسمٌ جديد كان يُنسى هنا فتعود الصفحة إلى «نظرة عامة» مع كل F5،
+   وهو ما وقع لصفحة «جودة ملاحظات الأداء». */
+const TAB_SCOPE: Record<string, Scope> = {
+  overview: "overview",
+  details: "details",
+  tasks: "tasks",
+  report: "weekly",
+  structure: "structure",
+  entities: "entities",
+  users: "users",
+  audit: "audit",
+  docs: "docs",
+  opplan: "opplan",
+  changes: "changes",
+  ...Object.fromEntries(SECTION_NAV.map(([k]) => [k, k as Scope])),
+};
 
 export default function Dashboard({ me }: { me: Me }) {
   const router = useRouter();
