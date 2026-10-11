@@ -5,8 +5,8 @@ import { apiFetch } from "@/lib/api";
 import { asset } from "@/lib/base";
 import { commitStats, ownerMap, nrm } from "@/lib/commit";
 import {
-  crQuarters, crMonths, crSectors, crLast, crPrevQ, crBand, CR_TONE,
-  type CrRow,
+  crQuarters, crMonths, crSectors, crLast, crPrevQ, crBand, crPick, crKindTotal, CR_TONE,
+  type CrRow, type CrKind, type CrStat,
 } from "@/lib/crq";
 import { readDelimited, readXlsx } from "@/lib/sheet";
 
@@ -235,11 +235,28 @@ export default function Changes({
     );
   }, [agg, quarters]);
   const [secQ, setSecQ] = useState("");
+  /* نوع الطلبات المعروض في أعمدة القطاعات: الكل · رؤية 2030 ·
+     الاستراتيجيات الوطنية — زرّان يقلبان العرض ويعيدانه */
+  const [kind, setKind] = useState<CrKind>("");
   const curSecQ = secQ || secQs[secQs.length - 1] || "";
   const sectors = useMemo(
     () => (curSecQ ? crSectors(agg, curSecQ, crPrevQ(curSecQ)) : []),
     [agg, curSecQ],
   );
+
+  /* المربّعان ونسبةُ كلٍّ منهما على مستوى الربع — مرجَّحةً بعدد
+     طلباته، فمجموعهما الموزون يساوي نسبة الربع نفسها */
+  const kinds = useMemo(() => {
+    const out: { k: CrKind; label: string; stat: CrStat }[] = [];
+    for (const [k, label] of [
+      ["v30", t("رؤية 2030", "Vision 2030")],
+      ["nat", t("الاستراتيجيات الوطنية", "National strategies")],
+    ] as [CrKind, string][]) {
+      const stat = crKindTotal(sectors, k);
+      if (stat) out.push({ k, label, stat });
+    }
+    return out;
+  }, [sectors, t]);
 
   useEffect(() => {
     load();
@@ -775,14 +792,15 @@ export default function Changes({
       {/* ------- ④ نسبة الالتزام لكل قطاع -------
           عمودان لكل قطاع: الربع المعروض وما قبله — كصفحة جودة
           ملاحظات الأداء. والقطاع يأتي من الصفوف المُدخَلة، فملفُ
-          الطلبات لا يحمل قطاعاً. */}
+          الطلبات لا يحمل قطاعاً.
+
+          ومربّعا النوع فوقها: الضغط على أحدهما يقلب الأعمدة إلى
+          نسبه وحده، والضغط ثانيةً يعيد النسبة الإجمالية. */}
       {page && sectors.length > 0 && (
         <>
           <div className="cr-h">
             <h3>{t("نسبة الالتزام لكل قطاع", "Compliance by sector")}</h3>
-            <span>
-              {`${curSecQ} ${t("مقارنةً بـ", "vs")} ${crPrevQ(curSecQ)}`}
-            </span>
+            <span>{`${curSecQ} ${t("مقارنةً بـ", "vs")} ${crPrevQ(curSecQ)}`}</span>
             {secQs.length > 1 && (
               <span className="chips">
                 {secQs.map((q) => (
@@ -797,34 +815,55 @@ export default function Changes({
               </span>
             )}
           </div>
+
+          {kinds.length > 0 && (
+            <div className="cr-kinds">
+              {kinds.map((k) => (
+                <button
+                  key={k.k}
+                  className={`cr-kind ${kind === k.k ? "on" : ""}`}
+                  onClick={() => setKind(kind === k.k ? "" : k.k)}
+                  title={t(
+                    kind === k.k ? "اضغط لعرض النسبة الإجمالية" : `اضغط لعرض نسب ${k.label}`,
+                    "Toggle",
+                  )}
+                >
+                  <b>{k.stat.pct}%</b>
+                  <span>{k.label}</span>
+                  <em>{t(arReq(k.stat.n), `${k.stat.n}`)}</em>
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="nq-sec">
             <div className="nqk">
               {sectors.map((x) => {
-                const tone = crBand(x.stat.pct).tone;
-                const d = x.was ? x.stat.pct - x.was.pct : null;
+                const now = crPick(x.now, kind);
+                const was = crPick(x.was, kind);
+                const d = now && was ? now.pct - was.pct : null;
+                const tone = now ? crBand(now.pct).tone : "no";
                 return (
                   <div className="g" key={x.name}>
                     <div className="gb">
                       {/* السابق أولاً فالحالي — فيُقرأ الاتجاه يميناً */}
-                      <div className={`c ${x.was ? "" : "na"}`}>
-                        <div className="bw" style={{ height: x.was ? `${Math.max(3, x.was.pct)}%` : undefined }}>
-                          <span className="v">{x.was ? `${x.was.pct}%` : "—"}</span>
-                          <span className="bar" style={{ background: x.was ? "var(--g-400)" : undefined }} />
+                      {[
+                        { q: crPrevQ(curSecQ), v: was, c: "var(--g-400)" },
+                        { q: curSecQ, v: now, c: CR_TONE[tone] },
+                      ].map((b, i) => (
+                        <div className={`c ${b.v ? "" : "na"}`} key={i} title={`${x.name} — ${b.q}`}>
+                          <div className="bw" style={b.v ? { height: `${Math.max(3, b.v.pct)}%` } : undefined}>
+                            <span className="v">{b.v ? `${b.v.pct}%` : "—"}</span>
+                            <span className="bar" style={b.v ? { background: b.c } : undefined} />
+                          </div>
+                          <span className="q">{b.q}</span>
                         </div>
-                        <span className="q">{crPrevQ(curSecQ)}</span>
-                      </div>
-                      <div className={`c ${x.stat.n ? "" : "na"}`}>
-                        <div className="bw" style={{ height: x.stat.n ? `${Math.max(3, x.stat.pct)}%` : undefined }}>
-                          <span className="v">{x.stat.n ? `${x.stat.pct}%` : "—"}</span>
-                          <span className="bar" style={{ background: x.stat.n ? CR_TONE[tone] : undefined }} />
-                        </div>
-                        <span className="q">{curSecQ}</span>
-                      </div>
+                      ))}
                     </div>
                     <div className="lb">
                       {x.name}
                       <em>
-                        {t(arReq(x.stat.n), `${x.stat.n}`)}
+                        {now ? t(arReq(now.n), `${now.n}`) : t("لا طلبات", "None")}
                         {d != null && d !== 0 && (
                           <span className={`nq-dl ${d < 0 ? "dn" : "up"}`}>
                             {" · "}
@@ -837,19 +876,6 @@ export default function Changes({
                 );
               })}
             </div>
-            {sectors.some((x) => x.v30 != null || x.nat != null) && (
-              <div className="cr-split">
-                {sectors
-                  .filter((x) => x.v30 != null || x.nat != null)
-                  .map((x) => (
-                    <span key={x.name}>
-                      <b>{x.name}</b>
-                      {x.v30 != null && ` · ${t("رؤية 2030", "Vision 2030")} ${x.v30}%`}
-                      {x.nat != null && ` · ${t("الاستراتيجيات الوطنية", "National")} ${x.nat}%`}
-                    </span>
-                  ))}
-              </div>
-            )}
           </div>
         </>
       )}

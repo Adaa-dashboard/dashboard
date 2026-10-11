@@ -40,13 +40,16 @@ insert into public.perf_items (section, id, ord, data) values
 on conflict (section, id) do update set data = excluded.data, ord = excluded.ord;
 
 -- ٣) قطاعات الربع الثاني 2026
---    `v30` نسبة رؤية 2030 · `nat` نسبة الاستراتيجيات الوطنية
---    والعدد مجموع الاثنين: 45+2 · 14+21 · 70+17 · 44+49
+--    `v30`/`n30` نسبة رؤية 2030 وعدد طلباتها
+--    `nat`/`nnat` نسبة الاستراتيجيات الوطنية وعددها
+--    والعدد الكلّي مجموعهما: 45+2 · 14+21 · 70+17 · 44+49
+--    وترجيح النوعين على الربع: رؤية 74% (173 طلباً) · وطنية 70%
+--    (89 طلباً) — ومجموعهما الموزون 73% = نسبة الربع نفسها
 insert into public.perf_items (section, id, ord, data) values
- ('changes', 'cr-s-2026-2-gov',  301, '{"row": "sec", "quarter": "الربع الثاني 2026", "sector": "الشؤون الحكومية",   "total": 47, "pct": 70, "v30": 69, "nat": 100}'::jsonb),
- ('changes', 'cr-s-2026-2-fin',  302, '{"row": "sec", "quarter": "الربع الثاني 2026", "sector": "المالي والاقتصادي",  "total": 35, "pct": 91, "v30": 86, "nat": 95}'::jsonb),
- ('changes', 'cr-s-2026-2-soc',  303, '{"row": "sec", "quarter": "الربع الثاني 2026", "sector": "الخدمات الاجتماعية", "total": 87, "pct": 79, "v30": 84, "nat": 59}'::jsonb),
- ('changes', 'cr-s-2026-2-inf',  304, '{"row": "sec", "quarter": "الربع الثاني 2026", "sector": "البنية التحتية",     "total": 93, "pct": 61, "v30": 61, "nat": 61}'::jsonb)
+ ('changes', 'cr-s-2026-2-gov',  301, '{"row": "sec", "quarter": "الربع الثاني 2026", "sector": "الشؤون الحكومية",   "total": 47, "pct": 70, "v30": 69,  "n30": 45, "nat": 100, "nnat": 2}'::jsonb),
+ ('changes', 'cr-s-2026-2-fin',  302, '{"row": "sec", "quarter": "الربع الثاني 2026", "sector": "المالي والاقتصادي",  "total": 35, "pct": 91, "v30": 86,  "n30": 14, "nat": 95,  "nnat": 21}'::jsonb),
+ ('changes', 'cr-s-2026-2-soc',  303, '{"row": "sec", "quarter": "الربع الثاني 2026", "sector": "الخدمات الاجتماعية", "total": 87, "pct": 79, "v30": 84,  "n30": 70, "nat": 59,  "nnat": 17}'::jsonb),
+ ('changes', 'cr-s-2026-2-inf',  304, '{"row": "sec", "quarter": "الربع الثاني 2026", "sector": "البنية التحتية",     "total": 93, "pct": 61, "v30": 61,  "n30": 44, "nat": 61,  "nnat": 49}'::jsonb)
 on conflict (section, id) do update set data = excluded.data, ord = excluded.ord;
 
 -- ٤) صلاحية تحرير هذه الصفوف لاحقاً من الواجهة
@@ -84,6 +87,16 @@ union all
 select 'ترجيح القطاعات = 73؟',
        round(sum((data->>'total')::numeric * (data->>'pct')::numeric)
              / nullif(sum((data->>'total')::numeric), 0))::text
+  from public.perf_items where section = 'changes' and data->>'row' = 'sec'
+union all
+select 'ترجيح رؤية 2030 = 74؟',
+       round(sum((data->>'n30')::numeric * (data->>'v30')::numeric)
+             / nullif(sum((data->>'n30')::numeric), 0))::text
+  from public.perf_items where section = 'changes' and data->>'row' = 'sec'
+union all
+select 'ترجيح الوطنية = 70؟',
+       round(sum((data->>'nnat')::numeric * (data->>'nat')::numeric)
+             / nullif(sum((data->>'nnat')::numeric), 0))::text
   from public.perf_items where section = 'changes' and data->>'row' = 'sec'
 union all
 select 'ترجيح الأشهر = 73؟',

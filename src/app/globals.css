@@ -10640,13 +10640,31 @@ input.cell-date {
 .cr-h h3 { margin: 0; font-size: 13.5px; font-weight: 800; color: var(--gt-900); }
 .cr-h > span { font-size: 11px; color: var(--muted); }
 .cr-h .chips { margin-inline-start: auto; }
-/* تفصيل رؤية 2030 مقابل الاستراتيجيات الوطنية تحت الأعمدة */
-.cr-split {
-  display: flex; flex-wrap: wrap; gap: 6px 16px;
-  margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line2);
-  font-size: 10.5px; color: var(--muted);
+/* مربّعا النوع فوق أعمدة القطاعات: رؤية 2030 · الاستراتيجيات
+   الوطنية. الضغط يقلب الأعمدة إلى نسب النوع، والضغط ثانيةً
+   يعيد الإجمالي — فالمربّع زرٌّ لا بطاقة عرض */
+.cr-kinds { display: flex; gap: 10px; margin: 0 2px 10px; flex-wrap: wrap; }
+.cr-kind {
+  flex: 1 1 200px; min-width: 0;
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 11px 14px; border-radius: 14px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--panel);
+  font: inherit; text-align: start;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
-.cr-split b { color: var(--ink-2); font-weight: 700; }
+.cr-kind b { font-size: 19px; font-weight: 800; color: var(--gt-700); line-height: 1; }
+.cr-kind span { font-size: 12px; font-weight: 700; color: var(--ink-2); }
+.cr-kind em {
+  margin-inline-start: auto; font-style: normal;
+  font-size: 10.5px; color: var(--muted); white-space: nowrap;
+}
+.cr-kind:hover { border-color: var(--g-400); }
+.cr-kind.on {
+  background: var(--g-800); border-color: var(--g-800);
+  box-shadow: 0 6px 16px rgba(0, 40, 35, 0.18);
+}
+.cr-kind.on b, .cr-kind.on span { color: #fff; }
+.cr-kind.on em { color: rgba(255, 255, 255, 0.78); }
 
 /* «نظرة عامة» تعرض بنود الشهر — سطرٌ يقول كم بقي في الصفحة */
 .tb-scope {

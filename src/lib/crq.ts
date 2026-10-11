@@ -260,15 +260,54 @@ export const crMonths = (stored: CrRow[], live: CrLite[]) => periods(stored, liv
 /** آخر `n` فتراتٍ — خطُّ «نظرة عامة» متابعةٌ لا أرشيف */
 export const crLast = <T,>(list: T[], n: number) => (list.length > n ? list.slice(-n) : list);
 
+/** قيمة قطاعٍ في ربع: الإجمالي ومعه تفصيل النوعين */
+export type CrSecVal = {
+  pct: number;
+  n: number;
+  /** رؤية 2030 — `null` إن لم يُدخَل تفصيلها */
+  v30: number | null;
+  n30: number | null;
+  /** الاستراتيجيات الوطنية */
+  nat: number | null;
+  nnat: number | null;
+};
+
 export type CrSector = {
   name: string;
-  stat: CrStat;
-  /** نسبة الربع السابق — `null` إن لم يُدخَل */
-  was: CrStat | null;
-  /** التفصيل حين يُدخَل: رؤية 2030 · الاستراتيجيات الوطنية */
-  v30: number | null;
-  nat: number | null;
+  /** الربع المعروض — `null` إن لم يرد فيه */
+  now: CrSecVal | null;
+  /** الربع الذي قبله */
+  was: CrSecVal | null;
 };
+
+/** أي نوعٍ من الطلبات يُعرض: الكل · رؤية 2030 · الاستراتيجيات الوطنية */
+export type CrKind = "" | "v30" | "nat";
+
+/**
+ * قراءة قيمةٍ بحسب النوع المختار — `null` حين لا تفصيل لذلك
+ * النوع في تلك الفترة، فيُعرض العمود مخطَّطاً بـ«—» لا بصفرٍ
+ * يُقرأ تراجعاً.
+ */
+export function crPick(v: CrSecVal | null, kind: CrKind): { pct: number; n: number } | null {
+  if (!v) return null;
+  if (kind === "") return { pct: v.pct, n: v.n };
+  const pct = kind === "v30" ? v.v30 : v.nat;
+  if (pct == null) return null;
+  const n = (kind === "v30" ? v.n30 : v.nnat) ?? 0;
+  return { pct, n };
+}
+
+function valOf(r: CrRow): CrSecVal {
+  const has = (k: string) => txt(r.data[k]) !== "";
+  return {
+    n: crNum(r.data.total),
+    pct: Math.max(0, Math.min(100, Math.round(crNum(r.data.pct)))),
+    v30: has("v30") ? Math.round(crNum(r.data.v30)) : null,
+    n30: has("n30") ? crNum(r.data.n30) : null,
+    nat: has("nat") ? Math.round(crNum(r.data.nat)) : null,
+    nnat: has("nnat") ? crNum(r.data.nnat) : null,
+  };
+}
 
 /**
  * قطاعات ربعٍ بعينه ومعها الربع الذي قبله — مصدرها الصفوف
@@ -277,27 +316,38 @@ export type CrSector = {
  */
 export function crSectors(stored: CrRow[], quarter: string, prev?: string): CrSector[] {
   const rows = stored.filter(crIsSec);
-  const of = (q: string) =>
-    rows.filter((r) => crNrm(r.data.quarter) === crNrm(q));
-  const now = of(quarter);
+  const of = (q: string) => rows.filter((r) => crNrm(r.data.quarter) === crNrm(q));
   const before = new Map(
-    (prev ? of(prev) : []).map((r) => [crNrm(r.data.sector), statOf(r)]),
+    (prev ? of(prev) : []).map((r) => [crNrm(r.data.sector), { nm: txt(r.data.sector).trim(), v: valOf(r) }]),
   );
-  const out: CrSector[] = now.map((r) => ({
+  const out: CrSector[] = of(quarter).map((r) => ({
     name: txt(r.data.sector).trim(),
-    stat: statOf(r),
-    was: before.get(crNrm(r.data.sector)) || null,
-    v30: txt(r.data.v30) === "" ? null : Math.round(crNum(r.data.v30)),
-    nat: txt(r.data.nat) === "" ? null : Math.round(crNum(r.data.nat)),
+    now: valOf(r),
+    was: before.get(crNrm(r.data.sector))?.v || null,
   }));
-  /* قطاعٌ كان في السابق ولم يَرِد في المعروض يبقى ظاهراً بـ«—»،
+  /* قطاعٌ كان في السابق ولم يَرِد في المعروض يبقى ظاهراً،
      وإلا بدا كأنه لم يكن */
-  for (const [k, st] of before)
-    if (!out.some((x) => crNrm(x.name) === k)) {
-      const r = (prev ? of(prev) : []).find((y) => crNrm(y.data.sector) === k);
-      out.push({ name: txt(r?.data.sector).trim(), stat: { n: 0, ok: 0, pct: 0 }, was: st, v30: null, nat: null });
-    }
-  return out.sort((a, b) => b.stat.pct - a.stat.pct || b.stat.n - a.stat.n);
+  for (const [k, x] of before)
+    if (!out.some((y) => crNrm(y.name) === k)) out.push({ name: x.nm, now: null, was: x.v });
+  return out.sort(
+    (a, b) => (b.now?.pct ?? -1) - (a.now?.pct ?? -1) || (b.now?.n ?? 0) - (a.now?.n ?? 0),
+  );
+}
+
+/**
+ * نسبة نوعٍ على مستوى الربع كلّه — مرجَّحةً بعدد طلباته، كما
+ * تُحسب نسبة الربع من قطاعاته.
+ */
+export function crKindTotal(secs: CrSector[], kind: CrKind): CrStat | null {
+  let n = 0, ok = 0;
+  for (const s of secs) {
+    const v = crPick(s.now, kind);
+    if (!v || !v.n) continue;
+    n += v.n;
+    ok += (v.pct / 100) * v.n;
+  }
+  if (!n) return null;
+  return { n, ok: Math.round(ok), pct: Math.round((ok / n) * 100) };
 }
 
 /** الربع الذي قبل ربعٍ مكتوبٍ نصّاً */
