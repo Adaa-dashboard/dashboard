@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { apiFetch } from "@/lib/api";
-import { nqOf, nqTally } from "@/lib/notesq";
+import { nqQuarters, nqOfQuarter, nqForEntities } from "@/lib/notesq";
 import { loadUserData, saveUserData } from "@/lib/userdata";
 import { sb } from "@/lib/supa";
 import { commitStats, ownerMap, nrm, type CommitRow } from "@/lib/commit";
@@ -5017,25 +5017,31 @@ export default function Portfolio({
      ------------------------------------------------------------
      كان يُقرأ من مؤشر الخطة التشغيلية، فيظهر الرقم نفسه في محفظة
      كل موظف كأنه رقمه. صار يُقرأ من صفحة «جودة ملاحظات الأداء»:
-     صفوفُ الموظف وحدها، والنسبة من مجاميعها لا من متوسط نسبها.
+     **جهاتُه هو** في آخر ربعٍ مرفوع، مرجّحةً بعدد العناصر.
 
-     ومن لا صفَّ له **صفرٌ لا رقمٌ مستعار** — بطلب صاحبة المنصة.
+     ولا عمود استشاريٍّ في الملف: المنصة تعرف من يتولّى كل جهة من
+     سجلّ الجهات، فلا يُكتب اسمٌ مرّتين ولا يختلف إملاؤه.
+
+     ومن لا جهةَ له فيها **صفرٌ لا رقمٌ مستعار** — بطلب صاحبة المنصة.
      ============================================================ */
   const [noteQ, setNoteQ] = useState<{ pct: number; q: string } | null>(null);
   useEffect(() => {
-    if (!me.name) return;
+    if (!regNames.length) {
+      setNoteQ(null);
+      return;
+    }
     void apiFetch("/api/items?section=notesq")
       .then((r) => r.json())
       .then((d) => {
         const rows = (Array.isArray(d.items) ? d.items : []) as { data: Rec }[];
-        const mine = nqOf(rows, me.name || "");
-        if (!mine.length) return setNoteQ(null);
-        const st = nqTally(mine);
-        const qs = [...new Set(mine.map((r) => txt(r.data.quarter)).filter(Boolean))];
-        setNoteQ({ pct: st.pct, q: qs.length === 1 ? qs[0] : `${st.ok} من ${st.total}` });
+        const qs = nqQuarters(rows);
+        const last = qs[qs.length - 1]?.q || "";
+        if (!last) return setNoteQ(null);
+        const st = nqForEntities(nqOfQuarter(rows, last), regNames);
+        setNoteQ(st ? { pct: st.pct, q: last } : null);
       })
       .catch(() => setNoteQ(null));
-  }, [me.name]);
+  }, [regNames]);
   const curQ = Math.floor(new Date().getMonth() / 3) + 1;
   const qLate = entities.filter((r) => {
     const q: number[] = Array.isArray(r.data.q) ? r.data.q : [];

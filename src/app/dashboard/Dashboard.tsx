@@ -41,6 +41,7 @@ import {
   StrategyBox,
   Projects,
   CxBox,
+  NotesQBox,
   useCollapse,
   CollapseBtn,
   SECTION_TITLE,
@@ -1484,6 +1485,16 @@ function Overview({
           onOpen={hasScope(me.scopes, "inststrat") ? () => onOpenTab("inststrat") : undefined}
         />
       </div>
+
+      {/* جودة ملاحظات الأداء — خطّ الأرباع: نسبةُ كل ربعٍ وفرقُه عن
+          سابقه. يراه كل من يفتح «نظرة عامة»، والصفحة لأصحابها. */}
+      <Sec
+        id="notesq"
+        title={t(SECTION_TITLE.notesq[0], SECTION_TITLE.notesq[1])}
+        extra={<MoreLink k="notesq" />}
+      >
+        <NotesQBox t={t} />
+      </Sec>
 
       {/* قياس تجربة المستفيد — فوق المشاريع بطلب المستخدمة.
           داخل <Sec> نفسه ليتوحّد عنوانه مع بقية عناوين نظرة عامة */}

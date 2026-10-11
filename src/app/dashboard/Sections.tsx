@@ -4,7 +4,10 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { CycleBar, CYCLE_CFG } from "./Cycle";
-import { nqByPerson, nqTally, nqKeyOf, nqNrm } from "@/lib/notesq";
+import {
+  nqTally, nqCriteria, nqGroup, nqQuarters, nqQOrder, nqObs, nqOfQuarter,
+  nqKeyOf, nqNrm, nqCheck, nqBand, NQ_BANDS, NQ_CKEYS,
+} from "@/lib/notesq";
 import { writeXlsx, readXlsxSheets, readPptxSlides } from "@/lib/sheet";
 import { asset } from "@/lib/base";
 import { publishUndo } from "@/lib/undoBus";
@@ -3527,27 +3530,128 @@ export function Outputs({ t }: { t: T }) {
 /* ============================================================
    جودة ملاحظات الأداء
    ------------------------------------------------------------
-   صفحةٌ يرفع فيها صاحبُها بيانات الربع: لكل استشاريٍّ كم تقريراً
-   رُوجع له وكم منها طابق معايير جودة الملاحظات. ومنها تُشتقّ
-   نسبةُ كلِّ موظفٍ في محفظته — فما كان يظهر هناك رقمَ الإدارة
-   الواحد لكل الناس صار رقم صاحب المحفظة نفسه.
+   دورةٌ ربعية: تُقيَّم ملاحظاتُ كل عنصرٍ متعثر (مؤشر أو مبادرة)
+   على أربعة معايير، ومنها تُشتقّ نسبةُ الجهة والقطاع والإدارة.
 
-   والحساب في `lib/notesq` ليُختبر بلا React ولا شبكة.
+   **لا رقم يُكتب يدوياً**: نسبة الإدارة والقطاع والجهة والمعايير
+   والفرق عن الربع السابق — كلُّها محسوبةٌ من الصفوف نفسها. فما
+   يُرفع مرةً يَظهر في الصفحة وفي نظرة عامة وفي محفظة الموظف بلا
+   إدخالٍ ثانٍ.
+
+   والحساب في `lib/notesq` ليُختبر بلا React ولا شبكة. وأهمّ ما
+   فيه: العنصر لا يُحتسب ملتزماً إلا باستيفاء المعايير الأربعة
+   كلّها، والترجيح بعدد العناصر لا بعدد الجهات.
    ============================================================ */
+
+/** لونُ النطاق — من متغيّرات الهوية لا بأرقامٍ مكتوبة */
+const NQ_TONE: Record<string, string> = {
+  ok: "var(--success)",
+  wt: "var(--warn)",
+  no: "var(--danger)",
+};
+/** تدرّج أعمدة المعايير — من درجات الهوية بترتيبها */
+const NQ_BAR = ["var(--g-400)", "var(--g-600)", "var(--g-800)", "var(--g-700)"];
+
+/** خانة نسبة ملوَّنة بنطاقها */
+function NqPct({ pct }: { pct: number }) {
+  const b = nqBand(pct);
+  return <span className={`nq-pc ${b.tone}`}>{AR(pct)}%</span>;
+}
+
+/** فرق الربع عن سابقه — ▲ أو ▼ أو لا شيء */
+function NqDelta({ d }: { d: number | null }) {
+  if (d === null || d === 0) return null;
+  return (
+    <span className={`nq-dl ${d < 0 ? "dn" : "up"}`}>
+      {d < 0 ? "▼" : "▲"} {AR(Math.abs(d))}%
+    </span>
+  );
+}
+
+/* ---------------- صندوق «نظرة عامة»: خطّ الأرباع ---------------- */
+export function NotesQBox({ t }: { t: T }) {
+  const { items, loaded } = useItems("notesq");
+  const qs = useMemo(() => nqQuarters(items), [items]);
+  if (!loaded) return <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>;
+  if (!qs.length)
+    return <div className="sx-none">{t("لا توجد بيانات بعد — تُرفع من صفحة القسم.", "No data yet.")}</div>;
+
+  /* أرباع السنة الأحدث: الصندوق لوحةُ متابعة لا أرشيفاً */
+  const year = Math.floor(nqQOrder(qs[qs.length - 1].q) / 10);
+  const QN = ["الربع الأول", "الربع الثاني", "الربع الثالث", "الربع الرابع"];
+  const shown = QN.map((nm) => {
+    const hit = qs.find((x) => nqQOrder(x.q) === year * 10 + QN.indexOf(nm) + 1);
+    return { nm, hit };
+  });
+
+  return (
+    <div className="nq-line">
+      {shown.map(({ nm, hit }) => {
+        const tone = hit ? nqBand(hit.stat.pct).tone : "";
+        return (
+          <div className={`nq-q ${hit ? "on " + tone : ""}`} key={nm}>
+            <b style={hit ? { color: NQ_TONE[tone] } : undefined}>
+              {hit ? `${AR(hit.stat.pct)}%` : "—"}
+              {hit && <NqDelta d={hit.delta} />}
+            </b>
+            <i style={hit ? { borderColor: NQ_TONE[tone] } : undefined} />
+            <span>{nm}</span>
+            <em>
+              {hit
+                ? t(`${AR(hit.stat.n)} عنصر`, `${hit.stat.n} items`)
+                : t("لم يُرفع بعد", "Not uploaded")}
+            </em>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ---------------- الصفحة ---------------- */
 const NQ_COLS: ICol[] = [
-  { k: "consultant", label: "الاستشاري", w: 150 },
-  { k: "entity", label: "الجهة", w: 200 },
-  { k: "quarter", label: "الربع", opts: ["", "الربع الأول", "الربع الثاني", "الربع الثالث", "الربع الرابع"], w: 115 },
-  { k: "total", label: "التقارير المراجَعة", w: 125 },
-  { k: "ok", label: "المطابقة للمعايير", w: 125 },
-  { k: "note", label: "ملاحظة", w: 200 },
+  { k: "entity", label: "الجهة", w: 220 },
+  { k: "sector", label: "القطاع", opts: ["", ...INST_SECTORS], w: 150 },
+  { k: "name", label: "العنصر", w: 200 },
+  { k: "kind", label: "النوع", opts: ["", "مؤشر", "مبادرة"], w: 100 },
+  { k: "c1", label: "وصف التحدي", w: 100 },
+  { k: "c2", label: "تصنيف التحدي", w: 100 },
+  { k: "c3", label: "الإجراء التصحيحي", w: 110 },
+  { k: "c4", label: "تاريخ الإجراء", w: 100 },
+  { k: "total", label: "عدد العناصر", w: 100 },
+  { k: "pct", label: "نسبة الالتزام ٪", w: 110 },
 ];
 
 function NotesQPage({ t, canEdit, add, gear }: SecPageProps) {
   const { items, loaded, save, remove, reload, undo, undoTop, dismissUndo } = useItems("notesq");
+  const [pick, setPick] = useState("");
+  const [tab, setTab] = useState<"sector" | "entity" | "data">("sector");
   const [q, setQ] = useState("");
   const [f, setF] = useState("");
   const [draft, setDraft] = useState<Record<string, Rec>>({});
+
+  const qs = useMemo(() => nqQuarters(items), [items]);
+  /* الافتراضي آخر ربعٍ مرفوع — هو ما يُسأل عنه */
+  const cur = pick || qs[qs.length - 1]?.q || "";
+  const qRows = useMemo(() => (cur ? nqOfQuarter(items, cur) : []), [items, cur]);
+
+  const all = useMemo(() => nqTally(qRows), [qRows]);
+  const crit = useMemo(() => nqCriteria(qRows), [qRows]);
+  const obs = useMemo(() => nqObs(qRows), [qRows]);
+  const bySec = useMemo(() => nqGroup(qRows, "sector"), [qRows]);
+  const byEnt = useMemo(() => nqGroup(qRows, "entity"), [qRows]);
+  const delta = qs.find((x) => nqNrm(x.q) === nqNrm(cur))?.delta ?? null;
+
+  /* جدول البيانات الخام — بعد البحث وفلتر القطاع */
+  const raw = useMemo(
+    () =>
+      qRows.filter((r) => {
+        const d = (r as Item).data;
+        if (f && txt(d.sector) !== f) return false;
+        return !q || `${txt(d.entity)} ${txt(d.name)}`.includes(q);
+      }) as Item[],
+    [qRows, q, f],
+  );
 
   const val = (it: Item, k: string) => txt(draft[it.id]?.[k] ?? it.data[k]);
   async function put(it: Item, k: string, v: string) {
@@ -3556,26 +3660,21 @@ function NotesQPage({ t, canEdit, add, gear }: SecPageProps) {
     await save(it.id, data, it.ord);
   }
 
-  const people = useMemo(() => nqByPerson(items), [items]);
-  const all = useMemo(() => nqTally(items), [items]);
-
-  const rows = useMemo(
-    () =>
-      items.filter((it) => {
-        const d = it.data;
-        if (f && txt(d.consultant) !== f) return false;
-        return !q || `${txt(d.consultant)} ${txt(d.entity)} ${txt(d.quarter)}`.includes(q);
-      }),
-    [items, q, f],
-  );
-
   function exportXl() {
-    const head = [...NQ_COLS.map((c) => c.label), "النسبة ٪"];
-    const body = rows.map((it) => [
-      ...NQ_COLS.map((c) => txt(it.data[c.k])),
-      String(nqTally([it]).pct),
-    ]);
-    download("جودة-ملاحظات-الأداء.xlsx", writeXlsx([{ name: "جودة الملاحظات", rows: [head, ...body] }]));
+    const head = ["الربع", ...NQ_COLS.map((c) => c.label)];
+    const body = (qRows as Item[]).map((it) => [cur, ...NQ_COLS.map((c) => txt(it.data[c.k]))]);
+    const sec = [["القطاع", "نسبة الالتزام ٪", "عدد العناصر"],
+      ...bySec.map((x) => [x.name, String(x.stat.pct), String(x.stat.n)])];
+    const ent = [["الجهة", "نسبة الالتزام ٪", "عدد العناصر"],
+      ...byEnt.map((x) => [x.name, String(x.stat.pct), String(x.stat.n)])];
+    download(
+      `جودة-ملاحظات-الأداء-${cur || ""}.xlsx`,
+      writeXlsx([
+        { name: "البيانات", rows: [head, ...body] },
+        { name: "القطاعات", rows: sec },
+        { name: "الجهات", rows: ent },
+      ]),
+    );
   }
 
   if (!loaded) return <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>;
@@ -3585,8 +3684,8 @@ function NotesQPage({ t, canEdit, add, gear }: SecPageProps) {
       <Toolbar
         q={q} setQ={setQ}
         filter={f} setFilter={setF}
-        options={people.map((p) => ({ v: p.name, l: `${p.name} (${AR(p.stat.pct)}%)` }))}
-        allLabel={t("كل الاستشاريين", "Everyone")}
+        options={bySec.map((x) => ({ v: x.name, l: `${x.name} (${AR(x.stat.n)})` }))}
+        allLabel={t("كل القطاعات", "All sectors")}
         onExport={exportXl}
         upload={canEdit ? <NotesQImport items={items} t={t} onDone={() => void reload()} /> : null}
         add={add}
@@ -3594,94 +3693,204 @@ function NotesQPage({ t, canEdit, add, gear }: SecPageProps) {
         t={t}
       />
 
-      {/* شريطُ كل استشاريٍّ ونسبته — وهي نفسها التي تظهر في محفظته */}
-      <div className="stabs">
-        <button className={`stab ${!f ? "on" : ""}`} onClick={() => setF("")}>
-          <span className="l">{t("الإدارة", "Department")}</span>
-          <b>{AR(all.pct)}%</b>
-        </button>
-        {people.map((p) => (
-          <button
-            key={p.name}
-            className={`stab ${f === p.name ? "on" : ""}`}
-            style={{ ["--c" as string]: p.stat.pct >= 90 ? "#1a9d5c" : p.stat.pct >= 70 ? "#e0971a" : "#d34a4a" }}
-            onClick={() => setF(f === p.name ? "" : p.name)}
-          >
-            <span className="l">{p.name}</span>
-            <b>{AR(p.stat.pct)}%</b>
-          </button>
-        ))}
-      </div>
-
-      {!rows.length ? (
+      {!items.length ? (
         <Empty
           title={t("لا توجد بيانات بعد", "Nothing yet")}
           note={t("تُرفع من «تصدير إكسل» أو تُضاف من زر «إضافة».", "Upload the file or add rows.")}
         />
       ) : (
-        <div className="tbl-wrap">
-          <table className="sx-tbl inst">
-            <thead>
-              <tr>
-                <th className="c num">#</th>
-                {NQ_COLS.map((c) => (
-                  <th key={c.k} style={{ minWidth: c.w }}>{c.label}</th>
+        <>
+          {/* الربع المعروض — آخر ما رُفع افتراضاً */}
+          <div className="chips" style={{ marginBottom: 12 }}>
+            {qs.map((x) => (
+              <button
+                key={x.q}
+                className={`chip sm ${nqNrm(x.q) === nqNrm(cur) ? "on" : ""}`}
+                onClick={() => setPick(x.q)}
+              >
+                {x.q}
+              </button>
+            ))}
+          </div>
+
+          <div className="nq-top">
+            <div className="nq-ring-box">
+              <div
+                className="nq-ring"
+                style={{
+                  background: `conic-gradient(${NQ_TONE[nqBand(all.pct).tone]} 0 ${all.pct}%, var(--line2) ${all.pct}% 100%)`,
+                }}
+              >
+                <i>{AR(all.pct)}%</i>
+              </div>
+              <div className="nq-k">
+                {t("نسبة العناصر المتعثرة الملتزمة بمعايير ملاحظات الأداء",
+                   "Elements complying with the notes criteria")}
+              </div>
+              <NqDelta d={delta} />
+              <div className="nq-n">
+                <b>{AR(all.n)}</b> {t("عنصر متعثر", "elements")}
+              </div>
+            </div>
+
+            <div className="nq-bars-box">
+              <h4>{t("حالة الالتزام بكتابة ملاحظات الأداء للعناصر المتعثرة وفقاً للمعايير",
+                     "Compliance by criterion")}</h4>
+              <div className="nq-bars">
+                {crit.map((c, i) => (
+                  <div className="nq-bar" key={c.name}>
+                    <b>{c.stat ? `${AR(c.stat.pct)}%` : "—"}</b>
+                    <u style={{ height: `${c.stat ? Math.max(c.stat.pct, 2) : 2}%`, background: NQ_BAR[i] }} />
+                    <span>{c.name}</span>
+                  </div>
                 ))}
-                <th className="c">{t("النسبة", "%")}</th>
-                {canEdit && <th className="c" />}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((it, n) => {
-                const pct = nqTally([it]).pct;
-                return (
-                  <tr key={it.id}>
-                    <td className="c num">{AR(n + 1)}</td>
-                    {NQ_COLS.map((c) => (
-                      <td key={c.k} className="cell" style={{ minWidth: c.w }}>
-                        {!canEdit ? (
-                          val(it, c.k) || "—"
-                        ) : c.opts ? (
-                          <select value={val(it, c.k)} onChange={(e) => void put(it, c.k, e.target.value)}>
-                            {c.opts.map((op) => (
-                              <option key={op} value={op}>{op || "—"}</option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input
-                            value={val(it, c.k)}
-                            onChange={(e) =>
-                              setDraft((old) => ({ ...old, [it.id]: { ...(old[it.id] || {}), [c.k]: e.target.value } }))
-                            }
-                            onBlur={(e) => {
-                              if (e.target.value !== txt(it.data[c.k])) void put(it, c.k, e.target.value);
-                            }}
-                          />
-                        )}
-                      </td>
-                    ))}
-                    {/* النسبة محسوبةٌ لا مُدخَلة، فلا تتعارض مع عموديها */}
-                    <td className={`cell c ${pct >= 90 ? "ok" : pct >= 70 ? "wt" : "no"}`}>{AR(pct)}%</td>
-                    {canEdit && (
-                      <td className="c">
-                        <button
-                          className="rowx"
-                          title={t("حذف الصف", "Delete row")}
-                          onClick={() => {
-                            if (!confirm(t(`حذف صف «${txt(it.data.consultant)}»؟`, "Delete row?"))) return;
-                            void remove(it.id);
-                          }}
-                        >
-                          ✕
-                        </button>
-                      </td>
-                    )}
+              </div>
+              <div className="nq-lg">
+                {NQ_BANDS.map((b) => (
+                  <span key={b.label}>
+                    <i style={{ background: NQ_TONE[b.tone] }} />
+                    {b.label} {AR(b.min)}–{b.min === 90 ? "100" : b.min === 70 ? "89" : "69"}%
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="chips" style={{ margin: "14px 0 10px" }}>
+            {([["sector", "القطاعات"], ["entity", "الجهات"], ["data", "البيانات"]] as const).map(([k, lb]) => (
+              <button key={k} className={`chip sm ${tab === k ? "on" : ""}`} onClick={() => setTab(k)}>
+                {lb}
+              </button>
+            ))}
+          </div>
+
+          {tab !== "data" ? (
+            <div className="tbl-wrap">
+              <table className="sx-tbl nq-tbl">
+                <thead>
+                  <tr>
+                    <th>{tab === "sector" ? t("القطاع", "Sector") : t("اسم الجهة", "Entity")}</th>
+                    <th className="c">{t("نسبة الالتزام", "Compliance")}</th>
+                    <th className="c">{t("عدد العناصر المتعثرة", "Elements")}</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody>
+                  {(tab === "sector" ? bySec : byEnt).map((x) => (
+                    <tr key={x.name}>
+                      <td>{x.name}</td>
+                      <td className="c"><NqPct pct={x.stat.pct} /></td>
+                      <td className="c">{AR(x.stat.n)}</td>
+                    </tr>
+                  ))}
+                  <tr className="nq-tot">
+                    <td>{t("الإجمالي", "Total")}</td>
+                    <td className="c"><NqPct pct={all.pct} /></td>
+                    <td className="c">{AR(all.n)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="tbl-wrap">
+              <table className="sx-tbl inst">
+                <thead>
+                  <tr>
+                    <th className="c num">#</th>
+                    {NQ_COLS.map((c) => (
+                      <th key={c.k} style={{ minWidth: c.w }}>{c.label}</th>
+                    ))}
+                    {canEdit && <th className="c" />}
+                  </tr>
+                </thead>
+                <tbody>
+                  {raw.map((it, n) => (
+                    <tr key={it.id}>
+                      <td className="c num">{AR(n + 1)}</td>
+                      {NQ_COLS.map((c) => (
+                        <td key={c.k} className="cell" style={{ minWidth: c.w }}>
+                          {!canEdit ? (
+                            val(it, c.k) || "—"
+                          ) : c.opts ? (
+                            <select value={val(it, c.k)} onChange={(e) => void put(it, c.k, e.target.value)}>
+                              {c.opts.map((op) => (
+                                <option key={op} value={op}>{op || "—"}</option>
+                              ))}
+                            </select>
+                          ) : NQ_CKEYS.includes(c.k) ? (
+                            /* المعايير مربّعُ اختيار — فالقيمة المحفوظة علامةٌ
+                               واحدة لا نصوصاً متفرّقة */
+                            <input
+                              type="checkbox"
+                              checked={nqCheck(it.data[c.k]) === 1}
+                              onChange={(e) => void put(it, c.k, e.target.checked ? "✅" : "")}
+                            />
+                          ) : (
+                            <input
+                              value={val(it, c.k)}
+                              onChange={(e) =>
+                                setDraft((old) => ({ ...old, [it.id]: { ...(old[it.id] || {}), [c.k]: e.target.value } }))
+                              }
+                              onBlur={(e) => {
+                                if (e.target.value !== txt(it.data[c.k])) void put(it, c.k, e.target.value);
+                              }}
+                            />
+                          )}
+                        </td>
+                      ))}
+                      {canEdit && (
+                        <td className="c">
+                          <button
+                            className="rowx"
+                            title={t("حذف الصف", "Delete row")}
+                            onClick={() => {
+                              if (!confirm(t(`حذف صف «${txt(it.data.entity)}»؟`, "Delete row?"))) return;
+                              void remove(it.id);
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                  {!raw.length && (
+                    <tr><td colSpan={NQ_COLS.length + 2} className="c">
+                      {t("لا توجد نتائج", "No results")}
+                    </td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {obs.some((o) => o.list.length) && (
+            <>
+              <h4 className="nq-h">{t("أبرز المشاهدات وملاحظات المقيمين", "Evaluator observations")}</h4>
+              <div className="nq-obs">
+                {obs.map((o) => (
+                  <div className="nq-ob" key={o.name}>
+                    <div className="oh">
+                      <b>{o.name}</b>
+                      <em>{t("نسبة تكرارها", "Frequency")}</em>
+                    </div>
+                    <ul>
+                      {o.list.length ? (
+                        o.list.map((x, i) => (
+                          <li key={i}>
+                            <b>{AR(x.pct)}%</b>
+                            <span>{x.text}</span>
+                          </li>
+                        ))
+                      ) : (
+                        <li className="none">{t("لا ملاحظات", "None")}</li>
+                      )}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </>
       )}
 
       <UndoBar step={undoTop} onUndo={() => void undo()} onClose={dismissUndo} t={t} />
@@ -3689,14 +3898,15 @@ function NotesQPage({ t, canEdit, add, gear }: SecPageProps) {
   );
 }
 
-/* رفع ملف الربع — المطابقة بالاستشاري والجهة والربع، فإعادة رفع
-   الملف نفسه تحدّث ولا تكرّر */
+/* رفع ملف الربع — يقبل صيغتَي الملف: صفّاً لكل عنصرٍ متعثر، أو
+   صفّاً لكل جهةٍ بعددها ونسبتها. والمطابقة بالجهة والعنصر والربع،
+   فإعادة رفع الملف نفسه تحدّث ولا تكرّر. */
 function NotesQImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => void }) {
   const [msg, setMsg] = useState("");
   const ref = useRef<HTMLInputElement>(null);
 
   const keyOf = (d: Rec) =>
-    `${nqNrm(d.consultant)}|${nqNrm(d.entity)}|${nqNrm(d.quarter)}`;
+    `${nqNrm(d.quarter)}|${nqNrm(d.entity)}|${nqNrm(d.name)}`;
 
   async function pick(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -3714,7 +3924,9 @@ function NotesQImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () =>
             const k = nqKeyOf(txt(c));
             if (k && !Object.values(m).includes(k)) m[ci] = k;
           });
-          if (Object.values(m).includes("consultant") && Object.values(m).includes("total")) {
+          const v = Object.values(m);
+          /* يكفي عمودُ الجهة ومعه معيارٌ واحد أو عددُ العناصر */
+          if (v.includes("entity") && (v.some((x) => NQ_CKEYS.includes(x)) || v.includes("total"))) {
             hit = { rows: rs, hi: i, map: m };
             break;
           }
@@ -3723,10 +3935,18 @@ function NotesQImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () =>
       }
       if (!hit) {
         setMsg(t(
-          "لم أجد صف العناوين — لا بدّ من عمود «الاستشاري» وعمود «التقارير المراجَعة».",
+          "لم أجد صف العناوين — لا بدّ من عمود «الجهة» ومعه المعايير الأربعة أو «عدد العناصر».",
           "Header row not found.",
         ));
         return;
+      }
+
+      /* الربع: من عمودٍ في الملف، وإلا يُسأل عنه مرّةً واحدة */
+      const hasQ = Object.values(hit.map).includes("quarter");
+      let qAll = "";
+      if (!hasQ) {
+        qAll = (prompt(t("ما الربع الذي يخصّه هذا الملف؟", "Which quarter?"), "الربع الثالث 2025") || "").trim();
+        if (!qAll) { setMsg(""); return; }
       }
 
       const byKey = new Map(items.map((it) => [keyOf(it.data), it]));
@@ -3737,9 +3957,12 @@ function NotesQImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () =>
         const d: Rec = {};
         for (const [ci, k] of Object.entries(hit.map)) {
           const v = txt(r[Number(ci)]).trim();
-          if (v) d[k] = v;
+          if (!v) continue;
+          /* المعايير تُوحَّد على علامةٍ واحدة، فلا تتفرّق «نعم» و«1» و«✓» */
+          d[k] = NQ_CKEYS.includes(k) ? (nqCheck(v) === 1 ? "✅" : nqCheck(v) === 0 ? "" : v) : v;
         }
-        if (!txt(d.consultant).trim()) continue;
+        if (!txt(d.entity).trim()) continue;
+        if (qAll) d.quarter = qAll;
         const cur = byKey.get(keyOf(d));
         if (cur) {
           upd++;
@@ -3911,13 +4134,20 @@ export function SectionPage({
 type Field = { k: string; label: string; kind?: "num" | "text" | "date" | "bool" | "area" };
 
 const FIELDS: Record<Exclude<SectionKey, "outputs" | "opplan">, Field[]> = {
+  /* صفٌّ واحد يصلح للصورتين: عنصرٌ متعثر بمعاييره الأربعة، أو جهةٌ
+     بعدد عناصرها ونسبتها. يُملأ ما يناسب ويُترك الباقي. */
   notesq: [
-    { k: "consultant", label: "الاستشاري" },
+    { k: "quarter", label: "الربع (مثال: الربع الثالث 2025)" },
     { k: "entity", label: "الجهة" },
-    { k: "quarter", label: "الربع" },
-    { k: "total", label: "عدد التقارير المراجَعة", kind: "num" },
-    { k: "ok", label: "المطابقة لمعايير جودة الملاحظات", kind: "num" },
-    { k: "note", label: "ملاحظة", kind: "area" },
+    { k: "sector", label: "القطاع (المالي والاقتصادي · البنية التحتية · الخدمات الاجتماعية · الشؤون الحكومية)" },
+    { k: "name", label: "العنصر المتعثر (مؤشر أو مبادرة)" },
+    { k: "kind", label: "النوع (مؤشر · مبادرة)" },
+    { k: "c1", label: "وصف التحدي — ✅ إن استوفى المعيار" },
+    { k: "c2", label: "تصنيف التحدي — ✅ إن استوفى المعيار" },
+    { k: "c3", label: "الإجراء التصحيحي — ✅ إن استوفى المعيار" },
+    { k: "c4", label: "تاريخ الإجراء التصحيحي — ✅ إن استوفى المعيار" },
+    { k: "total", label: "أو: عدد العناصر المتعثرة في الجهة", kind: "num" },
+    { k: "pct", label: "أو: نسبة الالتزام ٪", kind: "num" },
   ],
   sessions: [
     { k: "entity", label: "الجهة" },
