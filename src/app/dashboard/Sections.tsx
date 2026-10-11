@@ -3156,11 +3156,35 @@ export function CxPage({ t, canEdit, add, gear }: SecPageProps) {
 
   return (
     <>
-      {/* بلا بيانات لا شريط أدوات، فيبقى زرّ الرفع وحده هنا */}
-      {canEdit && !st.rows.length && (
-        <div className="sx-tools">
-          <CxImport t={t} onDone={() => void reload()} />
-        </div>
+      {/* الشريط في صدر الصفحة كبقية صفحات الأعمال الرئيسية —
+          كان تحت البطاقات والجدولين فلا يُرى إلا بعد تمريرٍ طويل */}
+      {st.rows.length ? (
+        <Toolbar
+          q={q} setQ={setQ} filter={f} setFilter={setF} options={INST_SECTORS} onExport={exportXl}
+          upload={
+            canEdit ? (
+              <>
+                <CxImport t={t} onDone={() => void reload()} />
+                {st.updated && (
+                  <span className="sx-count">{`${t("آخر رفع", "Last upload")}: ${st.updated}`}</span>
+                )}
+              </>
+            ) : null
+          }
+          add={add}
+          gear={gear}
+          t={t}
+        />
+      ) : (
+        canEdit && (
+          /* بلا بيانات لا بحث ولا فلتر، فيبقى الرفع و«إضافة» و⚙️ وحدها */
+          <div className="sx-tb">
+            {add}
+            <span className="gr" />
+            <CxImport t={t} onDone={() => void reload()} />
+            {gear}
+          </div>
+        )
       )}
 
       {!st.rows.length ? (
@@ -3288,23 +3312,6 @@ export function CxPage({ t, canEdit, add, gear }: SecPageProps) {
               </table>
             </div>
           </div>
-
-          <Toolbar
-            q={q} setQ={setQ} filter={f} setFilter={setF} options={INST_SECTORS} onExport={exportXl}
-            upload={
-              canEdit ? (
-                <>
-                  <CxImport t={t} onDone={() => void reload()} />
-                  {st.updated && (
-                    <span className="sx-count">{`${t("آخر رفع", "Last upload")}: ${st.updated}`}</span>
-                  )}
-                </>
-              ) : null
-            }
-            add={add}
-            gear={gear}
-            t={t}
-          />
 
           <div className="iw-bar">
             <span className="iw-tog">
