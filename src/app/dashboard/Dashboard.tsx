@@ -1095,6 +1095,53 @@ const SCOPES: { key: string; label: string; en: string; q: number | null }[] = [
   { key: "q3", label: "الربع الثالث", en: "Q3", q: 3 },
   { key: "q4", label: "الربع الرابع", en: "Q4", q: 4 },
 ];
+/* ============================================================
+   قسمٌ في «نظرة عامة» ورابطُ تفاصيله
+   ------------------------------------------------------------
+   **خارج `Overview` عمداً.** كانا معرَّفين داخله، فمع كل تحديثٍ
+   دوري (القياسات كل ٢٠ ثانية) يتغيّر «نوع» المكوّن في نظر React
+   فتُفكَّك أقسامُ الصفحة وتُركَّب من جديد: كل بطاقةٍ فيها تعود
+   إلى «جارٍ التحميل» وتُعيد طلب بياناتها، فتبدو الصفحة كأنها لا
+   تكفّ عن التحميل. تعريفُهما هنا يُثبّت النوع فلا تُفكَّك.
+   ============================================================ */
+function MoreLink({ k, scopes, onOpen }: { k: Scope; scopes: string[]; onOpen: (tab: string) => void }) {
+  const { t } = useT();
+  if (!hasScope(scopes, k)) return null;
+  return (
+    <button className="sx-link" onClick={() => onOpen(k)}>
+      {t("المزيد من التفاصيل", "More details")} ‹
+    </button>
+  );
+}
+
+function Sec({
+  id,
+  title,
+  extra,
+  chips,
+  children,
+}: {
+  id: string;
+  title: string;
+  extra?: ReactNode;
+  chips?: ReactNode;
+  children: ReactNode;
+}) {
+  const { t } = useT();
+  const { open, toggle } = useCollapse(id);
+  return (
+    <>
+      <h2 className={`section-title sx-title ${chips ? "with-chips" : ""}`} style={{ marginTop: 28 }}>
+        <CollapseBtn open={open} toggle={toggle} t={t} />
+        {title}
+        {chips}
+        {extra}
+      </h2>
+      {open && children}
+    </>
+  );
+}
+
 function Overview({
   me,
   refData,
@@ -1237,42 +1284,6 @@ function Overview({
   /* عنوان قسم قابل للطيّ — السهم يخفي محتواه ويبقى العنوان.
      الحالة في متصفح المستخدم وحده. */
   /** زرّ «المزيد من التفاصيل» — لمن يملك صلاحية القسم وحده */
-  function MoreLink({ k }: { k: Scope }) {
-    if (!hasScope(me.scopes, k)) return null;
-    return (
-      <button className="sx-link" onClick={() => onOpenTab(k)}>
-        {t("المزيد من التفاصيل", "More details")} ‹
-      </button>
-    );
-  }
-
-  function Sec({
-    id,
-    title,
-    extra,
-    chips,
-    children,
-  }: {
-    id: string;
-    title: string;
-    extra?: ReactNode;
-    chips?: ReactNode;
-    children: ReactNode;
-  }) {
-    const { open, toggle } = useCollapse(id);
-    return (
-      <>
-        <h2 className={`section-title sx-title ${chips ? "with-chips" : ""}`} style={{ marginTop: 28 }}>
-          <CollapseBtn open={open} toggle={toggle} t={t} />
-          {title}
-          {chips}
-          {extra}
-        </h2>
-        {open && children}
-      </>
-    );
-  }
-
   return (
     <div>
       <div className="toolbar">
@@ -1488,14 +1499,14 @@ function Overview({
 
       {/* قياس تجربة المستفيد — فوق المشاريع بطلب المستخدمة.
           داخل <Sec> نفسه ليتوحّد عنوانه مع بقية عناوين نظرة عامة */}
-      <Sec id="cx" title={t(SECTION_TITLE.cx[0], SECTION_TITLE.cx[1])} extra={<MoreLink k="cx" />}>
+      <Sec id="cx" title={t(SECTION_TITLE.cx[0], SECTION_TITLE.cx[1])} extra={<MoreLink k="cx" scopes={me.scopes} onOpen={onOpenTab} />}>
         <CxBox t={t} />
       </Sec>
 
       <Sec
         id="projects"
         title={t(SECTION_TITLE.projects[0], SECTION_TITLE.projects[1])}
-        extra={<MoreLink k="projects" />}
+        extra={<MoreLink k="projects" scopes={me.scopes} onOpen={onOpenTab} />}
       >
         <Projects t={t} canEdit={false} />
       </Sec>
@@ -1504,7 +1515,7 @@ function Overview({
         <Sec
           id="changes"
           title={t("طلبات التغيير", "Change requests")}
-          extra={<MoreLink k="changes" />}
+          extra={<MoreLink k="changes" scopes={me.scopes} onOpen={onOpenTab} />}
         >
           {/* موجزٌ لا صفحةً ثانية: المنصّة وخطُّ الأشهر. الجدول
               وأزرار الرفع في «مراجعة طلبات التغيير» وحدها */}
@@ -1523,7 +1534,7 @@ function Overview({
       <Sec
         id="notesq"
         title={t(SECTION_TITLE.notesq[0], SECTION_TITLE.notesq[1])}
-        extra={<MoreLink k="notesq" />}
+        extra={<MoreLink k="notesq" scopes={me.scopes} onOpen={onOpenTab} />}
       >
         <NotesQBox t={t} />
       </Sec>
@@ -1536,7 +1547,7 @@ function Overview({
         <Sec
           id="opplan"
           title={t("الخطة التشغيلية", "Operational plan")}
-          extra={<MoreLink k="opplan" />}
+          extra={<MoreLink k="opplan" scopes={me.scopes} onOpen={onOpenTab} />}
         >
           <OpPlanCard t={t} />
         </Sec>
