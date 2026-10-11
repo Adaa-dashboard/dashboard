@@ -9985,13 +9985,25 @@ input.cell-date {
 .stk-f .stk-done { color: #1a7a48; }
 .stk-f .stk-del { color: #b0453a; }
 
-/* الرصيف: sticky داخل مساحة الصفحة — فيلتصق بأسفل الشاشة مهما
-   طال التمرير، ويبقى داخل عرض الصفحة البيضاء فلا يعلو الشريط
-   الجانبي. وبلا ارتفاع، فلا يزيح ما تحته. */
+/* الرصيف **ثابتٌ في زاوية الشاشة** فوق زرّ المساعد الذكي.
+   كان `sticky` داخل مساحة الصفحة، فيتبع تدفّق المحتوى: يختلف
+   موضعه من صفحة لأخرى بطول جدولها وموضع تمريرها — وصاحبة
+   المنصة طلبته ثابتاً كزرّ المساعد. وبلا ارتفاع، فلا يزيح
+   ما تحته، و`pointer-events` تمنعه من حجب ما خلفه. */
 .stk-dock {
-  position: sticky; inset-block-end: 20px; height: 0; z-index: 46;
+  position: fixed;
+  /* خطُّ الرصيف، والقلم يعلوه بكامل ارتفاعه (translateY(-100%)) —
+     فيستقرّ فوق زرّ المساعد الذكي مباشرةً */
+  inset-block-end: 70px;
+  inset-inline-end: 22px;
+  height: 0; z-index: 46;
   display: flex; align-items: flex-end; gap: 10px;
   pointer-events: none;
+}
+/* الجوال: الشريط السفلي يرفع الزرّين معاً — وهذه القاعدة **بعد**
+   الأساسية لا قبلها، فمتساويتا الترجيح وآخرهما يغلب */
+@media (max-width: 860px) {
+  .stk-dock { inset-block-end: calc(126px + env(safe-area-inset-bottom)); }
 }
 .stk-dock > * { pointer-events: auto; transform: translateY(-100%); }
 
@@ -10022,8 +10034,6 @@ input.cell-date {
   .stk-card { width: 210px; }
   .stk-pen { width: 38px; height: 38px; font-size: 15px; }
   .stk-hint { font-size: 10.5px; padding: 6px 11px; white-space: normal; }
-  /* شريط التنقّل السفلي على الجوال — يُرفع الرصيف فوقه */
-  .stk-dock { inset-block-end: 76px; }
 }
 
 /* ============================================================
@@ -12133,8 +12143,10 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
 /* القلم وقائمته في حاويةٍ واحدة: القائمة تُوضع بالنسبة إلى القلم
    نفسه لا إلى الرصيف — فالرصيف بارتفاع صفر ويرفع أبناءه بتحويل */
 .stk-pw { position: relative; display: flex; }
+/* القائمة تُفتح من طرف القلم الداخلي: الزرّ في زاوية الشاشة،
+   فلو تدلّت من طرفه الآخر خرجت عن الحافة */
 .stk-menu {
-  position: absolute; bottom: 100%; margin-bottom: 9px; inset-inline-start: 0;
+  position: absolute; bottom: 100%; margin-bottom: 9px; inset-inline-end: 0;
   display: flex; flex-direction: column; gap: 2px; min-width: 232px;
   background: var(--panel); border: 1px solid var(--border);
   border-radius: 13px; padding: 5px;
