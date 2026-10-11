@@ -66,6 +66,8 @@ import {
   IconLayers,
   IconTree,
   IconCheck3,
+  IconQuality,
+  IconSwap,
   IconDots,
 } from "./icons";
 import OpPlan, { OpPlanCard } from "./OpPlan";
@@ -257,13 +259,14 @@ function shortKpi(name: string): string {
   return w.length <= 3 ? w.join(" ") : w.slice(0, 3).join(" ") + "…";
 }
 
-const SECTION_NAV: [SectionKey, (p: { size?: number }) => ReactElement][] = [
+const SECTION_NAV: [SectionKey & Scope, (p: { size?: number }) => ReactElement][] = [
   ["sessions", IconSess],
   ["natstrat", IconNat],
   ["inststrat", IconInst],
   ["outputs", IconOut],
   ["cx", IconCx],
   ["projects", IconProj],
+  ["notesq", IconQuality],
 ];
 
 /** تبويبات الأقسام — صفحاتُها محجوبةٌ بصلاحية القسم نفسه */
@@ -308,7 +311,7 @@ export default function Dashboard({ me }: { me: Me }) {
   /* المجموعة التي فيها الصفحة المفتوحة تُفتح وحدها، فلا يبحث
      أحدٌ عن صفحته داخل عنوان مطويّ */
   useEffect(() => {
-    const work: string[] = ["details", ...SECTION_NAV.map(([k]) => k as string)];
+    const work: string[] = ["details", "changes", ...SECTION_NAV.map(([k]) => k as string)];
     const more = ["users", "audit", "docs"];
     setGrp((g) => (work.includes(tab) ? "work" : more.includes(tab) ? "more" : g));
   }, [tab]);
@@ -496,6 +499,8 @@ export default function Dashboard({ me }: { me: Me }) {
     outputs: SECTION_TITLE.outputs,
     cx: SECTION_TITLE.cx,
     projects: SECTION_TITLE.projects,
+    notesq: SECTION_TITLE.notesq,
+    changes: ["مراجعة طلبات التغيير", "Change requests"],
   };
   const title = TITLES[tab] ?? TITLES.overview;
 
@@ -602,6 +607,12 @@ export default function Dashboard({ me }: { me: Me }) {
                     <SubItem key={key} id={key} label={SECTION_NAV_TITLE[key] ?? SECTION_TITLE[key]} />
                   ) : null,
                 )}
+                {/* **صفحةٌ مستقلّة لطلبات التغيير** — بطلب صاحبة المنصة:
+                    كانت صندوقاً داخل «نظرة عامة» وحدها، فمتابعتُها
+                    تعني النزول في صفحةٍ طويلة في كل مرة. والبيانات
+                    هي هي (`perf_change_requests`)، فما يظهر هنا هو
+                    ما يظهر هناك ولا تُدخَل مرّتين. */}
+                {can("changes") && <SubItem id="changes" label={["مراجعة طلبات التغيير", "Change requests"]} />}
                 {can("details") && <SubItem id="details" label={["المؤشرات التفصيلية", "KPI Details"]} />}
               </div>
             </>
@@ -813,6 +824,13 @@ export default function Dashboard({ me }: { me: Me }) {
               {tab === "opplan" && can("opplan") && (
                 <OpPlan t={t} canEdit={can("opplan:edit")} />
               )}
+              {tab === "changes" && can("changes") && (
+                <Changes
+                  t={t}
+                  canEdit={can("changes:upload")}
+                  canLink={can("changes:upload") || can("entities:edit")}
+                />
+              )}
               {SECTION_NAV.map(([key]) =>
                 tab === key && can(key) ? (
                   <SectionPage key={key} section={key} canEdit={can(`${key}:edit` as Scope)} meId={me.id} t={t} />
@@ -892,6 +910,9 @@ export default function Dashboard({ me }: { me: Me }) {
                 على الجوال ورقةٌ تُمرَّر، فالانسدال فيها عائق لا تنظيم */}
             <SheetItem id="mypage" icon={<IconFolder />} label={["محفظتي", "My portfolio"]} />
             <div className="sheet-h">{t("الأعمال الرئيسية", "Core work")}</div>
+            {can("changes") && (
+              <SheetItem id="changes" icon={<IconSwap />} label={["مراجعة طلبات التغيير", "Change requests"]} />
+            )}
             {SECTION_NAV.map(([key, Ic]) =>
               can(key) ? (
                 <SheetItem key={key} id={key} icon={<Ic />} label={SECTION_NAV_TITLE[key] ?? SECTION_TITLE[key]} />

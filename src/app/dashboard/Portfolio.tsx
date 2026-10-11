@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { apiFetch } from "@/lib/api";
+import { nqOf, nqTally } from "@/lib/notesq";
 import { loadUserData, saveUserData } from "@/lib/userdata";
 import { sb } from "@/lib/supa";
 import { commitStats, ownerMap, nrm, type CommitRow } from "@/lib/commit";
@@ -10,7 +11,6 @@ import { Cal } from "./Tools";
 import { EMPTY_NOTES, firstLine, preview, whenAr, type NotesData } from "./Notes";
 import { PIcon, IconPicker } from "./pickicons";
 import { IconGear } from "./icons";
-import MyEntities, { contribsOf, sumOf } from "./Entities";
 import { publishUndo } from "@/lib/undoBus";
 import { useLogos, logoKey, SESS_SHORT, INST_COLS, INST_SECTORS, CX_COLS, CX_QS, cxStagesOf, SECTION_TITLE } from "./Sections";
 import { OP_OWNERS, ALL_STATUSES, statusesOf, opFix, opRoles, opStatus, opTone } from "./OpPlan";
@@ -125,9 +125,12 @@ export const WIDGETS: WDef[] = [
      أصلاً، فلا تُكتب مرّةً ثانية */
   { key: "devplan", label: "خطتي التطويرية", group: "dev", icon: "trend", color: "#2f7fd1", section: "devplan" },
 
-  /* بقيا من الترتيب السابق — مخفيّان افتراضياً ولا تضيع بياناتهما،
-     ويُعادان من «تخصيص محفظتي» عند الحاجة */
-  { key: "strategies", label: "جهاتي ومساهماتها", group: "main", icon: "map", color: "#016b5f", section: "entities" },
+  /* **«جهاتي ومساهماتها» حُذف** بطلب صاحبة المنصة: مكرّرٌ مع
+     «الجهات المسندة لي» أعلى الصفحة، وهناك تُحرَّر الجهة وتُحذف.
+     وبياناته (قسم `entities`) باقيةٌ يقرؤها «التقارير الربعية».
+
+     «التقارير الربعية» بقيّةٌ من الترتيب السابق — مخفيٌّ افتراضياً
+     ويُعاد من «تخصيص محفظتي» عند الحاجة */
   { key: "quarterly", label: "التقارير الربعية", group: "main", icon: "calendar-check", color: "#1a9d5c", section: "entities" },
 ];
 
@@ -3358,6 +3361,11 @@ const CT_SIDES: { v: string; l: string }[] = [
   { v: "الجهة", l: "من الجهة" },
   { v: SIDE_VRO, l: "من مكتب تحقيق الرؤية (VRO)" },
 ];
+/** ومعها طرف المركز — لمجموعة «من مركز أداء» بعد أن صارت تُحرَّر */
+const CT_SIDES_ALL: { v: string; l: string }[] = [
+  { v: SIDE_US, l: "من مركز أداء" },
+  ...CT_SIDES,
+];
 
 /** وجه الجهة — شعارها إن وُجد، وإلا حرفان بلونٍ من اسمها */
 function EntFace({ name, logo }: { name: string; logo?: string }) {
@@ -3663,6 +3671,29 @@ function EntCard({
   const theirs = (x.theirs || []).filter((c) => !isVro(c));
   const vro = (x.theirs || []).filter(isVro);
   const lvl = (x.myLevel || "primary") as MyLevel;
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  /* حذف الجهة من السجلّ — ونقاط تواصلها معها. والحارس RLS
+     (`entities:edit`)، فمن لا يملكها تصله رسالةٌ صريحة بدل زرٍّ
+     لا يفعل شيئاً */
+  async function delEntity() {
+    if (!confirm(t(
+      `حذف «${x.name}» من سجلّ الجهات؟ تُحذف معها كل نقاط تواصلها.`,
+      `Delete ${x.name} and all its contacts?`,
+    ))) return;
+    setBusy(true);
+    setErr("");
+    const r = await apiFetch(`/api/entities?id=${encodeURIComponent(x.entityId)}`, { method: "DELETE" });
+    setBusy(false);
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}));
+      setErr(txt(j.error) || t("تعذّر الحذف", "Delete failed"));
+      return;
+    }
+    onDone();
+  }
+
   return (
     <div className="ecard">
       <div className="ec-h">
@@ -3671,14 +3702,24 @@ function EntCard({
           <b>{x.name}</b>
           {x.sector && <em>{x.sector}</em>}
         </span>
+        <button className="rowx ncard-x" disabled={busy} onClick={() => void delEntity()}
+                title={t("حذف الجهة", "Delete entity")} aria-label={t("حذف الجهة", "Delete entity")}>
+          ✕
+        </button>
       </div>
+      {err && <div className="ct-err">{err}</div>}
 
-      {/* نقاط المركز إسنادٌ يُدار في صفحة السجلّ، فتُعرض ولا تُحرَّر */}
+      {/* **نقاط المركز تُحرَّر من هنا أيضاً** — بطلب صاحبة المنصة:
+          الاستشاري المسؤول والبديل كانا للعرض فقط، فمن يفتح جهته
+          لا يصلح اسماً ولا جوالاً إلا من صفحة السجلّ. والحارس RLS
+          لا هذه الخانة. */}
       <CtGroup
         title={t("من مركز أداء", "From Adaa")}
         list={ours}
         entityId={x.entityId}
-        editable={false}
+        editable
+        sides={CT_SIDES_ALL}
+        newSide={SIDE_US}
         myId={x.myContactId}
         t={t}
         onDone={onDone}
@@ -4943,7 +4984,7 @@ export default function Portfolio({
   const dataOf = (k: WKey): Row[] =>
     k.startsWith("cw-")
       ? pf.of(k)
-      : k === "strategies" || k === "quarterly"
+      : k === "quarterly"
       ? entities
       : k === "contrib"
         ? contrib
@@ -4971,26 +5012,30 @@ export default function Portfolio({
   const lateChanges = changes.filter((r) => txt(r.data.status) === "متأخر").length;
   const commit = changes.length ? Math.round(((changes.length - lateChanges) / changes.length) * 100) : 0;
 
-  /* «نسبة التقارير الممتثلة لمعايير جودة الملاحظات» في الخطة
-     التشغيلية — آخر ربعٍ رُصد فيه فعليّ */
+  /* ============================================================
+     جودة ملاحظات الأداء — **رقمُ صاحب المحفظة لا رقمُ الإدارة**
+     ------------------------------------------------------------
+     كان يُقرأ من مؤشر الخطة التشغيلية، فيظهر الرقم نفسه في محفظة
+     كل موظف كأنه رقمه. صار يُقرأ من صفحة «جودة ملاحظات الأداء»:
+     صفوفُ الموظف وحدها، والنسبة من مجاميعها لا من متوسط نسبها.
+
+     ومن لا صفَّ له **صفرٌ لا رقمٌ مستعار** — بطلب صاحبة المنصة.
+     ============================================================ */
   const [noteQ, setNoteQ] = useState<{ pct: number; q: string } | null>(null);
   useEffect(() => {
-    void apiFetch("/api/items?section=opplan")
+    if (!me.name) return;
+    void apiFetch("/api/items?section=notesq")
       .then((r) => r.json())
       .then((d) => {
         const rows = (Array.isArray(d.items) ? d.items : []) as { data: Rec }[];
-        const it = rows.find((x) => /جودة\s*الملاحظات|جودة ملاحظات/.test(txt(x.data.name)));
-        if (!it) return setNoteQ(null);
-        const QN = ["الربع الأول", "الربع الثاني", "الربع الثالث", "الربع الرابع"];
-        for (let i = 4; i >= 1; i--) {
-          const v = it.data[`q${i}a`];
-          if (v !== undefined && v !== null && String(v).trim() !== "")
-            return setNoteQ({ pct: Math.round(num(v)), q: QN[i - 1] });
-        }
-        setNoteQ(null);
+        const mine = nqOf(rows, me.name || "");
+        if (!mine.length) return setNoteQ(null);
+        const st = nqTally(mine);
+        const qs = [...new Set(mine.map((r) => txt(r.data.quarter)).filter(Boolean))];
+        setNoteQ({ pct: st.pct, q: qs.length === 1 ? qs[0] : `${st.ok} من ${st.total}` });
       })
       .catch(() => setNoteQ(null));
-  }, []);
+  }, [me.name]);
   const curQ = Math.floor(new Date().getMonth() / 3) + 1;
   const qLate = entities.filter((r) => {
     const q: number[] = Array.isArray(r.data.q) ? r.data.q : [];
@@ -5083,7 +5128,9 @@ export default function Portfolio({
           break;
         case "opplan":
           got = noteQ ? noteQ.pct : null;
-          src = noteQ ? `${t("من الخطة التشغيلية", "From the operational plan")} · ${noteQ.q}` : g.how;
+          src = noteQ
+            ? `${t("من صفحة جودة ملاحظات الأداء", "From the notes-quality page")} · ${noteQ.q}`
+            : g.how;
           break;
         /* خطتي التطويرية: ما اكتمل من جدارات الخطة. وقبل أن
            تُدخَل جدارةٌ واحدة لا رقم يُحسب، فتُفتح الخانة ليُكتب
@@ -5161,14 +5208,6 @@ export default function Portfolio({
       };
     }
     switch (k) {
-      case "strategies": {
-        const tot = sumOf(entities.flatMap((r) => contribsOf(r.data)));
-        return {
-          count: entCount,
-          pct: entCount ? 100 : 0,
-          sub: `${tot.kpis} ${t("مؤشراً", "KPIs")} · ${tot.goals} ${t("هدفاً", "goals")} · ${tot.inits} ${t("مبادرة", "initiatives")}`,
-        };
-      }
       case "quarterly": {
         const total = entities.length * 4 || 1;
         const done = entities.reduce(
@@ -5269,19 +5308,6 @@ export default function Portfolio({
             q[i] = q[i] ? 0 : 1;
             void pf.save("entities", r.id, { ...r.data, q }, r.ord);
           }}
-        />
-      );
-    if (k === "strategies")
-      return (
-        <MyEntities
-          rows={entities}
-          t={t}
-          onSave={(id, data) => void pf.save("entities", id, data, entities.length + 1)}
-          onDelete={(id) => {
-            if (confirm(t("حذف الجهة وكل مساهماتها؟", "Delete the entity and its contributions?")))
-              void pf.remove("entities", id);
-          }}
-          onAdd={(data) => void pf.save("entities", "ent-" + newId(), data, entities.length + 1)}
         />
       );
     /* المساهمات تُعرض من الخطة دائماً — لا جدولاً محلياً عند فتحها */
@@ -5561,11 +5587,11 @@ export default function Portfolio({
             {myCommit ? `${myCommit.pct}%` : changes.length ? `${commit}%` : "—"}
           </div>
         </div>
-        {/* جودة ملاحظات الأداء: لا يُرصد فردياً بعد، فالرقم رقم
-            الإدارة من مؤشر الخطة التشغيلية */}
+        {/* صفرٌ لا «—» ولا رقمُ الإدارة: ما لم يُرصد للموظف شيء
+            فنسبتُه صفر — بطلب صاحبة المنصة */}
         <div className="kp">
           <div className="k">{t("نسبة الالتزام بجودة ملاحظات الأداء", "Notes quality")}</div>
-          <div className="v">{noteQ ? `${noteQ.pct}%` : "—"}</div>
+          <div className="v">{noteQ ? `${noteQ.pct}%` : "0%"}</div>
         </div>
       </div>
 

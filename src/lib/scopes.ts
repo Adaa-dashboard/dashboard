@@ -21,6 +21,8 @@ export type Scope =
   | "opplan"
   | "opplan:edit"
   | "cx"
+  | "notesq"
+  | "notesq:edit"
   | "sessions:edit"
   | "natstrat:edit"
   | "inststrat:edit"
@@ -67,6 +69,7 @@ export const SCOPE_GROUPS: { title: string; items: { key: Scope; label: string; 
       { key: "projects", label: "المشاريع الاستراتيجية" },
       { key: "cx", label: "أعمال قياس تجربة المستفيد", note: "من الخدمات الحكومية" },
       { key: "opplan", label: "الخطة التشغيلية", note: "محافظ المدراء: مؤشرات ومبادرات ومكاسب سريعة" },
+      { key: "notesq", label: "جودة ملاحظات الأداء", note: "نسبة كل استشاري — وتظهر في محفظته" },
     ],
   },
   {
@@ -81,6 +84,7 @@ export const SCOPE_GROUPS: { title: string; items: { key: Scope; label: string; 
       { key: "outputs:edit", label: "تحرير المخرجات الوطنية" },
       { key: "cx:edit", label: "تحرير أعمال قياس تجربة المستفيد" },
       { key: "projects:edit", label: "تحرير المشاريع الاستراتيجية" },
+      { key: "notesq:edit", label: "تحرير جودة ملاحظات الأداء", note: "رفع بيانات الربع" },
     ],
   },
   {
@@ -165,6 +169,7 @@ export const PAGE_ROWS: { title: string; rows: PageRow[] }[] = [
       { view: "outputs", label: "المخرجات الوطنية", edit: "outputs:edit" },
       { view: "cx", label: "أعمال قياس تجربة المستفيد", edit: "cx:edit" },
       { view: "projects", label: "المشاريع الاستراتيجية", edit: "projects:edit" },
+      { view: "notesq", label: "جودة ملاحظات الأداء", edit: "notesq:edit" },
     ],
   },
   {

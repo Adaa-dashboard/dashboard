@@ -56,6 +56,7 @@ export const SEC_NAME: Record<SectionKey, string> = {
   cx: "أعمال قياس تجربة المستفيد",
   opplan: "الخطة التشغيلية",
   projects: "المشاريع الاستراتيجية",
+  notesq: "جودة ملاحظات الأداء",
 };
 
 export function weekStartOf(iso: string): string {

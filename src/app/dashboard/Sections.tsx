@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { CycleBar, CYCLE_CFG } from "./Cycle";
+import { nqByPerson, nqTally, nqKeyOf, nqNrm } from "@/lib/notesq";
 import { writeXlsx, readXlsxSheets, readPptxSlides } from "@/lib/sheet";
 import { asset } from "@/lib/base";
 import { publishUndo } from "@/lib/undoBus";
@@ -26,7 +27,8 @@ type Rec = Record<string, any>;
 export type Item = { id: string; ord: number; data: Rec; updatedAt?: string; updatedBy?: string };
 type T = (ar: string, en: string) => string;
 
-export type SectionKey = "sessions" | "natstrat" | "inststrat" | "outputs" | "cx" | "projects" | "opplan";
+export type SectionKey =
+  | "sessions" | "natstrat" | "inststrat" | "outputs" | "cx" | "projects" | "opplan" | "notesq";
 
 export const SECTION_TITLE: Record<SectionKey, [string, string]> = {
   sessions: ["جلسات مراجعة الأداء", "Performance review sessions"],
@@ -36,6 +38,7 @@ export const SECTION_TITLE: Record<SectionKey, [string, string]> = {
   cx: ["أعمال قياس تجربة المستفيد من الخدمات الحكومية", "Beneficiary experience measurement"],
   projects: ["المشاريع الاستراتيجية", "Strategic projects"],
   opplan: ["الخطة التشغيلية لإدارة عمليات الأداء", "Operational plan"],
+  notesq: ["جودة ملاحظات الأداء", "Performance notes quality"],
 };
 
 /* اسم مختصر لعنصر القائمة الجانبية — الاسم الكامل يطول عليه */
@@ -3520,6 +3523,271 @@ export function Outputs({ t }: { t: T }) {
 }
 
 /* ============================================================
+   جودة ملاحظات الأداء
+   ------------------------------------------------------------
+   صفحةٌ يرفع فيها صاحبُها بيانات الربع: لكل استشاريٍّ كم تقريراً
+   رُوجع له وكم منها طابق معايير جودة الملاحظات. ومنها تُشتقّ
+   نسبةُ كلِّ موظفٍ في محفظته — فما كان يظهر هناك رقمَ الإدارة
+   الواحد لكل الناس صار رقم صاحب المحفظة نفسه.
+
+   والحساب في `lib/notesq` ليُختبر بلا React ولا شبكة.
+   ============================================================ */
+const NQ_COLS: ICol[] = [
+  { k: "consultant", label: "الاستشاري", w: 150 },
+  { k: "entity", label: "الجهة", w: 200 },
+  { k: "quarter", label: "الربع", opts: ["", "الربع الأول", "الربع الثاني", "الربع الثالث", "الربع الرابع"], w: 115 },
+  { k: "total", label: "التقارير المراجَعة", w: 125 },
+  { k: "ok", label: "المطابقة للمعايير", w: 125 },
+  { k: "note", label: "ملاحظة", w: 200 },
+];
+
+function NotesQPage({ t, canEdit, add, gear }: SecPageProps) {
+  const { items, loaded, save, remove, reload, undo, undoTop, dismissUndo } = useItems("notesq");
+  const [q, setQ] = useState("");
+  const [f, setF] = useState("");
+  const [draft, setDraft] = useState<Record<string, Rec>>({});
+
+  const val = (it: Item, k: string) => txt(draft[it.id]?.[k] ?? it.data[k]);
+  async function put(it: Item, k: string, v: string) {
+    const data = { ...it.data, ...(draft[it.id] || {}), [k]: v };
+    setDraft((old) => ({ ...old, [it.id]: { ...(old[it.id] || {}), [k]: v } }));
+    await save(it.id, data, it.ord);
+  }
+
+  const people = useMemo(() => nqByPerson(items), [items]);
+  const all = useMemo(() => nqTally(items), [items]);
+
+  const rows = useMemo(
+    () =>
+      items.filter((it) => {
+        const d = it.data;
+        if (f && txt(d.consultant) !== f) return false;
+        return !q || `${txt(d.consultant)} ${txt(d.entity)} ${txt(d.quarter)}`.includes(q);
+      }),
+    [items, q, f],
+  );
+
+  function exportXl() {
+    const head = [...NQ_COLS.map((c) => c.label), "النسبة ٪"];
+    const body = rows.map((it) => [
+      ...NQ_COLS.map((c) => txt(it.data[c.k])),
+      String(nqTally([it]).pct),
+    ]);
+    download("جودة-ملاحظات-الأداء.xlsx", writeXlsx([{ name: "جودة الملاحظات", rows: [head, ...body] }]));
+  }
+
+  if (!loaded) return <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>;
+
+  return (
+    <>
+      <Toolbar
+        q={q} setQ={setQ}
+        filter={f} setFilter={setF}
+        options={people.map((p) => ({ v: p.name, l: `${p.name} (${AR(p.stat.pct)}%)` }))}
+        allLabel={t("كل الاستشاريين", "Everyone")}
+        onExport={exportXl}
+        upload={canEdit ? <NotesQImport items={items} t={t} onDone={() => void reload()} /> : null}
+        add={add}
+        gear={gear}
+        t={t}
+      />
+
+      {/* شريطُ كل استشاريٍّ ونسبته — وهي نفسها التي تظهر في محفظته */}
+      <div className="stabs">
+        <button className={`stab ${!f ? "on" : ""}`} onClick={() => setF("")}>
+          <span className="l">{t("الإدارة", "Department")}</span>
+          <b>{AR(all.pct)}%</b>
+        </button>
+        {people.map((p) => (
+          <button
+            key={p.name}
+            className={`stab ${f === p.name ? "on" : ""}`}
+            style={{ ["--c" as string]: p.stat.pct >= 90 ? "#1a9d5c" : p.stat.pct >= 70 ? "#e0971a" : "#d34a4a" }}
+            onClick={() => setF(f === p.name ? "" : p.name)}
+          >
+            <span className="l">{p.name}</span>
+            <b>{AR(p.stat.pct)}%</b>
+          </button>
+        ))}
+      </div>
+
+      {!rows.length ? (
+        <Empty
+          title={t("لا توجد بيانات بعد", "Nothing yet")}
+          note={t("تُرفع من «تصدير إكسل» أو تُضاف من زر «إضافة».", "Upload the file or add rows.")}
+        />
+      ) : (
+        <div className="tbl-wrap">
+          <table className="sx-tbl inst">
+            <thead>
+              <tr>
+                <th className="c num">#</th>
+                {NQ_COLS.map((c) => (
+                  <th key={c.k} style={{ minWidth: c.w }}>{c.label}</th>
+                ))}
+                <th className="c">{t("النسبة", "%")}</th>
+                {canEdit && <th className="c" />}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((it, n) => {
+                const pct = nqTally([it]).pct;
+                return (
+                  <tr key={it.id}>
+                    <td className="c num">{AR(n + 1)}</td>
+                    {NQ_COLS.map((c) => (
+                      <td key={c.k} className="cell" style={{ minWidth: c.w }}>
+                        {!canEdit ? (
+                          val(it, c.k) || "—"
+                        ) : c.opts ? (
+                          <select value={val(it, c.k)} onChange={(e) => void put(it, c.k, e.target.value)}>
+                            {c.opts.map((op) => (
+                              <option key={op} value={op}>{op || "—"}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            value={val(it, c.k)}
+                            onChange={(e) =>
+                              setDraft((old) => ({ ...old, [it.id]: { ...(old[it.id] || {}), [c.k]: e.target.value } }))
+                            }
+                            onBlur={(e) => {
+                              if (e.target.value !== txt(it.data[c.k])) void put(it, c.k, e.target.value);
+                            }}
+                          />
+                        )}
+                      </td>
+                    ))}
+                    {/* النسبة محسوبةٌ لا مُدخَلة، فلا تتعارض مع عموديها */}
+                    <td className={`cell c ${pct >= 90 ? "ok" : pct >= 70 ? "wt" : "no"}`}>{AR(pct)}%</td>
+                    {canEdit && (
+                      <td className="c">
+                        <button
+                          className="rowx"
+                          title={t("حذف الصف", "Delete row")}
+                          onClick={() => {
+                            if (!confirm(t(`حذف صف «${txt(it.data.consultant)}»؟`, "Delete row?"))) return;
+                            void remove(it.id);
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <UndoBar step={undoTop} onUndo={() => void undo()} onClose={dismissUndo} t={t} />
+    </>
+  );
+}
+
+/* رفع ملف الربع — المطابقة بالاستشاري والجهة والربع، فإعادة رفع
+   الملف نفسه تحدّث ولا تكرّر */
+function NotesQImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => void }) {
+  const [msg, setMsg] = useState("");
+  const ref = useRef<HTMLInputElement>(null);
+
+  const keyOf = (d: Rec) =>
+    `${nqNrm(d.consultant)}|${nqNrm(d.entity)}|${nqNrm(d.quarter)}`;
+
+  async function pick(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setMsg(t("جارٍ القراءة...", "Reading..."));
+    try {
+      const sheets = await readXlsxSheets(await file.arrayBuffer());
+      let hit: { rows: string[][]; hi: number; map: Record<number, string> } | null = null;
+      for (const sh of sheets) {
+        const rs = sh.rows || [];
+        for (let i = 0; i < Math.min(rs.length, 8); i++) {
+          const m: Record<number, string> = {};
+          (rs[i] || []).forEach((c, ci) => {
+            const k = nqKeyOf(txt(c));
+            if (k && !Object.values(m).includes(k)) m[ci] = k;
+          });
+          if (Object.values(m).includes("consultant") && Object.values(m).includes("total")) {
+            hit = { rows: rs, hi: i, map: m };
+            break;
+          }
+        }
+        if (hit) break;
+      }
+      if (!hit) {
+        setMsg(t(
+          "لم أجد صف العناوين — لا بدّ من عمود «الاستشاري» وعمود «التقارير المراجَعة».",
+          "Header row not found.",
+        ));
+        return;
+      }
+
+      const byKey = new Map(items.map((it) => [keyOf(it.data), it]));
+      let maxOrd = items.reduce((a, b) => Math.max(a, b.ord || 0), 0);
+      const put: { id: string; ord: number; data: Rec }[] = [];
+      let upd = 0;
+      for (const r of hit.rows.slice(hit.hi + 1)) {
+        const d: Rec = {};
+        for (const [ci, k] of Object.entries(hit.map)) {
+          const v = txt(r[Number(ci)]).trim();
+          if (v) d[k] = v;
+        }
+        if (!txt(d.consultant).trim()) continue;
+        const cur = byKey.get(keyOf(d));
+        if (cur) {
+          upd++;
+          put.push({ id: cur.id, ord: cur.ord, data: { ...cur.data, ...d } });
+        } else {
+          put.push({ id: "nq-" + Math.random().toString(36).slice(2, 10), ord: ++maxOrd, data: d });
+        }
+      }
+      if (!put.length) {
+        setMsg(t("لا صفوف في الملف", "No rows in the file"));
+        return;
+      }
+      if (!confirm(t(
+        `سيُحدَّث ${upd} صفاً ويُضاف ${put.length - upd}. متابعة؟`,
+        `${upd} updated, ${put.length - upd} added. Continue?`,
+      ))) {
+        setMsg("");
+        return;
+      }
+      for (let i = 0; i < put.length; i += 40) {
+        const r = await apiFetch("/api/items", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ section: "notesq", items: put.slice(i, i + 40) }),
+        });
+        if (!r.ok) {
+          const j = await r.json().catch(() => ({}));
+          setMsg(txt(j.error) || t("تعذّر الحفظ", "Save failed"));
+          return;
+        }
+      }
+      setMsg(t(`تم · ${put.length} صفاً`, `Done · ${put.length}`));
+      onDone();
+    } catch {
+      setMsg(t("تعذّرت قراءة الملف", "Could not read the file"));
+    }
+  }
+
+  return (
+    <>
+      <button className="btn btn-sm" onClick={() => ref.current?.click()}>
+        <IconUp size={15} /> {t("تصدير إكسل", "Export Excel")}
+      </button>
+      <input ref={ref} type="file" accept=".xlsx,.xls" hidden onChange={pick} />
+      {msg && <span className="sx-msg">{msg}</span>}
+    </>
+  );
+}
+
+/* ============================================================
    الصفحات الكاملة
    ============================================================ */
 export function SectionPage({
@@ -3614,6 +3882,7 @@ export function SectionPage({
       {section === "natstrat" && <NationalPage t={t} canEdit={canEdit} add={addBtn} gear={gearBtn} />}
       {section === "inststrat" && <InstPage t={t} canEdit={canEdit} add={addBtn} gear={gearBtn} />}
       {section === "cx" && <CxPage t={t} canEdit={canEdit} add={addBtn} gear={gearBtn} />}
+      {section === "notesq" && <NotesQPage t={t} canEdit={canEdit} add={addBtn} gear={gearBtn} />}
       {section === "projects" && <Projects t={t} canEdit={canEdit} />}
 
 
@@ -3640,6 +3909,14 @@ export function SectionPage({
 type Field = { k: string; label: string; kind?: "num" | "text" | "date" | "bool" | "area" };
 
 const FIELDS: Record<Exclude<SectionKey, "outputs" | "opplan">, Field[]> = {
+  notesq: [
+    { k: "consultant", label: "الاستشاري" },
+    { k: "entity", label: "الجهة" },
+    { k: "quarter", label: "الربع" },
+    { k: "total", label: "عدد التقارير المراجَعة", kind: "num" },
+    { k: "ok", label: "المطابقة لمعايير جودة الملاحظات", kind: "num" },
+    { k: "note", label: "ملاحظة", kind: "area" },
+  ],
   sessions: [
     { k: "entity", label: "الجهة" },
     { k: "quarter", label: "الربع" },

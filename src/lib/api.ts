@@ -688,6 +688,20 @@ export async function apiFetch(path: string, init: Init = {}) {
        المحفظة خاصة بصاحبها، ولا يراها أحد — ولو كان مديره — إلا
        بمنحٍ صريح منه. الحراسة الحقيقية في RLS؛ ما هنا واجهة فقط. */
     /* ---------------- الجهات ونقاط التواصل ---------------- */
+    /* حذف جهة من السجلّ — ونقاط تواصلها تذهب معها بـ`on delete
+       cascade`. الحارس سياسة `perf_ent_write` (`entities:edit`):
+       لا صفَّ محذوفاً = لا صلاحية، فتُقال الرسالة بدل صمتٍ موهم. */
+    if (p === "/api/entities" && method === "DELETE") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const id = q.get("id") || "";
+      if (!id) return err("لا توجد جهة", 400);
+      const { data, error } = await s.from("perf_entities").delete().eq("id", id).select("id");
+      if (error) return err(error.message, 403);
+      if (!data?.length) return err("الحذف لصاحب صلاحية «تحرير الجهات»", 403);
+      return ok({ ok: true });
+    }
+
     if (p === "/api/entities" && method === "GET") {
       const me = await whoAmI();
       if (!me) return err("غير مصرّح", 401);
