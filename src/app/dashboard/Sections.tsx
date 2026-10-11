@@ -6,7 +6,7 @@ import { apiFetch } from "@/lib/api";
 import { CycleBar, CYCLE_CFG } from "./Cycle";
 import {
   nqTally, nqCriteria, nqGroup, nqQuarters, nqQOrder, nqObs, nqOfQuarter,
-  nqKeyOf, nqNrm, nqCheck, nqBand, NQ_BANDS, NQ_CKEYS,
+  nqKeyOf, nqNrm, nqCheck, nqBand, nqEntities, NQ_BANDS, NQ_CKEYS,
 } from "@/lib/notesq";
 import { writeXlsx, readXlsxSheets, readPptxSlides } from "@/lib/sheet";
 import { asset } from "@/lib/base";
@@ -3639,7 +3639,7 @@ function NotesQPage({ t, canEdit, add, gear }: SecPageProps) {
   const crit = useMemo(() => nqCriteria(qRows), [qRows]);
   const obs = useMemo(() => nqObs(qRows), [qRows]);
   const bySec = useMemo(() => nqGroup(qRows, "sector"), [qRows]);
-  const byEnt = useMemo(() => nqGroup(qRows, "entity"), [qRows]);
+  const byEnt = useMemo(() => nqEntities(qRows), [qRows]);
   const delta = qs.find((x) => nqNrm(x.q) === nqNrm(cur))?.delta ?? null;
 
   /* جدول البيانات الخام — بعد البحث وفلتر القطاع */
@@ -3782,11 +3782,17 @@ function NotesQPage({ t, canEdit, add, gear }: SecPageProps) {
                       <td className="c">{AR(x.stat.n)}</td>
                     </tr>
                   ))}
-                  <tr className="nq-tot">
-                    <td>{t("الإجمالي", "Total")}</td>
-                    <td className="c"><NqPct pct={all.pct} /></td>
-                    <td className="c">{AR(all.n)}</td>
-                  </tr>
+                  {/* **لا صفَّ إجمالي في تبويب الجهات**: نسبةُ الجهة
+                      كما تُنشر في العرض متوسطُ معاييرها الأربعة، بينما
+                      الإجمالي نسبةُ العناصر المستوفية للأربعة كلِّها —
+                      فمجموعٌ تحتها يناقض ما فوقها (94% مقابل 79%). */}
+                  {tab === "sector" && (
+                    <tr className="nq-tot">
+                      <td>{t("الإجمالي", "Total")}</td>
+                      <td className="c"><NqPct pct={all.pct} /></td>
+                      <td className="c">{AR(all.n)}</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

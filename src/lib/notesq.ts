@@ -84,20 +84,38 @@ export function nqCheck(v: unknown): 1 | 0 | -1 {
 /* ---------------- نوع الصفّ ---------------- */
 /** صفُّ ملاحظةٍ من المقيِّمين — لا يدخل أي حساب */
 export const nqIsObs = (r: NQRow) => txt(r.data.row) === "obs";
+/**
+ * صفُّ جهةٍ بالنسبة المنشورة في العرض — **مقياسٌ آخر**.
+ * ------------------------------------------------------------
+ * عمودُ نسبة الجهة في العرض الربعي يقيس **متوسط المعايير الأربعة**
+ * لتلك الجهة، لا نسبةَ العناصر المستوفية للأربعة كلِّها. والدليل
+ * من أرقام الربع الثاني نفسها:
+ *   · المرجَّح بعدد العناصر لنِسَب الجهات الـ101 = 94%، وهو عينُ
+ *     متوسط المعايير (90+96+98+91)÷4 = 93.75.
+ *   · ونسبة الإدارة المعلنة 79% = المستوفية للأربعة كلِّها.
+ *   · و«83%» في العرض = الجهات التي بلغت 90% فأكثر = 84/101.
+ *
+ * فلو دخل هذا الصفّ في المجاميع لانقلب الإجمالي من 79% إلى 94%.
+ * لذلك **يُعرض في جدول الجهات ولا يدخل أيَّ مجموع** — بطلب صاحبة
+ * المنصة أن يبقى الجدول «نفس اللي بالعرض».
+ */
+export const nqIsEnt = (r: NQRow) => txt(r.data.row) === "ent";
+/** صفٌّ لا يدخل الحساب: ملاحظةٌ أو جهةٌ بالمقياس المنشور */
+const nqSkip = (r: NQRow) => nqIsObs(r) || nqIsEnt(r);
 /** صفُّ عنصر: فيه علامةُ معيارٍ واحدٍ على الأقل */
 export const nqIsItem = (r: NQRow) =>
-  !nqIsObs(r) && NQ_CKEYS.some((k) => nqCheck(r.data[k]) >= 0 && txt(r.data[k]) !== "");
+  !nqSkip(r) && NQ_CKEYS.some((k) => nqCheck(r.data[k]) >= 0 && txt(r.data[k]) !== "");
 
 /** وزن الصفّ = عدد العناصر التي يمثّلها */
 export function nqWeight(r: NQRow): number {
-  if (nqIsObs(r)) return 0;
+  if (nqSkip(r)) return 0;
   if (nqIsItem(r)) return 1;
   return nqNum(r.data.total);
 }
 
 /** ما التزم من عناصر الصفّ */
 export function nqOk(r: NQRow): number {
-  if (nqIsObs(r)) return 0;
+  if (nqSkip(r)) return 0;
   if (nqIsItem(r)) {
     /* **الأربعة كلُّها**: معيارٌ واحد غير مستوفٍ يُسقط العنصر.
        والمجهول (`-1`) يُعدّ غير مستوفٍ فلا تُرفع النسبة بلا سند. */
@@ -114,7 +132,7 @@ export function nqOk(r: NQRow): number {
 
 /** ما استوفى المعيار رقم `i` (0..3) من عناصر الصفّ */
 export function nqOkOf(r: NQRow, i: number): number {
-  if (nqIsObs(r)) return 0;
+  if (nqSkip(r)) return 0;
   if (nqIsItem(r)) return nqCheck(r.data[NQ_CKEYS[i]]) === 1 ? 1 : 0;
   const tot = nqNum(r.data.total);
   const p = r.data[NQ_PKEYS[i]];
@@ -160,7 +178,7 @@ export function nqCriteria(rows: NQRow[]): { name: string; stat: NQStat | null }
 export function nqGroup(rows: NQRow[], key: string): { name: string; stat: NQStat }[] {
   const m = new Map<string, { name: string; rows: NQRow[] }>();
   for (const r of rows) {
-    if (nqIsObs(r)) continue;
+    if (nqSkip(r)) continue;
     const nm = txt(r.data[key]).trim();
     if (!nm) continue;
     const k = nqNrm(nm);
@@ -237,6 +255,27 @@ export function nqObs(rows: NQRow[]): { name: string; list: NQObs[] }[] {
   });
 }
 
+/* ---------------- جدول الجهات ---------------- */
+/**
+ * الجهات كما تُعرض في الصفحة.
+ * متى وُجدت صفوف `ent` في الربع عُرضت بنسبها المنشورة — «نفس اللي
+ * بالعرض». وإلا اشتُقّت من الصفوف العادية بمقياس الأربعة كلِّها.
+ */
+export function nqEntities(rows: NQRow[]): { name: string; stat: NQStat; published: boolean }[] {
+  const ent = rows.filter(nqIsEnt);
+  if (ent.length) {
+    return ent
+      .map((r) => {
+        const n = nqNum(r.data.total);
+        const pct = Math.round(nqNum(r.data.pct));
+        return { name: txt(r.data.entity).trim(), stat: { n, ok: (pct / 100) * n, pct }, published: true };
+      })
+      .filter((x) => !!x.name)
+      .sort((a, b) => b.stat.pct - a.stat.pct || b.stat.n - a.stat.n);
+  }
+  return nqGroup(rows, "entity").map((x) => ({ ...x, published: false }));
+}
+
 /* ---------------- ما يخصّ موظفاً بعينه ---------------- */
 /**
  * نسبة الموظف = مجاميع **جهاته** — لا عمود استشاريٍّ في الملف.
@@ -247,7 +286,15 @@ export function nqObs(rows: NQRow[]): { name: string; list: NQObs[] }[] {
 export function nqForEntities(rows: NQRow[], names: Iterable<string>): NQStat | null {
   const mine = new Set([...names].map((x) => nqNrm(x)).filter(Boolean));
   if (!mine.size) return null;
-  const sub = rows.filter((r) => !nqIsObs(r) && mine.has(nqNrm(r.data.entity)));
+  /* صفوف الجهات المنشورة أولاً — هي المقياس الذي يُعرض لكل جهة،
+     فنسبةُ الموظف تُقرأ بنفسه لا بمقياسٍ آخر */
+  const pub = nqEntities(rows).filter((x) => mine.has(nqNrm(x.name)));
+  if (pub.length) {
+    const n = pub.reduce((a, x) => a + x.stat.n, 0);
+    const ok = pub.reduce((a, x) => a + x.stat.ok, 0);
+    return { n, ok, pct: n > 0 ? Math.round((ok / n) * 100) : 0 };
+  }
+  const sub = rows.filter((r) => !nqSkip(r) && mine.has(nqNrm(r.data.entity)));
   if (!sub.length) return null;
   return nqTally(sub);
 }
