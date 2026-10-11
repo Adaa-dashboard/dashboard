@@ -12771,7 +12771,16 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
 }
 .nq-bars { display: flex; align-items: flex-end; gap: 16px; height: 180px; padding: 8px 10px 0; }
 .nq-bar { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; }
-.nq-bar u { width: 100%; border-radius: 8px 8px 0 0; display: block; text-decoration: none; }
+/* أعمدةٌ نحيفة لا مستطيلاتٍ عريضة — بطلب صاحبة المنصة. العرض
+   محدودٌ بـ`max-width` والعمود موسَّط في خانته، فتبقى المسافات
+   بينها واسعةً مهما اتّسعت الشاشة */
+.nq-bar u {
+  width: 100%;
+  max-width: 44px;
+  border-radius: 6px 6px 0 0;
+  display: block;
+  text-decoration: none;
+}
 .nq-bar b { font-family: "Noto Kufi Arabic", sans-serif; font-size: 13px; font-weight: 800; color: var(--g-900); }
 .nq-bar span { font-size: 10.5px; color: var(--ink-2); text-align: center; min-height: 28px; overflow-wrap: anywhere; }
 .nq-lg { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; font-size: 10.5px; color: var(--ink-2); margin-top: 8px; }
