@@ -874,13 +874,55 @@ export function Sessions({ limit, t }: { limit?: number; t: T }) {
 /* ---------- بطاقة جهة في جلسات مراجعة الأداء ----------
    على نمط بطاقة الاستراتيجية الوطنية: حلقةُ الأداء العام أولاً،
    ثم العناصر المتعثرة التي استوجبت الجلسة، ثم مسار المراحل الست. */
+/* ------------------------------------------------------------
+   حذف جهةٍ من بطاقة — صفحتا الجلسات والاستراتيجيات الوطنية
+   ------------------------------------------------------------
+   الجداول (المؤسسية · البكس · المشاريع) فيها ✕ في آخر عمود منذ
+   البداية، والبطاقتان كانتا بلا حذفٍ أصلاً — لا منعاً بصلاحية،
+   فسياسة `perf_items_write` في القاعدة `for all` والحذف مشمولٌ
+   بها لمن يملك `<القسم>:edit`.
+
+   و**الحذف لا يُفقد شيئاً**: `remove` تدفع الصفّ كاملاً إلى مكدّس
+   التراجع قبل أن تحذفه، فشريط ↩️ يعيده بمحتواه. والتأكيد باسم
+   الجهة لا بـ«حذف الصف؟» — فما يُحذف يُسمّى.
+   ------------------------------------------------------------ */
+function DelCard({
+  it, name, canEdit, remove, t,
+}: {
+  it: Item;
+  name: string;
+  canEdit?: boolean;
+  remove?: (id: string) => Promise<string | null>;
+  t: T;
+}) {
+  const [busy, setBusy] = useState(false);
+  if (!canEdit || !remove) return null;
+  return (
+    <button
+      className="rowx ncard-x"
+      disabled={busy}
+      title={t("حذف", "Delete")}
+      aria-label={t("حذف", "Delete")}
+      onClick={async () => {
+        if (!confirm(t(`حذف «${name || "هذا البند"}»؟`, "Delete this row?"))) return;
+        setBusy(true);
+        await remove(it.id);
+        setBusy(false);
+      }}
+    >
+      ✕
+    </button>
+  );
+}
+
 function SessCard({
-  it, t, canEdit, save, logo,
+  it, t, canEdit, save, remove, logo,
 }: {
   it: Item;
   t: T;
   canEdit?: boolean;
   save?: (id: string, data: Rec, ord: number) => Promise<string | null>;
+  remove?: (id: string) => Promise<string | null>;
   logo?: string;
 }) {
   const d = it.data;
@@ -928,6 +970,7 @@ function SessCard({
         <span className="tg" style={{ background: band.hex, color: "#fff" }}>
           {band.label}
         </span>
+        <DelCard it={it} name={txt(d.entity)} canEdit={canEdit} remove={remove} t={t} />
       </div>
       <div className="own">
         {txt(d.quarter) || "—"} · {cur}
@@ -1193,7 +1236,7 @@ function SessImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => v
 }
 
 function SessionsPage({ t, canEdit, add, gear }: SecPageProps) {
-  const { items, loaded, save, reload } = useItems("sessions");
+  const { items, loaded, save, remove, reload, undo, undoTop, dismissUndo } = useItems("sessions");
   const [q, setQ] = useState("");
   /* فلتر واحد يجمع الحالة والمرحلة والتصعيد — بدل المربعات فوق */
   const [f, setF] = useState("");
@@ -1308,6 +1351,7 @@ function SessionsPage({ t, canEdit, add, gear }: SecPageProps) {
               t={t}
               canEdit={canEdit}
               save={save}
+              remove={remove}
               logo={logos[logoKey(txt(it.data.entity))]}
             />
           ))}
@@ -1315,6 +1359,9 @@ function SessionsPage({ t, canEdit, add, gear }: SecPageProps) {
       ) : (
         <div className="pf-none">{t("لا توجد جهات مطابقة", "Nothing here")}</div>
       )}
+
+      {/* ↩️ كان ينقص هذه الصفحة وحدها — ومع الحذف لا بدّ منه */}
+      <UndoBar step={undoTop} onUndo={() => void undo()} onClose={dismissUndo} t={t} />
     </>
   );
 }
@@ -1424,12 +1471,13 @@ export function useLogos() {
 
 /* بطاقة استراتيجية وطنية — حلقة القياس وأربعة أرقام ومسار المراجعة */
 function NatCard({
-  it, t, canEdit, save, logo,
+  it, t, canEdit, save, remove, logo,
 }: {
   it: Item;
   t: T;
   canEdit?: boolean;
   save?: (id: string, data: Rec, ord: number) => Promise<string | null>;
+  remove?: (id: string) => Promise<string | null>;
   logo?: string;
 }) {
   const d = it.data;
@@ -1454,6 +1502,7 @@ function NatCard({
         <span className={`tg ${d.tech ? "ok" : "no"}`}>
           {d.tech ? t("مقبولة فنياً", "Accepted") : t("غير مقبولة فنياً", "Not accepted")}
         </span>
+        <DelCard it={it} name={txt(d.name)} canEdit={canEdit} remove={remove} t={t} />
       </div>
       <div className="own">
         {txt(d.owner) || "—"} · {NAT_STEPS[natStage(d) - 1]}
@@ -1738,7 +1787,7 @@ function NatImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => vo
 }
 
 function NationalPage({ t, canEdit, add, gear }: SecPageProps) {
-  const { items, loaded, save, reload, undo, undoTop, dismissUndo } = useItems("natstrat");
+  const { items, loaded, save, remove, reload, undo, undoTop, dismissUndo } = useItems("natstrat");
   const [q, setQ] = useState("");
   /* التبويب المختار — حالة الاعتماد */
   const [tab, setTab] = useState(4);
@@ -1813,6 +1862,7 @@ function NationalPage({ t, canEdit, add, gear }: SecPageProps) {
               t={t}
               canEdit={canEdit}
               save={save}
+              remove={remove}
               logo={logos[logoKey(txt(it.data.name))]}
             />
           ))}

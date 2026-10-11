@@ -9486,6 +9486,20 @@ input.cell-date {
 }
 .ncard .tg.ok { background: var(--ok-bg); color: var(--ok-tx); border: 1px solid var(--ok-bd); }
 .ncard .tg.no { background: var(--dgr-bg); color: var(--dgr-tx); border: 1px solid var(--dgr-bd); }
+/* ✕ الحذف في طرف رأس البطاقة: باهتٌ حتى يُقصد، فلا يُضغط بالخطأ
+   وهو ملاصقٌ لشارة الحالة. وعلى اللمس يبقى ظاهراً — لا مرورَ فيه */
+.ncard .hd .ncard-x {
+  flex: none;
+  font-size: 12px;
+  line-height: 1;
+  padding: 3px 6px;
+  margin-top: 2px;
+  opacity: 0.45;
+  transition: opacity 0.15s;
+}
+.ncard:hover .hd .ncard-x,
+.ncard .hd .ncard-x:focus-visible { opacity: 1; }
+@media (hover: none) { .ncard .hd .ncard-x { opacity: 0.75; } }
 .ncard .own {
   font-size: 11.5px;
   color: var(--muted);
