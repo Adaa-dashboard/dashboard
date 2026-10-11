@@ -12668,19 +12668,27 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
    الهوية يسري عليها مع بقية المنصة ولا تتخلّف عنها.
    ============================================================ */
 
-/* خطّ الأرباع في «نظرة عامة» */
+/* خطّ الأرباع في «نظرة عامة» — **داخل إطارٍ كبقيّة بنود الصفحة**
+   بطلب صاحبة المنصة: كان الخطّ عارياً على خلفية الصفحة فيبدو
+   سائباً بين صناديقها */
 .nq-line {
   display: flex;
   align-items: flex-end;
-  padding: 14px 6px 6px;
+  padding: 18px 16px 12px;
   position: relative;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--panel);
+  box-shadow: 0 6px 18px rgba(0, 40, 35, 0.05);
 }
 .nq-line::before {
   content: "";
   position: absolute;
   right: 9%;
   left: 9%;
-  bottom: 52px;
+  /* بمحاذاة مركز الدوائر: تحتها اسمُ الربع وعددُه، فلو بقي الخطّ
+     عند 52px مرّ في وسط الكلام */
+  bottom: 77px;
   height: 2px;
   background: var(--line2);
 }
