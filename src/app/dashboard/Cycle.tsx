@@ -35,6 +35,15 @@ export const CYCLE_CFG: Record<string, { nameKey: string; byConsultant: boolean 
   outputs: { nameKey: "name", byConsultant: false },
 };
 
+/** اسمٌ قصير للقسم — لنصّ التنبيه في الجرس */
+export const CYCLE_TITLE: Record<string, string> = {
+  sessions: "جلسات مراجعة الأداء",
+  natstrat: "الاستراتيجيات الوطنية",
+  inststrat: "الاستراتيجيات المؤسسية",
+  cx: "قياس تجربة المستفيد",
+  outputs: "المخرجات الوطنية",
+};
+
 const dayTxt = (iso: string | number) => {
   const d = new Date(iso);
   return Number.isNaN(d.getTime())

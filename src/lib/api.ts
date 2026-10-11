@@ -342,12 +342,44 @@ export async function apiFetch(path: string, init: Init = {}) {
       /* `startedBy` يُختم هنا لا من الواجهة، فلا يُنسب فتحُ الدورة
          إلى غير من فتحها */
       const val = body.value as Record<string, unknown> | null;
-      const stamped = val ? { ...val, startedBy: me.name || me.username || "" } : null;
+      /* **الإنهاء حذفُ السطر لا كتابةُ null**: عمود `value` في
+         `perf_settings` لا يقبل الفراغ، فكان الإيقاف يفشل بـ
+         «violates not-null constraint». ولا سطرَ = لا فترة، وهو
+         أصدق تمثيلاً من سطرٍ فارغ. */
+      if (!val) {
+        const { error } = await s.from("perf_settings").delete().eq("key", `cycle:${sec}`);
+        if (error) return err(error.message, 403);
+        return ok({ ok: true });
+      }
       const { error } = await s
         .from("perf_settings")
-        .upsert([{ key: `cycle:${sec}`, value: stamped }], { onConflict: "key" });
+        .upsert([{ key: `cycle:${sec}`, value: { ...val, startedBy: me.name || me.username || "" } }],
+                { onConflict: "key" });
       if (error) return err(error.message, 403);
       return ok({ ok: true });
+    }
+
+    /* **كل الفترات المفتوحة بطلبٍ واحد** — للجرس: ليعلم كلُّ موظف
+       أنّ قسماً يخصّ جهاته فُتح فيه تحديثٌ دوري. ومعها صفوفُ تلك
+       الأقسام وحدها، فيُحسب «من لم يحدّث» في المتصفّح بلا طلبٍ
+       لكل قسم. ولا سطرَ = لا فترة ⇒ يختفي التنبيه من نفسه. */
+    if (p === "/api/cycles" && method === "GET") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const { data } = await s.from("perf_settings").select("key,value").like("key", "cycle:%");
+      const cycles = (data || [])
+        .map((r) => ({ section: String(r.key).slice("cycle:".length), cycle: r.value }))
+        .filter((c) => c.section && c.cycle);
+      const secs = cycles.map((c) => c.section);
+      const items: Record<string, ReturnType<typeof rowItem>[]> = {};
+      if (secs.length) {
+        const { data: its } = await s.from("perf_items").select("*").in("section", secs);
+        for (const r of its || []) {
+          const k = String(r.section);
+          (items[k] = items[k] || []).push(rowItem(r));
+        }
+      }
+      return ok({ cycles, items });
     }
 
     /* ---------------- القياسات ---------------- */

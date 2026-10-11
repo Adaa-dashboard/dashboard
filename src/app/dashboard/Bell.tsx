@@ -11,6 +11,7 @@
      · طلبات تغيير على جهاته — جديدةٌ أو تجاوزت مدّتها
      · مراجعةُ جهات التواصل المستحقّة عليه هذا الربع
      · إعلانٌ نُشر ولم يره بعد
+     · فترةُ تحديثٍ دوريّ فُتحت على قسمٍ فيه جهاته
 
    **الأولوية بالفعل لا بالمصدر**: المتأخر أولاً ثم المستحقّ اليوم
    ثم ما يقترب. والعدّاد الأحمر لا يحمل إلا ما استحقّ التصرّف —
@@ -23,6 +24,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "@/lib/api";
 import { nrm } from "@/lib/commit";
+import { CYCLE_CFG, CYCLE_TITLE } from "./Cycle";
+import { myPending, type Cycle, type CycleRow } from "@/lib/cycle";
 
 type T = (ar: string, en: string) => string;
 
@@ -96,12 +99,13 @@ export function useBell(meId: string, meName: string, extra: Alert[] = []) {
     const get = (p: string) =>
       apiFetch(p).then((r) => r.json()).catch(() => ({} as Record<string, unknown>));
 
-    const [tk, ch, rv, an, ents] = await Promise.all([
+    const [tk, ch, rv, an, ents, cy] = await Promise.all([
       get("/api/tasks"),
       get("/api/changes"),
       get("/api/entities/review"),
       get("/api/ticker"),
       get("/api/entities/mine"),
+      get("/api/cycles"),
     ]);
 
     /* جهاتي: ما أنا نقطةُ تواصلها الأساسية — فطلبات غيري لا
@@ -173,7 +177,37 @@ export function useBell(meId: string, meName: string, extra: Alert[] = []) {
         tab: "entities",
       });
 
-    /* ٤) إعلانٌ نُشر — خبرٌ يُعلم به، والعاجل منه يستحقّ التصرّف */
+    /* ٤) التحديث الدوري — قسمٌ فُتحت فيه فترةُ تحديث وفيه ما يخصّني
+       ------------------------------------------------------------
+       **تنبيهٌ مشتقٌّ لا رسالةٌ تُبعث**: يُحسب من الفترة القائمة
+       وصفوف القسم في كل فتحة. فمتى حدّث الموظف صفوفَه — أو أُنهيت
+       الفترة فحُذف سطرُها — اختفى التنبيه من نفسه، بلا شطبٍ ولا
+       تنظيف.
+
+       وما «يخصّني» صفٌّ أنا استشاريُّه، أو صفٌّ جهتُه من جهاتي
+       التي أنا نقطةُ تواصلها الأساسية — فلا يُنبَّه أحدٌ بعملِ
+       غيره. (وصفحةُ الجهات ونقاط التواصل لها تنبيهها في ٣). */
+    for (const c of (Array.isArray(cy.cycles) ? cy.cycles : []) as
+      { section: string; cycle: Cycle }[]) {
+      const cfg = CYCLE_CFG[c.section];
+      if (!cfg) continue;
+      const rows = ((cy.items as Record<string, CycleRow[]>)?.[c.section] || []) as CycleRow[];
+      const mine = myPending(
+        c.cycle, rows, cfg.nameKey, cfg.byConsultant, meName, mineNames, nrm,
+      );
+      if (!mine.length) continue;
+      out.push({
+        id: "cyc-" + c.section,
+        kind: "today",
+        group: "التحديث الدوري",
+        title: `${CYCLE_TITLE[c.section] || c.section} — ${mine.length} بحاجة إلى تحديث`,
+        sub: mine.slice(0, 3).map((x) => x.label).filter(Boolean).join(" · "),
+        days: 0,
+        tab: c.section,
+      });
+    }
+
+    /* ٥) إعلانٌ نُشر — خبرٌ يُعلم به، والعاجل منه يستحقّ التصرّف */
     for (const a of (Array.isArray(an.ticker) ? an.ticker : []) as Tick[]) {
       out.push({
         id: "a" + a.id,
@@ -186,7 +220,7 @@ export function useBell(meId: string, meName: string, extra: Alert[] = []) {
     }
 
     setBase(out);
-  }, [meId]);
+  }, [meId, meName]);
 
   useEffect(() => {
     void load();

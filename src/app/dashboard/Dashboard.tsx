@@ -266,6 +266,9 @@ const SECTION_NAV: [SectionKey, (p: { size?: number }) => ReactElement][] = [
   ["projects", IconProj],
 ];
 
+/** تبويبات الأقسام — صفحاتُها محجوبةٌ بصلاحية القسم نفسه */
+const SECTION_TABS = new Set<string>(SECTION_NAV.map(([k]) => k));
+
 export default function Dashboard({ me }: { me: Me }) {
   const router = useRouter();
   const isAdmin = me.role === "admin";
@@ -704,7 +707,18 @@ export default function Dashboard({ me }: { me: Me }) {
                 </svg>
               </button>
             )}
-            <Tools t={t} meId={me.id} meName={me.name || ""} onGo={(x) => setTab(x)} />
+            {/* تنبيهُ الجرس قد يشير إلى قسمٍ لا يملك صاحبُ الحساب
+                صلاحيةَ صفحته (نقطةُ تواصلٍ على جهةٍ في قسمِ فريقٍ
+                آخر)، فالضغطةُ تُهمَل بدل أن تفتح صفحةً فارغة */}
+            <Tools
+              t={t}
+              meId={me.id}
+              meName={me.name || ""}
+              onGo={(x) => {
+                if (SECTION_TABS.has(x) && !hasScope(me.scopes, x as Scope)) return;
+                setTab(x);
+              }}
+            />
           </div>
 
           {/* شريط الإعلانات فوق كل صفحة — للقراءة، والنشر من القلم */}

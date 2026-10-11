@@ -163,3 +163,51 @@ export function pendingOf(
   }
   return { pending, done, total: units.length };
 }
+
+/* ------------------------------------------------------------
+   ما يخصّني من المطالَبات — لتنبيه الجرس
+   ------------------------------------------------------------
+   «إذا بدأ التحديث يجي تنبيه لكل الموظفين اللي عندهم جهات لها
+   علاقة بالقسم». و«جهاته» صفٌّ هو استشاريُّه، أو صفٌّ جهتُه من
+   جهاته التي هو نقطةُ تواصلها الأساسية.
+
+   والناتج مشتقٌّ من الحالة القائمة: متى حدّث صفوفَه أو أُنهيت
+   الفترة (فحُذف سطرُها) خلا الناتج من نفسه — فلا تنبيهٌ يُشطب
+   ولا رسالةٌ تُنظَّف.
+   ------------------------------------------------------------ */
+
+/** أعمدةُ الجهة في الأقسام الخمسة — أيُّها طابق جهاتي فالصفُّ لي */
+const ENT_KEYS = ["entity", "owner", "name", "sector"];
+
+export function myPending(
+  cycle: Cycle | null,
+  rows: CycleRow[],
+  nameKey: string,
+  byConsultant: boolean,
+  meName: string,
+  mineNames: Set<string>,
+  /* **مُوحِّد أسماء الجهات يأتي من حيث أتت `mineNames`**: الأسماء
+     تُوحَّد هناك بـ`lib/commit` لا بـ`nrm` هذه — وهذه لا تُمسّ،
+     فمنها تُبنى مفاتيح الوحدات المحفوظة في القاعدة. */
+  entNrm: (v: unknown) => string = (v) => nrm(txt(v)),
+  now = Date.now(),
+): Pending[] {
+  const { pending } = pendingOf(cycle, rows, nameKey, byConsultant, now);
+  if (!pending.length) return [];
+  const me = nrm(meName);
+  /* الوحدةُ الاستشارية باسمي — وإن لم يبقَ لي صفٌّ باسم جهة */
+  const keys = new Set<string>(me ? ["c:" + me] : []);
+  for (const r of rows) {
+    const u = unitOf(r, nameKey, byConsultant);
+    if (!u) continue;
+    const c = nrm(txt(r.data.consultant));
+    const mine =
+      (!!c && !!me && c === me) ||
+      ENT_KEYS.some((k) => {
+        const v = entNrm(r.data[k]);
+        return !!v && mineNames.has(v);
+      });
+    if (mine) keys.add(u.k);
+  }
+  return pending.filter((u) => keys.has(u.k));
+}
