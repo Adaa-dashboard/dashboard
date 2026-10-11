@@ -3549,8 +3549,6 @@ const NQ_TONE: Record<string, string> = {
   wt: "var(--warn)",
   no: "var(--danger)",
 };
-/** تدرّج أعمدة المعايير — من درجات الهوية بترتيبها */
-const NQ_BAR = ["var(--g-400)", "var(--g-600)", "var(--g-800)", "var(--g-700)"];
 
 /** اسم الربع الذي قبله — ليُسمّى العمود الفارغ باسمه لا بـ«السابق» */
 const NQ_QN = ["الربع الأول", "الربع الثاني", "الربع الثالث", "الربع الرابع"];
@@ -3757,12 +3755,23 @@ function NotesQPage({ t, canEdit, add, gear }: SecPageProps) {
             <div className="nq-bars-box">
               <h4>{t("حالة الالتزام بكتابة ملاحظات الأداء للعناصر المتعثرة وفقاً للمعايير",
                      "Compliance by criterion")}</h4>
-              <div className="nq-bars">
-                {crit.map((c, i) => (
-                  <div className="nq-bar" key={c.name}>
+              {/* أشرطة أفقية: اسم المعيار يميناً والنسبة يساراً — بطلب
+                  صاحبة المنصة. والأعمدة الرأسية كانت تُجبر الاسم على
+                  سطرٍ ضيّق تحتها. ولونُ الشريط من نطاقه، فالدليل أسفله
+                  يشرح الألوان بدل أن يكون زينة */}
+              <div className="nq-rows">
+                {crit.map((c) => (
+                  <div className="r" key={c.name}>
+                    <span className="n">{c.name}</span>
+                    <span className="t">
+                      <i
+                        style={{
+                          width: `${c.stat ? Math.max(c.stat.pct, 1) : 0}%`,
+                          background: c.stat ? NQ_TONE[nqBand(c.stat.pct).tone] : "transparent",
+                        }}
+                      />
+                    </span>
                     <b>{c.stat ? `${AR(c.stat.pct)}%` : "—"}</b>
-                    <u style={{ height: `${c.stat ? Math.max(c.stat.pct, 2) : 2}%`, background: NQ_BAR[i] }} />
-                    <span>{c.name}</span>
                   </div>
                 ))}
               </div>

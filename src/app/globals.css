@@ -12769,20 +12769,26 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
   font-family: "Noto Kufi Arabic", sans-serif;
   font-size: 12px; font-weight: 800; color: var(--g-900);
 }
-.nq-bars { display: flex; align-items: flex-end; gap: 16px; height: 180px; padding: 8px 10px 0; }
-.nq-bar { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; }
-/* أعمدةٌ نحيفة لا مستطيلاتٍ عريضة — بطلب صاحبة المنصة. العرض
-   محدودٌ بـ`max-width` والعمود موسَّط في خانته، فتبقى المسافات
-   بينها واسعةً مهما اتّسعت الشاشة */
-.nq-bar u {
-  width: 100%;
-  max-width: 44px;
-  border-radius: 6px 6px 0 0;
-  display: block;
-  text-decoration: none;
+/* أشرطة المعايير أفقية: الاسم يميناً والنسبة يساراً — أوسعُ
+   للاسم من عمودٍ رأسيٍّ ضيّق، وأسهلُ في المقارنة لأن الأشرطة
+   تبدأ كلها من خطٍّ واحد */
+.nq-rows { display: flex; flex-direction: column; gap: 12px; padding: 12px 2px 4px; }
+.nq-rows .r { display: flex; align-items: center; gap: 12px; }
+.nq-rows .n {
+  flex: 0 0 150px;
+  font-size: 11.5px; font-weight: 700; color: var(--ink-2);
+  line-height: 1.4; overflow-wrap: anywhere;
 }
-.nq-bar b { font-family: "Noto Kufi Arabic", sans-serif; font-size: 13px; font-weight: 800; color: var(--g-900); }
-.nq-bar span { font-size: 10.5px; color: var(--ink-2); text-align: center; min-height: 28px; overflow-wrap: anywhere; }
+.nq-rows .t {
+  flex: 1; min-width: 0; height: 16px; border-radius: 999px;
+  background: var(--line2); overflow: hidden; display: block;
+}
+.nq-rows .t i { display: block; height: 100%; border-radius: 999px; transition: width 0.2s; }
+.nq-rows .r b {
+  flex: 0 0 48px; text-align: left;
+  font-family: "Noto Kufi Arabic", sans-serif; font-size: 13px; font-weight: 800; color: var(--g-900);
+}
+@media (max-width: 640px) { .nq-rows .n { flex-basis: 110px; font-size: 11px; } }
 .nq-lg { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; font-size: 10.5px; color: var(--ink-2); margin-top: 8px; }
 .nq-lg i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-left: 4px; }
 
