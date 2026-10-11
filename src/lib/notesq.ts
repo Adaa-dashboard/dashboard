@@ -202,19 +202,32 @@ export function nqQOrder(q: string): number {
   return y * 10 + n;
 }
 
-/** كل ربعٍ ونسبتُه، بترتيبه الزمني — ومعه فرقُه عن سابقه */
-export function nqQuarters(rows: NQRow[]): { q: string; stat: NQStat; delta: number | null }[] {
-  const g = nqGroup(rows, "quarter").sort((a, b) => nqQOrder(a.name) - nqQOrder(b.name));
-  return g.map((x, i) => ({
-    q: x.name,
-    stat: x.stat,
-    delta: i === 0 ? null : x.stat.pct - g[i - 1].stat.pct,
-  }));
-}
-
 /** صفوف ربعٍ بعينه */
 export const nqOfQuarter = (rows: NQRow[], q: string): NQRow[] =>
   rows.filter((r) => nqNrm(r.data.quarter) === nqNrm(q));
+
+/**
+ * كل ربعٍ ونسبتُه، بترتيبه الزمني — ومعه فرقُه عن سابقه.
+ *
+ * **قائمة الأرباع من كل صفٍّ يحمل ربعاً**، ولو لم يكن فيه ما يُعدّ
+ * (صفُّ جهةٍ منشورة أو ملاحظةُ مقيِّم). وإلا اختفى الربع كلُّه من
+ * الشرائح فتبدو الصفحة فارغةً وفيها بيانات — وهو ما وقع حين
+ * أُدرجت صفوف الجهات قبل صفوف القطاعات.
+ */
+export function nqQuarters(rows: NQRow[]): { q: string; stat: NQStat; delta: number | null }[] {
+  const m = new Map<string, string>();
+  for (const r of rows) {
+    const nm = txt(r.data.quarter).trim();
+    if (nm) m.set(nqNrm(nm), nm);
+  }
+  const g = [...m.values()]
+    .sort((a, b) => nqQOrder(a) - nqQOrder(b))
+    .map((q) => ({ q, stat: nqTally(nqOfQuarter(rows, q)) }));
+  return g.map((x, i) => ({
+    ...x,
+    delta: i === 0 ? null : x.stat.pct - g[i - 1].stat.pct,
+  }));
+}
 
 /* ---------------- أبرز المشاهدات ---------------- */
 export type NQObs = { criterion: string; text: string; pct: number };
