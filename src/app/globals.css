@@ -12751,7 +12751,7 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
    بأربعة أسطر. صارت بعرضٍ محدود والباقي فراغ — بطلب صاحبة المنصة */
 .nq-top {
   display: grid;
-  grid-template-columns: 300px minmax(0, 560px);
+  grid-template-columns: 300px minmax(0, 480px);
   justify-content: start;
   gap: 14px;
   align-items: start;
@@ -12784,25 +12784,33 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
 /* أشرطة المعايير أفقية: الاسم يميناً والنسبة يساراً — أوسعُ
    للاسم من عمودٍ رأسيٍّ ضيّق، وأسهلُ في المقارنة لأن الأشرطة
    تبدأ كلها من خطٍّ واحد */
-.nq-rows { display: flex; flex-direction: column; gap: 11px; padding: 10px 2px 2px; }
-.nq-rows .r { display: flex; align-items: center; gap: 12px; }
-.nq-rows .n {
-  flex: 0 0 150px;
-  font-size: 11.5px; font-weight: 700; color: var(--ink-2);
-  line-height: 1.4; overflow-wrap: anywhere;
+/* **شبكةٌ لا صفوفٌ مستقلّة**: عمودُ الأسماء `max-content` فيأخذ
+   عرض أطولها وحده — لا عرضاً ثابتاً يترك فجوةً واسعة بين الاسم
+   القصير وشريطه. فتبدأ الأشرطة كلها من خطٍّ واحد بأقلّ مسافة.
+   و`display: contents` على الصفّ تُسقطه من الشبكة فتدخلها خلاياه. */
+.nq-rows {
+  display: grid;
+  grid-template-columns: max-content 1fr max-content;
+  gap: 12px 10px;
+  align-items: center;
+  padding: 10px 2px 2px;
 }
-/* الشريط رفيع: سُمكُه 16px كان يجعله مستطيلاً عريضاً يبتلع
-   الصفّ — بطلب صاحبة المنصة */
+.nq-rows .r { display: contents; }
+.nq-rows .n {
+  font-size: 11.5px; font-weight: 700; color: var(--ink-2);
+  line-height: 1.4; white-space: nowrap;
+}
+/* الشريط رفيع: سُمكُه 16px كان يجعله مستطيلاً عريضاً يبتلع الصفّ */
 .nq-rows .t {
-  flex: 1; min-width: 0; height: 9px; border-radius: 999px;
+  min-width: 0; height: 9px; border-radius: 999px;
   background: var(--line2); overflow: hidden; display: block;
 }
 .nq-rows .t i { display: block; height: 100%; border-radius: 999px; transition: width 0.2s; }
 .nq-rows .r b {
-  flex: 0 0 48px; text-align: left;
+  min-width: 42px; text-align: left;
   font-family: "Noto Kufi Arabic", sans-serif; font-size: 13px; font-weight: 800; color: var(--g-900);
 }
-@media (max-width: 640px) { .nq-rows .n { flex-basis: 110px; font-size: 11px; } }
+@media (max-width: 640px) { .nq-rows .n { font-size: 10.5px; white-space: normal; } }
 .nq-lg { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; font-size: 10.5px; color: var(--ink-2); margin-top: 10px; }
 .nq-lg i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-left: 4px; }
 
