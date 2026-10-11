@@ -12923,6 +12923,8 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
 }
 .nq-ob li:last-child { border-bottom: 0; }
 .nq-ob li.none { color: var(--muted); justify-content: center; }
+.nq-ob li span { flex: 1; min-width: 0; }
+/* النسبة في آخر السطر — تحت عنوانها «نسبة تكرارها» في الرأس */
 .nq-ob li b {
   font-family: "Noto Kufi Arabic", sans-serif; font-size: 12px; font-weight: 800;
   color: var(--g-700); flex: none; min-width: 36px; text-align: left;

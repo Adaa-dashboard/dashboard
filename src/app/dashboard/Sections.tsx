@@ -3863,9 +3863,11 @@ function NotesQPage({ t, canEdit, add, gear }: SecPageProps) {
                     <ul>
                       {o.list.length ? (
                         o.list.map((x, i) => (
+                          /* النصّ أولاً ثم النسبة — فتقع النسبة تحت
+                             عنوانها «نسبة تكرارها» لا تحت اسم المعيار */
                           <li key={i}>
-                            <b>{AR(x.pct)}%</b>
                             <span>{x.text}</span>
+                            <b>{AR(x.pct)}%</b>
                           </li>
                         ))
                       ) : (
