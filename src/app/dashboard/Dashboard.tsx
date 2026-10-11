@@ -1486,16 +1486,6 @@ function Overview({
         />
       </div>
 
-      {/* جودة ملاحظات الأداء — خطّ الأرباع: نسبةُ كل ربعٍ وفرقُه عن
-          سابقه. يراه كل من يفتح «نظرة عامة»، والصفحة لأصحابها. */}
-      <Sec
-        id="notesq"
-        title={t(SECTION_TITLE.notesq[0], SECTION_TITLE.notesq[1])}
-        extra={<MoreLink k="notesq" />}
-      >
-        <NotesQBox t={t} />
-      </Sec>
-
       {/* قياس تجربة المستفيد — فوق المشاريع بطلب المستخدمة.
           داخل <Sec> نفسه ليتوحّد عنوانه مع بقية عناوين نظرة عامة */}
       <Sec id="cx" title={t(SECTION_TITLE.cx[0], SECTION_TITLE.cx[1])} extra={<MoreLink k="cx" />}>
@@ -1519,6 +1509,18 @@ function Overview({
           />
         </Sec>
       )}
+
+      {/* جودة ملاحظات الأداء — **تحت طلبات التغيير** بطلب صاحبة المنصة:
+          مراجعةُ الملاحظات ومراجعةُ الطلبات عملٌ واحد متّصل.
+          وخطُّ الأرباع يراه كل من يفتح «نظرة عامة»، والصفحة لأصحابها. */}
+      <Sec
+        id="notesq"
+        title={t(SECTION_TITLE.notesq[0], SECTION_TITLE.notesq[1])}
+        extra={<MoreLink k="notesq" />}
+      >
+        <NotesQBox t={t} />
+      </Sec>
+
 
       {/* الخطة التشغيلية كبقيّة الأقسام: العنوان في رأس القسم و«المزيد
           من التفاصيل ›» بجانبه. كانت البطاقة تحمل عنوانها الخاص
