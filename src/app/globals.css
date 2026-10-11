@@ -12584,6 +12584,13 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
 /* الفراغ الذي يدفع الإكسل و⚙️ إلى آخر الشريط */
 .sx-tb .gr { flex: 1; }
 
+/* تبويبا نافذة إعدادات القسم */
+.sg-tabs { padding: 0 18px 2px; }
+/* داخل التبويب لا إطارَ ولا عنوان: التبويب نفسه يسمّيه، وصندوقٌ
+   داخل صندوق يضيّق النافذة بلا فائدة */
+.m-b > .cyc-set { border: none; background: none; padding: 0; margin: 0; }
+.m-b > .cyc-set > h4 { display: none; }
+
 /* ---- لوحة الفترة داخل ⚙️ ---- */
 .cyc-set {
   border: 1px solid var(--border); border-radius: 14px;

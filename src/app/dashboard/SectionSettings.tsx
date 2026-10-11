@@ -59,6 +59,9 @@ export default function SectionSettings({
   onClose: () => void;
   t: T;
 }) {
+  /* يُفتح على «التحديث الدوري»: هو ما يُفتح لأجله ⚙️ أكثر ممّا
+     يُفتح للتفويض */
+  const [tab, setTab] = useState<"cycle" | "grant">("cycle");
   const [people, setPeople] = useState<Person[]>([]);
   const [grants, setGrants] = useState<Grant[]>([]);
   const [may, setMay] = useState(false);
@@ -126,11 +129,24 @@ export default function SectionSettings({
           </button>
         </div>
 
-        <div className="m-b">
-          {/* التحديث الدوري أولاً: هو ما يُفتح لأجله ⚙️ أكثر ممّا
-              يُفتح للتفويض، ويراه من يحرّر القسم */}
-          {rows && <CycleSettings section={section} rows={rows} t={t} />}
+        {/* **تبويبان لا قائمةٌ واحدة**: الفترة الدورية والتفويض
+            أمران مختلفان، وعرضُهما معاً يُلخبط النافذة — بطلب صاحبة
+            المنصة. والنافذة واحدة لكل الأقسام، فيسري على الخمس. */}
+        {rows && (
+          <div className="chips sg-tabs">
+            <button className={`chip sm ${tab === "cycle" ? "on" : ""}`} onClick={() => setTab("cycle")}>
+              {t("التحديث الدوري", "Update round")}
+            </button>
+            <button className={`chip sm ${tab === "grant" ? "on" : ""}`} onClick={() => setTab("grant")}>
+              {t("صلاحيات التحديث", "Delegation")}
+            </button>
+          </div>
+        )}
 
+        <div className="m-b">
+          {rows && tab === "cycle" && <CycleSettings section={section} rows={rows} t={t} />}
+
+          {(!rows || tab === "grant") && <>
           {err && <div className="alert alert-error">{err}</div>}
 
           {loading ? (
@@ -241,6 +257,7 @@ export default function SectionSettings({
               )}
             </>
           )}
+          </>}
         </div>
 
         <div className="m-f">
