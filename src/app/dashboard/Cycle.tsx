@@ -106,11 +106,9 @@ export function CycleBar({
   return (
     <div className="cyc">
       <div className="cyc-h">
+        {/* الاسم وعدّاده وحدهما — لا شرحَ ولا تاريخ، بطلب صاحبة المنصة */}
         <span className="cyc-when">
-          {t(
-            `فترة تحديث ${cycle.every ? EVERY_AR[cycle.every] : ""} — بدأت ${dayTxt(windowStart(cycle))}`,
-            `Update window started ${dayTxt(windowStart(cycle))}`,
-          )}
+          {t("التحديث الدوري", "Update round")}
           {total > 0 && <b> · {t(`حدّث ${done} من ${total}`, `${done}/${total}`)}</b>}
         </span>
       </div>
@@ -228,26 +226,7 @@ export function CycleSettings({
               </label>
             </div>
           )}
-          <p className="cyc-nt">
-            {units.length
-              ? t(
-                  every === "range"
-                    ? `سيُطالَب ${units.length} بالتحديث خلال الفترة المحدّدة، ويخرج كلٌّ منهم متى حُدِّثت بنوده.`
-                    : `سيُطالَب ${units.length} بالتحديث، ويتجدّد الطلب ${EVERY_AR[every]}اً من نفسه بلا ضغط زرّ.`,
-                  `${units.length} will be asked to update.`,
-                )
-              : t("لا توجد بنود في هذه الصفحة بعد", "Nothing to update yet")}
-          </p>
         </div>
-      )}
-
-      {open && cycle && (
-        <p className="cyc-nt">
-          {t(
-            `فترة ${cycle.every ? EVERY_AR[cycle.every] : "مفتوحة"} بدأها ${cycle.startedBy || "—"}. النافذة الحالية من ${dayTxt(windowStart(cycle))}${cycle.every === "range" && cycle.to ? ` إلى ${dayTxt(cycle.to)}` : ""}.`,
-            "A window is open.",
-          )}
-        </p>
       )}
 
       {err && <div className="cyc-err">{err}</div>}

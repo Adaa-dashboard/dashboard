@@ -12436,7 +12436,6 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
 }
 .op-add:hover { background: var(--tint); color: var(--g-800); border-color: var(--g-600); }
 
-.opc-note { font-size: 10.5px; color: var(--muted); margin: 0 0 12px; line-height: 1.7; }
 .opc-tb { width: 100%; border-collapse: collapse; font-size: 11.5px; }
 .opc-tb th { font-size: 10px; color: var(--muted); font-weight: 700; text-align: start; padding: 0 8px 8px; }
 .opc-tb td { padding: 7px 8px; border-top: 1px solid var(--border); vertical-align: middle; }
@@ -12616,8 +12615,6 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
   border: 1px solid var(--border); border-radius: 9px; padding: 6px 9px;
   font: inherit; font-size: 11.5px; background: var(--panel); color: var(--text);
 }
-/* **لا `.nt`**: صنفٌ عام في المنصة فيه `display:flex` يسطّح السطر */
-.cyc-nt { margin: 0; font-size: 10.5px; color: var(--muted); line-height: 1.7; }
 .cyc-when { font-size: 11px; color: var(--muted); }
 .cyc-when b { color: var(--g-800); font-weight: 800; }
 .cyc-end {

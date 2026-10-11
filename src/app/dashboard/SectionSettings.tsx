@@ -157,12 +157,6 @@ export default function SectionSettings({
             </div>
           ) : (
             <>
-              <p className="sg-note">
-                {t(
-                  "من ينوب عنك في هذا القسم أثناء إجازتك — إلى تاريخٍ ينتهي عنده التفويض بنفسه.",
-                  "Whoever stands in for you while you are away — until a date it ends on its own.",
-                )}
-              </p>
 
               <div className="sg-form">
                 <label>
@@ -195,7 +189,6 @@ export default function SectionSettings({
                   {t("السبب", "Reason")}
                   <input
                     value={note}
-                    placeholder={t("إجازة · انتداب · تغطية", "Leave · secondment")}
                     onChange={(e) => setNote(e.target.value)}
                   />
                 </label>
