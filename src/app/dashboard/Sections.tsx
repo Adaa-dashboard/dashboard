@@ -1506,6 +1506,7 @@ function NatCard({
       </div>
       <div className="own">
         {txt(d.owner) || "—"} · {NAT_STEPS[natStage(d) - 1]}
+        {txt(d.sector) ? ` · ${txt(d.sector)}` : ""}
       </div>
 
       <div className="bd">
@@ -1592,6 +1593,7 @@ function natKeyOf(head: string): string {
   if (h.includes("تحدي") || h.includes("معوق")) return "challenge";
   if (h.includes("القادم") || h.includes("التالي")) return "next";
   if (h.includes("دعم")) return "support";
+  if (h.includes("قطاع")) return "sector";
   if (h.includes("جهه") || h.includes("مالك")) return "owner";
   if (h.includes("استراتيجي") || h.includes("اسم")) return "name";
   return "";
@@ -1789,6 +1791,8 @@ function NatImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => vo
 function NationalPage({ t, canEdit, add, gear }: SecPageProps) {
   const { items, loaded, save, remove, reload, undo, undoTop, dismissUndo } = useItems("natstrat");
   const [q, setQ] = useState("");
+  /* القطاع المختار من الفلتر — فارغٌ = كل القطاعات */
+  const [sec, setSec] = useState("");
   /* التبويب المختار — حالة الاعتماد */
   const [tab, setTab] = useState(4);
   const logos = useLogos();
@@ -1797,21 +1801,36 @@ function NationalPage({ t, canEdit, add, gear }: SecPageProps) {
     () =>
       items.filter((it) => {
         const d = it.data;
+        if (sec && txt(d.sector) !== sec) return false;
         return !q || `${txt(d.name)} ${txt(d.owner)} ${txt(d.domain)}`.includes(q);
       }),
-    [items, q],
+    [items, q, sec],
   );
   /* البحث يتجاوز التبويب: من يكتب اسم استراتيجية يريدها أينما كانت */
   const rows = q ? found : found.filter((it) => natStage(it.data) === tab);
 
+  /* **فلتر القطاعات** — كانت القائمة «كل الحالات» فارغةً بلا خيار
+     واحد، فلا تفعل شيئاً. القطاعات الأربعة المعتمدة أولاً، ثم أيُّ
+     قطاعٍ ورد في البيانات وليس منها، ومع كلٍّ عددُه. والقطاع يأتي
+     من عمود «القطاع» في ملف الرفع أو من نموذج التعديل. */
+  const secOpts = useMemo(() => {
+    const n = new Map<string, number>();
+    for (const it of items) {
+      const v = txt(it.data.sector).trim();
+      if (v) n.set(v, (n.get(v) || 0) + 1);
+    }
+    const all = [...INST_SECTORS, ...[...n.keys()].filter((x) => !INST_SECTORS.includes(x))];
+    return all.filter((x) => n.has(x)).map((x) => ({ v: x, l: `${x} (${AR(n.get(x) || 0)})` }));
+  }, [items]);
+
   function exportXl() {
-    const head = ["الاستراتيجية", "الجهة", "حالة الاعتماد", "قابلية القياس ٪", "المؤشرات الممثلة",
+    const head = ["الاستراتيجية", "الجهة", "القطاع", "حالة الاعتماد", "قابلية القياس ٪", "المؤشرات الممثلة",
       "إجمالي المؤشرات", "المبادرات الممثلة", "إجمالي المبادرات", "المراجعة الفنية",
       "فترة الاستراتيجية", "تاريخ الاعتماد", "أبرز الملاحظات",
       "الوضع الحالي", "التحديات", "الخطوات القادمة", "الدعم المطلوب"];
     const body = items.map((it) => {
       const d = it.data;
-      return [txt(d.name), txt(d.owner), NAT_STEPS[natStage(d) - 1], numOf(d.meas),
+      return [txt(d.name), txt(d.owner), txt(d.sector), NAT_STEPS[natStage(d) - 1], numOf(d.meas),
         numOf(d.kpisRep), numOf(d.kpisTot), numOf(d.initRep), numOf(d.initTot),
         d.tech ? "مقبولة فنياً" : "غير مقبولة فنياً", txt(d.period), txt(d.approvedAt), txt(d.note),
         txt(d.current), txt(d.challenge), txt(d.next), txt(d.support)];
@@ -1824,7 +1843,10 @@ function NationalPage({ t, canEdit, add, gear }: SecPageProps) {
   return (
     <>
       <Toolbar
-        q={q} setQ={setQ} filter="" setFilter={() => {}} options={[]} onExport={exportXl}
+        q={q} setQ={setQ}
+        filter={sec} setFilter={setSec} options={secOpts}
+        allLabel={t("كل القطاعات", "All sectors")}
+        onExport={exportXl}
         upload={canEdit ? <NatImport items={items} t={t} onDone={() => void reload()} /> : null}
         add={add}
         gear={gear}
@@ -1833,7 +1855,9 @@ function NationalPage({ t, canEdit, add, gear }: SecPageProps) {
 
       <div className="stabs">
         {[4, 3, 2, 1].map((st) => {
-          const n = items.filter((it) => natStage(it.data) === st).length;
+          /* العدّ من `found` لا من `items`: التبويب يعدّ ما يراه
+             المستخدم بعد الفلتر، وإلا ناقضَ الرقمُ ما تحته */
+          const n = found.filter((it) => natStage(it.data) === st).length;
           return (
             <button
               key={st}
@@ -2437,6 +2461,28 @@ function InstCard({ it, t }: { it: Item; t: T }) {
 /* ---------------- بطاقة جهة واحدة ----------------
    أربع محطات، كل محطة باسمها وقيمتها تحتها ونقطة بلون حالتها —
    بدل خلايا جدول عرضها مئة بكسل يُقتطع فيها النص */
+/* ------------------------------------------------------------
+   مرحلة الجهة في المؤسسية — **أول خطوةٍ لم تكتمل بعد**
+   ------------------------------------------------------------
+   الخطوات الأربع متتابعة لا متنافية، فلو عُدَّ «من أنجز كلَّ خطوة»
+   لوقعت الجهة الواحدة في أربع خانات ولم تُجمَع الأعداد على شيء.
+   وبهذا التعريف تصير الخانات متنافيةً كما في الوطنية تماماً:
+   مجموعها عدد الجهات، والضغط على خانةٍ يُظهر ما وقف عندها.
+   والخامسة «اكتملت» لا بدّ منها، وإلا اختفت الجهة التي أنهت
+   الأربع من كل الخانات.
+   ------------------------------------------------------------ */
+const INST_TABS = ["تسمية ممثل", "الاجتماع التعريفي", "الوثائق", "تفعيل القياس", "اكتملت"];
+const INST_TAB_TONE = ["#8a9a95", "#e0971a", "#0f8a8a", "#2f7fd1", "#1a9d5c"];
+
+/** 0..3 = الخطوة المتوقَّف عندها · 4 = أنهى الأربع */
+function instStep(d: Rec): number {
+  if (txt(d.rep) !== "تمت تسمية ممثل") return 0;
+  if (txt(d.meet) !== "تم") return 1;
+  if (txt(d.docs) !== "✓") return 2;
+  if (txt(d.live) !== "مفعل") return 3;
+  return 4;
+}
+
 function instSteps(d: Rec, t: T) {
   const rep = txt(d.rep);
   const meet = txt(d.meet);
@@ -2529,8 +2575,10 @@ function InstPage({ t, canEdit, add, gear }: SecPageProps) {
   const [q, setQ] = useState("");
   const [f, setF] = useState("");
   const [view, setView] = useState<"cards" | "table">("cards");
-  /* القطاع المختار — تبويب أعلى الصفحة */
-  const [tab, setTab] = useState(INST_SECTORS[0]);
+  /* المرحلة المختارة — شريط أعلى الصفحة، كشريط الوطنية.
+     كان الشريط للقطاعات والقائمة «كل الحالات» فارغة، فصار
+     الشريط للحالات والقائمة للقطاعات — بطلب صاحبة المنصة */
+  const [stage, setStage] = useState(0);
   const [edit, setEdit] = useState<Item | null>(null);
   const [draft, setDraft] = useState<Record<string, Rec>>({});
 
@@ -2554,6 +2602,23 @@ function InstPage({ t, canEdit, add, gear }: SecPageProps) {
     [items, q, f],
   );
 
+  /* البحث يتجاوز الشريط: من يكتب اسم جهة يريدها في أيّ مرحلةٍ كانت */
+  const list = useMemo(
+    () => (q ? rows : rows.filter((it) => instStep(it.data) === stage)),
+    [rows, q, stage],
+  );
+
+  /* القطاعات بأعدادها — القائمة كانت تعرض الأربعة بلا عدد */
+  const secOpts = useMemo(() => {
+    const n = new Map<string, number>();
+    for (const it of items) {
+      const v = txt(it.data.sector).trim();
+      if (v) n.set(v, (n.get(v) || 0) + 1);
+    }
+    const all = [...INST_SECTORS, ...[...n.keys()].filter((x) => !INST_SECTORS.includes(x))];
+    return all.filter((x) => n.has(x)).map((x) => ({ v: x, l: `${x} (${AR(n.get(x) || 0)})` }));
+  }, [items]);
+
   function exportXl() {
     const head = INST_COLS.map((c) => c.label);
     const body = rows.map((it) => INST_COLS.map((c) => txt(it.data[c.k])));
@@ -2562,15 +2627,30 @@ function InstPage({ t, canEdit, add, gear }: SecPageProps) {
 
   if (!loaded) return <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>;
 
-  /* قطاعات الملف أولاً بترتيبها، ثم أي قطاع أُضيف لاحقاً */
-  const secs = [...INST_SECTORS, ...Array.from(new Set(rows.map((r) => txt(r.data.sector)))).filter(
-    (x) => x && !INST_SECTORS.includes(x),
-  )];
-
   return (
     <>
-      <Toolbar q={q} setQ={setQ} filter={f} setFilter={setF} options={INST_SECTORS}
+      <Toolbar q={q} setQ={setQ} filter={f} setFilter={setF} options={secOpts}
+               allLabel={t("كل القطاعات", "All sectors")}
                onExport={exportXl} add={add} gear={gear} t={t} />
+
+      {/* شريط الحالات الأربع — فوق العرضين معاً، فالجدول يتبع
+          المرحلة المختارة كما تتبعها البطاقات */}
+      <div className="stabs">
+        {INST_TABS.map((nm, i) => (
+          <button
+            key={nm}
+            className={`stab ${!q && stage === i ? "on" : ""}`}
+            style={{ ["--c" as string]: INST_TAB_TONE[i] }}
+            onClick={() => {
+              setQ("");
+              setStage(i);
+            }}
+          >
+            <span className="l">{nm}</span>
+            <b>{AR(rows.filter((it) => instStep(it.data) === i).length)}</b>
+          </button>
+        ))}
+      </div>
 
       <div className="iw-bar">
         <span className="iw-tog">
@@ -2587,47 +2667,22 @@ function InstPage({ t, canEdit, add, gear }: SecPageProps) {
       </div>
 
       {view === "cards" ? (
-        <>
-          <div className="stabs">
-            {secs.map((sc) => {
-              const n = items.filter((r) => txt(r.data.sector) === sc).length;
-              return (
-                <button
-                  key={sc}
-                  className={`stab ${!q && !f && tab === sc ? "on" : ""}`}
-                  onClick={() => {
-                    setQ("");
-                    setF("");
-                    setTab(sc);
-                  }}
-                >
-                  <span className="l">{sc}</span>
-                  <b>{AR(n)}</b>
-                </button>
-              );
-            })}
+        !list.length ? (
+          <div className="pf-none">{t("لا توجد نتائج", "No results")}</div>
+        ) : (
+          <div className="iw-grid">
+            {list.map((it) => (
+              <InstEntity
+                key={it.id}
+                it={it}
+                t={t}
+                onEdit={canEdit ? () => setEdit(it) : undefined}
+                canEdit={canEdit}
+                remove={remove}
+              />
+            ))}
           </div>
-
-          {(() => {
-            /* البحث أو الفلتر يتجاوز التبويب — من يبحث يريد النتيجة أينما كانت */
-            const list = q || f ? rows : rows.filter((r) => txt(r.data.sector) === tab);
-            if (!list.length) return <div className="pf-none">{t("لا توجد نتائج", "No results")}</div>;
-            return (
-              <div className="iw-grid">
-                {list.map((it) => (
-                  <InstEntity
-                    key={it.id}
-                    it={it}
-                    t={t}
-                    onEdit={canEdit ? () => setEdit(it) : undefined}
-                    canEdit={canEdit}
-                    remove={remove}
-                  />
-                ))}
-              </div>
-            );
-          })()}
-        </>
+        )
       ) : (
         <div className="tbl-wrap">
           <table className="sx-tbl inst">
@@ -2643,7 +2698,7 @@ function InstPage({ t, canEdit, add, gear }: SecPageProps) {
               </tr>
             </thead>
             <tbody>
-              {rows.map((it, n) => (
+              {list.map((it, n) => (
                 <tr key={it.id}>
                   <td className="c num">{AR(n + 1)}</td>
                   {INST_COLS.map((c) => {
@@ -3600,6 +3655,7 @@ const FIELDS: Record<Exclude<SectionKey, "outputs" | "opplan">, Field[]> = {
   natstrat: [
     { k: "name", label: "الاستراتيجية" },
     { k: "owner", label: "الجهة المالكة" },
+    { k: "sector", label: "القطاع (المالي والاقتصادي · البنية التحتية · الخدمات الاجتماعية · الشؤون الحكومية)" },
     { k: "domain", label: "النطاق (التوطين · الحج · الفضاء…)" },
     { k: "stage", label: "حالة الاعتماد (1 إعداد · 2 مراجعة · 3 اللجنة · 4 مجلس الوزراء)", kind: "num" },
     { k: "tech", label: "مقبولة فنياً؟", kind: "bool" },

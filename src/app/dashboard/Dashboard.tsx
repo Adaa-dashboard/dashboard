@@ -1206,37 +1206,6 @@ function Overview({
   const shownInd = statusFilter ? indData.filter((d) => d.bandLabel === statusFilter) : indData;
 
 
-  function exportCsv() {
-    const header = ["القطاع", "المؤشر", "الوحدة", "المستهدف", "المنجز", "نسبة الإنجاز %", "آخر تحديث"];
-    const rows: string[][] = [];
-    for (const s of sectors)
-      for (const ind of indicators) {
-        const key = tkey(s.id, ind.id);
-        const m = latest.get(key);
-        const tgt = tgtForScope(refData, key, scopeQ);
-        const rr = evaluate(m?.actual, tgt, bands);
-        rows.push([
-          s.name,
-          ind.name,
-          ind.unit === "percent" ? "نسبة" : "عدد",
-          tgt != null ? String(tgt) : "",
-          m?.actual != null ? String(m.actual) : "",
-          rr.achievement != null ? String(Math.round(rr.achievement)) : "",
-          fmtDate(m?.updatedAt, lang),
-        ]);
-      }
-    const csv = [header, ...rows]
-      .map((r) => r.map((c) => (/[",\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c)).join(","))
-      .join("\r\n");
-    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "الأداء.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
   // ===== السلاسل الزمنية للأداء العام وللقطاعات =====
   const targetOf = useCallback(
     (sectorId: string, indicatorId: string) => tgtAnnual(refData, tkey(sectorId, indicatorId)),
@@ -1291,9 +1260,8 @@ function Overview({
         <button className="btn btn-ghost btn-sm" onClick={() => void load()}>
           {t("تحديث", "Refresh")}
         </button>
-        <button className="btn btn-sm" onClick={exportCsv}>
-          ⬇ {t("تصدير Excel", "Export Excel")}
-        </button>
+        {/* «تصدير Excel» أُزيل بطلب صاحبة المنصة — لا داعي له هنا،
+            والتصدير في كل صفحةِ قسمٍ على حدة */}
       </div>
 
       <div className="ov-top">
@@ -1520,9 +1488,16 @@ function Overview({
         </Sec>
       )}
 
+      {/* الخطة التشغيلية كبقيّة الأقسام: العنوان في رأس القسم و«المزيد
+          من التفاصيل ›» بجانبه. كانت البطاقة تحمل عنوانها الخاص
+          و«↩ اضغط للتفاصيل» فتبدو غريبةً بين أخواتها */}
       {hasScope(me.scopes, "opplan") && (
-        <Sec id="opplan" title={t("الخطة التشغيلية", "Operational plan")}>
-          <OpPlanCard t={t} onOpen={() => onOpenTab("opplan")} />
+        <Sec
+          id="opplan"
+          title={t("الخطة التشغيلية", "Operational plan")}
+          extra={<MoreLink k="opplan" />}
+        >
+          <OpPlanCard t={t} />
         </Sec>
       )}
 

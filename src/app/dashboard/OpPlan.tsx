@@ -1230,7 +1230,7 @@ function OpEdit({
 }
 
 /* ---------------- بطاقة «نظرة عامة» ---------------- */
-export function OpPlanCard({ t, onOpen }: { t: T; onOpen: () => void }) {
+export function OpPlanCard({ t }: { t: T }) {
   const { items, loaded } = useItems("opplan");
   const rows = useMemo(() => items.map((x) => opFix(x.data as Rec)), [items]);
   if (!loaded || !rows.length) return null;
@@ -1243,12 +1243,9 @@ export function OpPlanCard({ t, onOpen }: { t: T; onOpen: () => void }) {
   const perOwner = OP_OWNERS.map((o) => ({ o, n: rows.filter((d) => txt(d.owner) === o).length }));
 
   return (
-    <div className="op-card" onClick={onOpen} role="button" tabIndex={0}
-         onKeyDown={(e) => e.key === "Enter" && onOpen()}>
-      <div className="h">
-        <h3>{t("الخطة التشغيلية 2026م", "Operational plan 2026")}</h3>
-        <span>{t("↩ اضغط للتفاصيل", "Open")}</span>
-      </div>
+    /* العنوان و«المزيد من التفاصيل» في رأس القسم بنظرة عامة — كبقيّة
+       الأقسام. فلا ترويسةَ داخل البطاقة ولا ضغطةَ على كامِلها. */
+    <div className="op-card">
       <div className="n3">
         <div className="k" style={{ ["--c" as string]: KIND_COLOR.kpi }}>
           <b>{kpis.length}</b>

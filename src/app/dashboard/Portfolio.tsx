@@ -727,13 +727,18 @@ function NotesWidget({ t, onOpen }: { t: T; onOpen: () => void }) {
     void loadUserData<NotesData>("notes", EMPTY_NOTES).then((d) => setData(d || EMPTY_NOTES));
   }, []);
   const sorted = [...(data.notes || [])].sort((a, b) => txt(b.updatedAt).localeCompare(txt(a.updatedAt)));
-  /* **المثبَّتة وحدها**: المحفظة لوحةُ ما يعني صاحبها الآن، لا
-     أرشيفَ ملاحظاته. وآخرُ ما ثُبِّت أعلاها، وأربعٌ حدّاً — فوقها
-     يصير الصندوق قائمةً تُمرَّر لا لوحةً تُقرأ بلمحة. */
+  /* المثبَّتة أولاً: المحفظة لوحةُ ما يعني صاحبها الآن. وآخرُ ما
+     ثُبِّت أعلاها، وأربعٌ حدّاً — فوقها يصير الصندوق قائمةً تُمرَّر
+     لا لوحةً تُقرأ بلمحة.
+
+     **وبلا تثبيت تُعرض آخر الملاحظات** — بطلب صاحبة المنصة: الصندوق
+     الفارغ يوحي أن لا ملاحظة أصلاً، وقد تكون عشرون. فالدبوس يختار
+     ما يتصدّر، لا شرطاً لظهور شيء. */
   const pinned = sorted
     .filter((n) => !!n.pinnedAt)
     .sort((a, b) => txt(b.pinnedAt).localeCompare(txt(a.pinnedAt)));
-  const list = pinned.slice(0, PIN_MAX);
+  const latest = pinned.length ? [] : sorted.slice(0, PIN_MAX);
+  const list = pinned.length ? pinned.slice(0, PIN_MAX) : latest;
   /* الميزة الأقل وضوحاً في المنصة: التاريخ يُقرأ من نص الملاحظة.
      فيُشرح هنا حتى يُكتشف، ويختفي الشرح متى ظهر أثره — أي متى صار
      لملاحظة موعد — فلا يبقى تنبيهاً دائماً لمن عرفه. */
@@ -751,22 +756,13 @@ function NotesWidget({ t, onOpen }: { t: T; onOpen: () => void }) {
       )}
       <div className="nts">
         {list.map((n) => (
-          <div className="nt2 pin" key={n.id}>
+          <div className={`nt2 ${n.pinnedAt ? "pin" : ""}`} key={n.id}>
             <div className="t">{firstLine(n)}</div>
             <div className="x">{preview(n)}</div>
             <div className="m">{whenAr(n.updatedAt)}</div>
           </div>
         ))}
-        {!list.length && (
-          <div className="pf-none">
-            {sorted.length
-              ? t(
-                  "لا ملاحظة مثبَّتة — ثبِّت ما تريد رؤيته هنا بالدبوس 📌 من «ملاحظاتي».",
-                  "Pin a note to see it here.",
-                )
-              : t("لا توجد ملاحظات بعد.", "No notes yet.")}
-          </div>
-        )}
+        {!list.length && <div className="pf-none">{t("لا توجد ملاحظات بعد.", "No notes yet.")}</div>}
       </div>
       {pinned.length > PIN_MAX && (
         <div className="pf-hint">

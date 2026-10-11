@@ -11656,18 +11656,13 @@ input.cell-date {
 .op-err { font-size: 11px; font-weight: 700; color: var(--dgr-tx); margin-bottom: 8px; }
 
 /* بطاقة نظرة عامة */
+/* بطاقةٌ ساكنة كبقيّة بطاقات نظرة عامة: العنوان و«المزيد من
+   التفاصيل» في رأس القسم فوقها، فلا ترويسةَ لها ولا ضغطةَ على
+   كامِلها (وقد أُزيلت معها `cursor:pointer` والرفعة عند المرور) */
 .op-card {
   border: 1px solid var(--border); border-radius: 16px; background: var(--panel);
   padding: 14px 16px; box-shadow: 0 6px 18px rgba(0, 40, 35, .06);
-  cursor: pointer; transition: transform .12s, box-shadow .12s;
 }
-.op-card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0, 40, 35, .1); }
-.op-card .h { display: flex; align-items: center; gap: 9px; margin-bottom: 11px; }
-.op-card .h h3 {
-  flex: 1; margin: 0; font-family: "Noto Kufi Arabic", sans-serif;
-  font-size: 13.5px; font-weight: 800; color: var(--g-900);
-}
-.op-card .h > span { font-size: 10.5px; color: var(--muted); }
 .op-card .n3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin-bottom: 11px; }
 @media (max-width: 720px) { .op-card .n3 { grid-template-columns: 1fr; } }
 .op-card .k {
