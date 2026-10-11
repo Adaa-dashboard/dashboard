@@ -12581,6 +12581,36 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
    ============================================================ */
 .cyc { margin-bottom: 12px; }
 .cyc-h { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+/* الفراغ الذي يدفع الإكسل و⚙️ إلى آخر الشريط */
+.sx-tb .gr { flex: 1; }
+
+/* ---- لوحة الفترة داخل ⚙️ ---- */
+.cyc-set {
+  border: 1px solid var(--border); border-radius: 14px;
+  padding: 13px 15px; margin-bottom: 14px; background: var(--soft);
+}
+.cyc-set > h4 { margin: 0 0 10px; font-size: 12.5px; font-weight: 800; color: var(--g-800); }
+.cyc-two { display: flex; gap: 10px; flex-wrap: wrap; }
+.cyc-two label {
+  display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 11px;
+  padding: 7px 11px; font-size: 11.5px; font-weight: 700; color: var(--ink-2);
+}
+.cyc-two label.on { border-color: var(--g-600); color: var(--g-800); background: var(--tint); }
+.cyc-two input { width: 15px; height: 15px; accent-color: var(--g-700); cursor: pointer; }
+.cyc-two label:has(input:disabled) { opacity: .5; cursor: default; }
+.cyc-opt { margin-top: 11px; display: flex; flex-direction: column; gap: 9px; }
+/* **لا `.row`**: صنفٌ عام في المنصة فيه `flex:1; min-width:160px`
+   لكل ابن، فتتكدّس الخيارات سطراً سطراً — نفس عطب `.nt` */
+.cyc-r { display: flex; gap: 6px; flex-wrap: wrap; align-items: flex-end; }
+.cyc-r.dates label { display: flex; flex-direction: column; gap: 4px; }
+.cyc-r.dates span { font-size: 10px; font-weight: 700; color: var(--muted); }
+.cyc-r.dates input {
+  border: 1px solid var(--border); border-radius: 9px; padding: 6px 9px;
+  font: inherit; font-size: 11.5px; background: var(--panel); color: var(--text);
+}
+/* **لا `.nt`**: صنفٌ عام في المنصة فيه `display:flex` يسطّح السطر */
+.cyc-nt { margin: 0; font-size: 10.5px; color: var(--muted); line-height: 1.7; }
 .cyc-when { font-size: 11px; color: var(--muted); }
 .cyc-when b { color: var(--g-800); font-weight: 800; }
 .cyc-end {

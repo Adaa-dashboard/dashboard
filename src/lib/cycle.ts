@@ -17,12 +17,26 @@
 export type CycleRow = { id: string; data: Record<string, unknown>; updatedAt?: string };
 /** وحدةٌ تُطالَب بالتحديث: استشاريٌّ أو جهةٌ أو استراتيجية */
 export type CycleUnit = { k: string; label: string; sub?: string };
+/** كل كم تُفتح نافذةٌ جديدة — أو مدّةٌ محدّدة لا تتكرّر */
+export type Every = "daily" | "weekly" | "monthly" | "range";
+export const EVERY_AR: Record<Every, string> = {
+  daily: "يومي",
+  weekly: "أسبوعي",
+  monthly: "شهري",
+  range: "فترة محدّدة",
+};
 export type Cycle = {
+  /** بدء الفترة — ومنه تُحسب النوافذ المتعاقبة */
   startedAt: string;
   startedBy: string;
+  every?: Every;
+  /** في `range` وحدها: أوّل الفترة وآخرها (YYYY-MM-DD) */
+  from?: string;
+  to?: string;
   units: CycleUnit[];
-  /** ما حُذف من الشريط يدوياً بالـ✕ — لا يُطالَب في هذه الدورة */
-  dropped: string[];
+  /** ما حُذف من الشريط بالـ✕ — ومعه وقتُه، فيعود الاسم مع كل نافذةٍ
+      جديدة. ولولا الوقت لبقي محذوفاً إلى الأبد. */
+  dropped: { k: string; at: string }[];
 };
 
 const txt = (v: unknown) => (v === null || v === undefined ? "" : String(v));
@@ -62,6 +76,48 @@ export function unitsOf(rows: CycleRow[], nameKey: string, byConsultant: boolean
   return [...m.values()];
 }
 
+const DAY = 86400000;
+
+/**
+ * **بداية النافذة الحالية** — والدورة تتجدّد من نفسها: «كل شهر»
+ * يعني أن الجميع يُطالَبون من جديد مع كل شهرٍ يمرّ، بلا أن يضغط
+ * أحدٌ زرّاً. وبلا `every` نافذةٌ واحدة تبدأ من `startedAt`.
+ */
+export function windowStart(c: Cycle, now = Date.now()): number {
+  const t0 = Date.parse(c.every === "range" ? c.from || c.startedAt : c.startedAt);
+  if (!Number.isFinite(t0) || now <= t0) return t0;
+  if (c.every === "daily") return t0 + Math.floor((now - t0) / DAY) * DAY;
+  if (c.every === "weekly") return t0 + Math.floor((now - t0) / (7 * DAY)) * 7 * DAY;
+  if (c.every === "monthly") {
+    /* بالتقويم لا بـ30 يوماً: من بدأ في 31 يناير تقع نافذته التالية
+       في آخر فبراير، فلا تنزلق البداية شهراً بعد شهر */
+    const d = new Date(t0);
+    let at = new Date(t0);
+    for (let i = 1; ; i++) {
+      const nx = new Date(t0);
+      nx.setMonth(d.getMonth() + i);
+      /* شهرٌ أقصر من يوم البداية ⇒ يُشدّ إلى آخر يومٍ فيه */
+      if (nx.getDate() !== d.getDate()) nx.setDate(0);
+      if (nx.getTime() > now) break;
+      at = nx;
+      if (i > 600) break;
+    }
+    return at.getTime();
+  }
+  return t0;
+}
+
+/** هل الفترة مفتوحة الآن؟ — `range` تُغلق بانقضاء آخرها */
+export function isOpen(c: Cycle | null, now = Date.now()): boolean {
+  if (!c) return false;
+  if (c.every !== "range") return true;
+  const to = c.to ? Date.parse(c.to) : NaN;
+  const from = Date.parse(c.from || c.startedAt);
+  if (Number.isFinite(from) && now < from) return false;
+  /* `to` يومٌ كامل: تنتهي الفترة بنهايته لا بأوّله */
+  return !Number.isFinite(to) || now <= to + DAY;
+}
+
 export type Pending = CycleUnit & { done: number; total: number };
 
 /**
@@ -73,10 +129,15 @@ export function pendingOf(
   rows: CycleRow[],
   nameKey: string,
   byConsultant: boolean,
+  now = Date.now(),
 ): { pending: Pending[]; done: number; total: number } {
-  if (!cycle) return { pending: [], done: 0, total: 0 };
-  const start = Date.parse(cycle.startedAt);
-  const dropped = new Set(cycle.dropped || []);
+  if (!cycle || !isOpen(cycle, now)) return { pending: [], done: 0, total: 0 };
+  const start = windowStart(cycle, now);
+  /* المحذوف يعود مع كل نافذةٍ جديدة — فحذفُه إعفاءٌ لهذه النافذة
+     لا شطبٌ دائم */
+  const dropped = new Set(
+    (cycle.dropped || []).filter((d) => Date.parse(d.at) >= start).map((d) => d.k),
+  );
   /* العدّ من الصفوف الحاضرة الآن: صفٌّ حُذف بعد بدء الدورة لا
      يُطالَب به، وصفٌّ أُضيف بعدها لا يُحشر فيها */
   const tally = new Map<string, { done: number; total: number }>();

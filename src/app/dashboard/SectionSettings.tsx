@@ -11,6 +11,7 @@
    ============================================================ */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { CycleSettings } from "./Cycle";
 import { apiFetch } from "@/lib/api";
 
 type T = (ar: string, en: string) => string;
@@ -46,12 +47,15 @@ export default function SectionSettings({
   section,
   title,
   meId,
+  rows,
   onClose,
   t,
 }: {
   section: string;
   title: string;
   meId: string;
+  /** بنود القسم — منها تُلتقط قائمة من يُطالَب بالتحديث */
+  rows?: { id: string; data: Record<string, unknown>; updatedAt?: string }[];
   onClose: () => void;
   t: T;
 }) {
@@ -123,6 +127,10 @@ export default function SectionSettings({
         </div>
 
         <div className="m-b">
+          {/* التحديث الدوري أولاً: هو ما يُفتح لأجله ⚙️ أكثر ممّا
+              يُفتح للتفويض، ويراه من يحرّر القسم */}
+          {rows && <CycleSettings section={section} rows={rows} t={t} />}
+
           {err && <div className="alert alert-error">{err}</div>}
 
           {loading ? (

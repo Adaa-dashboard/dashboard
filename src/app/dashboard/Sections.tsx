@@ -577,7 +577,10 @@ function UndoBar({
    بديل تشغيل SQL يدوياً: الملف مرفق مع الموقع، والزر يكتبه عبر
    نفس واجهة القسم — فتحكمه صلاحيات الحساب لا امتيازات القاعدة.
    لا يُضاف بند موجود مسبقاً، فالضغط مرتين لا يكرّر شيئاً. */
-const SEEDED: SectionKey[] = ["natstrat", "inststrat", "projects"];
+/* «تحميل البيانات الأولية» أُزيل من الأعمال الرئيسية بطلب صاحبة
+   المنصة: بياناتها دخلت مرّة، فبقاء الزرّ بابٌ لإعادة تحميلها فوق
+   ما حُرّر. ويبقى في «المشاريع الاستراتيجية» وحدها. */
+const SEEDED: SectionKey[] = ["projects"];
 
 function SeedBtn({
   section, have, t, onDone,
@@ -651,6 +654,11 @@ function Bar({ v }: { v: number }) {
   );
 }
 
+/* الأعمال الرئيسية صفحاتٌ موحّدة: شريطٌ واحد في صدره «إضافة»،
+   وفي آخره صندوقا الإكسل ثم ⚙️ — والصفحة تستقبلهما وتضعهما في
+   شريطها، فلا يبقى شريطان فوق بعض */
+type SecPageProps = { t: T; canEdit?: boolean; add?: ReactNode; gear?: ReactNode };
+
 function Toolbar({
   q,
   setQ,
@@ -659,6 +667,8 @@ function Toolbar({
   options,
   onExport,
   upload,
+  add,
+  gear,
   allLabel,
   t,
 }: {
@@ -672,12 +682,17 @@ function Toolbar({
   /** زرّ رفع الملف — يقف بجانب زرّ التنزيل لا في سطرٍ فوقه،
       فالعملان على الملف نفسه وموضعهما واحد */
   upload?: ReactNode;
+  /** زرّ «إضافة» — في صدر الشريط */
+  add?: ReactNode;
+  /** ⚙️ إعدادات القسم — في آخره مع صندوقَي الإكسل */
+  gear?: ReactNode;
   /** نص الخيار الأول — «كل الحالات» ما لم يُمرَّر غيره */
   allLabel?: string;
   t: T;
 }) {
   return (
     <div className="sx-tb">
+      {add}
       <input
         className="sx-search"
         value={q}
@@ -696,12 +711,16 @@ function Toolbar({
           );
         })}
       </select>
+      {/* الفراغ يدفع الإكسل والإعدادات إلى آخر الشريط — أي إلى
+          يساره في صفحةٍ عربية */}
+      <span className="gr" />
       {/* صندوق الإكسل واحدٌ في المنصة كلها: أخضر مصمت وسهمٌ يقول
           أهو تنزيلٌ أم رفع — وكان هذا شفّافاً وذاك مصمتاً */}
       <button className="btn btn-sm" onClick={onExport}>
-        <IconDown size={15} /> {t("تنزيل إكسل", "Download Excel")}
+        <IconDown size={15} /> {t("تصدير إكسل", "Export Excel")}
       </button>
       {upload}
+      {gear}
     </div>
   );
 }
@@ -1171,7 +1190,7 @@ function SessImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => v
   );
 }
 
-function SessionsPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
+function SessionsPage({ t, canEdit, add, gear }: SecPageProps) {
   const { items, loaded, save, reload } = useItems("sessions");
   const [q, setQ] = useState("");
   /* فلتر واحد يجمع الحالة والمرحلة والتصعيد — بدل المربعات فوق */
@@ -1243,11 +1262,14 @@ function SessionsPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
   if (!items.length)
     return (
       <>
-        {canEdit && (
-          <div className="sx-tools">
-            <SessImport items={items} t={t} onDone={() => void reload()} />
-          </div>
-        )}
+        {/* الشريط يبقى في الصفحة الفارغة: منه تُضاف أول جهة ويُرفع
+            أول ملف، فلو أُخفي تعذّر البدء */}
+        <div className="sx-tb">
+          {add}
+          <span className="gr" />
+          {canEdit && <SessImport items={items} t={t} onDone={() => void reload()} />}
+          {gear}
+        </div>
         <Empty
           title={t("لا توجد جلسات بعد", "No sessions yet")}
           note={t("رفعُ ملف البيانات، أو إضافة الجهات من زر «إضافة».", "Upload the data file or add entities.")}
@@ -1266,6 +1288,8 @@ function SessionsPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
         allLabel={t("الكل", "All")}
         onExport={exportXl}
         upload={canEdit ? <SessImport items={items} t={t} onDone={() => void reload()} /> : null}
+        add={add}
+        gear={gear}
         t={t}
       />
 
@@ -1711,7 +1735,7 @@ function NatImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => vo
   );
 }
 
-function NationalPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
+function NationalPage({ t, canEdit, add, gear }: SecPageProps) {
   const { items, loaded, save, reload, undo, undoTop, dismissUndo } = useItems("natstrat");
   const [q, setQ] = useState("");
   /* التبويب المختار — حالة الاعتماد */
@@ -1751,6 +1775,8 @@ function NationalPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
       <Toolbar
         q={q} setQ={setQ} filter="" setFilter={() => {}} options={[]} onExport={exportXl}
         upload={canEdit ? <NatImport items={items} t={t} onDone={() => void reload()} /> : null}
+        add={add}
+        gear={gear}
         t={t}
       />
 
@@ -2435,7 +2461,7 @@ function InstEntity({ it, t, onEdit }: { it: Item; t: T; onEdit?: () => void }) 
   );
 }
 
-function InstPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
+function InstPage({ t, canEdit, add, gear }: SecPageProps) {
   const { items, loaded, save, remove, reload, undo, undoTop, dismissUndo } = useItems("inststrat");
   const [q, setQ] = useState("");
   const [f, setF] = useState("");
@@ -2480,7 +2506,8 @@ function InstPage({ t, canEdit }: { t: T; canEdit?: boolean }) {
 
   return (
     <>
-      <Toolbar q={q} setQ={setQ} filter={f} setFilter={setF} options={INST_SECTORS} onExport={exportXl} t={t} />
+      <Toolbar q={q} setQ={setQ} filter={f} setFilter={setF} options={INST_SECTORS}
+               onExport={exportXl} add={add} gear={gear} t={t} />
 
       <div className="iw-bar">
         <span className="iw-tog">
@@ -2950,7 +2977,7 @@ function CxImport({ t, onDone }: { t: T; onDone: () => void }) {
   );
 }
 
-export function CxPage({ t, canEdit }: { t: T; canEdit: boolean }) {
+export function CxPage({ t, canEdit, add, gear }: SecPageProps) {
   const { items, loaded, save, remove, reload, undo, undoTop, dismissUndo } = useItems("cx");
   const [q, setQ] = useState("");
   const [f, setF] = useState("");
@@ -3141,6 +3168,8 @@ export function CxPage({ t, canEdit }: { t: T; canEdit: boolean }) {
                 </>
               ) : null
             }
+            add={add}
+            gear={gear}
             t={t}
           />
 
@@ -3407,6 +3436,7 @@ export function SectionPage({
       section={section}
       title={t(SECTION_TITLE[section][0], SECTION_TITLE[section][1])}
       meId={meId || ""}
+      rows={items}
       onClose={() => setGear(false)}
       t={t}
     />
@@ -3417,10 +3447,24 @@ export function SectionPage({
     <CycleBar section={section} rows={items} canEdit={canEdit} t={t} />
   ) : null;
 
+  /* الزرّان يُمرَّران إلى شريط الصفحة نفسه، فلا يبقى شريطان فوق
+     بعض: «إضافة» في صدره و⚙️ في آخره مع صندوقَي الإكسل */
+  const addBtn = canEdit ? (
+    <button className="btn btn-sm" onClick={() => setEditing("new")}>
+      ＋ {t("إضافة", "Add")}
+    </button>
+  ) : null;
+
   if (section === "outputs")
     return (
       <div>
-        {gearBtn && <div className="sx-tools">{gearBtn}</div>}
+        {(addBtn || gearBtn) && (
+          <div className="sx-tb">
+            {addBtn}
+            <span className="gr" />
+            {gearBtn}
+          </div>
+        )}
         {cycleBar}
         <Outputs t={t} />
         {gearModal}
@@ -3429,27 +3473,22 @@ export function SectionPage({
 
   return (
     <div key={nonce}>
-      {canEdit && (
+      {section === "projects" && canEdit && (
         <div className="sx-tools">
           <button className="btn btn-sm" onClick={() => setEditing("new")}>
             {t("إضافة", "Add")}
           </button>
           {SEEDED.includes(section) && (
-            <SeedBtn
-              section={section}
-              have={have}
-              t={t}
-              onDone={() => setNonce((n) => n + 1)}
-            />
+            <SeedBtn section={section} have={have} t={t} onDone={() => setNonce((n) => n + 1)} />
           )}
           {gearBtn}
         </div>
       )}
       {cycleBar}
-      {section === "sessions" && <SessionsPage t={t} canEdit={canEdit} />}
-      {section === "natstrat" && <NationalPage t={t} canEdit={canEdit} />}
-      {section === "inststrat" && <InstPage t={t} canEdit={canEdit} />}
-      {section === "cx" && <CxPage t={t} canEdit={canEdit} />}
+      {section === "sessions" && <SessionsPage t={t} canEdit={canEdit} add={addBtn} gear={gearBtn} />}
+      {section === "natstrat" && <NationalPage t={t} canEdit={canEdit} add={addBtn} gear={gearBtn} />}
+      {section === "inststrat" && <InstPage t={t} canEdit={canEdit} add={addBtn} gear={gearBtn} />}
+      {section === "cx" && <CxPage t={t} canEdit={canEdit} add={addBtn} gear={gearBtn} />}
       {section === "projects" && <Projects t={t} canEdit={canEdit} />}
 
 
