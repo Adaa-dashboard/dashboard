@@ -12749,13 +12749,17 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
 /* البطاقتان بقدر محتواهما عرضاً وطولاً: `1fr` كانت تمدّ بطاقة
    المعايير على ما بقي من الشاشة مهما اتّسعت، فتصير شريطاً عريضاً
    بأربعة أسطر. صارت بعرضٍ محدود والباقي فراغ — بطلب صاحبة المنصة */
+/* **بطاقتان متساويتان تملآن العرض**: كان عمود الدائرة 300px ثابتاً
+   والمعايير بعرضٍ محدود، فيبقى على اليسار فراغٌ واسع. صارتا
+   نصفين متساويين — بطلب صاحبة المنصة. ومحتوى بطاقة المعايير
+   موسَّطٌ رأسياً فلا يتكدّس أعلاها ويبقى تحته فراغ. */
 .nq-top {
   display: grid;
-  grid-template-columns: 300px minmax(0, 480px);
-  justify-content: start;
+  grid-template-columns: 1fr 1fr;
   gap: 14px;
-  align-items: start;
+  align-items: stretch;
 }
+.nq-bars-box { display: flex; flex-direction: column; justify-content: center; }
 @media (max-width: 900px) { .nq-top { grid-template-columns: 1fr; } }
 .nq-ring-box,
 .nq-bars-box {
