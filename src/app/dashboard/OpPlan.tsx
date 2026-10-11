@@ -1236,42 +1236,52 @@ export function OpPlanCard({ t }: { t: T }) {
   if (!loaded || !rows.length) return null;
 
   const of = (k: string) => rows.filter((d) => txt(d.kind) === k);
-  const kpis = of("kpi");
-  const good = kpis.filter((d) => onTrack(d) === true).length;
-  const bad = kpis.filter((d) => onTrack(d) === false).length;
-  const stOf = (k: string, s: string) => of(k).filter((d) => opStatus(d) === s).length;
   const perOwner = OP_OWNERS.map((o) => ({ o, n: rows.filter((d) => txt(d.owner) === o).length }));
 
   return (
     /* العنوان و«المزيد من التفاصيل» في رأس القسم بنظرة عامة — كبقيّة
-       الأقسام. فلا ترويسةَ داخل البطاقة ولا ضغطةَ على كامِلها. */
+       الأقسام. فلا ترويسةَ داخل البطاقة ولا ضغطةَ على كامِلها.
+
+       والبطاقات الثلاث **هي بطاقات صفحة الخطة نفسها** شكلاً ورمزاً
+       ولوناً — بطلب صاحبة المنصة — ويفترقان في ترتيب الداخل:
+       هنا الحلقة أولاً والعدد في قلبها، والحالات تحتها سطراً
+       أفقياً؛ وهناك العدد فوق والحالات عموداً بجانب الحلقة. */
     <div className="op-card">
-      <div className="n3">
-        <div className="k" style={{ ["--c" as string]: KIND_COLOR.kpi }}>
-          <b>{kpis.length}</b>
-          <span>{t("مؤشراً", "KPIs")}</span>
-          <em>{t(`${good} على المسار · ${bad} دون المستهدف`, `${good} on track`)}</em>
-        </div>
-        <div className="k" style={{ ["--c" as string]: KIND_COLOR.init }}>
-          <b>{of("init").length}</b>
-          <span>{t("مبادرة", "Initiatives")}</span>
-          <em>
-            {t(
-              `${stOf("init", "مكتملة")} مكتملة · ${stOf("init", "على المسار")} على المسار · ${stOf("init", "متأخرة")} متأخرة`,
-              `${stOf("init", "مكتملة")} done`,
-            )}
-          </em>
-        </div>
-        <div className="k" style={{ ["--c" as string]: KIND_COLOR.win }}>
-          <b>{of("win").length}</b>
-          <span>{t("مكاسب سريعة", "Quick wins")}</span>
-          <em>
-            {t(
-              `${stOf("win", "مكتملة")} مكتملة · ${stOf("win", "على المسار")} على المسار · ${stOf("win", "متأخرة")} متأخرة`,
-              `${stOf("win", "مكتملة")} done`,
-            )}
-          </em>
-        </div>
+      <div className="opk-3 opk-ov">
+        {KINDS.map((k) => {
+          const Ic = KIND_ICON[k];
+          const rs = of(k);
+          const sts = statusesOf(k);
+          const sc = (x: string) => rs.filter((d) => stOf(d) === x).length;
+          return (
+            <div className="opk v" key={k} style={{ ["--c" as string]: KIND_COLOR[k] }}>
+              <span className="h">
+                <span className="t">{t(KIND_LABEL[k][0], KIND_LABEL[k][1])}</span>
+                <span className="ic"><Ic size={20} /></span>
+              </span>
+              <span className="dw">
+                <Donut
+                  size={132}
+                  w={14}
+                  parts={sts.map((x) => ({ v: sc(x), c: ST_COLOR[x] }))}
+                  mid={String(rs.length)}
+                  /* كلمةٌ واحدة تحت الرقم لا اسم البطاقة: الاسم
+                     في رأسها فوقُ، وتكراره في قلب الحلقة حشو */
+                  sub={t("بنداً", "items")}
+                />
+              </span>
+              <span className="lg row">
+                {sts.map((x) => (
+                  <span key={x}>
+                    <i style={{ background: ST_COLOR[x] }} />
+                    <b>{sc(x)}</b>
+                    <em>{x}</em>
+                  </span>
+                ))}
+              </span>
+            </div>
+          );
+        })}
       </div>
       <div className="pp">
         {perOwner.map(({ o, n }) => (
