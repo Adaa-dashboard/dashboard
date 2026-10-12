@@ -530,9 +530,10 @@ export default function Changes({
         </div>
       )}
 
-      {/* شريط الأدوات في صدر الصفحة — ولا يظهر في «نظرة عامة»:
-          الرفع والنسخ والتصدير عملُ الصفحة لا الموجز */}
-      {page && (
+      {/* الشريط في الموضعين: **الشرائح الثلاث تظهر في «نظرة عامة»**
+          أيضاً — بطلب صاحبة المنصة، فهي تقول حالة الطلبات بلمحة
+          وتفلتر الجدول تحتها. والرفع والنسخ والتصدير عملُ الصفحة
+          لا الموجز، فتبقى محجوبة عنه. */}
       <div className="cr-bar">
         <span className="pills">
           {CHIPS.map((c) => (
@@ -549,33 +550,36 @@ export default function Changes({
           ))}
         </span>
         <div style={{ flex: 1 }} />
-        {canEdit && (
-          <button className="btn btn-ghost btn-sm" onClick={() => setPasting(true)}>
-            {t("لصق الجدول", "Paste")}
-          </button>
-        )}
-        <button className="btn btn-ghost btn-sm" onClick={copyTable} disabled={!shown.length}>
-          {t("نسخ الجدول", "Copy")}
-        </button>
-        <button className="btn btn-ghost btn-sm" onClick={exportCsv} disabled={!shown.length}>
-          ⬇ Excel
-        </button>
-        {canEdit && (
+        {page && (
           <>
-            <button className="btn btn-sm" onClick={() => fileRef.current?.click()} disabled={busy}>
-              {busy ? t("جارٍ الحفظ…", "Saving…") : t("⬆ رفع ملف المنصة", "Upload file")}
+            {canEdit && (
+              <button className="btn btn-ghost btn-sm" onClick={() => setPasting(true)}>
+                {t("لصق الجدول", "Paste")}
+              </button>
+            )}
+            <button className="btn btn-ghost btn-sm" onClick={copyTable} disabled={!shown.length}>
+              {t("نسخ الجدول", "Copy")}
             </button>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".xlsx,.xls,.csv,.txt"
-              style={{ display: "none" }}
-              onChange={onFile}
-            />
+            <button className="btn btn-ghost btn-sm" onClick={exportCsv} disabled={!shown.length}>
+              ⬇ Excel
+            </button>
+            {canEdit && (
+              <>
+                <button className="btn btn-sm" onClick={() => fileRef.current?.click()} disabled={busy}>
+                  {busy ? t("جارٍ الحفظ…", "Saving…") : t("⬆ رفع ملف المنصة", "Upload file")}
+                </button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".xlsx,.xls,.csv,.txt"
+                  style={{ display: "none" }}
+                  onChange={onFile}
+                />
+              </>
+            )}
           </>
         )}
       </div>
-      )}
 
       {tops.length > 0 && (
         <div className="card cr-top">
