@@ -2830,20 +2830,24 @@ table.matrix thead th {
   justify-content: space-between;
   gap: 26px;
 }
+/* الأسطورة تملأ ما بقي من عرض البطاقة، فينزاح عمود الأعداد إلى
+   طرفها الأيسر — أي إلى جوار الحلقة — بدل أن يلتصق بالأسماء */
 .sx-box .wk-lg {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
 }
 .sx-box .wk-lg > div {
   font-size: 11.5px;
   line-height: 2.15;
 }
 .sx-box .wk-lg u {
-  /* فجوةٌ أوسع بين اسم المرحلة وعددها، فينزاح العدد يساراً قليلاً */
-  padding-inline-start: 30px;
+  /* أدنى فجوة بين الاسم وعدده — وما زاد يصنعه امتداد الأسطورة */
+  padding-inline-start: 24px;
 }
-/* الحلقة لا تلتصق بحافة البطاقة اليسرى — تنزاح يميناً قليلاً */
+/* الحلقة لا تلتصق بحافة البطاقة اليسرى — تنزاح يميناً، ويبقى
+   البياض في أقصى اليسار. وموضعها من الحافة واحدٌ في البطاقات
+   الأربع فتقف على خطٍّ واحد */
 .sx-box .wk-dw .wk-dn {
-  margin-inline-end: 30px;
+  margin-inline-end: 42px;
 }
 .sx-box .wk-lg i {
   width: 9px;
