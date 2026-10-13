@@ -105,40 +105,41 @@ function DomCard({ d, support }: { d: Dom; support?: string }) {
         </div>
       )}
 
-      {d.support && d.support.length > 0 && (
-        /* المتأخر لا يُترك رقماً: يُقابله ما يلزم لرفعه */
-        <div className="wk-sup">
-          <div className="wk-suph">
-            <PIcon id="alert" size={15} />
-            <b>الدعم المطلوب</b>
-          </div>
-          {support ? (
-            <p>{support}</p>
-          ) : (
-            <ul className="wk-lst">
-              {d.support.slice(0, 4).map((l) => (
-                <li key={l.name}>
-                  {l.name}
-                  {l.detail ? <u> — {l.detail}</u> : null}
-                </li>
-              ))}
-              {d.support.length > 4 && <li className="more">{`و${d.support.length - 4} غيرها`}</li>}
-            </ul>
-          )}
+      {d.donut && (
+        <div className="wk-dw">
+          <DonutLegend slices={d.donut.slices} />
+          <DonutRing slices={d.donut.slices} total={d.donut.total} unit={d.donut.unit} />
         </div>
+      )}
+
+      {d.rows && d.rows.length > 0 && (
+        /* جدولٌ بسيط: التكليف وحالته وما يحتاجه — العناوين فوق
+           والتحديث تحتها */
+        <table className="wk-tb">
+          <thead>
+            <tr>
+              <th>التكليف</th>
+              <th>الحالة</th>
+              <th>الدعم المطلوب</th>
+            </tr>
+          </thead>
+          <tbody>
+            {d.rows.slice(0, 6).map((r) => (
+              <tr key={r.name}>
+                <td>{r.name}</td>
+                <td className={r.tone}>{r.state}</td>
+                {/* الدعم يُكتب في الإعدادات، ويخصّ المتأخر وحده */}
+                <td className="sup">{r.tone === "warn" ? support || "—" : "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
 
       {d.big && (
         <div className="wk-big">
           <b>{d.big.n}</b>
           <span>{d.big.label}</span>
-        </div>
-      )}
-
-      {d.donut && (
-        <div className="wk-dw">
-          <DonutLegend slices={d.donut.slices} />
-          <DonutRing slices={d.donut.slices} total={d.donut.total} unit={d.donut.unit} />
         </div>
       )}
 

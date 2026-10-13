@@ -74,11 +74,14 @@ export type Bar = { name: string; pct: number; plan: number; late: boolean };
 export type Stat = { n: number; label: string; tone: "ok" | "warn" | "mute"; icon?: string };
 export type Line = { name: string; detail?: string };
 
+/** صفٌّ في جدول التكليفات: التكليف وحالته وما يحتاجه */
+export type Row = { name: string; state: string; tone: "ok" | "warn" | "mute" };
+
 export type Dom = {
   k: string;
   title: string;
-  /** يظهر في بطاقة التكليفات حين يوجد متأخر: ما يحتاج تدخّلاً */
-  support?: Line[];
+  /** جدول التكليفات — ما تحرّك منها هذا الأسبوع وما تأخّر */
+  rows?: Row[];
   /** عدد ما تغيّر في هذا المجال خلال الأسبوع */
   updates: number;
   big?: { n: number; label: string };
@@ -216,15 +219,27 @@ function taskDom(tasks: TaskLite[], a: string, b: string, upd: number): Dom | nu
   });
   if (!rows.length) return null;
   const updates = done.length + fresh.length + upd;
-  /* المتأخر يحتاج تدخّلاً، فيُسمّى صراحةً مع مدّة تأخّره */
+
+  /* جدول التكليفات: ما اكتمل أو ورد هذا الأسبوع، وما تأخّر —
+     بلا تكرارٍ إن كان التكليف جديداً ومتأخراً معاً */
   const today = day(new Date().toISOString());
-  const support: Line[] = late
-    .map((x) => {
-      const d = day(txt(x.dueDate));
-      const n = Math.round((new Date(today).getTime() - new Date(d).getTime()) / 86400000);
-      return { name: txt(x.title), detail: n > 0 ? `متأخر ${arDays(n)}` : "" };
-    })
-    .filter((l) => !!l.name);
+  const lateDays = (x: TaskLite) => {
+    const d = day(txt(x.dueDate));
+    if (!d) return 0;
+    return Math.round((new Date(today).getTime() - new Date(d).getTime()) / 86400000);
+  };
+  const seen = new Set<string>();
+  const tbl: Row[] = [];
+  const push = (x: TaskLite, state: string, tone: "ok" | "warn" | "mute") => {
+    const nm = txt(x.title);
+    const key = txt(x.id) || nm;
+    if (!nm || seen.has(key)) return;
+    seen.add(key);
+    tbl.push({ name: nm, state, tone });
+  };
+  for (const x of late) push(x, `متأخر ${arDays(lateDays(x))}`, "warn");
+  for (const x of done) push(x, "مكتمل", "ok");
+  for (const x of fresh) push(x, "جديد", "mute");
   return {
     k: "task",
     ...DOM_META.task,
@@ -236,8 +251,7 @@ function taskDom(tasks: TaskLite[], a: string, b: string, upd: number): Dom | nu
       { n: done.length, label: "مكتمل", tone: "ok", icon: "check" },
       { n: late.length, label: "متأخر", tone: "warn", icon: "clock" },
     ],
-    lines: done.map((x) => ({ name: txt(x.title) })),
-    support: support.length ? support : undefined,
+    rows: tbl.length ? tbl : undefined,
   };
 }
 
