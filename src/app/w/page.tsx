@@ -22,13 +22,24 @@ function Shared() {
   /* `gone` رمزٌ منتهٍ أو مُلغى · `err` الدالة نفسها أخطأت — التفريق
      بينهما ضروري: الأول شأن المستلِم، والثاني خللٌ يُبلَّغ عنه */
   const [state, setState] = useState<"loading" | "gone" | "err" | "ready">("loading");
+  /* نصّ الخطأ كما جاء من الخادم — يُعرض صغيراً لتُنقل المشكلة كما هي
+     بدل وصفها بالكلام */
+  const [why, setWhy] = useState("");
 
   useEffect(() => {
     (async () => {
       if (!token) return setState("gone");
-      await ensureAnon();
+      try {
+        await ensureAnon();
+      } catch (e) {
+        setWhy(`الدخول المجهول: ${(e as Error)?.message || e}`);
+        return setState("err");
+      }
       const { data, error } = await sb().rpc("perf_shared_report", { p_token: token });
-      if (error) return setState("err");
+      if (error) {
+        setWhy(error.message || "خطأ غير معروف");
+        return setState("err");
+      }
       if (!data) return setState("gone");
 
       const weekStart = String(data.weekStart);
@@ -108,6 +119,7 @@ function Shared() {
             ? "الرابط سليم، لكن تعذّر تجهيز التقرير الآن. أبلغ إدارة عمليات الأداء وستُعيد المحاولة."
             : "انتهت صلاحية هذا الرابط أو أُلغي. اطلب رابطًا جديدًا من إدارة عمليات الأداء."}
         </span>
+        {state === "err" && why && <code className="wk-why">{why}</code>}
       </div>
     );
   }

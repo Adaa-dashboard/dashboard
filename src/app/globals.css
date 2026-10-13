@@ -2315,6 +2315,18 @@ table.matrix thead th {
   font-size: 16px;
   color: var(--gt-900);
 }
+.wk-why {
+  font-size: 10.5px;
+  color: var(--muted);
+  background: var(--soft2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  max-width: 420px;
+  direction: ltr;
+  text-align: center;
+  word-break: break-word;
+}
 .wk-gone span {
   font-size: 13px;
   color: var(--ink-2);
