@@ -14,7 +14,12 @@
 --  يُفتح بما تيسّر بدل أن يسقط كلُّه.
 -- ============================================================
 
-create or replace function public.perf_shared_report(p_token text)
+--  وتُحذف الدالة أولاً: `create or replace` يرفض تغيير اسم
+--  الوسيط إن كان مختلفاً في النسخة المنصّبة، فيبقى القديم عاملاً
+--  ويظن المشغّل أن الإصلاح تمّ.
+drop function if exists public.perf_shared_report(text);
+
+create function public.perf_shared_report(p_token text)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare
   s     record;
