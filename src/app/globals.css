@@ -2838,7 +2838,12 @@ table.matrix thead th {
   line-height: 2.15;
 }
 .sx-box .wk-lg u {
-  padding-inline-start: 16px;
+  /* فجوةٌ أوسع بين اسم المرحلة وعددها، فينزاح العدد يساراً قليلاً */
+  padding-inline-start: 30px;
+}
+/* الحلقة لا تلتصق بحافة البطاقة اليسرى — تنزاح يميناً قليلاً */
+.sx-box .wk-dw .wk-dn {
+  margin-inline-end: 30px;
 }
 .sx-box .wk-lg i {
   width: 9px;
