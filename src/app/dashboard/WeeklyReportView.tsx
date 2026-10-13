@@ -67,16 +67,18 @@ export default function WeeklyReportView({
 
   return (
     <div className={`wkx ${dir === "h" ? "wkx-h" : "wkx-v"} ${band ? "has-band" : ""}`}>
-      <div className="wkx-top">
-        {band && (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            className="wkx-bg"
-            src={asset(dir === "h" ? "/wk-cover-h.jpg" : "/wk-cover-v.jpg")}
-            alt=""
-            aria-hidden
-          />
-        )}
+      {band && (
+        /* الخلفية تملأ الورقة كلها لا شريطاً منها — المحتوى يعلوها
+           في جهة البياض، فتبدو الصفحة كما صُمِّمت */
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          className="wkx-bg"
+          src={asset(dir === "h" ? "/wk-cover-h.jpg" : "/wk-cover-v.jpg")}
+          alt=""
+          aria-hidden
+        />
+      )}
+      <div className="wkx-in">
         <header className="wkx-head">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={asset("/adaa-logo.png")} alt="أداء" className="wkx-logo" />
@@ -89,7 +91,6 @@ export default function WeeklyReportView({
             </span>
           </div>
         </header>
-      </div>
 
       <div className="wkx-sum">
         <b>{r.total}</b>
@@ -144,10 +145,11 @@ export default function WeeklyReportView({
         </section>
       )}
 
-      <footer className="wkx-foot">
-        <span>مركز أداء · {dept}</span>
-        <span>{arCount(r.total, "منجز")}</span>
-      </footer>
+        <footer className="wkx-foot">
+          <span>مركز أداء · {dept}</span>
+          <span>{arCount(r.total, "منجز")}</span>
+        </footer>
+      </div>
     </div>
   );
 }

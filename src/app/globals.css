@@ -2323,10 +2323,11 @@ table.matrix thead th {
 }
 
 /* ===== تقرير المنجزات (.wkx) =====
-   صفحةٌ واحدة: شريط خلفية الهوية، ترويسة، مجموع المنجزات،
-   ثم بطاقةٌ لكل نوع منجز تحتها أسماء بنوده.
-   العرض محدودٌ بعرض الورقة فيبدو على الشاشة كما يُطبع. */
+   ورقةٌ واحدة بخلفية الهوية كاملةً — الصورة تملأ الورقة خلف
+   المحتوى لا شريطاً أعلاها، والمحتوى يبتعد عن شريط المدينة في
+   الحافة. العرض محدودٌ بنسبة A4 فيبدو على الشاشة كما يُطبع. */
 .wkx {
+  position: relative;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 16px;
@@ -2338,12 +2339,9 @@ table.matrix thead th {
 .wkx-h {
   max-width: 1200px;
 }
-
-/* الترويسة فوق خلفية الهوية — صورةُ الغلاف تُقتطع شريطاً أعلى
-   التقرير، والنصّ على جهة البياض منها لا على المدينة */
-.wkx-top {
-  position: relative;
-  background: var(--panel);
+.wkx.has-band {
+  border-color: transparent;
+  box-shadow: var(--glow);
 }
 .wkx-bg {
   position: absolute;
@@ -2351,31 +2349,38 @@ table.matrix thead th {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center 28%;
+  /* الحافة المزخرفة ثابتة مهما طال التقرير، والاقتطاع من الجهة
+     الفارغة — فالمدينة لا تُقصّ */
+  object-position: left top;
   display: block;
+  z-index: 0;
 }
-.wkx-head {
+.wkx-in {
   position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: inherit;
+}
+.has-band .wkx-in {
+  /* المحتوى في جهة البياض من التصميم */
+  padding-inline-end: 23%;
+}
+.wkx-h.has-band .wkx-in {
+  padding-inline-end: 20%;
+}
+
+.wkx-head {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 10px;
-  padding: 20px 26px 22px;
+  gap: 9px;
+  padding: 22px 26px 16px;
   border-bottom: 1px solid var(--border);
 }
 .has-band .wkx-head {
-  min-height: 178px;
-  justify-content: space-between;
   border-bottom: none;
-  /* النص بعيدٌ عن شريط المدينة في الجهة المقابلة */
-  padding-inline-end: 34%;
-}
-.wkx-h .wkx-bg {
-  object-position: center 22%;
-}
-.wkx-h.has-band .wkx-head {
-  min-height: 150px;
-  padding-inline-end: 26%;
+  padding-block-start: 26px;
 }
 .wkx-ht {
   display: flex;
@@ -2385,7 +2390,7 @@ table.matrix thead th {
 .wkx-ht h2 {
   margin: 0;
   font-family: "Noto Kufi Arabic", sans-serif;
-  font-size: 19px;
+  font-size: 20px;
   color: var(--gt-900);
 }
 .wkx-dept {
@@ -2398,7 +2403,7 @@ table.matrix thead th {
   color: var(--ink-2);
 }
 .wkx-logo {
-  height: 42px;
+  height: 44px;
   width: auto;
 }
 
@@ -2407,9 +2412,15 @@ table.matrix thead th {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  padding: 16px 24px;
+  margin: 0 26px 4px;
+  padding: 13px 18px;
+  border-radius: 12px;
   background: var(--g-50);
-  border-bottom: 1px solid var(--border);
+  border: 1px solid var(--border);
+}
+.has-band .wkx-sum {
+  background: rgba(255, 255, 255, 0.62);
+  border-color: rgba(255, 255, 255, 0.9);
 }
 .wkx-sum b {
   font-family: "Noto Kufi Arabic", sans-serif;
@@ -2440,7 +2451,7 @@ table.matrix thead th {
   align-items: start;
   grid-template-columns: repeat(auto-fill, minmax(238px, 1fr));
   gap: 12px;
-  padding: 18px 24px;
+  padding: 14px 26px 18px;
 }
 .wkx-h .wkx-grid {
   grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
@@ -2450,6 +2461,12 @@ table.matrix thead th {
   border-radius: 14px;
   padding: 13px 14px;
   background: var(--soft);
+}
+.has-band .wkx-k {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(255, 255, 255, 0.95);
+}
+.wkx-k {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -2513,7 +2530,7 @@ table.matrix thead th {
 
 /* الأقسام المكتوبة يدويًا */
 .wkx-sec {
-  padding: 0 24px 16px;
+  padding: 0 26px 16px;
   break-inside: avoid;
 }
 .wkx-sec h3 {
@@ -2540,7 +2557,7 @@ table.matrix thead th {
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  padding: 13px 24px;
+  padding: 13px 26px;
   border-top: 1px solid var(--border);
   font-size: 11.5px;
   color: var(--muted);
@@ -2748,10 +2765,10 @@ table.matrix thead th {
 }
 
 @media screen and (max-width: 760px) {
-  .has-band .wkx-head,
-  .wkx-h.has-band .wkx-head {
-    padding-inline-end: 26px;
-    background: linear-gradient(90deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.5));
+  .has-band .wkx-in,
+  .wkx-h.has-band .wkx-in {
+    padding-inline-end: 0;
+    background: rgba(255, 255, 255, 0.82);
   }
   .wkx-grid,
   .wkx-h .wkx-grid {
@@ -2799,6 +2816,17 @@ table.matrix thead th {
     border: none;
     border-radius: 0;
     max-width: none;
+  }
+  /* الورقة المطبوعة صفحةٌ كاملة ولو قلّ المحتوى، وإلا انقطعت
+     الخلفية في منتصفها. عائمٌ بلا عرض داخل سياق تنسيقٍ مغلق */
+  .wkx.has-band::before {
+    content: "";
+    float: inline-start;
+    width: 0;
+    padding-block-start: 138%;
+  }
+  .wkx-h.has-band::before {
+    padding-block-start: 68%;
   }
   /* الورقة أضيق من الشاشة، فلولا هذا لانهارت البطاقات عموداً واحداً */
   .wkx-grid {
