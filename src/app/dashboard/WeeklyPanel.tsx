@@ -21,81 +21,6 @@ type ShareRow = {
   lastView: string | null;
 };
 
-/* ============================================================
-   تصدير PDF — من **نافذةٍ مستقلة فيها ورقة التقرير وحدها**.
-   `window.print()` على الصفحة كما هي كانت تُعلّق المتصفح: فهو
-   يُعيد تخطيط اللوحة كلها (الشريط والأقسام وجداولها) على مقاس
-   الورق قبل أن يفتح نافذة الطباعة، وذلك تخطيطٌ ثقيل بلا طائل
-   لأن كل ذلك مخفيٌّ في الطباعة أصلاً.
-   فننسخ ورقة `.wkx` وأوراق الأنماط نفسها إلى نافذةٍ جديدة
-   ونطبعها — فلا يُخطَّط إلا ما يُطبع.
-   ============================================================ */
-function printReport() {
-  const sheet = document.querySelector(".wkx");
-  if (!sheet) return window.print();
-  const w = window.open("", "_blank", "width=1100,height=800");
-  /* منعت النوافذ المنبثقة ⇒ الطريقة القديمة خيرٌ من لا شيء */
-  if (!w) return window.print();
-
-  /* الأنماط **تُلصق نصّاً** لا تُستدعى بروابط: النافذة مكتوبة
-     بـ`document.write`، وانتظار تحميل روابطها فيها غير موثوق —
-     كانت معاينة الطباعة تقف على «Loading preview…» لأن الطباعة
-     تبدأ وورقة الأنماط لم تصل بعد. وما تعذّرت قراءته (خطوطٌ من
-     نطاقٍ آخر) يُنسخ رابطاً كما هو */
-  const css: string[] = [];
-  const links: string[] = [];
-  for (const node of Array.from(
-    document.querySelectorAll<HTMLStyleElement | HTMLLinkElement>('style, link[rel="stylesheet"]'),
-  )) {
-    const ss = node.sheet as CSSStyleSheet | null;
-    let text = "";
-    try {
-      text = ss ? Array.from(ss.cssRules).map((r) => r.cssText).join("\n") : "";
-    } catch {
-      text = ""; /* ورقةٌ من نطاقٍ آخر — لا تُقرأ */
-    }
-    if (text) css.push(text);
-    else if (node instanceof HTMLLinkElement) links.push(node.outerHTML);
-    else css.push(node.textContent || "");
-  }
-
-  w.document.open();
-  w.document.write(
-    '<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8">' +
-      `<base href="${document.baseURI}"><title>الإنجاز الأسبوعي</title>` +
-      links.join("") +
-      `<style>${css.join("\n")}</style>` +
-      '</head><body class="wk-printing">' +
-      sheet.outerHTML +
-      "</body></html>",
-  );
-  w.document.close();
-
-  const go = async () => {
-    /* الصور ثم الخطوط قبل الطباعة — وإلا خرجت الورقة بلا خلفية
-       أو بخطٍّ بديل، أو وقفت المعاينة تنتظرها */
-    try {
-      await Promise.all(
-        Array.from(w.document.images).map((im) =>
-          im.complete
-            ? null
-            : new Promise((done) => {
-                im.onload = im.onerror = () => done(null);
-              }),
-        ),
-      );
-      await (w.document as Document & { fonts?: FontFaceSet }).fonts?.ready;
-    } catch {
-      /* متصفحٌ قديم — نمضي */
-    }
-    w.focus();
-    w.print();
-  };
-  /* لا نعتمد على حدث `load`: في نافذةٍ مكتوبة قد يكون وقع قبل أن
-     نستمع إليه، فتبقى الطباعة معلّقة بلا سبب ظاهر */
-  setTimeout(go, 120);
-  w.addEventListener("afterprint", () => w.close());
-}
 
 /* ============================================================
    تنزيل PDF بلا نظام الطباعة — بعض الأجهزة تقف معاينة الطباعة
@@ -104,51 +29,29 @@ function printReport() {
    فنرسم الورقة بأنفسنا إلى صورة ثم نقطّعها صفحاتِ A4 في ملف PDF
    يُنزَّل مباشرة. المكتبتان تُحمَّلان عند الضغط لا مع الصفحة.
    ============================================================ */
-async function makePdf(week: string, landscape: boolean) {
+async function makePdf(week: string) {
   const el = document.querySelector(".wkx") as HTMLElement | null;
   if (!el) return;
   const [h2c, jsp] = await Promise.all([import("html2canvas-pro"), import("jspdf")]);
   /* أدوات التحرير ليست من التقرير — تُخفى أثناء التصوير */
   document.body.classList.add("wk-shot");
-  const scale = 2;
   let canvas: HTMLCanvasElement;
-  /* مواضع نهايات البطاقات — لنقطع الصفحة بينها لا في وسط بطاقة */
-  let stops: number[] = [];
   try {
-    canvas = await h2c.default(el, { scale, backgroundColor: "#ffffff", useCORS: true });
-    const top = el.getBoundingClientRect().top;
-    stops = Array.from(el.querySelectorAll<HTMLElement>(".wkx-in > *, .wk-two > .wk-card"))
-      .map((n) => (n.getBoundingClientRect().bottom - top) * scale)
-      .sort((a, b) => a - b);
+    canvas = await h2c.default(el, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
   } finally {
     document.body.classList.remove("wk-shot");
   }
-  const pdf = new jsp.jsPDF({ orientation: landscape ? "l" : "p", unit: "mm", format: "a4" });
-  const pad = 6;
-  const pw = pdf.internal.pageSize.getWidth() - pad * 2;
-  const ph = pdf.internal.pageSize.getHeight() - pad * 2;
-  /* ارتفاع الصفحة الواحدة بالبكسل على مقياس الصورة */
-  const pageH = Math.floor((canvas.width * ph) / pw);
-  let y = 0;
-  while (y < canvas.height) {
-    const room = Math.min(pageH, canvas.height - y);
-    /* أقرب نهاية بطاقة تقع داخل الصفحة — ولا نقبلها إن كانت تترك
-       أكثر من ثلث الصفحة بياضاً، فالأبيض الكثير أسوأ من قطعٍ نظيف */
-    const fit = stops.filter((s) => s > y + pageH * 0.55 && s <= y + room);
-    const h = Math.round(room < pageH ? room : fit.length ? fit[fit.length - 1] - y : room);
-    const cut = document.createElement("canvas");
-    cut.width = canvas.width;
-    cut.height = h;
-    const ctx = cut.getContext("2d");
-    if (ctx) {
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, cut.width, cut.height);
-      ctx.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
-    }
-    if (y > 0) pdf.addPage();
-    pdf.addImage(cut.toDataURL("image/jpeg", 0.92), "JPEG", pad, pad, pw, (h * pw) / canvas.width);
-    y += h;
-  }
+  /* **صفحةٌ واحدة بمقاس الورقة نفسها**: لا تقطيع إلى صفحات A4 ولا
+     هامشٌ أبيض حولها — الملف صورة التقرير كما يُرى على الشاشة */
+  const w = canvas.width;
+  const h = canvas.height;
+  const pdf = new jsp.jsPDF({
+    orientation: w > h ? "l" : "p",
+    unit: "px",
+    format: [w, h],
+    compress: true,
+  });
+  pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, w, h);
   pdf.save(`الإنجاز-الأسبوعي-${week}.pdf`);
 }
 
@@ -363,9 +266,6 @@ export default function WeeklyPanel({
           <button className="btn btn-ghost" onClick={() => setTune(true)}>
             ⚙️ {t("إعدادات التقرير", "Report settings")}
           </button>
-          <button className="btn btn-ghost" onClick={printReport}>
-            {t("طباعة", "Print")}
-          </button>
           <button
             className="btn"
             disabled={pdfBusy}
@@ -373,7 +273,7 @@ export default function WeeklyPanel({
               setPdfBusy(true);
               setMsg(t("جارٍ تجهيز الملف…", "Preparing the file…"));
               try {
-                await makePdf(week, prefs.layout.dir === "h");
+                await makePdf(week);
                 setMsg(t("نُزِّل الملف ✓", "Downloaded ✓"));
               } catch (e) {
                 setMsg(`${t("تعذّر التصدير", "Export failed")}: ${(e as Error)?.message || e}`);

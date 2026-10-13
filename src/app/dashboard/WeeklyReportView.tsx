@@ -187,16 +187,20 @@ function DomCard({
                     <td className={r.tone}>{r.state}</td>
                     <td className="sup">
                       {onTaskSup ? (
-                        <input
-                          className="wk-supin"
-                          value={v}
-                          placeholder="اكتب الدعم المطلوب…"
-                          onChange={(e) => setDraft((x) => ({ ...x, [r.id]: e.target.value }))}
-                          onBlur={(e) => onTaskSup(r.id, e.target.value.trim())}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                          }}
-                        />
+                        <>
+                          <input
+                            className="wk-supin"
+                            value={v}
+                            placeholder="اكتب الدعم المطلوب…"
+                            onChange={(e) => setDraft((x) => ({ ...x, [r.id]: e.target.value }))}
+                            onBlur={(e) => onTaskSup(r.id, e.target.value.trim())}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                            }}
+                          />
+                          {/* نسخةٌ نصّية تحلّ محلّ الحقل في الملف المصدَّر */}
+                          <span className="sup-txt">{v || "—"}</span>
+                        </>
                       ) : (
                         v || "—"
                       )}

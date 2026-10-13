@@ -2375,11 +2375,12 @@ table.matrix thead th {
   padding: 28px 28px 18px;
 }
 .has-band .wkx-in {
-  /* المحتوى في جهة البياض من التصميم */
-  padding-inline-end: 24%;
+  /* المحتوى في جهة البياض من التصميم — وحُجز له 24% فبدت البطاقات
+     متجمّعةً في يمين الورقة. الموجة الفاتحة تحتمل البطاقات فوقها */
+  padding-inline-end: 17%;
 }
 .wkx-h.has-band .wkx-in {
-  padding-inline-end: 19%;
+  padding-inline-end: 13%;
 }
 
 .wkx-head {
@@ -2658,6 +2659,19 @@ table.matrix thead th {
 }
 .wk-tb td.sup {
   color: var(--muted);
+}
+/* الدعم نصّاً لا حقلاً عند التصوير والطباعة: الحقل يُظهر ما يسعه
+   سطرٌ واحد ويبدأ من حيث وقف المؤشر، فيخرج الكلام مقطوعاً */
+.wk-tb td.sup .sup-txt {
+  display: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.wk-shot .wk-tb td.sup .wk-supin {
+  display: none;
+}
+.wk-shot .wk-tb td.sup .sup-txt {
+  display: block;
 }
 /* مربّع اختيار ما يظهر من التكاليف */
 .wk-tb th.pick,
@@ -3362,8 +3376,12 @@ table.matrix thead th {
      ويختفي معه ما استُبعد من تكاليف ومشاريع */
   .wk-tb th.pick,
   .wk-tb td.pick,
-  .wk-pr .pick {
+  .wk-pr .pick,
+  .wk-tb td.sup .wk-supin {
     display: none !important;
+  }
+  .wk-tb td.sup .sup-txt {
+    display: block !important;
   }
   .wk-tb tr.off,
   .wk-pr.off {
