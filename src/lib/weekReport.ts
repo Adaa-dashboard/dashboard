@@ -185,7 +185,11 @@ export function natDonut(items: ItemLite[]) {
   };
 }
 
-export function instDonut(items: ItemLite[]) {
+/** @param startedOnly يُسقط «لم يُعقد اجتماعها» ويقصر الحلقة على ما
+    بدأ مساره — في **تقرير المنجزات** تحديداً: ما لم يبدأ ليس
+    إنجازاً، وعرضه بين المنجزات يُقرأ تقصيراً. وصفحة «نظرة عامة»
+    تبقى على المحفظة كاملةً، فهي حالةٌ لا إنجاز. */
+export function instDonut(items: ItemLite[], startedOnly = false) {
   /* قسمةٌ بأبعد مرحلةٍ بلغتها الجهة، فمجموع الشرائح = عدد الجهات.
      أما عدّادات الصفحة فمتداخلة (الجهة المفعَّل قياسها معدودةٌ في
      «عُقد اجتماعها» أيضاً)، فلا تصلح شرائحَ حلقة */
@@ -200,10 +204,13 @@ export function instDonut(items: ItemLite[]) {
       : 0;
     c[i]++;
   }
+  const slices = INST_STAGES.map((label, i) => ({ label, n: c[i], color: RAMP[i] }));
+  if (!startedOnly) return { total: items.length, unit: "جهة", slices };
+  const started = slices.slice(1);
   return {
-    total: items.length,
-    unit: "جهة",
-    slices: INST_STAGES.map((label, i) => ({ label, n: c[i], color: RAMP[i] })),
+    total: started.reduce((n, x) => n + x.n, 0),
+    unit: "جهة في المسار",
+    slices: started,
   };
 }
 
@@ -450,7 +457,7 @@ export function buildWeekReport(args: {
                 : pl(lines.length, "جهة حُدِّثت هذا الأسبوع", "جهات حُدِّثت هذا الأسبوع"),
             }
           : undefined,
-      donut: instDonut(sec("inststrat")),
+      donut: instDonut(sec("inststrat"), true),
       note: inst.length ? noteOf(lines) : undefined,
       lines,
     });
