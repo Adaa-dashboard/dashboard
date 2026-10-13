@@ -69,7 +69,8 @@ const RAMP = ["#d7e2de", "#9ecdbb", "#5bb594", "#1b9c74", "#0b6b50"];
 
 /* ---------------- أنواع المخرجات ---------------- */
 export type Slice = { label: string; n: number; color: string };
-export type Bar = { name: string; pct: number; late: boolean };
+/** شريط مشروع: الإنجاز الفعلي، والمخطط له (المستهدف عند تاريخه) */
+export type Bar = { name: string; pct: number; plan: number; late: boolean };
 export type Stat = { n: number; label: string; tone: "ok" | "warn" | "mute"; icon?: string };
 export type Line = { name: string; detail?: string };
 /** مستهدف المجال: ما تحقّق منه وكم المستهدف */
@@ -259,6 +260,7 @@ function projDom(items: ItemLite[], moved: Ach[], touched: Line[]): Dom | null {
       return {
         name: txt(it.data.name),
         pct: Math.round(actual * 10) / 10,
+        plan: Math.round(planned * 10) / 10,
         late: actual < planned,
       };
     })
@@ -267,7 +269,7 @@ function projDom(items: ItemLite[], moved: Ach[], touched: Line[]): Dom | null {
   /* المشروع في السجلّ ولا بند له (حُذف مثلاً): يُعرض بما في المنجز */
   for (const m of moved)
     if (!bars.some((x) => x.name === m.name))
-      bars.push({ name: m.name, pct: num((m.detail || "").split("←").pop()), late: false });
+      bars.push({ name: m.name, pct: num((m.detail || "").split("←").pop()), plan: 0, late: false });
   const n = moved.length ? linesOf(moved).length : touched.length;
   return {
     k: "proj",

@@ -196,8 +196,15 @@ function DomCard({ d, support }: { d: Dom; support?: string }) {
               <span className="nm">{b.name}</span>
               <span className="bar">
                 <i className={b.late ? "a" : ""} style={{ width: `${Math.max(0, Math.min(100, b.pct))}%` }} />
+                {/* علامة المخطط — موضع المستهدف عند تاريخه */}
+                {b.plan > 0 && (
+                  <s style={{ insetInlineStart: `${Math.max(0, Math.min(100, b.plan))}%` }} />
+                )}
               </span>
-              <span className="pc">{b.pct}%</span>
+              <span className="pc">
+                {b.pct}%
+                {b.plan > 0 && <em>المخطط {b.plan}%</em>}
+              </span>
             </div>
           ))}
         </div>
