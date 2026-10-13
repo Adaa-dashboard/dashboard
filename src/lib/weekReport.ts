@@ -73,8 +73,6 @@ export type Slice = { label: string; n: number; color: string };
 export type Bar = { name: string; pct: number; plan: number; late: boolean };
 export type Stat = { n: number; label: string; tone: "ok" | "warn" | "mute"; icon?: string };
 export type Line = { name: string; detail?: string };
-/** مستهدف المجال: ما تحقّق منه وكم المستهدف */
-export type Goal = { n: number; of: number; label: string };
 
 export type Dom = {
   k: string;
@@ -88,7 +86,6 @@ export type Dom = {
   stats?: Stat[];
   lines?: Line[];
   bars?: Bar[];
-  goal?: Goal;
   /** سطر «أبرزها» تحت الحلقة */
   note?: string;
 };
@@ -312,8 +309,11 @@ function sesDonut(items: ItemLite[]) {
   };
 }
 
-/** تجربة المستفيد: صدر لها تقرير · في المسار · لم تبدأ.
-    «صدر لها تقرير» = اعتُمد تقريرها في أيّ ربع، وهو تعريف الملف نفسه */
+/** تجربة المستفيد — **الحلقة على المستهدف لا على كل الأجهزة**:
+    في وسطها ٦٩ (المستهدف)، وشريحتاها ما صدر له تقرير وما بقي
+    منه. وقائمة الملف كلها ١٥٤ جهازاً، فحلقةٌ عليها تُخفي السؤال
+    الحقيقي: كم بقي من المستهدف.
+    «صدر له تقرير» = اعتُمد تقريره في أيّ ربع، وهو تعريف الملف نفسه */
 const CX_OK = "تم الاعتماد";
 const CX_QK = ["q0", "q1", "q2", "q3", "q4"];
 /** مستهدف البكس — من صفّ الإعدادات `cx-meta`، وإن لم يُضبط بعد
@@ -327,20 +327,24 @@ export function cxTarget(items: ItemLite[]): number {
 function cxDonut(items: ItemLite[]) {
   /* صفّ الإعدادات (`cx-meta`) ليس جهازاً فلا يُعدّ */
   const rows = items.filter((it) => it.id !== "cx-meta");
-  let rep = 0, live = 0, none = 0;
+  let rep = 0, live = 0;
   for (const it of rows) {
     const d = it.data;
     if (CX_QK.some((q) => txt(d[`${q}Issue`]) === CX_OK)) rep++;
     else if (txt(d.meet) === "تم" || txt(d.survey) || txt(d.card) || txt(d.l1)) live++;
-    else none++;
   }
+  const target = cxTarget(items);
+  /* ما في المسار لا يُحتسب إلا في حدود ما بقي من المستهدف */
+  const left = Math.max(0, target - rep);
+  const prog = Math.min(live, left);
   return {
-    total: rows.length,
-    unit: "جهاز",
+    /* تجاوُز المستهدف لا يُخفى: الوسط يصير العدد المحقَّق نفسه */
+    total: Math.max(target, rep),
+    unit: rep >= target ? "جهاز" : "المستهدف",
     slices: [
-      { label: "صدر لها تقرير", n: rep, color: RAMP[4] },
-      { label: "في المسار", n: live, color: RAMP[2] },
-      { label: "لم تبدأ", n: none, color: RAMP[0] },
+      { label: "صدر له تقرير", n: rep, color: RAMP[4] },
+      { label: "في المسار", n: prog, color: RAMP[2] },
+      { label: "لم يبدأ بعد", n: Math.max(0, left - prog), color: RAMP[0] },
     ],
   };
 }
@@ -480,11 +484,6 @@ export function buildWeekReport(args: {
             }
           : undefined,
       donut: cxDonut(sec("cx")),
-      goal: {
-        n: cxDonut(sec("cx")).slices[0].n,
-        of: cxTarget(sec("cx")),
-        label: "جهازاً صدر له تقرير",
-      },
       note: cx.length ? noteOf(lines, 3) : undefined,
       lines,
     });

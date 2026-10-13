@@ -2684,49 +2684,6 @@ table.matrix thead th {
   font-weight: 700;
 }
 
-/* المستهدف — شريطٌ تحت الحلقة */
-.wk-goal {
-  margin-top: 10px;
-  padding-top: 9px;
-  border-top: 1px solid var(--line2);
-}
-.wk-goalt {
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
-  margin-bottom: 5px;
-}
-.wk-goalt b {
-  font-family: "Noto Kufi Arabic", sans-serif;
-  font-size: 14px;
-  color: var(--gt-900);
-  font-variant-numeric: tabular-nums;
-}
-.wk-goalt b span {
-  font-family: "IBM Plex Sans Arabic", sans-serif;
-  font-size: 10.5px;
-  font-weight: 400;
-  color: var(--muted);
-}
-.wk-goalt em {
-  font-style: normal;
-  font-size: 10.5px;
-  color: var(--ink-2);
-}
-.wk-goal .bar {
-  display: block;
-  height: 8px;
-  border-radius: 6px;
-  background: var(--line2);
-  overflow: hidden;
-}
-.wk-goal .bar i {
-  display: block;
-  height: 100%;
-  border-radius: 6px;
-  background: #1b9c74;
-}
-
 /* قوائم الأسماء */
 .wk-lst {
   list-style: none;

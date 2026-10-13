@@ -183,21 +183,6 @@ function DomCard({ d, support }: { d: Dom; support?: string }) {
         </div>
       )}
 
-      {d.goal && (
-        /* المستهدف لا يُفهم من الحلقة وحدها: شريطٌ صريح تحتها */
-        <div className="wk-goal">
-          <div className="wk-goalt">
-            <b>
-              {d.goal.n} <span>من {d.goal.of}</span>
-            </b>
-            <em>{d.goal.label}</em>
-          </div>
-          <span className="bar">
-            <i style={{ width: `${Math.max(0, Math.min(100, (d.goal.n / (d.goal.of || 1)) * 100))}%` }} />
-          </span>
-        </div>
-      )}
-
       {d.bars && (
         <div className="wk-bars">
           {d.bars.map((b) => (
