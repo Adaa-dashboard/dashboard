@@ -2827,7 +2827,9 @@ function cxStats(items: Item[]) {
    حجم العنوان وزرّ الطيّ مع بقية الأقسام (كان ١٤px بدل ١٨px). */
 export function CxBox({ t, onOpen }: { t: T; onOpen?: () => void }) {
   const { items, loaded } = useItems("cx");
-  const title = SECTION_TITLE.cx;
+  /* عنوانٌ مختصر في «نظرة عامة» — الكامل («…من الخدمات الحكومية»)
+     يلتفّ سطرين في رأس البطاقة */
+  const title: [string, string] = ["أعمال قياس تجربة المستفيد", "Beneficiary experience"];
   const { open, toggle } = useCollapse("cx");
 
   const box = (body: ReactNode) => (
@@ -2870,10 +2872,6 @@ export function CxBox({ t, onOpen }: { t: T; onOpen?: () => void }) {
         </span>
         <span>
           {t("احتُسبت في المؤشر", "Counted in KPI")} <b>{AR(st.counted)}</b>
-        </span>
-        <span>
-          {t("الخدمات المخطط قياسها", "Services planned")} <b>{AR(st.servPlan)}</b> {t("من", "of")}{" "}
-          <b>{AR(st.servTot)}</b>
         </span>
       </div>
     </>,
