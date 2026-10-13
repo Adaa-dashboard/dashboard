@@ -19,14 +19,17 @@ function Shared() {
   const token = useSearchParams().get("t") || "";
   const [report, setReport] = useState<WeekReport | null>(null);
   const [prefs, setPrefs] = useState<WeeklyPrefs | null>(null);
-  const [state, setState] = useState<"loading" | "gone" | "ready">("loading");
+  /* `gone` رمزٌ منتهٍ أو مُلغى · `err` الدالة نفسها أخطأت — التفريق
+     بينهما ضروري: الأول شأن المستلِم، والثاني خللٌ يُبلَّغ عنه */
+  const [state, setState] = useState<"loading" | "gone" | "err" | "ready">("loading");
 
   useEffect(() => {
     (async () => {
       if (!token) return setState("gone");
       await ensureAnon();
       const { data, error } = await sb().rpc("perf_shared_report", { p_token: token });
-      if (error || !data) return setState("gone");
+      if (error) return setState("err");
+      if (!data) return setState("gone");
 
       const weekStart = String(data.weekStart);
       const settings = (data.settings || {}) as Record<string, unknown>;
@@ -93,13 +96,17 @@ function Shared() {
 
   if (state === "loading") return <div className="empty">جارٍ التحميل...</div>;
 
-  if (state === "gone") {
+  if (state === "gone" || state === "err") {
     return (
       <div className="wk-gone">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={asset("/adaa-logo.png")} alt="أداء" className="wk-logo" />
-        <b>الرابط غير صالح</b>
-        <span>انتهت صلاحية هذا الرابط أو أُلغي. اطلب رابطًا جديدًا من إدارة عمليات الأداء.</span>
+        <b>{state === "err" ? "تعذّر فتح التقرير" : "الرابط غير صالح"}</b>
+        <span>
+          {state === "err"
+            ? "الرابط سليم، لكن تعذّر تجهيز التقرير الآن. أبلغ إدارة عمليات الأداء وستُعيد المحاولة."
+            : "انتهت صلاحية هذا الرابط أو أُلغي. اطلب رابطًا جديدًا من إدارة عمليات الأداء."}
+        </span>
       </div>
     );
   }

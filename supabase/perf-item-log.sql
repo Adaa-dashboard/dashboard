@@ -124,7 +124,13 @@ revoke all on function public.perf_item_log_prune(int) from public, anon;
 -- ------------------------------------------------------------
 create or replace function public.perf_shared_report(p_token text)
 returns jsonb language plpgsql security definer set search_path = public as $$
-declare s record;
+declare
+  s     record;
+  d0    date;
+  d1    date;
+  v_log jsonb := '[]'::jsonb;
+  v_chg jsonb := '[]'::jsonb;
+  v_con jsonb := '[]'::jsonb;
 begin
   select * into s from public.perf_shares
    where token = p_token
@@ -134,6 +140,36 @@ begin
   update public.perf_shares
      set views = views + 1, last_view = now()
    where token = p_token;
+
+  d0 := s.week_start::date;
+  d1 := d0 + 7;
+
+  /* سجلّ التغييرات — أسبوع الرابط وحده */
+  begin
+    select coalesce(jsonb_agg(to_jsonb(x) order by x.at), '[]'::jsonb) into v_log
+      from public.perf_item_log x
+     where x.at >= d0::timestamptz and x.at < d1::timestamptz;
+  exception when others then v_log := '[]'::jsonb;
+  end;
+
+  /* طلبات التغيير: المفتوح كله، والمغلق في آخر ١٨٠ يوماً — منها
+     نسبة الالتزام ومقارنتها بالأسبوع الماضي */
+  begin
+    select coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) into v_chg
+      from public.perf_change_requests x
+     where x.closed_at is null or x.closed_at >= d0 - 180;
+  exception when others then v_chg := '[]'::jsonb;
+  end;
+
+  /* جهات التواصل التي روجعت بياناتها في الأسبوع */
+  begin
+    select coalesce(jsonb_agg(jsonb_build_object('entity', e.name, 'reviewedAt', c.reviewed_at)), '[]'::jsonb)
+      into v_con
+      from public.perf_contacts c
+      join public.perf_entities e on e.id = c.entity_id
+     where c.reviewed_at >= d0::timestamptz and c.reviewed_at < d1::timestamptz;
+  exception when others then v_con := '[]'::jsonb;
+  end;
 
   return jsonb_build_object(
     'weekStart', s.week_start,
@@ -145,19 +181,9 @@ begin
     'tasks',        (select coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) from public.perf_tasks x),
     'items',        (select coalesce(jsonb_agg(to_jsonb(x) order by x.ord), '[]'::jsonb) from public.perf_items x),
     'settings',     (select coalesce(jsonb_object_agg(key, value), '{}'::jsonb) from public.perf_settings),
-    'log',          (select coalesce(jsonb_agg(to_jsonb(x) order by x.at), '[]'::jsonb)
-                       from public.perf_item_log x
-                      where x.at >= s.week_start::timestamptz
-                        and x.at <  (s.week_start::date + 7)::timestamptz),
-    'changes',      (select coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb)
-                       from public.perf_changes x
-                      where x.closed_at >= s.week_start::date
-                        and x.closed_at <  (s.week_start::date + 7)),
-    'contacts',     (select coalesce(jsonb_agg(jsonb_build_object('entity', e.name, 'reviewedAt', c.reviewed_at)), '[]'::jsonb)
-                       from public.perf_contacts c
-                       join public.perf_entities e on e.id = c.entity_id
-                      where c.reviewed_at >= s.week_start::timestamptz
-                        and c.reviewed_at <  (s.week_start::date + 7)::timestamptz)
+    'log',      v_log,
+    'changes',  v_chg,
+    'contacts', v_con
   );
 end;
 $$;
