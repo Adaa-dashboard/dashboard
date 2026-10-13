@@ -2251,8 +2251,13 @@ export function StrategyBox({
         <div className="sx-dline">
           <span className="l">{t("نسبة قابلية قياس الاستراتيجيات المعتمدة من مجلس الوزراء", "Measurability — CoM approved")}</span>
           {all ? (
-            /* النسبة وحدها — تفصيل «س من ص مؤشراً» لا يُحتاج هنا */
-            <b>{AR(pct)}٪</b>
+            <>
+              <b>{AR(pct)}٪</b>
+              <em>{`${AR(rep)} ${t("من", "of")} ${AR(all)} ${t("مؤشراً في", "KPIs across")} ${AR(appr.length)} ${t("جهة", "entities")}`}</em>
+              <span className="bar">
+                <i style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
+              </span>
+            </>
           ) : (
             <em>{t("لا توجد استراتيجية معتمدة من مجلس الوزراء بعد", "None approved yet")}</em>
           )}
