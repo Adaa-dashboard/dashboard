@@ -51,7 +51,7 @@ export default function WeeklyPanel({
   /* التكاليف وجهات التواصل تُقرأ مرة واحدة — لا تتغيّر بتغيّر
      الأسبوع. والسجلّ وحده يُعاد طلبه لأنه مقيَّد بمداه. */
   const loadData = useCallback(async () => {
-    const sec = ["natstrat", "inststrat", "projects"];
+    const sec = ["natstrat", "inststrat", "sessions", "cx", "projects"];
     const [tk, me, ch, en, ...its] = await Promise.all([
       apiFetch("/api/tasks").then((r) => r.json()).catch(() => ({})),
       apiFetch("/api/me").then((r) => r.json()).catch(() => ({})),

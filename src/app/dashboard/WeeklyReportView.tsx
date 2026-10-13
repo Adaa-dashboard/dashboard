@@ -110,7 +110,7 @@ function DomCard({ d }: { d: Dom }) {
           <PIcon id={DOM_ICON[d.k] || "award"} size={18} />
         </span>
         <b>{d.title}</b>
-        <span className="wk-cnt">{d.updates} تحديثاً</span>
+        {d.updates > 0 && <span className="wk-cnt">{d.updates} تحديثاً</span>}
       </div>
 
       {d.stats && (

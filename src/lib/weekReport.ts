@@ -9,8 +9,15 @@
      • **حلقة الحالة** — أين تقف المحفظة كلها الآن (للوطنية والمؤسسية)
      • **الأسماء** — البنود التي وقع عليها المنجز
 
-   القاعدة الحاكمة: **المجال بلا تحديث لا يظهر إطلاقاً** — لا بطاقة
-   فارغة ولا صفر. وما تراه في التقرير وقع فعلاً هذا الأسبوع.
+   طبقتان في كل بطاقة:
+     • **الحالة الآن** — تُقرأ من بنود القسم نفسها، فتظهر ولو لم
+       يقع في الأسبوع شيء (الحلقة، أشرطة المشاريع، حالات التكليفات).
+     • **ما تغيّر هذا الأسبوع** — من السجلّ، أو من تاريخ تعديل البند
+       (`updatedAt`) إن لم يكن السجلّ مركَّباً بعد.
+
+   والقاعدة الحاكمة: **المجال بلا بياناتٍ أصلاً لا يظهر** — لا بطاقة
+   فارغة ولا صفر. أما المجال الذي له بيانات فيظهر بحالته، وشارة
+   «N تحديثاً» لا تُطبع إلا إن وقع تحديثٌ فعلاً.
    ============================================================ */
 
 import {
@@ -24,7 +31,7 @@ import {
 } from "./achievements";
 
 export type Rec = Record<string, unknown>;
-export type ItemLite = { id: string; data: Rec };
+export type ItemLite = { id: string; data: Rec; updatedAt?: string | null };
 
 /* ---------------- أدوات ---------------- */
 const txt = (v: unknown) => (v === null || v === undefined ? "" : String(v));
@@ -119,6 +126,15 @@ const KIND_DOM: Record<string, DomKey> = {
   task: "task",
 };
 
+/** البنود التي عُدِّلت في المدى — بديل السجلّ قبل تركيبه، وهو
+    يعرف **أنّ** البند تغيّر ولا يعرف **ماذا** تغيّر فيه */
+function touchedIn(items: ItemLite[], a: string, b: string): Line[] {
+  return items
+    .filter((it) => inRange(txt(it.updatedAt), a, b))
+    .map((it) => ({ name: txt(it.data.name) || txt(it.data.entity) || it.id }))
+    .filter((l) => !!l.name);
+}
+
 /** أسماءٌ بلا تكرار، والتفصيل من أحدث منجز للاسم نفسه */
 function linesOf(list: Ach[]): Line[] {
   const seen = new Map<string, Line>();
@@ -128,6 +144,9 @@ function linesOf(list: Ach[]): Line[] {
   }
   return [...seen.values()];
 }
+
+/** صيغة المفرد والجمع — «استراتيجية واحدة» مقابل «٣ استراتيجيات» */
+const pl = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
 const noteOf = (lines: Line[], max = 2) =>
   lines
@@ -177,8 +196,8 @@ function taskDom(tasks: TaskLite[], a: string, b: string, upd: number): Dom | nu
     const d = day(txt(x.dueDate));
     return !!d && d < day(new Date().toISOString());
   });
+  if (!rows.length) return null;
   const updates = done.length + fresh.length + upd;
-  if (!updates) return null;
   return {
     k: "task",
     ...DOM_META.task,
@@ -195,11 +214,11 @@ function taskDom(tasks: TaskLite[], a: string, b: string, upd: number): Dom | nu
 }
 
 /* ---------------- المشاريع ---------------- */
-function projDom(items: ItemLite[], moved: Ach[]): Dom | null {
-  if (!moved.length) return null;
-  const names = new Set(moved.map((m) => m.name));
+/** كل المشاريع بأشرطتها — الحالة الآن، ويُذكر فوقها ما تقدّم منها
+    هذا الأسبوع إن وُجد */
+function projDom(items: ItemLite[], moved: Ach[], touched: Line[]): Dom | null {
+  if (!items.length && !moved.length) return null;
   const bars: Bar[] = items
-    .filter((it) => names.has(txt(it.data.name)))
     .map((it) => {
       const actual = num(it.data.actual);
       const planned = num(it.data.planned);
@@ -208,17 +227,75 @@ function projDom(items: ItemLite[], moved: Ach[]): Dom | null {
         pct: Math.round(actual * 10) / 10,
         late: actual < planned,
       };
-    });
+    })
+    .filter((x) => !!x.name)
+    .sort((x, y) => y.pct - x.pct);
   /* المشروع في السجلّ ولا بند له (حُذف مثلاً): يُعرض بما في المنجز */
   for (const m of moved)
     if (!bars.some((x) => x.name === m.name))
       bars.push({ name: m.name, pct: num((m.detail || "").split("←").pop()), late: false });
+  const n = moved.length ? linesOf(moved).length : touched.length;
   return {
     k: "proj",
     ...DOM_META.proj,
-    updates: moved.length,
-    big: { n: bars.length, label: bars.length === 1 ? "مشروع تقدّم هذا الأسبوع" : "مشاريع تقدّمت هذا الأسبوع" },
+    updates: moved.length || touched.length,
+    big: n
+      ? {
+          n,
+          label: moved.length
+            ? pl(n, "مشروع تقدّم هذا الأسبوع", "مشاريع تقدّمت هذا الأسبوع")
+            : pl(n, "مشروع حُدِّث هذا الأسبوع", "مشاريع حُدِّثت هذا الأسبوع"),
+        }
+      : undefined,
     bars,
+  };
+}
+
+/* ---------------- حلقتا الجلسات وتجربة المستفيد ---------------- */
+/** مراحل الجلسة الستّ: `done` عدد المكتمل منها */
+function sesDonut(items: ItemLite[]) {
+  let done = 0, live = 0, none = 0;
+  for (const it of items) {
+    const stages = Array.isArray(it.data.stages) ? (it.data.stages as unknown[]) : [];
+    const full = stages.length || 6;
+    const d = num(it.data.done);
+    if (d >= full && full > 0) done++;
+    else if (d > 0) live++;
+    else none++;
+  }
+  return {
+    total: items.length,
+    unit: "جهة",
+    slices: [
+      { label: "اكتملت جلستها", n: done, color: RAMP[4] },
+      { label: "قيد التنفيذ", n: live, color: RAMP[2] },
+      { label: "لم تبدأ", n: none, color: RAMP[0] },
+    ],
+  };
+}
+
+/** تجربة المستفيد: صدر لها تقرير · في المسار · لم تبدأ.
+    «صدر لها تقرير» = اعتُمد تقريرها في أيّ ربع، وهو تعريف الملف نفسه */
+const CX_OK = "تم الاعتماد";
+const CX_QK = ["q0", "q1", "q2", "q3", "q4"];
+function cxDonut(items: ItemLite[]) {
+  /* صفّ الإعدادات (`cx-meta`) ليس جهازاً فلا يُعدّ */
+  const rows = items.filter((it) => it.id !== "cx-meta");
+  let rep = 0, live = 0, none = 0;
+  for (const it of rows) {
+    const d = it.data;
+    if (CX_QK.some((q) => txt(d[`${q}Issue`]) === CX_OK)) rep++;
+    else if (txt(d.meet) === "تم" || txt(d.survey) || txt(d.card) || txt(d.l1)) live++;
+    else none++;
+  }
+  return {
+    total: rows.length,
+    unit: "جهاز",
+    slices: [
+      { label: "صدر لها تقرير", n: rep, color: RAMP[4] },
+      { label: "في المسار", n: live, color: RAMP[2] },
+      { label: "لم تبدأ", n: none, color: RAMP[0] },
+    ],
   };
 }
 
@@ -248,84 +325,146 @@ export function buildWeekReport(args: {
   const prevB = shift(b, -7);
   const crPrev = achChanges(args.changes, prevA, prevB);
 
+  const items = args.items;
+  const sec = (k: string) => items[k] || [];
+  /* ما عُدِّل من البنود هذا الأسبوع — يُستعمل حين لا يُسعف السجلّ */
+  const tch = (k: string) => touchedIn(sec(k), a, b);
+
   const doms: Dom[] = [];
   const add = (d: Dom | null) => {
-    if (d && d.updates > 0 && args.on[d.k] !== false) doms.push(d);
+    if (d && args.on[d.k] !== false) doms.push(d);
   };
 
-  /* ١) التكليفات */
+  /* ١) التكليفات — حالتها الآن، وما وقع فيها هذا الأسبوع */
   add(taskDom(args.tasks, a, b, 0));
 
   /* ٢) الاستراتيجيات الوطنية */
   const nat = domAch("nat");
-  if (nat.length) {
-    const lines = linesOf(nat);
+  const natT = tch("natstrat");
+  if (sec("natstrat").length || nat.length) {
+    const lines = nat.length ? linesOf(nat) : natT;
     add({
       k: "nat",
       ...DOM_META.nat,
-      updates: nat.length,
-      big: {
-        n: lines.length,
-        label: lines.length === 1 ? "استراتيجية تقدّمت هذا الأسبوع" : "استراتيجيات تقدّمت هذا الأسبوع",
-      },
-      donut: natDonut(args.items.natstrat || []),
-      note: noteOf(lines),
+      updates: nat.length || natT.length,
+      big: lines.length
+        ? {
+            n: lines.length,
+            label: nat.length
+              ? pl(lines.length, "استراتيجية تقدّمت هذا الأسبوع", "استراتيجيات تقدّمت هذا الأسبوع")
+              : pl(lines.length, "استراتيجية حُدِّثت هذا الأسبوع", "استراتيجيات حُدِّثت هذا الأسبوع"),
+          }
+        : undefined,
+      donut: natDonut(sec("natstrat")),
+      note: nat.length ? noteOf(lines) : undefined,
       lines,
     });
   }
 
   /* ٣) الاستراتيجيات المؤسسية */
   const inst = domAch("inst");
-  if (inst.length) {
-    const lines = linesOf(inst);
+  const instT = tch("inststrat");
+  if (sec("inststrat").length || inst.length) {
+    const lines = inst.length ? linesOf(inst) : instT;
     const live = linesOf(of("live"));
     add({
       k: "inst",
       ...DOM_META.inst,
-      updates: inst.length,
+      updates: inst.length || instT.length,
       big: live.length
-        ? { n: live.length, label: live.length === 1 ? "جهة فُعِّل قياسها هذا الأسبوع" : "جهات فُعِّل قياسها هذا الأسبوع" }
-        : { n: lines.length, label: "جهات تقدّمت هذا الأسبوع" },
-      donut: instDonut(args.items.inststrat || []),
-      note: noteOf(lines),
+        ? {
+            n: live.length,
+            label: live.length === 1 ? "جهة فُعِّل قياسها هذا الأسبوع" : "جهات فُعِّل قياسها هذا الأسبوع",
+          }
+        : lines.length
+          ? {
+              n: lines.length,
+              label: inst.length
+                ? pl(lines.length, "جهة تقدّمت هذا الأسبوع", "جهات تقدّمت هذا الأسبوع")
+                : pl(lines.length, "جهة حُدِّثت هذا الأسبوع", "جهات حُدِّثت هذا الأسبوع"),
+            }
+          : undefined,
+      donut: instDonut(sec("inststrat")),
+      note: inst.length ? noteOf(lines) : undefined,
       lines,
     });
   }
 
   /* ٤) جلسات مراجعة الأداء */
-  const ses = linesOf(domAch("ses"));
-  if (ses.length)
+  const sesA = domAch("ses");
+  const sesT = tch("sessions");
+  if (sec("sessions").length || sesA.length) {
+    const lines = sesA.length ? linesOf(sesA) : sesT;
     add({
       k: "ses",
       ...DOM_META.ses,
-      updates: domAch("ses").length,
-      big: { n: ses.length, label: ses.length === 1 ? "جهة تقدّمت جلستها" : "جهات تقدّمت جلساتها" },
-      lines: ses,
+      updates: sesA.length || sesT.length,
+      big: lines.length
+        ? {
+            n: lines.length,
+            label: sesA.length
+              ? pl(lines.length, "جهة تقدّمت جلستها", "جهات تقدّمت جلساتها")
+              : pl(lines.length, "جهة حُدِّثت جلستها هذا الأسبوع", "جهات حُدِّثت جلساتها هذا الأسبوع"),
+          }
+        : undefined,
+      donut: sesDonut(sec("sessions")),
+      note: sesA.length ? noteOf(lines, 3) : undefined,
+      lines,
     });
+  }
 
   /* ٥) تجربة المستفيد */
   const cx = domAch("cx");
-  if (cx.length) {
+  const cxT = tch("cx");
+  if (sec("cx").length || cx.length) {
     const reps = linesOf(of("cxrep"));
+    const lines = cx.length ? linesOf(cx) : cxT;
     add({
       k: "cx",
       ...DOM_META.cx,
-      updates: cx.length,
+      updates: cx.length || cxT.length,
       big: reps.length
         ? { n: reps.length, label: reps.length === 1 ? "جهاز صدر له تقرير" : "أجهزة صدرت لها تقارير" }
-        : { n: linesOf(cx).length, label: "أجهزة تقدّمت في المسار" },
-      lines: linesOf(cx),
+        : lines.length
+          ? {
+              n: lines.length,
+              label: cx.length
+                ? pl(lines.length, "جهاز تقدّم في المسار", "أجهزة تقدّمت في المسار")
+                : pl(lines.length, "جهاز حُدِّث هذا الأسبوع", "أجهزة حُدِّثت هذا الأسبوع"),
+            }
+          : undefined,
+      donut: cxDonut(sec("cx")),
+      note: cx.length ? noteOf(lines, 3) : undefined,
+      lines,
     });
   }
 
   /* ٦) المشاريع */
-  add(projDom(args.items.projects || [], of("proj")));
+  add(projDom(sec("projects"), of("proj"), tch("projects")));
 
   /* طلبات التغيير **بلا بطاقة**: نسبتها وأعدادها في شريط الملخّص
      أعلى الصفحة وحده — بطلب المستخدمة، فلا تتكرر المعلومة */
   const open = args.changes.filter((c) => !day(txt(c.closedAt))).length;
+  /* النسبة الكلية لكل ما أُغلق — تُعرض حين لا يُغلق شيءٌ هذا الأسبوع،
+     فالحلقة لا تظهر صفراً وكأن الالتزام انهار */
+  let crAllN = 0, crAllOk = 0;
+  for (const c of args.changes) {
+    if (!day(txt(c.closedAt)) || c.sla == null || c.workDays == null) continue;
+    crAllN++;
+    if (Number(c.workDays) < Number(c.sla)) crAllOk++;
+  }
+  const crAll = crAllN ? Math.round((crAllOk / crAllN) * 100) : null;
 
-  const total = ach.length + cr.n;
+  /* ما تحرّك هذا الأسبوع: السجلّ أولاً، وإلا تواريخ تعديل البنود */
+  const touchedAll = ["natstrat", "inststrat", "sessions", "cx", "projects"].reduce(
+    (n, k) => n + tch(k).length,
+    0,
+  );
+  const taskEv = args.tasks.filter(
+    (x) => txt(x.kind) === "assignment" && (inRange(txt(x.completedAt), a, b) || inRange(txt(x.createdAt), a, b)),
+  ).length;
+
+  const total = (ach.length || touchedAll) + cr.n + taskEv;
   const prevAch = args.logPrev ? achFromLog(args.logPrev).length + crPrev.n : null;
 
   return {
@@ -333,7 +472,7 @@ export function buildWeekReport(args: {
     weekEnd: b,
     total,
     totalPrev: prevAch,
-    crPct: cr.pct,
+    crPct: cr.pct ?? crAll,
     crPctPrev: crPrev.pct,
     crClosed: cr.n,
     crOpen: open,

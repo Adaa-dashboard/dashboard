@@ -75,6 +75,7 @@ function Shared() {
         (items[k] = items[k] || []).push({
           id: String(r.id || ""),
           data: (r.data || {}) as Record<string, unknown>,
+          updatedAt: r.updated_at ? String(r.updated_at) : null,
         });
       }
 
