@@ -74,6 +74,8 @@ export type Line = { name: string; detail?: string };
 export type Dom = {
   k: string;
   title: string;
+  /** يظهر في بطاقة التكليفات حين يوجد متأخر: ما يحتاج تدخّلاً */
+  support?: Line[];
   /** عدد ما تغيّر في هذا المجال خلال الأسبوع */
   updates: number;
   big?: { n: number; label: string };
@@ -198,6 +200,15 @@ function taskDom(tasks: TaskLite[], a: string, b: string, upd: number): Dom | nu
   });
   if (!rows.length) return null;
   const updates = done.length + fresh.length + upd;
+  /* المتأخر يحتاج تدخّلاً، فيُسمّى صراحةً مع مدّة تأخّره */
+  const today = day(new Date().toISOString());
+  const support: Line[] = late
+    .map((x) => {
+      const d = day(txt(x.dueDate));
+      const n = Math.round((new Date(today).getTime() - new Date(d).getTime()) / 86400000);
+      return { name: txt(x.title), detail: n > 0 ? `متأخر ${arDays(n)}` : "" };
+    })
+    .filter((l) => !!l.name);
   return {
     k: "task",
     ...DOM_META.task,
@@ -210,7 +221,16 @@ function taskDom(tasks: TaskLite[], a: string, b: string, upd: number): Dom | nu
       { n: late.length, label: "متأخر", tone: "warn", icon: "clock" },
     ],
     lines: done.map((x) => ({ name: txt(x.title) })),
+    support: support.length ? support : undefined,
   };
+}
+
+/** صيغة الأيام بالعربية — كما في لوحة التكاليف */
+function arDays(n: number): string {
+  if (n === 1) return "يوماً";
+  if (n === 2) return "يومين";
+  if (n <= 10) return `${n} أيام`;
+  return `${n} يوماً`;
 }
 
 /* ---------------- المشاريع ---------------- */

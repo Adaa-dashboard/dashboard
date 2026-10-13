@@ -102,7 +102,7 @@ function Donut({ slices, total, unit }: { slices: Slice[]; total: number; unit: 
 }
 
 /* ---------- بطاقة مجال ---------- */
-function DomCard({ d }: { d: Dom }) {
+function DomCard({ d, support }: { d: Dom; support?: string }) {
   return (
     <div className="wk-card">
       <div className="wk-ch">
@@ -126,6 +126,29 @@ function DomCard({ d }: { d: Dom }) {
               <span>{s.label}</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {d.support && d.support.length > 0 && (
+        /* المتأخر لا يُترك رقماً: يُقابله ما يلزم لرفعه */
+        <div className="wk-sup">
+          <div className="wk-suph">
+            <PIcon id="alert" size={15} />
+            <b>الدعم المطلوب</b>
+          </div>
+          {support ? (
+            <p>{support}</p>
+          ) : (
+            <ul className="wk-lst">
+              {d.support.slice(0, 4).map((l) => (
+                <li key={l.name}>
+                  {l.name}
+                  {l.detail ? <u> — {l.detail}</u> : null}
+                </li>
+              ))}
+              {d.support.length > 4 && <li className="more">{`و${d.support.length - 4} غيرها`}</li>}
+            </ul>
+          )}
         </div>
       )}
 
@@ -258,7 +281,7 @@ export default function WeeklyReportView({
         {rows.map((row, i) => (
           <div className={row.length > 1 ? "wk-two" : ""} key={i}>
             {row.map((d) => (
-              <DomCard d={d} key={d.k} />
+              <DomCard d={d} key={d.k} support={(prefs.texts || {}).support} />
             ))}
           </div>
         ))}
