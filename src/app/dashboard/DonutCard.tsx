@@ -47,9 +47,10 @@ export function DonutRing({
             return el;
           })}
       </svg>
-      <b style={size > 110 ? { fontSize: 22 } : undefined}>
+      {/* العدد في الوسط يكبر مع الحلقة — وإلا تاه في فراغها */}
+      <b style={size > 100 ? { fontSize: Math.round(size * 0.185) } : undefined}>
         {total}
-        <span>{unit}</span>
+        <span style={size > 100 ? { fontSize: Math.round(size * 0.075) } : undefined}>{unit}</span>
       </b>
     </span>
   );

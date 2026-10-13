@@ -2054,6 +2054,10 @@ const SEC_ICON: Partial<Record<SectionKey, string>> = {
   notesq: "checklist",
 };
 
+/** قُطر حلقات «نظرة عامة» — واحدٌ للبطاقات الأربع، وأكبر من قياس
+    التقرير الأسبوعي لأن البطاقة هنا أوسع فيبقى حولها بياضٌ كثير */
+const DONUT = 152;
+
 export function StatusBars({
   section,
   t,
@@ -2174,16 +2178,20 @@ export function SessionsBox({ t, onOpen }: { t: T; onOpen?: () => void }) {
 
   return box(
     <>
+      {/* الحلقة أولاً في البطاقات الأربع — فتستوي حلقاتها في مستوى
+          واحد، والسطر الوصفي تحتها لا فوقها */}
+      <DonutCard slices={d.slices} total={d.total} unit={d.unit} size={DONUT} />
       <div className="sx-dsub">
         {arEnt(items.length)}
         {quarter ? ` · ${quarter}` : ""}
       </div>
-      <DonutCard slices={d.slices} total={d.total} unit={d.unit} size={120} />
-      {/* الجهات التي تحتاج تصعيداً — بخط أحمر تحت الحلقة */}
-      <div className={`ss-esc ${sum.esc ? "on" : ""}`}>
-        <b>{AR(sum.esc)}</b>
-        <span>{t("جهة تحتاج تصعيداً", "entities need escalation")}</span>
-      </div>
+      {/* التصعيد لا يُذكر إلا إن وُجد — «٠ جهة» ليست معلومة */}
+      {sum.esc > 0 && (
+        <div className="ss-esc on">
+          <b>{AR(sum.esc)}</b>
+          <span>{t("جهة تحتاج تصعيداً", "entities need escalation")}</span>
+        </div>
+      )}
     </>,
   );
 }
@@ -2239,9 +2247,9 @@ export function StrategyBox({
     const pct = all ? Math.round((rep / all) * 100) : 0;
     return box(
       <>
-        <DonutCard slices={d.slices} total={d.total} unit={d.unit} size={120} />
+        <DonutCard slices={d.slices} total={d.total} unit={d.unit} size={DONUT} />
         <div className="sx-dline">
-          <span className="l">{t("نسبة قابلية قياس المعتمدة من مجلس الوزراء", "Measurability — CoM approved")}</span>
+          <span className="l">{t("نسبة قابلية قياس الاستراتيجيات المعتمدة من مجلس الوزراء", "Measurability — CoM approved")}</span>
           {all ? (
             <>
               <b>{AR(pct)}٪</b>
@@ -2263,7 +2271,7 @@ export function StrategyBox({
   const pct = items.length ? Math.round((live / items.length) * 100) : 0;
   return box(
     <>
-      <DonutCard slices={d.slices} total={d.total} unit={d.unit} size={120} />
+      <DonutCard slices={d.slices} total={d.total} unit={d.unit} size={DONUT} />
       <div className="sx-dline">
         <span className="l">{t("نسبة تفعيل القياس", "Measurement live %")}</span>
         <b>{AR(pct)}٪</b>
@@ -2865,7 +2873,7 @@ export function CxBox({ t, onOpen }: { t: T; onOpen?: () => void }) {
   const d = cxDonut(items);
   return box(
     <>
-      <DonutCard slices={d.slices} total={d.total} unit={d.unit} size={120} />
+      <DonutCard slices={d.slices} total={d.total} unit={d.unit} size={DONUT} />
       <div className="sx-dfoot">
         <span>
           {t("مجموع التقارير المعتمدة", "Approved reports")} <b>{AR(st.reportsTot)}</b>
