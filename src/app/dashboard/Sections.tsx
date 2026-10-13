@@ -2251,13 +2251,8 @@ export function StrategyBox({
         <div className="sx-dline">
           <span className="l">{t("نسبة قابلية قياس الاستراتيجيات المعتمدة من مجلس الوزراء", "Measurability — CoM approved")}</span>
           {all ? (
-            <>
-              <b>{AR(pct)}٪</b>
-              <em>{`${AR(rep)} ${t("من", "of")} ${AR(all)} ${t("مؤشراً في", "KPIs across")} ${AR(appr.length)} ${t("استراتيجية", "strategies")}`}</em>
-              <span className="bar">
-                <i style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
-              </span>
-            </>
+            /* النسبة وحدها — تفصيل «س من ص مؤشراً» لا يُحتاج هنا */
+            <b>{AR(pct)}٪</b>
           ) : (
             <em>{t("لا توجد استراتيجية معتمدة من مجلس الوزراء بعد", "None approved yet")}</em>
           )}
@@ -2273,12 +2268,11 @@ export function StrategyBox({
     <>
       <DonutCard slices={d.slices} total={d.total} unit={d.unit} size={DONUT} />
       <div className="sx-dline">
-        <span className="l">{t("نسبة تفعيل القياس", "Measurement live %")}</span>
+        <span className="l">
+          {t("نسبة تفعيل قياس الاستراتيجيات المؤسسية", "Institutional measurement live %")}
+        </span>
         <b>{AR(pct)}٪</b>
         <em>{`${AR(live)} ${t("من", "of")} ${AR(items.length)} ${t("جهة", "entities")}`}</em>
-        <span className="bar">
-          <i style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
-        </span>
       </div>
     </>,
   );

@@ -2824,7 +2824,9 @@ table.matrix thead th {
    مع ذلك في عمودٍ واحد لأن الأسطورة بعرض أطول اسم فيها */
 .sx-box .wk-dw {
   margin-top: 2px;
-  justify-content: center;
+  /* إلى يمين البطاقة لا وسطها: التوسيط كان يترك بياضاً واسعاً
+     على جانبيها */
+  justify-content: flex-start;
   gap: 26px;
 }
 .sx-box .wk-lg {
