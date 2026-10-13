@@ -2647,6 +2647,38 @@ table.matrix thead th {
 .wk-tb td.sup {
   color: var(--muted);
 }
+/* حقل الدعم: يُكتب في الصفحة ويبدو نصّاً حتى يُلمس */
+.wk-supin {
+  width: 100%;
+  border: none;
+  border-bottom: 1px dashed var(--border);
+  background: transparent;
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: 11px;
+  padding: 2px 2px 3px;
+  border-radius: 0;
+}
+.wk-supin::placeholder {
+  color: var(--muted);
+  opacity: 0.6;
+}
+.wk-supin:hover {
+  border-bottom-color: var(--g-400);
+}
+.wk-supin:focus {
+  outline: none;
+  border-bottom-color: var(--g-600);
+  background: var(--soft);
+}
+@media print {
+  .wk-supin {
+    border-bottom: none;
+  }
+  .wk-supin::placeholder {
+    color: transparent;
+  }
+}
 
 /* سطر تحديث الأسبوع — **تحت الحلقة** لا فوقها، فتستوي الحلقات
    في مستوى واحد عبر البطاقات المتجاورة */

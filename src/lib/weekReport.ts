@@ -75,7 +75,7 @@ export type Stat = { n: number; label: string; tone: "ok" | "warn" | "mute"; ico
 export type Line = { name: string; detail?: string };
 
 /** صفٌّ في جدول التكليفات: التكليف وحالته وما يحتاجه */
-export type Row = { name: string; state: string; tone: "ok" | "warn" | "mute" };
+export type Row = { id: string; name: string; state: string; tone: "ok" | "warn" | "mute" };
 
 export type Dom = {
   k: string;
@@ -242,7 +242,8 @@ function taskDom(tasks: TaskLite[], a: string, b: string, upd: number): Dom | nu
     const key = txt(x.id) || nm;
     if (!nm || seen.has(key)) return;
     seen.add(key);
-    tbl.push({ name: nm, state, tone });
+    /* المعرّف يثبت بين الأسابيع، فالدعم المكتوب يلتصق بالتكليف نفسه */
+    tbl.push({ id: key, name: nm, state, tone });
   };
   for (const x of late) push(x, `متأخر ${arDays(lateDays(x))}`, "warn");
   for (const x of done) push(x, "مكتمل", "ok");

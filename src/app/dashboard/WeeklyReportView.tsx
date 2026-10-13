@@ -78,7 +78,18 @@ function Ring({ pct }: { pct: number }) {
 }
 
 /* ---------- بطاقة مجال ---------- */
-function DomCard({ d, support }: { d: Dom; support?: string }) {
+function DomCard({
+  d,
+  support,
+  texts,
+  onSupport,
+}: {
+  d: Dom;
+  support?: string;
+  texts: Record<string, string>;
+  /** يُمرَّر لمن يملك التحرير — فيُكتب الدعم في الصفحة مباشرةً */
+  onSupport?: (id: string, text: string) => void;
+}) {
   return (
     <div className="wk-card">
       <div className="wk-ch">
@@ -124,14 +135,28 @@ function DomCard({ d, support }: { d: Dom; support?: string }) {
             </tr>
           </thead>
           <tbody>
-            {d.rows.slice(0, 6).map((r) => (
-              <tr key={r.name}>
-                <td>{r.name}</td>
-                <td className={r.tone}>{r.state}</td>
-                {/* الدعم يُكتب في الإعدادات، ويخصّ المتأخر وحده */}
-                <td className="sup">{r.tone === "warn" ? support || "—" : "—"}</td>
-              </tr>
-            ))}
+            {d.rows.slice(0, 6).map((r) => {
+              /* لكل تكليف دعمه، وإن لم يُكتب فنصّ الإعدادات للمتأخر */
+              const v = texts[`sup:${r.id}`] ?? (r.tone === "warn" ? support || "" : "");
+              return (
+                <tr key={r.id}>
+                  <td>{r.name}</td>
+                  <td className={r.tone}>{r.state}</td>
+                  <td className="sup">
+                    {onSupport ? (
+                      <input
+                        className="wk-supin"
+                        defaultValue={v}
+                        placeholder="اكتب الدعم المطلوب…"
+                        onBlur={(e) => onSupport(r.id, e.target.value.trim())}
+                      />
+                    ) : (
+                      v || "—"
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}
@@ -192,9 +217,12 @@ const PAIRED = new Set(["nat", "inst", "ses", "cx"]);
 export default function WeeklyReportView({
   report,
   prefs,
+  onSupport,
 }: {
   report: WeekReport;
   prefs: WeeklyPrefs;
+  /** كتابة «الدعم المطلوب» في الصفحة — لمن يملك تحرير التقرير */
+  onSupport?: (id: string, text: string) => void;
 }) {
   const { dir, band, dept } = prefs.layout;
   const r = report;
@@ -255,7 +283,13 @@ export default function WeeklyReportView({
         {rows.map((row, i) => (
           <div className={row.length > 1 ? "wk-two" : ""} key={i}>
             {row.map((d) => (
-              <DomCard d={d} key={d.k} support={(prefs.texts || {}).support} />
+              <DomCard
+                d={d}
+                key={d.k}
+                support={(prefs.texts || {}).support}
+                texts={prefs.texts || {}}
+                onSupport={onSupport}
+              />
             ))}
           </div>
         ))}

@@ -126,6 +126,26 @@ export default function WeeklyPanel({
     [week, weekEnd, log, logPrev, changes, tasks, contacts, items, prefs.on, prefs.texts],
   );
 
+  /* «الدعم المطلوب» يُكتب في الصفحة مباشرةً: يُحفظ لهذا الأسبوع
+     وحده عند مغادرة الحقل، فلا يحتاج فتح الإعدادات */
+  const saveSupport = useCallback(
+    async (id: string, text: string) => {
+      const key = `sup:${id}`;
+      if ((prefs.texts?.[key] || "") === text) return;
+      const next: WeeklyPrefs = { ...prefs, texts: { ...prefs.texts, [key]: text } };
+      setOver(next);
+      const r = await apiFetch("/api/weekly", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope: "week", week, prefs: next }),
+      })
+        .then((x) => x.json())
+        .catch(() => ({ error: "تعذّر الحفظ" }));
+      setMsg(r?.error ? String(r.error) : t("حُفظ الدعم المطلوب ✓", "Saved ✓"));
+    },
+    [prefs, week, t],
+  );
+
   async function save(next: WeeklyPrefs, scope: "default" | "week") {
     setBusy(true);
     setMsg("");
@@ -211,7 +231,11 @@ export default function WeeklyPanel({
       {loading ? (
         <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>
       ) : (
-        <WeeklyReportView report={report} prefs={prefs} />
+        <WeeklyReportView
+          report={report}
+          prefs={prefs}
+          onSupport={canEdit ? saveSupport : undefined}
+        />
       )}
 
     </div>
