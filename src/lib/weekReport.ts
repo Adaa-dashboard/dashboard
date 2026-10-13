@@ -66,7 +66,6 @@ export type Line = { name: string; detail?: string };
 
 export type Dom = {
   k: string;
-  icon: string;
   title: string;
   /** عدد ما تغيّر في هذا المجال خلال الأسبوع */
   updates: number;
@@ -99,14 +98,16 @@ export type WeekReport = {
 export const DOM_KEYS = ["task", "nat", "inst", "ses", "cx", "proj", "crq"] as const;
 export type DomKey = (typeof DOM_KEYS)[number];
 
-export const DOM_META: Record<DomKey, { icon: string; title: string }> = {
-  task: { icon: "📋", title: "حالة التكليفات" },
-  nat: { icon: "🏛️", title: "الاستراتيجيات الوطنية" },
-  inst: { icon: "🏢", title: "الاستراتيجيات المؤسسية" },
-  ses: { icon: "🗓️", title: "جلسات مراجعة الأداء" },
-  cx: { icon: "👥", title: "تجربة المستفيد" },
-  proj: { icon: "📊", title: "حالة المشاريع الاستراتيجية" },
-  crq: { icon: "🔄", title: "مراجعة طلبات التغيير" },
+/* الأيقونة ليست هنا: الواجهة ترسمها بأيقونات المنصة نفسها
+   (`icons.tsx`) حسب المفتاح، فلا رموز تعبيرية في التقرير */
+export const DOM_META: Record<DomKey, { title: string }> = {
+  task: { title: "حالة التكليفات" },
+  nat: { title: "الاستراتيجيات الوطنية" },
+  inst: { title: "الاستراتيجيات المؤسسية" },
+  ses: { title: "جلسات مراجعة الأداء" },
+  cx: { title: "تجربة المستفيد" },
+  proj: { title: "حالة المشاريع الاستراتيجية" },
+  crq: { title: "مراجعة طلبات التغيير" },
 };
 
 /* المنجز إلى أي مجال ينتمي */

@@ -18,6 +18,31 @@
 import { asset } from "@/lib/base";
 import { listOf, type WeeklyPrefs } from "@/lib/weeklyPrefs";
 import type { Dom, Slice, WeekReport } from "@/lib/weekReport";
+import {
+  IconAward, IconCalendar, IconCheck3, IconCx, IconInst, IconNat,
+  IconProj, IconSess, IconSwap, IconTarget,
+} from "./icons";
+
+/* أيقونات المنصة نفسها — بيضاء محدَّدة بالأخضر، لا رموز تعبيرية
+   يرسمها كل نظامٍ بألوانه */
+type Ico = (p: { size?: number }) => React.ReactElement;
+const DOM_ICON: Record<string, Ico> = {
+  task: IconCheck3,
+  nat: IconNat,
+  inst: IconInst,
+  ses: IconSess,
+  cx: IconCx,
+  proj: IconProj,
+  crq: IconSwap,
+};
+
+function Badge({ icon: I, lg }: { icon: Ico; lg?: boolean }) {
+  return (
+    <span className={`wk-ic ${lg ? "lg" : ""}`}>
+      <I size={lg ? 21 : 15} />
+    </span>
+  );
+}
 
 const AR_MONTHS = [
   "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
@@ -94,7 +119,7 @@ function DomCard({ d }: { d: Dom }) {
   return (
     <div className="wk-card">
       <div className="wk-ch">
-        <i>{d.icon}</i>
+        <Badge icon={DOM_ICON[d.k] || IconAward} />
         <b>{d.title}</b>
         <span className="wk-cnt">{d.updates} تحديثاً</span>
       </div>
@@ -207,12 +232,15 @@ export default function WeeklyReportView({
           <img src={asset("/adaa-logo.png")} alt="أداء" className="wkx-logo" />
           <h2>الإنجاز الأسبوعي</h2>
           <div className="wkx-dept">{dept}</div>
-          <div className="wkx-dt">📅 {rangeText2(r.weekStart, r.weekEnd)}</div>
+          <div className="wkx-dt">
+            <IconCalendar size={13} />
+            {rangeText2(r.weekStart, r.weekEnd)}
+          </div>
         </header>
 
         <div className="wk-kpi">
           <div>
-            <span className="tile">📄</span>
+            <Badge icon={IconAward} lg />
             <span className="tx">
               <b>{r.total}</b>
               <span>تحديثاً هذا الأسبوع</span>
@@ -244,7 +272,7 @@ export default function WeeklyReportView({
         {prefs.on.next !== false && next.length > 0 && (
           <div className="wk-card">
             <div className="wk-ch">
-              <i>🎯</i>
+              <Badge icon={IconTarget} />
               <b>الخطوات القادمة</b>
             </div>
             <ol className="wk-nx">
