@@ -168,11 +168,11 @@ export default function WeeklyPanel({
     [week, weekEnd, log, logPrev, changes, tasks, contacts, items, prefs.on, prefs.texts],
   );
 
-  /* اختيار ما يظهر من التكاليف — يُحفظ لهذا الأسبوع وحده فور
-     الضغط، فلا يحتاج فتح الإعدادات */
-  const pickTask = useCallback(
-    async (id: string, keep: boolean) => {
-      const key = `tsk:${id}`;
+  /* اختيار ما يظهر من التكاليف والمشاريع — يُحفظ لهذا الأسبوع
+     وحده فور الضغط، فلا يحتاج فتح الإعدادات. المفتاح يصل كاملاً
+     من العرض (`tsk:<id>` أو `prj:<name>`) */
+  const pickRow = useCallback(
+    async (key: string, keep: boolean) => {
       const next: WeeklyPrefs = { ...prefs, on: { ...prefs.on, [key]: keep } };
       setOver(next);
       const r = await apiFetch("/api/weekly", {
@@ -296,7 +296,7 @@ export default function WeeklyPanel({
         <WeeklyReportView
           report={report}
           prefs={prefs}
-          onPick={canEdit ? pickTask : undefined}
+          onPick={canEdit ? pickRow : undefined}
           onTaskSup={canEdit ? saveTaskSup : undefined}
         />
       )}

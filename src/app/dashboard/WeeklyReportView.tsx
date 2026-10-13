@@ -91,8 +91,9 @@ function DomCard({
   on: Record<string, boolean>;
   /** النصوص المحفوظة — `sup:<id>` دعمُ تكليفٍ بعينه */
   texts: Record<string, string>;
-  /** يُمرَّر لمن يملك التحرير — فيُختار ما يظهر من التكاليف */
-  onPick?: (id: string, keep: boolean) => void;
+  /** يُمرَّر لمن يملك التحرير — فيُختار ما يظهر من التكاليف
+      والمشاريع. المفتاح كامل: `tsk:<id>` أو `prj:<name>` */
+  onPick?: (key: string, keep: boolean) => void;
   /** دعم التكليف يُكتب في خلّيته مباشرة */
   onTaskSup?: (id: string, text: string) => void;
 }) {
@@ -165,7 +166,7 @@ function DomCard({
                           type="checkbox"
                           checked={keep}
                           title="يظهر في التقرير"
-                          onChange={(e) => onPick(r.id, e.target.checked)}
+                          onChange={(e) => onPick(`tsk:${r.id}`, e.target.checked)}
                         />
                       </td>
                     )}
@@ -203,8 +204,21 @@ function DomCard({
 
       {d.bars && (
         <div className="wk-bars">
-          {d.bars.map((b) => (
-            <div className="wk-pr" key={b.name}>
+          {d.bars
+            .filter((b) => onPick || on[`prj:${b.name}`] !== false)
+            .map((b) => {
+              const keep = on[`prj:${b.name}`] !== false;
+              return (
+            <div className={`wk-pr ${keep ? "" : "off"}`} key={b.name}>
+              {onPick && (
+                <input
+                  type="checkbox"
+                  className="pick"
+                  checked={keep}
+                  title="يظهر في التقرير"
+                  onChange={(e) => onPick(`prj:${b.name}`, e.target.checked)}
+                />
+              )}
               <span className="nm">{b.name}</span>
               <span className="bar">
                 <i className={b.late ? "a" : ""} style={{ width: `${Math.max(0, Math.min(100, b.pct))}%` }} />
@@ -218,7 +232,8 @@ function DomCard({
                 {b.plan > 0 && <em>المخطط {b.plan}%</em>}
               </span>
             </div>
-          ))}
+              );
+            })}
         </div>
       )}
 
@@ -255,8 +270,8 @@ export default function WeeklyReportView({
 }: {
   report: WeekReport;
   prefs: WeeklyPrefs;
-  /** اختيار ما يظهر من التكاليف — لمن يملك تحرير التقرير */
-  onPick?: (id: string, keep: boolean) => void;
+  /** اختيار ما يظهر من التكاليف والمشاريع — لمن يملك التحرير */
+  onPick?: (key: string, keep: boolean) => void;
   /** دعم كل تكليف يُكتب في جدوله مباشرة */
   onTaskSup?: (id: string, text: string) => void;
 }) {
