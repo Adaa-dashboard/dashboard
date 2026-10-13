@@ -133,11 +133,13 @@ function period(q: string): { from: string; to: string; label: string } | null {
   return null;
 }
 
-type Ctx = {
+export type Ctx = {
   me: Me;
   tasks: Rec[];
   rows: Rec[];
   changes: Rec[];
+  /* سجلّ الجهات — الاسم والقطاع والأسماء البديلة ونقاط التواصل */
+  entities: EntReg[];
   /* بنود الأقسام الخمسة من نظرة عامة — مفتاحها اسم القسم */
   sections: Record<string, Rec[]>;
   /* أسماء الأشخاص — لنسبة المهمة المتأخرة إلى من كُلِّف بها */
@@ -145,6 +147,16 @@ type Ctx = {
   /* تغطية الاجتماعات الربعية لكل عضو في الفريق — أعداد فقط،
      تأتي من دالة في القاعدة ولا تحمل شيئاً من محتوى المحافظ */
   team: { name: string; done: number; total: number }[];
+};
+
+export type EntReg = {
+  id: string;
+  name: string;
+  kind?: string;
+  sector?: string;
+  aliases?: string[];
+  ours?: Rec[];
+  theirs?: Rec[];
 };
 
 /* ---------------- زبدة الأقسام الخمسة ----------------
@@ -198,6 +210,224 @@ const SEC_OPEN: Record<SecKey, Ans["open"]> = {
   cx: { tab: "cx", label: "افتح صفحة أعمال قياس تجربة المستفيد" },
   projects: { tab: "projects", label: "افتح صفحة المشاريع الاستراتيجية" },
 };
+
+/* ============================================================
+   ملفّ الجهة — ملخّصٌ تنفيذيٌّ واحد يجمع ما في المنصة كلها عنها
+   ------------------------------------------------------------
+   «عطني كل شيء عن وزارة الحج» أو «ملخص عن هيئة كذا» أو اسمُها
+   مجرَّداً. الجواب يُركَّب لحظةَ السؤال من صفوف الأقسام نفسها،
+   فلا رقم مخزَّن يتقادم، وما لا يملك صاحبُ الحساب صلاحيتَه لا
+   يصل إليه أصلاً (تحجبه RLS) فلا يظهر في الملفّ.
+   ============================================================ */
+
+/** تطبيعٌ لمطابقة أسماء الجهات: بلا همزات ولا «ال» ولا مسافات زائدة */
+const eNrm = (v: unknown) => nrm(txt(v)).replace(/\s+/g, " ").trim();
+
+/** الجهة التي ورد اسمها (أو أحد أسمائها البديلة) في السؤال */
+export function findEntity(q: string, c: Ctx): { name: string; reg?: EntReg } | null {
+  const nq = eNrm(q);
+  let name = "";
+  let reg: EntReg | undefined;
+  let len = 0;
+  const take = (cand: string, r?: EntReg) => {
+    const n = eNrm(cand);
+    /* أربعة أحرف فأكثر: «نقل» و«بلد» تقع داخل كلماتٍ أخرى */
+    if (n.length < 5 || !nq.includes(n) || n.length <= len) return;
+    name = r?.name || cand;
+    reg = r;
+    len = n.length;
+  };
+  for (const e of c.entities) {
+    take(e.name, e);
+    for (const a of e.aliases || []) take(a, e);
+  }
+  /* جهةٌ في بيانات الأقسام ولم تُسجَّل في سجلّ الجهات بعد */
+  if (!name)
+    for (const k of ["sessions", "inststrat", "natstrat", "cx", "notesq"]) {
+      for (const r of c.sections[k] || []) {
+        const d = (r.data || {}) as Rec;
+        take(txt(d.entity) || txt(d.owner) || txt(d.name));
+      }
+    }
+  return name ? { name, reg } : null;
+}
+
+/** ملفّ الجهة: سطورٌ مجموعة من كل قسمٍ فيه ذكرٌ لها */
+export function entityBrief(ent: { name: string; reg?: EntReg }, c: Ctx): Ans {
+  const d = (x: Rec) => (x.data || {}) as Rec;
+  const names = new Set([ent.name, ...(ent.reg?.aliases || [])].map(eNrm));
+  const same = (v: unknown) => {
+    const n = eNrm(v);
+    return !!n && names.has(n);
+  };
+  const of = (k: string, f: (d: Rec) => unknown) =>
+    (c.sections[k] || []).filter((r) => same(f(d(r))));
+
+  const L: string[] = [];
+  const chips: Ans["chips"] = [];
+
+  /* ---- التعريف ---- */
+  const sector =
+    txt(ent.reg?.sector) ||
+    txt(d(of("inststrat", (x) => x.owner)[0] || {}).sector) ||
+    txt(d(of("natstrat", (x) => x.owner)[0] || {}).sector);
+  if (sector) chips.push({ k: "القطاع", v: sector });
+  const kind = txt(ent.reg?.kind);
+  const idLine = [sector && `القطاع: ${sector}`, kind && `النوع: ${kind}`].filter(Boolean).join(" · ");
+  if (idLine) L.push(idLine);
+
+  /* ---- من يتولّاها من المركز ---- */
+  const ours = (ent.reg?.ours || []) as Rec[];
+  const roleOf = (r: string) => ours.filter((x) => txt(x.role) === r).map((x) => txt(x.userName) || txt(x.name)).filter(Boolean);
+  const main = roleOf("أساسي");
+  const alt = roleOf("بديل");
+  const vro = ours.filter((x) => txt(x.role).includes("vro") || txt(x.role).toLowerCase().includes("vro")).map((x) => txt(x.name));
+  const inst0 = of("inststrat", (x) => x.owner)[0];
+  const cons = main.length ? main : [txt(d(inst0 || {}).consultant)].filter(Boolean);
+  if (cons.length || alt.length || vro.length)
+    L.push(
+      [
+        cons.length && `الاستشاري: ${cons.join("، ")}`,
+        alt.length && `البديل: ${alt.join("، ")}`,
+        vro.length && `مكتب VRO: ${vro.join("، ")}`,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    );
+
+  /* ---- نقطة التواصل من الجهة ---- */
+  const theirs = (ent.reg?.theirs || []) as Rec[];
+  if (theirs.length)
+    L.push(
+      "تواصل الجهة: " +
+        theirs
+          .slice(0, 3)
+          .map((x) => [txt(x.name), txt(x.jobTitle)].filter(Boolean).join(" — "))
+          .join(" · "),
+    );
+
+  /* ---- جلسة مراجعة الأداء ---- */
+  const sess = of("sessions", (x) => x.entity)[0];
+  if (sess) {
+    const s0 = d(sess);
+    const raw = Array.isArray(s0.stages) ? (s0.stages as unknown[]) : [];
+    const full = raw.length || 6;
+    const done = Math.max(0, Math.min(full, num(s0.done)));
+    const bits = [
+      `الجلسة: ${done}/${full} مراحل`,
+      txt(s0.quarter) && txt(s0.quarter),
+      num(s0.perf) ? `الأداء العام ${num(s0.perf)}%` : "",
+      num(s0.kpiTot) ? `المؤشرات المتعثرة ${num(s0.kpiBad)} من ${num(s0.kpiTot)}` : "",
+      num(s0.initTot) ? `المبادرات المتعثرة ${num(s0.initBad)} من ${num(s0.initTot)}` : "",
+      num(s0.esc) ? `تصعيد من المستوى ${num(s0.esc)}` : "",
+    ].filter(Boolean);
+    L.push(bits.join(" · "));
+    if (txt(s0.note).trim()) L.push(`أبرز التحديات: ${txt(s0.note).trim()}`);
+  }
+
+  /* ---- استراتيجياتها الوطنية ---- */
+  const nat = of("natstrat", (x) => x.owner);
+  for (const r of nat.slice(0, 4)) {
+    const n0 = d(r);
+    const st = Math.max(1, Math.min(4, num(n0.stage, 1)));
+    L.push(
+      [
+        `استراتيجية وطنية: ${txt(n0.name) || "بلا اسم"}`,
+        NAT_STEPS[st - 1],
+        num(n0.meas) ? `قابلية القياس ${num(n0.meas)}%` : "",
+        n0.tech ? "مقبولة فنياً" : "غير مقبولة فنياً",
+        num(n0.kpisTot) ? `المؤشرات ${num(n0.kpisRep)} من ${num(n0.kpisTot)}` : "",
+        txt(n0.period) && `الفترة ${txt(n0.period)}`,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    );
+  }
+  if (nat.length > 4) L.push(`… و${nat.length - 4} استراتيجية وطنية أخرى لها.`);
+
+  /* ---- استراتيجيتها المؤسسية ---- */
+  if (inst0) {
+    const i0 = d(inst0);
+    L.push(
+      [
+        "الاستراتيجية المؤسسية:",
+        txt(i0.rep) || "تسمية الممثل لم تُسجَّل",
+        txt(i0.meet) ? `الاجتماع التعريفي ${txt(i0.meet)}` : "",
+        txt(i0.docsState) ? `الوثائق ${txt(i0.docsState)}` : txt(i0.docs) === "✓" ? "الوثائق مستلمة" : "",
+        txt(i0.live) ? `القياس ${txt(i0.live)}` : "",
+        txt(i0.target) ? `المستهدف ${txt(i0.target)}` : "",
+        txt(i0.phase),
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    );
+  }
+
+  /* ---- قياس تجربة المستفيد ---- */
+  const cx0 = of("cx", (x) => x.name)[0] || of("cx", (x) => x.owner)[0];
+  if (cx0) {
+    const x0 = d(cx0);
+    L.push(
+      [
+        "تجربة المستفيد:",
+        txt(x0.meet) ? `الاجتماع التعريفي ${txt(x0.meet)}` : "",
+        txt(x0.survey) ? `حصر الخدمات ${txt(x0.survey)}` : "",
+        txt(x0.card) ? `بطاقة القياس ${txt(x0.card)}` : "",
+        num(x0.servPlan) ? `الخدمات المخطط قياسها ${num(x0.servPlan)}` : "",
+        txt(x0.counted) ? `احتُسب في المؤشر: ${txt(x0.counted)}` : "",
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    );
+  }
+
+  /* ---- جودة ملاحظات الأداء: آخر ربعٍ لها ---- */
+  const nq = of("notesq", (x) => x.entity);
+  if (nq.length) {
+    const last = nq[nq.length - 1];
+    const q0 = d(last);
+    L.push(
+      [
+        "جودة ملاحظات الأداء:",
+        txt(q0.quarter),
+        txt(q0.pct) !== "" ? `الالتزام ${num(q0.pct)}%` : "",
+        num(q0.total) ? `${num(q0.total)} عنصراً` : "",
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    );
+  }
+
+  /* ---- طلبات التغيير ---- */
+  const chs = c.changes.filter((x) => same(x.owner));
+  if (chs.length) {
+    const openCr = chs.filter((x) => txt(x.status) === "open");
+    const lateCr = openCr.filter(
+      (x) => x.sla != null && x.workDays != null && Number(x.workDays) >= Number(x.sla),
+    );
+    chips.push({ k: "طلبات مفتوحة", v: String(openCr.length) });
+    if (lateCr.length) chips.push({ k: "متأخرة", v: String(lateCr.length), tone: "r" });
+    L.push(
+      `طلبات التغيير: ${openCr.length} مفتوح${lateCr.length ? ` منها ${lateCr.length} تجاوز مدّته` : ""} · ${chs.length - openCr.length} تمت مراجعته`,
+    );
+    for (const x of lateCr.slice(0, 3))
+      L.push(`— ${txt(x.code)} ${txt(x.itemName)}`.trim());
+  }
+
+  if (!L.length)
+    L.push("لا توجد بيانات مسجّلة عن هذه الجهة في الأقسام التي تملك صلاحيتها.");
+
+  return {
+    title: ent.name,
+    icon: "building",
+    chips,
+    lines: L,
+    note: "ملفٌّ تنفيذيٌّ مركَّب الآن من صفوف الأقسام — لا رقم مخزَّن، ولا يظهر فيه ما لا تملك صلاحيته.",
+    open: c.me.scopes.includes("entities")
+      ? { tab: "entities", label: "افتح سجلّ الجهات" }
+      : undefined,
+  };
+}
 
 /** ملخّص قسم واحد — الأرقام أولاً ثم أبرز البنود */
 function sectionBrief(k: SecKey, items: Rec[]): Ans {
@@ -772,11 +1002,12 @@ const HELP: Ans = {
         "«عطني الزبدة من الاستراتيجيات الوطنية» — وكذلك: جلسات مراجعة الأداء · الاستراتيجيات المؤسسية · أعمال قياس تجربة المستفيد · المخرجات الوطنية · المشاريع الاستراتيجية",
         "«كم استراتيجية مؤسسية مخطط تفعيلها الربع الثالث؟» — أسأل عن قسم بقيد، فأعدّ لك من صفحته وأسمّي الصفوف",
         "«كم جهة فُعِّل قياسها؟» · «كم استراتيجية وطنية معتمدة من مجلس الوزراء؟» · «كم جهازاً لم يبدأ في تجربة المستفيد؟»",
+        "«عطني كل شيء عن (اسم الجهة)» — ملفٌّ تنفيذيٌّ واحد يجمع ما في المنصة كلها عنها: جلستها واستراتيجياتها وتجربة المستفيد وجودة ملاحظاتها وطلبات تغييرها. ويكفي أن تكتب اسم الجهة مجرَّداً.",
       ],
       note: "الإجابات تُحسب من بياناتك داخل متصفحك — لا يخرج منها شيء.",
     };
 
-function answer(q0: string, c: Ctx): Ans {
+export function answer(q0: string, c: Ctx): Ans {
   const q = q0.trim();
   const mine = c.tasks.filter((x) => x.assigneeId === c.me.id);
   const open = mine.filter((x) => x.state !== "done");
@@ -843,6 +1074,20 @@ function answer(q0: string, c: Ctx): Ans {
      «أهم ما عندك الآن»، والشرح خلف زر ⓘ */
   if (has(q, "مساعدة", "وش تقدر", "ماذا تستطيع", "الأوامر", "وش أقدر أسوي", "وش اقدر اسوي"))
     return HELP;
+
+  /* ---- ملفّ الجهة: **قبل زبدة الأقسام** — اسم الجهة قد يحوي
+     «وطني» أو «مؤسسي» فيخطفه فرع القسم وإلا ---- */
+  {
+    const asked = has(
+      q, "كل شي عن", "كل شيء عن", "كل شى عن", "ملخص عن", "ملخص تنفيذي", "ملف الجهة",
+      "نبذة عن", "معلومات عن", "وش عندنا عن", "عطني عن", "اعطني عن", "ايش عندنا عن",
+    );
+    const ent = asked || q.trim().length <= 60 ? findEntity(q, c) : null;
+    /* الاسم مجرَّداً يكفي، أو مع عبارة طلبٍ صريحة. وسؤالٌ طويلٌ
+       بلا عبارة طلب يُترك لفروعه — فقد يكون سؤالاً عن رقمٍ بعينه */
+    if (ent && (asked || eNrm(q).replace(eNrm(ent.name), "").trim().length <= 12))
+      return entityBrief(ent, c);
+  }
 
   /* زبدة قسم من نظرة عامة — قبل بقية الفروع لأن كلمة
      «الاستراتيجيات» يخطفها فرع «جهاتي» وإلا */
@@ -1080,6 +1325,7 @@ const SUGGEST = [
   "وش هذي المنصة؟",
   "وش أقدر أفتح؟",
   "أهم شي عندي الآن",
+  "عطني كل شيء عن وزارة الصحة",
   "عطني الزبدة من الاستراتيجيات الوطنية",
   "كم استراتيجية مؤسسية مخطط تفعيلها الربع الثالث؟",
   "كم جهازاً صدر له تقرير في تجربة المستفيد؟",
@@ -1111,16 +1357,21 @@ export default function Assistant({
   const box = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
-    const KEYS = ["sessions", "natstrat", "inststrat", "outputs", "cx", "projects"];
+    /* `notesq` أُضيف لأجل ملفّ الجهة — نسبة التزامها بمعايير
+       ملاحظات الأداء جزءٌ من ملخّصها */
+    const KEYS = ["sessions", "natstrat", "inststrat", "outputs", "cx", "projects", "notesq"];
     /* تغطية الفريق لا تُطلب إلا لمن له فريق — والدالة نفسها
        تتحقّق في القاعدة، فالطلب هنا توفيرٌ لا حماية */
     const leads = me.isLead || me.scopes.includes("users");
-    const [tk, pf, tm, ...secs] = await Promise.all([
+    const [tk, pf, tm, er, cr, ...secs] = await Promise.all([
       apiFetch("/api/tasks").then((r) => r.json()).catch(() => ({})),
       apiFetch("/api/portfolio").then((r) => r.json()).catch(() => ({})),
       leads
         ? apiFetch("/api/team/quarter").then((r) => r.json()).catch(() => ({}))
         : Promise.resolve({}),
+      /* سجلّ الجهات وطلبات التغيير — مصدرا ملفّ الجهة */
+      apiFetch("/api/entities").then((r) => r.json()).catch(() => ({})),
+      apiFetch("/api/changes").then((r) => r.json()).catch(() => ({})),
       /* القسم الذي لا يملك صاحب الحساب صلاحيته يرجع فارغاً من RLS،
          فلا يرى في الزبدة ما لا يراه في الصفحة */
       ...KEYS.map((k) =>
@@ -1135,7 +1386,8 @@ export default function Assistant({
       me,
       tasks: tk.tasks || [],
       rows: pf.items || [],
-      changes: [],
+      changes: (cr.changes || []) as Rec[],
+      entities: (er.entities || []) as EntReg[],
       sections,
       people: (tk.people || []) as { id: string; name: string }[],
       team: (tm.team || []) as { name: string; done: number; total: number }[],
