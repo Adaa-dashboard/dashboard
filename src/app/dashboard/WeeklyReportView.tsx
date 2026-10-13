@@ -245,7 +245,7 @@ export default function WeeklyReportView({
           <div>
             <Ring pct={r.crPct ?? 0} />
             <span className="tx">
-              <b className="sm">نسبة الالتزام في طلبات التغيير</b>
+              <b className="sm">نسبة الالتزام في مراجعة طلبات التغيير</b>
               <span>{crNewText(r.crNew)}</span>
               {r.crPctPrev != null && <em>مقابل {r.crPctPrev}% الأسبوع الماضي</em>}
             </span>
