@@ -78,7 +78,7 @@ export type Slice = {
 /** شريط مشروع: الإنجاز الفعلي، والمخطط له (المستهدف عند تاريخه) */
 export type Bar = { name: string; pct: number; plan: number; late: boolean };
 export type Stat = { n: number; label: string; tone: "ok" | "warn" | "mute"; icon?: string };
-export type Line = { name: string; detail?: string };
+export type Line = { name: string; detail?: string; id?: string };
 /** بندٌ تقدّم هذا الأسبوع — لونه لون شريحته في الحلقة */
 export type Up = { name: string; label: string; color: string };
 
@@ -152,7 +152,7 @@ const KIND_DOM: Record<string, DomKey> = {
 function touchedIn(items: ItemLite[], a: string, b: string): Line[] {
   return items
     .filter((it) => inRange(txt(it.updatedAt), a, b))
-    .map((it) => ({ name: txt(it.data.name) || txt(it.data.entity) || it.id }))
+    .map((it) => ({ id: it.id, name: txt(it.data.name) || txt(it.data.entity) || it.id }))
     .filter((l) => !!l.name);
 }
 
@@ -161,7 +161,7 @@ function linesOf(list: Ach[]): Line[] {
   const seen = new Map<string, Line>();
   for (const a of list) {
     const nm = a.name || "—";
-    seen.set(nm, { name: nm, detail: a.detail });
+    seen.set(nm, { name: nm, detail: a.detail, id: a.id });
   }
   return [...seen.values()];
 }
@@ -407,20 +407,28 @@ function upsIn(
   label: (d: Rec) => string,
   slices: Slice[],
 ) {
+  /* المطابقة **بالمعرّف أولاً**: اسم البند في السجلّ قد يختلف عن
+     اسمه في الجدول (تسميةٌ من جدول الجهات، أو مسافةٌ زائدة)، فكان
+     المخرج يخلو من السهم رغم وقوع التقدّم فعلاً */
+  const byId = new Map(items.map((it) => [it.id, it]));
   const byName = new Map<string, ItemLite>();
   for (const it of items) {
     const nm = txt(it.data.name) || txt(it.data.entity);
-    if (nm) byName.set(nm, it);
+    if (nm) byName.set(nm.trim(), it);
   }
   const color = new Map(slices.map((x) => [x.label, x.color]));
   const count: Record<string, number> = {};
   const named: Up[] = [];
   for (const l of lines) {
-    const it = byName.get(l.name);
-    if (!it) continue;
-    const lab = label(it.data);
-    count[lab] = (count[lab] || 0) + 1;
-    named.push({ name: l.name, label: lab, color: color.get(lab) || "#1b9c74" });
+    const it = (l.id && byId.get(l.id)) || byName.get(l.name.trim());
+    const lab = it ? label(it.data) : "";
+    /* بندٌ لم يعد في الجدول (حُذف مثلاً): يبقى اسمه بلا لون شريحة */
+    if (lab) count[lab] = (count[lab] || 0) + 1;
+    named.push({
+      name: it ? txt(it.data.name) || txt(it.data.entity) || l.name : l.name,
+      label: lab,
+      color: (lab && color.get(lab)) || "#9aa6a2",
+    });
   }
   return { count, named };
 }

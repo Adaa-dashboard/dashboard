@@ -28,6 +28,8 @@ export type LogRow = {
 export type Ach = {
   /** مفتاح النوع — به تُجمع البطاقات */
   k: string;
+  /** معرّف البند في قسمه — المطابقة به أوثق من المطابقة بالاسم */
+  id?: string;
   /** اسم البند: الجهة أو الاستراتيجية */
   name: string;
   /** تفصيلٌ قصير يظهر تحت الاسم: «40% ← 100%» */
@@ -92,7 +94,7 @@ const CX_FIELDS: Record<string, string> = {
  * لا يُعدّ إنجازاً (تصحيح اسم، تراجعٌ في قيمة، حقلٌ لا يعنينا).
  */
 export function achOf(r: LogRow): Ach | null {
-  const base = { name: r.name || r.itemId, at: r.at, by: r.byName };
+  const base = { id: r.itemId, name: r.name || r.itemId, at: r.at, by: r.byName };
   const o = r.oldVal.trim();
   const n = r.newVal.trim();
   if (r.field === "__new") return null;

@@ -2735,7 +2735,7 @@ table.matrix thead th {
   gap: 7px;
   font-size: 10.5px;
   color: var(--ink-2);
-  line-height: 1.95;
+  line-height: 1.6;
 }
 .wk-lg i {
   flex: 0 0 auto;
@@ -2765,28 +2765,29 @@ table.matrix thead th {
 /* ما تقدّم هذا الأسبوع — تحت الحلقة: نقطةٌ بلون مرحلته ثم اسمه */
 .wk-ups {
   list-style: none;
-  margin: 10px 0 0;
-  padding: 9px 0 0;
+  margin: 9px 0 0;
+  padding: 8px 0 0;
   border-top: 1px solid var(--line2);
 }
 .wk-ups li {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   font-size: 10px;
   color: var(--text);
-  line-height: 1.95;
+  line-height: 1.6;
 }
+/* نقطةٌ أصغر من نقاط الأسطورة فوقها، فلا تُخلط بها */
 .wk-ups li i {
   flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
 }
 .wk-ups li.more {
   color: var(--muted);
   font-size: 9.5px;
-  padding-inline-start: 15px;
+  padding-inline-start: 11px;
 }
 
 .wk-note2 {
