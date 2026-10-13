@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.4",
+    "html2canvas-pro": "^2.5.0",
+    "jspdf": "^4.2.1",
     "next": "^15.5.25",
     "nodemailer": "^6.10.0",
     "pdfjs-dist": "^4.10.38",
@@ -26,6 +28,7 @@
     "@types/pg": "^8.20.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "playwright": "^1.64.0",
     "typescript": "^5.7.0"
   }
 }

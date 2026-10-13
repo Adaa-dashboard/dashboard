@@ -97,6 +97,61 @@ function printReport() {
   w.addEventListener("afterprint", () => w.close());
 }
 
+/* ============================================================
+   تنزيل PDF بلا نظام الطباعة — بعض الأجهزة تقف معاينة الطباعة
+   فيها على «Loading preview…» وخانة الطابعة تدور بلا نهاية:
+   العطل في خدمة الطباعة بويندوز لا في الصفحة، ولا حيلة للمتصفح.
+   فنرسم الورقة بأنفسنا إلى صورة ثم نقطّعها صفحاتِ A4 في ملف PDF
+   يُنزَّل مباشرة. المكتبتان تُحمَّلان عند الضغط لا مع الصفحة.
+   ============================================================ */
+async function makePdf(week: string, landscape: boolean) {
+  const el = document.querySelector(".wkx") as HTMLElement | null;
+  if (!el) return;
+  const [h2c, jsp] = await Promise.all([import("html2canvas-pro"), import("jspdf")]);
+  /* أدوات التحرير ليست من التقرير — تُخفى أثناء التصوير */
+  document.body.classList.add("wk-shot");
+  const scale = 2;
+  let canvas: HTMLCanvasElement;
+  /* مواضع نهايات البطاقات — لنقطع الصفحة بينها لا في وسط بطاقة */
+  let stops: number[] = [];
+  try {
+    canvas = await h2c.default(el, { scale, backgroundColor: "#ffffff", useCORS: true });
+    const top = el.getBoundingClientRect().top;
+    stops = Array.from(el.querySelectorAll<HTMLElement>(".wkx-in > *, .wk-two > .wk-card"))
+      .map((n) => (n.getBoundingClientRect().bottom - top) * scale)
+      .sort((a, b) => a - b);
+  } finally {
+    document.body.classList.remove("wk-shot");
+  }
+  const pdf = new jsp.jsPDF({ orientation: landscape ? "l" : "p", unit: "mm", format: "a4" });
+  const pad = 6;
+  const pw = pdf.internal.pageSize.getWidth() - pad * 2;
+  const ph = pdf.internal.pageSize.getHeight() - pad * 2;
+  /* ارتفاع الصفحة الواحدة بالبكسل على مقياس الصورة */
+  const pageH = Math.floor((canvas.width * ph) / pw);
+  let y = 0;
+  while (y < canvas.height) {
+    const room = Math.min(pageH, canvas.height - y);
+    /* أقرب نهاية بطاقة تقع داخل الصفحة — ولا نقبلها إن كانت تترك
+       أكثر من ثلث الصفحة بياضاً، فالأبيض الكثير أسوأ من قطعٍ نظيف */
+    const fit = stops.filter((s) => s > y + pageH * 0.55 && s <= y + room);
+    const h = Math.round(room < pageH ? room : fit.length ? fit[fit.length - 1] - y : room);
+    const cut = document.createElement("canvas");
+    cut.width = canvas.width;
+    cut.height = h;
+    const ctx = cut.getContext("2d");
+    if (ctx) {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, cut.width, cut.height);
+      ctx.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+    }
+    if (y > 0) pdf.addPage();
+    pdf.addImage(cut.toDataURL("image/jpeg", 0.92), "JPEG", pad, pad, pw, (h * pw) / canvas.width);
+    y += h;
+  }
+  pdf.save(`الإنجاز-الأسبوعي-${week}.pdf`);
+}
+
 export default function WeeklyPanel({
   t,
   canEdit = false,
@@ -118,6 +173,7 @@ export default function WeeklyPanel({
   const [logErr, setLogErr] = useState("");
   const [base, setBase] = useState<unknown>(null);
   const [over, setOver] = useState<unknown>(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
   const [canShare, setCanShare] = useState(false);
   const [loading, setLoading] = useState(true);
   const [tune, setTune] = useState(false);
@@ -307,8 +363,25 @@ export default function WeeklyPanel({
           <button className="btn btn-ghost" onClick={() => setTune(true)}>
             ⚙️ {t("إعدادات التقرير", "Report settings")}
           </button>
-          <button className="btn" onClick={printReport}>
-            {t("تصدير PDF", "Export PDF")}
+          <button className="btn btn-ghost" onClick={printReport}>
+            {t("طباعة", "Print")}
+          </button>
+          <button
+            className="btn"
+            disabled={pdfBusy}
+            onClick={async () => {
+              setPdfBusy(true);
+              setMsg(t("جارٍ تجهيز الملف…", "Preparing the file…"));
+              try {
+                await makePdf(week, prefs.layout.dir === "h");
+                setMsg(t("نُزِّل الملف ✓", "Downloaded ✓"));
+              } catch (e) {
+                setMsg(`${t("تعذّر التصدير", "Export failed")}: ${(e as Error)?.message || e}`);
+              }
+              setPdfBusy(false);
+            }}
+          >
+            {pdfBusy ? t("جارٍ التجهيز…", "Preparing…") : t("تنزيل PDF", "Download PDF")}
           </button>
         </div>
       </div>

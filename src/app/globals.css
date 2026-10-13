@@ -3263,6 +3263,18 @@ table.matrix thead th {
   }
 }
 
+/* أثناء تصوير الورقة لملف PDF — كالطباعة: لا مربّعات اختيار
+   ولا صفوفَ مستبعَدة */
+.wk-shot .wk-tb th.pick,
+.wk-shot .wk-tb td.pick,
+.wk-shot .wk-pr .pick {
+  display: none !important;
+}
+.wk-shot .wk-tb tr.off,
+.wk-shot .wk-pr.off {
+  display: none !important;
+}
+
 /* نافذة التصدير المستقلة — فيها الورقة وحدها */
 .wk-printing {
   margin: 0;
