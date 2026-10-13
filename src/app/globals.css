@@ -2647,6 +2647,19 @@ table.matrix thead th {
 .wk-tb td.sup {
   color: var(--muted);
 }
+.wk-supnote {
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line2);
+  font-size: 10.5px;
+  color: var(--ink-2);
+  line-height: 1.85;
+}
+.wk-supnote b {
+  color: var(--gold);
+  font-weight: 700;
+}
+
 /* حقل الدعم: يُكتب في الصفحة ويبدو نصّاً حتى يُلمس */
 .wk-supin {
   width: 100%;

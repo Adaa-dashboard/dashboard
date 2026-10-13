@@ -15,6 +15,8 @@
    ولا صفر.
    ============================================================ */
 
+import { useState } from "react";
+
 import { asset } from "@/lib/base";
 import { listOf, type WeeklyPrefs } from "@/lib/weeklyPrefs";
 import type { Dom, WeekReport } from "@/lib/weekReport";
@@ -90,6 +92,8 @@ function DomCard({
   /** يُمرَّر لمن يملك التحرير — فيُكتب الدعم في الصفحة مباشرةً */
   onSupport?: (id: string, text: string) => void;
 }) {
+  /* ما يُكتب في الحقل الآن — قبل أن يصل الحفظ ويعود في `texts` */
+  const [draft, setDraft] = useState<Record<string, string>>({});
   return (
     <div className="wk-card">
       <div className="wk-ch">
@@ -136,8 +140,8 @@ function DomCard({
           </thead>
           <tbody>
             {d.rows.slice(0, 6).map((r) => {
-              /* لكل تكليف دعمه، وإن لم يُكتب فنصّ الإعدادات للمتأخر */
-              const v = texts[`sup:${r.id}`] ?? (r.tone === "warn" ? support || "" : "");
+              /* لكل تكليف دعمه الخاص */
+              const v = draft[r.id] ?? texts[`sup:${r.id}`] ?? "";
               return (
                 <tr key={r.id}>
                   <td>{r.name}</td>
@@ -146,9 +150,13 @@ function DomCard({
                     {onSupport ? (
                       <input
                         className="wk-supin"
-                        defaultValue={v}
+                        value={v}
                         placeholder="اكتب الدعم المطلوب…"
+                        onChange={(e) => setDraft((x) => ({ ...x, [r.id]: e.target.value }))}
                         onBlur={(e) => onSupport(r.id, e.target.value.trim())}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                        }}
                       />
                     ) : (
                       v || "—"
@@ -159,6 +167,14 @@ function DomCard({
             })}
           </tbody>
         </table>
+      )}
+
+      {/* نصّ «الدعم المطلوب» المكتوب في الإعدادات — يخصّ المجال كله،
+          فيظهر تحت الجدول لا في خلية صفٍّ بعينه */}
+      {d.rows && d.rows.length > 0 && support && (
+        <div className="wk-supnote">
+          <b>الدعم المطلوب:</b> {support}
+        </div>
       )}
 
       {d.big && (
