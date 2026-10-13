@@ -126,13 +126,12 @@ export default function WeeklyPanel({
     [week, weekEnd, log, logPrev, changes, tasks, contacts, items, prefs.on, prefs.texts],
   );
 
-  /* «الدعم المطلوب» يُكتب في الصفحة مباشرةً: يُحفظ لهذا الأسبوع
-     وحده عند مغادرة الحقل، فلا يحتاج فتح الإعدادات */
-  const saveSupport = useCallback(
-    async (id: string, text: string) => {
-      const key = `sup:${id}`;
-      if ((prefs.texts?.[key] || "") === text) return;
-      const next: WeeklyPrefs = { ...prefs, texts: { ...prefs.texts, [key]: text } };
+  /* اختيار ما يظهر من التكاليف — يُحفظ لهذا الأسبوع وحده فور
+     الضغط، فلا يحتاج فتح الإعدادات */
+  const pickTask = useCallback(
+    async (id: string, keep: boolean) => {
+      const key = `tsk:${id}`;
+      const next: WeeklyPrefs = { ...prefs, on: { ...prefs.on, [key]: keep } };
       setOver(next);
       const r = await apiFetch("/api/weekly", {
         method: "PUT",
@@ -141,9 +140,27 @@ export default function WeeklyPanel({
       })
         .then((x) => x.json())
         .catch(() => ({ error: "تعذّر الحفظ" }));
-      setMsg(r?.error ? String(r.error) : t("حُفظ الدعم المطلوب ✓", "Saved ✓"));
+      if (r?.error) setMsg(String(r.error));
     },
-    [prefs, week, t],
+    [prefs, week],
+  );
+
+  /* الدعم المطلوب يُكتب في بطاقته مباشرة — نصٌّ عامٌّ للإدارة
+     يُحفظ لهذا الأسبوع كما تُحفظ بقية كتابة الأسبوع */
+  const saveSupport = useCallback(
+    async (v: string) => {
+      const next: WeeklyPrefs = { ...prefs, texts: { ...prefs.texts, support: v } };
+      setOver(next);
+      const r = await apiFetch("/api/weekly", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope: "week", week, prefs: next }),
+      })
+        .then((x) => x.json())
+        .catch(() => ({ error: "تعذّر الحفظ" }));
+      if (r?.error) setMsg(String(r.error));
+    },
+    [prefs, week],
   );
 
   async function save(next: WeeklyPrefs, scope: "default" | "week") {
@@ -234,6 +251,7 @@ export default function WeeklyPanel({
         <WeeklyReportView
           report={report}
           prefs={prefs}
+          onPick={canEdit ? pickTask : undefined}
           onSupport={canEdit ? saveSupport : undefined}
         />
       )}

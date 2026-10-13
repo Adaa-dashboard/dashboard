@@ -2659,50 +2659,49 @@ table.matrix thead th {
 .wk-tb td.sup {
   color: var(--muted);
 }
-.wk-supnote {
-  margin-top: 9px;
-  padding-top: 8px;
-  border-top: 1px solid var(--line2);
-  font-size: 10.5px;
-  color: var(--ink-2);
-  line-height: 1.85;
+/* مربّع اختيار ما يظهر من التكاليف */
+.wk-tb th.pick,
+.wk-tb td.pick {
+  width: 26px;
+  padding-inline: 2px;
 }
-.wk-supnote b {
-  color: var(--gold);
-  font-weight: 700;
+.wk-tb td.pick input {
+  accent-color: var(--g-600);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+.wk-tb tr.off td {
+  opacity: 0.42;
 }
 
-/* حقل الدعم: يُكتب في الصفحة ويبدو نصّاً حتى يُلمس */
+/* الدعم المطلوب — بطاقةٌ في آخر التقرير، تُكتب في مكانها */
 .wk-supin {
   width: 100%;
-  border: none;
-  border-bottom: 1px dashed var(--border);
+  border: 1px dashed var(--line2);
+  border-radius: 8px;
   background: transparent;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 11.5px;
+  line-height: 1.95;
   color: var(--ink-2);
-  font-family: inherit;
-  font-size: 11px;
-  padding: 2px 2px 3px;
-  border-radius: 0;
-}
-.wk-supin::placeholder {
-  color: var(--muted);
-  opacity: 0.6;
-}
-.wk-supin:hover {
-  border-bottom-color: var(--g-400);
+  resize: vertical;
 }
 .wk-supin:focus {
   outline: none;
-  border-bottom-color: var(--g-600);
-  background: var(--soft);
+  border-color: var(--primary);
+  border-style: solid;
 }
-@media print {
-  .wk-supin {
-    border-bottom: none;
-  }
-  .wk-supin::placeholder {
-    color: transparent;
-  }
+.wk-supp {
+  display: none;
+}
+.wk-sup2 {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--ink-2);
+  line-height: 1.95;
+  white-space: pre-wrap;
 }
 
 /* سطر تحديث الأسبوع — **تحت الحلقة** لا فوقها، فتستوي الحلقات
@@ -3214,6 +3213,9 @@ table.matrix thead th {
   }
   body {
     background: var(--panel);
+  }
+  .wk-supp {
+    display: block !important;
   }
   .no-print,
   .rail,
