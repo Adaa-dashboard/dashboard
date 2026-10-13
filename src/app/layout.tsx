@@ -39,6 +39,24 @@ export default function RootLayout({
               'document.documentElement.setAttribute("dir","ltr");}}catch(e){}',
           }}
         />
+        {/* بعد كل نشرٍ تتغيّر أسماء ملفات الكود، والمتصفح قد يكون
+            محتفظاً بصفحةٍ قديمة تشير إلى ملفٍ لم يعد موجوداً ⇒
+            «Application error: a client-side exception». فنلتقط فشل
+            تحميل أي ملفٍ من `_next/static` ونعيد التحميل **مرة
+            واحدة** (علامةٌ في sessionStorage تُمسح بعد نجاح الفتح)،
+            فتُجلب الصفحة الجديدة بدل شاشة الخطأ */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              '(function(){var re=/Loading chunk|ChunkLoadError|dynamically imported module|module script failed/i;' +
+              'function again(){try{if(sessionStorage.getItem("c_rl"))return;sessionStorage.setItem("c_rl","1");' +
+              'location.reload();}catch(e){}}' +
+              'function isChunk(t){try{return t&&t.tagName==="SCRIPT"&&String(t.src||"").indexOf("/_next/static/")>-1;}catch(e){return false;}}' +
+              'addEventListener("error",function(e){if(isChunk(e&&e.target)||re.test(String(e&&e.message||"")))again();},true);' +
+              'addEventListener("unhandledrejection",function(e){var r=e&&e.reason;re.test(String((r&&r.message)||r||""))&&again();});' +
+              'addEventListener("load",function(){setTimeout(function(){try{sessionStorage.removeItem("c_rl");}catch(e){}},4000);});})();',
+          }}
+        />
       </head>
       <body>{children}</body>
     </html>
