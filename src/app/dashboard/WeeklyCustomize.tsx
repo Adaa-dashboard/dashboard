@@ -59,8 +59,9 @@ export default function WeeklyCustomize({
     layout: { ...DEFAULT_LAYOUT, ...prefs.layout },
   });
 
-  /* المنجزات وحدها في قائمة المفاتيح — الترويسة ثابتة، والنصوص
-     لها مجموعتها */
+  /* المجالات وحدها في قائمة المفاتيح — الترويسة ثابتة، والنصوص
+     لها مجموعتها. والمجال المؤشَّر عليه لا يظهر إن لم يقع فيه
+     تحديثٌ هذا الأسبوع: الإخفاء يمنع، ولا يُنشئ. */
   const kinds = useMemo(() => WEEK_BLOCKS.filter((b) => b.kind === "auto" && !b.fixed), []);
   const writable = useMemo(() => WEEK_BLOCKS.filter((b) => b.kind !== "auto"), []);
   const nOn = kinds.filter((b) => draft.on[b.k] !== false).length;
@@ -119,7 +120,7 @@ export default function WeeklyCustomize({
 
       <Grp
         icon="✓"
-        title={t("ما يظهر من المنجزات", "Achievements shown")}
+        title={t("ما يظهر من المجالات", "Sections shown")}
         extra={
           <>
             <span className="muted">{`${nOn} ${t("من", "of")} ${kinds.length}`}</span>

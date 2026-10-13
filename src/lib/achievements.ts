@@ -146,7 +146,9 @@ export function achOf(r: LogRow): Ach | null {
     return { ...base, k: "session", detail: `${a} ← ${b} من 6 مراحل` };
   }
 
-  if (r.section === "projects" && (r.field === "act" || r.field === "progress")) {
+  /* حقل نسبة الإنجاز الفعلي اسمه `actual` في بنود المشاريع —
+     و`act`/`progress` تسميتان قديمتان تبقيان مقبولتين */
+  if (r.section === "projects" && ["actual", "act", "progress"].includes(r.field)) {
     const a = numOf(o) ?? 0;
     const b = numOf(n);
     if (b == null || b <= a) return null;
@@ -179,7 +181,10 @@ export type ChangeLite = {
   sla?: number | null; workDays?: number | null;
   status?: string; closedAt?: string;
 };
-export type TaskLite = { id?: string; title?: string; kind?: string; state?: string; completedAt?: string };
+export type TaskLite = {
+  id?: string; title?: string; kind?: string; state?: string;
+  completedAt?: string; createdAt?: string; dueDate?: string;
+};
 export type ContactLite = { entity?: string; reviewedAt?: string };
 
 const inRange = (iso: string, from: string, to: string) => {
@@ -227,74 +232,4 @@ export function achReviews(rows: ContactLite[], from: string, to: string): Ach[]
     out.push({ k: "review", name: nm, at: txt(c.reviewedAt) });
   }
   return out;
-}
-
-/** تجميع المنجزات ببطاقاتها بترتيب `ACH_KINDS` */
-export function achGroups(list: Ach[]): { kind: AchKind; items: Ach[] }[] {
-  return ACH_KINDS.map((kind) => ({
-    kind,
-    items: list.filter((a) => a.k === kind.k),
-  }));
-}
-
-/** صيغة العدد العربية: «جهة واحدة» · «جهتان» · «٣ جهات» */
-export function arCount(n: number, unit: string): string {
-  const plural: Record<string, string> = {
-    استراتيجية: "استراتيجيات", جهة: "جهات", جلسة: "جلسات", تقرير: "تقارير",
-    جهاز: "أجهزة", مشروع: "مشاريع", ربع: "أرباع", طلب: "طلبات", تكليف: "تكاليف",
-  };
-  const p = plural[unit] || unit;
-  if (n === 1) return `${unit} واحدة`;
-  /* المثنى: «جهة» ⇒ «جهتان» لا «جهةان» — التاء المربوطة تُفتح */
-  if (n === 2) return unit.endsWith("ة") ? `${unit.slice(0, -1)}تان` : `${unit}ان`;
-  if (n <= 10) return `${n} ${p}`;
-  return `${n} ${unit}`;
-}
-
-/* ---------------- تجميع تقرير الأسبوع ---------------- */
-
-export type WeekAch = {
-  weekStart: string;
-  weekEnd: string;
-  /** البطاقات بترتيب `ACH_KINDS` — المطفأة في التفضيلات مُسقَطة */
-  groups: { kind: AchKind; items: Ach[] }[];
-  /** نسبة الالتزام في طلبات التغيير المُغلقة هذا الأسبوع */
-  crPct: number | null;
-  /** مجموع المنجزات */
-  total: number;
-};
-
-export function buildWeekAch(args: {
-  weekStart: string;
-  weekEnd: string;
-  log: LogRow[];
-  changes: ChangeLite[];
-  tasks: TaskLite[];
-  contacts: ContactLite[];
-  /** مفاتيح المنجزات المؤشَّر عليها */
-  on: Record<string, boolean>;
-}): WeekAch {
-  const { weekStart: a, weekEnd: b } = args;
-  const cr = achChanges(args.changes, a, b);
-  const all: Ach[] = [
-    ...achFromLog(args.log),
-    ...cr.list,
-    ...achTasks(args.tasks, a, b),
-    ...achReviews(args.contacts, a, b),
-  ];
-  /* المنجَز أولاً والأكثر عدداً قبل غيره، والأصفار في آخر الصفحة —
-     فالتقرير يبدأ بما وقع لا بما لم يقع، وترتيب `ACH_KINDS` يفصل
-     بين المتساويين فيبقى الشكل ثابتاً من أسبوع لآخر */
-  const groups = achGroups(all)
-    .filter((g) => args.on[g.kind.k] !== false)
-    .map((g, i) => ({ g, i }))
-    .sort((x, y) => y.g.items.length - x.g.items.length || x.i - y.i)
-    .map((x) => x.g);
-  return {
-    weekStart: a,
-    weekEnd: b,
-    groups,
-    crPct: cr.pct,
-    total: groups.reduce((n, g) => n + g.items.length, 0),
-  };
 }

@@ -8,14 +8,9 @@ import WeeklyReportView, { arDate2 } from "./WeeklyReportView";
 import WeeklyCustomize from "./WeeklyCustomize";
 import { weekStartOf, shiftDays } from "@/lib/weeklyReport";
 import { mergePrefs, type WeeklyPrefs } from "@/lib/weeklyPrefs";
-import {
-  buildWeekAch,
-  type ChangeLite,
-  type ContactLite,
-  type LogRow,
-  type TaskLite,
-  type WeekAch,
-} from "@/lib/achievements";
+import type { ChangeLite, ContactLite, LogRow, TaskLite } from "@/lib/achievements";
+import { buildWeekReport, type ItemLite, type WeekReport } from "@/lib/weekReport";
+import { listOf } from "@/lib/weeklyPrefs";
 
 type ShareRow = {
   token: string;
@@ -41,6 +36,9 @@ export default function WeeklyPanel({
   const [changes, setChanges] = useState<ChangeLite[]>([]);
   const [tasks, setTasks] = useState<TaskLite[]>([]);
   const [contacts, setContacts] = useState<ContactLite[]>([]);
+  /* بنود الأقسام — منها حلقات الحالة وأشرطة المشاريع */
+  const [items, setItems] = useState<Record<string, ItemLite[]>>({});
+  const [logPrev, setLogPrev] = useState<LogRow[] | null>(null);
   const [logErr, setLogErr] = useState("");
   const [base, setBase] = useState<unknown>(null);
   const [over, setOver] = useState<unknown>(null);
@@ -53,12 +51,19 @@ export default function WeeklyPanel({
   /* التكاليف وجهات التواصل تُقرأ مرة واحدة — لا تتغيّر بتغيّر
      الأسبوع. والسجلّ وحده يُعاد طلبه لأنه مقيَّد بمداه. */
   const loadData = useCallback(async () => {
-    const [tk, me, ch, en] = await Promise.all([
+    const sec = ["natstrat", "inststrat", "projects"];
+    const [tk, me, ch, en, ...its] = await Promise.all([
       apiFetch("/api/tasks").then((r) => r.json()).catch(() => ({})),
       apiFetch("/api/me").then((r) => r.json()).catch(() => ({})),
       apiFetch("/api/changes").then((r) => r.json()).catch(() => ({})),
       apiFetch("/api/entities").then((r) => r.json()).catch(() => ({})),
+      ...sec.map((k) =>
+        apiFetch(`/api/items?section=${k}`).then((r) => r.json()).catch(() => ({})),
+      ),
     ]);
+    const bag: Record<string, ItemLite[]> = {};
+    sec.forEach((k, i) => (bag[k] = (its[i]?.items || []) as ItemLite[]));
+    setItems(bag);
     setTasks((tk.tasks || []) as TaskLite[]);
     setChanges((ch.changes || []) as ChangeLite[]);
     type Ent = { name?: string; ours?: { reviewedAt?: string }[]; theirs?: { reviewedAt?: string }[] };
@@ -72,11 +77,16 @@ export default function WeeklyPanel({
 
   const loadLog = useCallback(async () => {
     setLoading(true);
-    /* المدى يوم كامل: من بداية الأحد إلى نهاية السبت */
-    const r = await apiFetch(
-      `/api/itemlog?from=${week}T00:00:00&to=${shiftDays(week, 7)}T00:00:00`,
-    ).then((x) => x.json()).catch(() => ({}));
+    /* المدى يوم كامل: من بداية الأحد إلى نهاية السبت.
+       ويُطلب أسبوعان معاً — الثاني للمقارنة «مقابل الأسبوع الماضي» */
+    const [r, rp] = await Promise.all([
+      apiFetch(`/api/itemlog?from=${week}T00:00:00&to=${shiftDays(week, 7)}T00:00:00`)
+        .then((x) => x.json()).catch(() => ({})),
+      apiFetch(`/api/itemlog?from=${shiftDays(week, -7)}T00:00:00&to=${week}T00:00:00`)
+        .then((x) => x.json()).catch(() => ({})),
+    ]);
     setLog((r.log || []) as LogRow[]);
+    setLogPrev(rp.error ? null : ((rp.log || []) as LogRow[]));
     setLogErr(r.error ? String(r.error) : "");
     setLoading(false);
   }, [week]);
@@ -99,18 +109,21 @@ export default function WeeklyPanel({
 
   const prefs: WeeklyPrefs = useMemo(() => mergePrefs(base, over), [base, over]);
 
-  const report: WeekAch = useMemo(
+  const report: WeekReport = useMemo(
     () =>
-      buildWeekAch({
+      buildWeekReport({
         weekStart: week,
         weekEnd,
         log,
+        logPrev,
         changes,
         tasks,
         contacts,
+        items,
         on: prefs.on,
+        next: listOf(prefs.texts?.next || ""),
       }),
-    [week, weekEnd, log, changes, tasks, contacts, prefs.on],
+    [week, weekEnd, log, logPrev, changes, tasks, contacts, items, prefs.on, prefs.texts],
   );
 
   async function save(next: WeeklyPrefs, scope: "default" | "week") {

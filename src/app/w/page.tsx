@@ -6,14 +6,9 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ensureAnon, sb } from "@/lib/supa";
 import { mergePrefs, type WeeklyPrefs } from "@/lib/weeklyPrefs";
-import {
-  buildWeekAch,
-  type ChangeLite,
-  type ContactLite,
-  type LogRow,
-  type TaskLite,
-  type WeekAch,
-} from "@/lib/achievements";
+import type { ChangeLite, ContactLite, LogRow, TaskLite } from "@/lib/achievements";
+import { buildWeekReport, type ItemLite, type WeekReport } from "@/lib/weekReport";
+import { listOf } from "@/lib/weeklyPrefs";
 import WeeklyReportView from "@/app/dashboard/WeeklyReportView";
 
 /* صفحة عامة: تُفتح برمز في الرابط بلا أي حساب.
@@ -22,7 +17,7 @@ import WeeklyReportView from "@/app/dashboard/WeeklyReportView";
    ما تراه الإدارة، بما في ذلك الأقسام المخفاة من «تخصيص التقرير». */
 function Shared() {
   const token = useSearchParams().get("t") || "";
-  const [report, setReport] = useState<WeekAch | null>(null);
+  const [report, setReport] = useState<WeekReport | null>(null);
   const [prefs, setPrefs] = useState<WeeklyPrefs | null>(null);
   const [state, setState] = useState<"loading" | "gone" | "ready">("loading");
 
@@ -73,8 +68,24 @@ function Shared() {
         reviewedAt: String(r.reviewedAt || ""),
       }));
 
+      /* بنود الأقسام تأتي في حزمةٍ واحدة، فتُفرز هنا لحلقات الحالة */
+      const items: Record<string, ItemLite[]> = {};
+      for (const r of (data.items || []) as Record<string, unknown>[]) {
+        const k = String(r.section || "");
+        (items[k] = items[k] || []).push({
+          id: String(r.id || ""),
+          data: (r.data || {}) as Record<string, unknown>,
+        });
+      }
+
       setPrefs(p);
-      setReport(buildWeekAch({ weekStart, weekEnd, log, changes, tasks, contacts, on: p.on }));
+      setReport(
+        buildWeekReport({
+          weekStart, weekEnd, log, changes, tasks, contacts, items,
+          on: p.on,
+          next: listOf(p.texts?.next || ""),
+        }),
+      );
       setState("ready");
     })();
   }, [token]);

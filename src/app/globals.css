@@ -2322,10 +2322,10 @@ table.matrix thead th {
   line-height: 1.9;
 }
 
-/* ===== تقرير المنجزات (.wkx) =====
-   ورقةٌ واحدة بخلفية الهوية كاملةً — الصورة تملأ الورقة خلف
-   المحتوى لا شريطاً أعلاها، والمحتوى يبتعد عن شريط المدينة في
-   الحافة. العرض محدودٌ بنسبة A4 فيبدو على الشاشة كما يُطبع. */
+/* ===== تقرير الإنجاز الأسبوعي (.wkx / .wk-card) =====
+   ورقةٌ واحدة بخلفية الهوية كاملةً خلف المحتوى، والمحتوى في جهة
+   البياض منها. بطاقةٌ لكل مجال، وحلقةُ حالةٍ للوطنية والمؤسسية
+   في وسطها العدد الإجمالي. */
 .wkx {
   position: relative;
   background: var(--panel);
@@ -2333,11 +2333,11 @@ table.matrix thead th {
   border-radius: 16px;
   overflow: hidden;
   width: 100%;
-  max-width: 860px;
+  max-width: 900px;
   margin: 0 auto;
 }
 .wkx-h {
-  max-width: 1200px;
+  max-width: 1240px;
 }
 .wkx.has-band {
   border-color: transparent;
@@ -2360,206 +2360,405 @@ table.matrix thead th {
   z-index: 1;
   display: flex;
   flex-direction: column;
-  min-height: inherit;
+  padding: 28px 28px 18px;
 }
 .has-band .wkx-in {
   /* المحتوى في جهة البياض من التصميم */
-  padding-inline-end: 23%;
+  padding-inline-end: 24%;
 }
 .wkx-h.has-band .wkx-in {
-  padding-inline-end: 20%;
+  padding-inline-end: 19%;
 }
 
 .wkx-head {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 9px;
-  padding: 22px 26px 16px;
-  border-bottom: 1px solid var(--border);
-}
-.has-band .wkx-head {
-  border-bottom: none;
-  padding-block-start: 26px;
-}
-.wkx-ht {
-  display: flex;
-  flex-direction: column;
   gap: 3px;
+  margin-bottom: 13px;
 }
-.wkx-ht h2 {
+.wkx-logo {
+  height: 46px;
+  width: auto;
+  margin-bottom: 7px;
+}
+.wkx-head h2 {
   margin: 0;
   font-family: "Noto Kufi Arabic", sans-serif;
-  font-size: 20px;
+  font-size: 25px;
   color: var(--gt-900);
 }
 .wkx-dept {
-  font-size: 13px;
-  color: var(--gt-700);
+  font-size: 14px;
   font-weight: 700;
+  color: var(--gt-700);
 }
-.wkx-meta {
-  font-size: 11.5px;
+.wkx-dt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 7px;
+  font-size: 11px;
   color: var(--ink-2);
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 5px 12px;
 }
-.wkx-logo {
-  height: 44px;
-  width: auto;
+:root[data-theme="dark"] .wkx-dt {
+  background: var(--panel-2);
 }
 
-/* مجموع الأسبوع */
-.wkx-sum {
+/* شريط الملخّص */
+.wk-kpi {
   display: flex;
-  align-items: baseline;
   gap: 10px;
-  margin: 0 26px 4px;
-  padding: 13px 18px;
-  border-radius: 12px;
-  background: var(--g-50);
+  margin-bottom: 10px;
+}
+.wk-kpi > div {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 14px 16px;
+  background: var(--panel);
   border: 1px solid var(--border);
+  border-radius: 15px;
+  box-shadow: 0 2px 8px rgba(0, 40, 34, 0.05);
 }
-.has-band .wkx-sum {
-  background: rgba(255, 255, 255, 0.62);
-  border-color: rgba(255, 255, 255, 0.9);
+.has-band .wk-kpi > div,
+.has-band .wk-card {
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(255, 255, 255, 0.95);
 }
-.wkx-sum b {
+.wk-kpi .tile {
+  flex: 0 0 auto;
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  background: var(--g-50);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+.wk-kpi .tx b {
+  display: block;
   font-family: "Noto Kufi Arabic", sans-serif;
-  font-size: 32px;
-  line-height: 1;
+  font-size: 28px;
+  line-height: 1.1;
   color: var(--gt-900);
   font-variant-numeric: tabular-nums;
 }
-.wkx-sum span {
-  font-size: 13px;
+.wk-kpi .tx b.sm {
+  font-size: 16px;
+}
+.wk-kpi .tx > span {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 700;
   color: var(--ink-2);
 }
-.wkx-sum em {
-  margin-inline-start: auto;
+.wk-kpi .tx em {
+  display: block;
   font-style: normal;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--gold);
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* الحلقتان */
+.wk-rg,
+.wk-dn {
+  position: relative;
+  flex: 0 0 auto;
+  line-height: 0;
+}
+.wk-rg svg,
+.wk-dn svg {
+  transform: rotate(-90deg);
+}
+.wk-rg b,
+.wk-dn b {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.15;
+  font-family: "Noto Kufi Arabic", sans-serif;
+  color: var(--gt-900);
+}
+.wk-rg b {
+  font-size: 14px;
+}
+.wk-dn b {
+  font-size: 17px;
+}
+.wk-dn b span {
+  font-family: "IBM Plex Sans Arabic", sans-serif;
+  font-size: 9px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+/* بطاقة مجال */
+.wk-card {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 5px 12px;
-}
-
-/* بطاقة لكل نوع منجز */
-.wkx-grid {
-  display: grid;
-  align-items: start;
-  grid-template-columns: repeat(auto-fill, minmax(238px, 1fr));
-  gap: 12px;
-  padding: 14px 26px 18px;
-}
-.wkx-h .wkx-grid {
-  grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
-}
-.wkx-k {
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 13px 14px;
-  background: var(--soft);
-}
-.has-band .wkx-k {
-  background: rgba(255, 255, 255, 0.72);
-  border-color: rgba(255, 255, 255, 0.95);
-}
-.wkx-k {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  border-radius: 15px;
+  box-shadow: 0 2px 8px rgba(0, 40, 34, 0.05);
+  padding: 12px 15px 14px;
+  margin-bottom: 10px;
   break-inside: avoid;
 }
-.wkx-k > b {
-  font-family: "Noto Kufi Arabic", sans-serif;
-  font-size: 24px;
-  line-height: 1.1;
-  color: var(--gt-800);
-  font-variant-numeric: tabular-nums;
-}
-.wkx-k > span {
-  font-size: 12px;
-  color: var(--ink-2);
-  font-weight: 700;
-  line-height: 1.6;
-}
-.wkx-k.zero {
-  background: transparent;
-  border-style: dashed;
-}
-.wkx-k.zero > b {
-  color: var(--muted);
-}
-.wkx-k.zero > span {
-  color: var(--muted);
-  font-weight: 400;
-}
-.wkx-none {
-  font-size: 11px;
-  color: var(--muted);
-}
-.wkx-names {
-  list-style: none;
-  margin: 6px 0 0;
-  padding: 0;
+.wk-two {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  border-top: 1px solid var(--line2);
-  padding-top: 7px;
+  gap: 10px;
 }
-.wkx-names li {
-  font-size: 11px;
-  color: var(--ink-2);
-  line-height: 1.6;
+.wk-two > .wk-card {
+  flex: 1;
+  min-width: 0;
+}
+.wk-ch {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
 }
-.wkx-names li b {
-  font-weight: 700;
+.wk-ch i {
+  font-style: normal;
+  font-size: 14px;
 }
-.wkx-names li span {
-  color: var(--muted);
-  font-size: 10.5px;
-}
-.wkx-names li.more {
-  color: var(--muted);
-}
-
-/* الأقسام المكتوبة يدويًا */
-.wkx-sec {
-  padding: 0 26px 16px;
-  break-inside: avoid;
-}
-.wkx-sec h3 {
-  margin: 0 0 7px;
+.wk-ch b {
   font-family: "Noto Kufi Arabic", sans-serif;
   font-size: 13.5px;
   color: var(--gt-900);
 }
-.wkx-sec p {
-  margin: 0;
-  font-size: 12.5px;
+.wk-cnt {
+  margin-inline-start: auto;
+  font-size: 10px;
+  font-weight: 700;
   color: var(--ink-2);
-  line-height: 2;
-  white-space: pre-wrap;
+  background: var(--soft2);
+  border-radius: 8px;
+  padding: 3px 10px;
+  white-space: nowrap;
 }
-.wkx-list {
-  margin: 0;
-  padding-inline-start: 20px;
-  font-size: 12.5px;
+
+/* صف الحالات (التكليفات · طلبات التغيير) */
+.wk-sts {
+  display: flex;
+}
+.wk-sts > div {
+  flex: 1;
+  text-align: center;
+  padding: 2px 4px;
+  border-inline-start: 1px solid var(--line2);
+}
+.wk-sts > div:last-child {
+  border-inline-start: none;
+}
+.wk-sts b {
+  display: block;
+  font-family: "Noto Kufi Arabic", sans-serif;
+  font-size: 21px;
+  line-height: 1;
+  color: var(--gt-900);
+  font-variant-numeric: tabular-nums;
+}
+.wk-sts b.warn {
+  color: var(--gold);
+}
+.wk-sts b.mute {
+  color: var(--muted);
+}
+.wk-sts span {
+  display: block;
+  font-size: 10.5px;
   color: var(--ink-2);
-  line-height: 2;
+  margin-top: 3px;
 }
+
+/* رقم الأسبوع الكبير */
+.wk-big {
+  text-align: center;
+  margin: 2px 0 9px;
+}
+.wk-big b {
+  display: block;
+  font-family: "Noto Kufi Arabic", sans-serif;
+  font-size: 26px;
+  line-height: 1;
+  color: var(--gt-900);
+  font-variant-numeric: tabular-nums;
+}
+.wk-big span {
+  font-size: 11px;
+  color: var(--ink-2);
+}
+
+/* الحلقة وأسطورتها */
+.wk-dw {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.wk-lg {
+  flex: 1;
+  min-width: 0;
+}
+.wk-lg > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10.5px;
+  color: var(--ink-2);
+  line-height: 1.95;
+}
+.wk-lg i {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.wk-lg u {
+  text-decoration: none;
+  margin-inline-start: auto;
+  font-weight: 700;
+  color: var(--gt-900);
+  font-variant-numeric: tabular-nums;
+}
+.wk-note2 {
+  margin-top: 9px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line2);
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+.wk-note2 b {
+  color: var(--gt-700);
+  font-weight: 700;
+}
+
+/* قوائم الأسماء */
+.wk-lst {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.wk-lst li {
+  position: relative;
+  padding-inline-start: 12px;
+  font-size: 11px;
+  color: var(--ink-2);
+  line-height: 1.95;
+}
+.wk-lst li::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: 2px;
+  inset-block-start: 9px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--g-400);
+}
+.wk-lst li u {
+  text-decoration: none;
+  color: var(--muted);
+}
+.wk-lst li.more {
+  color: var(--muted);
+}
+
+/* أشرطة المشاريع */
+.wk-pr {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 8px;
+}
+.wk-pr:last-child {
+  margin-bottom: 0;
+}
+.wk-pr .nm {
+  flex: 0 0 38%;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+}
+.wk-pr .bar {
+  flex: 1;
+  height: 11px;
+  border-radius: 7px;
+  background: var(--line2);
+  overflow: hidden;
+}
+.wk-pr .bar i {
+  display: block;
+  height: 100%;
+  border-radius: 7px;
+  background: #1b9c74;
+}
+.wk-pr .bar i.a {
+  background: var(--gold);
+}
+.wk-pr .pc {
+  flex: 0 0 44px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--gt-900);
+  font-variant-numeric: tabular-nums;
+}
+
+/* الخطوات القادمة */
+.wk-nx {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.wk-nx li {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 11.5px;
+  color: var(--ink-2);
+  line-height: 1.75;
+  margin-bottom: 7px;
+}
+.wk-nx li:last-child {
+  margin-bottom: 0;
+}
+.wk-nx i {
+  font-style: normal;
+  flex: 0 0 auto;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: var(--g-50);
+  color: var(--gt-700);
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wk-empty {
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 22px 16px;
+}
+
 .wkx-foot {
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  padding: 13px 26px;
-  border-top: 1px solid var(--border);
-  font-size: 11.5px;
+  padding-top: 13px;
+  font-size: 10px;
   color: var(--muted);
 }
 
@@ -2770,9 +2969,9 @@ table.matrix thead th {
     padding-inline-end: 0;
     background: rgba(255, 255, 255, 0.82);
   }
-  .wkx-grid,
-  .wkx-h .wkx-grid {
-    grid-template-columns: 1fr;
+  .wk-two,
+  .wk-kpi {
+    flex-direction: column;
   }
   .wcx-f {
     flex-wrap: wrap;
@@ -2828,20 +3027,12 @@ table.matrix thead th {
   .wkx-h.has-band::before {
     padding-block-start: 68%;
   }
-  /* الورقة أضيق من الشاشة، فلولا هذا لانهارت البطاقات عموداً واحداً */
-  .wkx-grid {
-    grid-template-columns: 1fr 1fr;
-    gap: 9px;
-    padding: 14px 18px;
+  .wkx-in {
+    padding: 18px 18px 12px;
   }
-  .wkx-h .wkx-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-  .wkx-top,
-  .wkx-sum,
-  .wkx-k,
-  .wkx-sec,
-  .wkx-names {
+  .wkx-bg,
+  .wk-kpi > div,
+  .wk-card {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
     break-inside: avoid;
