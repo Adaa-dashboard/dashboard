@@ -2684,6 +2684,70 @@ table.matrix thead th {
   font-weight: 700;
 }
 
+/* ===== حلقات «نظرة عامة» — تستعير أصناف التقرير الأسبوعي ===== */
+.sx-box .wk-dw {
+  margin-top: 2px;
+}
+.sx-dsub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+/* سطر النسبة تحت الحلقة */
+.sx-dline {
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--line2);
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.sx-dline .l {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--gt-900);
+}
+.sx-dline b {
+  font-family: "Noto Kufi Arabic", sans-serif;
+  font-size: 17px;
+  color: var(--gt-700);
+  font-variant-numeric: tabular-nums;
+}
+.sx-dline em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--muted);
+}
+.sx-dline .bar {
+  flex: 1 0 100%;
+  height: 8px;
+  border-radius: 6px;
+  background: var(--line2);
+  overflow: hidden;
+}
+.sx-dline .bar i {
+  display: block;
+  height: 100%;
+  border-radius: 6px;
+  background: #1b9c74;
+}
+.sx-dfoot {
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--line2);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  font-size: 11.5px;
+  color: var(--ink-2);
+}
+.sx-dfoot b {
+  font-weight: 700;
+  color: var(--gt-900);
+  font-variant-numeric: tabular-nums;
+}
+
 /* قوائم الأسماء */
 .wk-lst {
   list-style: none;

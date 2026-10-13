@@ -17,7 +17,8 @@
 
 import { asset } from "@/lib/base";
 import { listOf, type WeeklyPrefs } from "@/lib/weeklyPrefs";
-import type { Dom, Slice, WeekReport } from "@/lib/weekReport";
+import type { Dom, WeekReport } from "@/lib/weekReport";
+import { DonutRing, DonutLegend } from "./DonutCard";
 import { PIcon } from "./pickicons";
 
 /* أيقونات مكتبة المنصة (`PICK_ICONS`) — خطّية خضراء بلا تعبئة،
@@ -72,40 +73,6 @@ function Ring({ pct }: { pct: number }) {
         />
       </svg>
       <b>{pct}%</b>
-    </span>
-  );
-}
-
-/** حلقة الحالات — في وسطها العدد الإجمالي ووحدته */
-function Donut({ slices, total, unit }: { slices: Slice[]; total: number; unit: string }) {
-  const r = 34;
-  const c = 2 * Math.PI * r;
-  const sum = slices.reduce((n, s) => n + s.n, 0) || 1;
-  let off = 0;
-  return (
-    <span className="wk-dn">
-      <svg width="92" height="92" viewBox="0 0 92 92">
-        <circle cx="46" cy="46" r={r} fill="none" stroke="var(--line2)" strokeWidth="13" />
-        {slices
-          .filter((s) => s.n > 0)
-          .map((s) => {
-            const len = (c * s.n) / sum;
-            const el = (
-              <circle
-                key={s.label}
-                cx="46" cy="46" r={r} fill="none" stroke={s.color} strokeWidth="13"
-                strokeDasharray={`${len} ${c - len}`}
-                strokeDashoffset={-off}
-              />
-            );
-            off += len;
-            return el;
-          })}
-      </svg>
-      <b>
-        {total}
-        <span>{unit}</span>
-      </b>
     </span>
   );
 }
@@ -170,16 +137,8 @@ function DomCard({ d, support }: { d: Dom; support?: string }) {
 
       {d.donut && (
         <div className="wk-dw">
-          <div className="wk-lg">
-            {d.donut.slices.map((s) => (
-              <div key={s.label}>
-                <i style={{ background: s.color }} />
-                {s.label}
-                <u>{s.n}</u>
-              </div>
-            ))}
-          </div>
-          <Donut slices={d.donut.slices} total={d.donut.total} unit={d.donut.unit} />
+          <DonutLegend slices={d.donut.slices} />
+          <DonutRing slices={d.donut.slices} total={d.donut.total} unit={d.donut.unit} />
         </div>
       )}
 

@@ -14,6 +14,8 @@ import { publishUndo } from "@/lib/undoBus";
 import { initials, toneOf } from "@/lib/entlogo";
 import { IconGear, IconDown, IconUp } from "./icons";
 import SectionSettings from "./SectionSettings";
+import DonutCard from "./DonutCard";
+import { natDonut, instDonut, sesDonut, cxDonut } from "@/lib/weekReport";
 
 /* ============================================================
    الأقسام الخمسة المتفرّعة من المؤشرات التفصيلية:
@@ -2016,30 +2018,10 @@ function NationalDetail({
 }
 
 /* ------------------------------------------------------------
-   بطاقتا «نظرة عامة» — معلومات عامة فقط، والأسماء والتفاصيل
-   كلها في صفحة كل قسم. الوطنية يميناً والمؤسسية يساراً.
+   بطاقات «نظرة عامة» — حلقةُ الحالة نفسها التي في التقرير
+   الأسبوعي، بحسبةٍ واحدة من `lib/weekReport.ts`. والأسماء
+   والتفاصيل كلها في صفحة كل قسم.
    ------------------------------------------------------------ */
-function KV({ label, n, tot, tone }: { label: string; n: number; tot: number; tone?: string }) {
-  return (
-    <div className="kv">
-      <span className="t">{label}</span>
-      <span className="mb">
-        <i className={tone || ""} style={{ width: `${tot ? (n / tot) * 100 : 0}%` }} />
-      </span>
-      <b>{AR(n)}</b>
-    </div>
-  );
-}
-
-function GCell({ k, children }: { k: string; children: ReactNode }) {
-  return (
-    <div className="gc">
-      <div className="k">{k}</div>
-      <div className="v">{children}</div>
-    </div>
-  );
-}
-
 /* ============================================================
    بطاقة «أشرطة الحالة» — الحالات الثلاث أشرطةً بنسبتها وعددها.
    تقرأ من `weekSummary` نفسها التي يقرأ منها التقرير الأسبوعي،
@@ -2169,46 +2151,22 @@ export function SessionsBox({ t, onOpen }: { t: T; onOpen?: () => void }) {
       <div className="sx-none">{t("لا توجد بيانات بعد — تُضاف من صفحة القسم.", "No data yet.")}</div>,
     );
 
-  const tot = items.length || 1;
   const quarter = txt(items[0]?.data?.quarter);
-  /* ترتيب المسار: لم تبدأ ← قيد التنفيذ ← مكتملة — بطلب المستخدمة */
-  const ROWS: { k: string; n: number; inner: string; c: string }[] = [
-    { k: "لم تبدأ", n: sum.none, inner: "لم تُجدول بعد", c: "#9aa8a4" },
-    { k: "قيد التنفيذ", n: sum.live, inner: "قيد الإعداد", c: "#e0971a" },
-    { k: "مكتملة", n: sum.done, inner: "اكتملت مراحلها", c: "#1a7a48" },
-  ];
+  const d = sesDonut(items);
 
   return box(
-    <div className="pbars">
-      <div className="pb-sub">
+    <>
+      <div className="sx-dsub">
         {arEnt(items.length)}
         {quarter ? ` · ${quarter}` : ""}
       </div>
-      {ROWS.map((b) => {
-        const pct = Math.round((b.n / tot) * 100);
-        return (
-          <div className="pb-row" key={b.k}>
-            <div className="pb-h">
-              <b>{b.k}</b>
-              <span>{pct}%</span>
-              <i>{AR(b.n)}</i>
-            </div>
-            <div className="pb-t">
-              <span className="pb-f" style={{ width: `${Math.max(pct, 3)}%`, background: b.c }}>
-                {pct >= 26 && <em>{b.inner}</em>}
-                <u className="knob" />
-              </span>
-            </div>
-          </div>
-        );
-      })}
-
-      {/* الجهات التي تحتاج تصعيداً — بخط أحمر تحت الأعمدة */}
+      <DonutCard slices={d.slices} total={d.total} unit={d.unit} size={120} />
+      {/* الجهات التي تحتاج تصعيداً — بخط أحمر تحت الحلقة */}
       <div className={`ss-esc ${sum.esc ? "on" : ""}`}>
         <b>{AR(sum.esc)}</b>
         <span>{t("جهة تحتاج تصعيداً", "entities need escalation")}</span>
       </div>
-    </div>,
+    </>,
   );
 }
 
@@ -2247,116 +2205,51 @@ export function StrategyBox({
       <div className="sx-none">{t("لا توجد بيانات بعد — تُضاف من صفحة القسم.", "No data yet.")}</div>,
     );
 
-  const tot = items.length;
-  const last = items.map((x) => txt(x.data.updated)).sort().slice(-1)[0] || "—";
-
+  /* الحلقة نفسها التي في التقرير الأسبوعي، بالحسبة نفسها
+     (`lib/weekReport.ts`) — فلا يفترق رقم الصفحة عن رقم التقرير */
   if (section === "natstrat") {
-    const c = [0, 0, 0, 0];
-    for (const it of items) c[natStage(it.data) - 1]++;
-    /* توزيع النطاقات بدل متوسط واحد: المتوسط يخلط ما لم يصل المركز
-       بعد (قابليته صفر) بما قِيس وطلع ضعيفاً، فيعطي رقماً مضلِّلاً */
-    const band = { hi: 0, mid: 0, low: 0 };
-    for (const it of items) {
-      const m = numOf(it.data.meas);
-      if (m >= 90) band.hi++;
-      else if (m >= 70) band.mid++;
-      else band.low++;
-    }
-    const tech = items.filter((x) => x.data.tech).length;
+    const d = natDonut(items);
     /* نسبة القياس على **المعتمدة من مجلس الوزراء وحدها**: ما لم
        يُعتمد بعدُ فقائمة مؤشراته غير نهائية، فإدخاله في النسبة
-       يخفضها بما لم يحن دوره — بطلب المستخدمة. */
+       يخفضها بما لم يحن دوره */
     const appr = items.filter((x) => natStage(x.data) === NAT_STEPS.length);
     const rep = appr.reduce((a, x) => a + numOf(x.data.kpisRep), 0);
     const all = appr.reduce((a, x) => a + numOf(x.data.kpisTot), 0);
-    const repPct = all ? Math.round((rep / all) * 100) : 0;
+    const pct = all ? Math.round((rep / all) * 100) : 0;
     return box(
       <>
-        <div className="head-row">
-          <div className="big">
-            <b>{AR(tot)}</b>
-            <span>{t("استراتيجية وطنية", "national")}</span>
-          </div>
-          <div className="side">
-            {NAT_STEPS.map((s, i) => (
-              <KV key={s} label={s} n={c[i]} tot={tot} tone={i >= 2 ? "g" : ""} />
-            ))}
-          </div>
-        </div>
-        <div className="gen">
-          <GCell k={t("قابلية القياس", "Measurability")}>
-            <span className="bands">
-              <span className="hi">
-                {AR(band.hi)} <em>{t("مرتفعة", "high")}</em>
+        <DonutCard slices={d.slices} total={d.total} unit={d.unit} size={120} />
+        <div className="sx-dline">
+          <span className="l">{t("نسبة قابلية قياس المعتمدة من مجلس الوزراء", "Measurability — CoM approved")}</span>
+          {all ? (
+            <>
+              <b>{AR(pct)}٪</b>
+              <em>{`${AR(rep)} ${t("من", "of")} ${AR(all)} ${t("مؤشراً في", "KPIs across")} ${AR(appr.length)} ${t("استراتيجية", "strategies")}`}</em>
+              <span className="bar">
+                <i style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
               </span>
-              <span className="mid">
-                {AR(band.mid)} <em>{t("متوسطة", "medium")}</em>
-              </span>
-              <span className="low">
-                {AR(band.low)} <em>{t("منخفضة", "low")}</em>
-              </span>
-            </span>
-          </GCell>
-          <GCell k={t("مقبولة فنياً", "Technically accepted")}>
-            {AR(tech)} <em>{`${t("من", "of")} ${AR(tot)}`}</em>
-          </GCell>
-          <GCell k={t("نسبة قياس المعتمدة من مجلس الوزراء", "Measured — CoM approved")}>
-            {all ? (
-              <>
-                {AR(repPct)}٪{" "}
-                <em>{`${AR(rep)} ${t("من", "of")} ${AR(all)} ${t("مؤشراً", "KPIs")}`}</em>
-              </>
-            ) : (
-              <em>{t("لا توجد معتمدة بعد", "None approved yet")}</em>
-            )}
-          </GCell>
-          <GCell k={t("آخر تحديث", "Last update")}>
-            <span className="dt">{last}</span>
-          </GCell>
+            </>
+          ) : (
+            <em>{t("لا توجد استراتيجية معتمدة من مجلس الوزراء بعد", "None approved yet")}</em>
+          )}
         </div>
       </>,
     );
   }
 
-  const cnt = (k: string, v: string) => items.filter((x) => txt(x.data[k]) === v).length;
-  const met = cnt("meet", "تم");
-  const docs = cnt("docs", "✓");
-  const live = cnt("live", "مفعل");
-  const pct = Math.round((live / tot) * 100);
-  const goals = cnt("phase", "Phase 1");
-  const kpis = cnt("phase", "Phase 2");
+  const d = instDonut(items);
+  const live = items.filter((x) => txt(x.data.live) === "مفعل").length;
+  const pct = items.length ? Math.round((live / items.length) * 100) : 0;
   return box(
     <>
-      <div className="head-row">
-        <div className="big">
-          <b>{AR(tot)}</b>
-          <span>{t("جهة", "entities")}</span>
-        </div>
-        <div className="side">
-          <KV label={t("عُقد الاجتماع التعريفي", "Kickoff held")} n={met} tot={tot} />
-          <KV label={t("الوثائق مستلمة", "Docs received")} n={docs} tot={tot} />
-          <KV label={t("اكتملت الوثائق", "Docs complete")} n={cnt("docsState", "مكتمل")} tot={tot} />
-          <KV label={t("فُعِّل القياس", "Measurement live")} n={live} tot={tot} tone="g" />
-        </div>
-      </div>
-      <div className="gen">
-        <GCell k={t("نسبة تفعيل القياس", "Measurement live %")}>
-          <span className="meas">
-            <span className="n hi">{AR(pct)}٪</span>
-            <span className="bar">
-              <i className="hi" style={{ width: `${pct}%` }} />
-            </span>
-          </span>
-        </GCell>
-        <GCell k={t("لم يُعقد اجتماعها", "Kickoff pending")}>
-          {AR(tot - met)} <em>{t("جهة", "entities")}</em>
-        </GCell>
-        <GCell k="Phase 1 · Phase 2">
-          {AR(goals)} <em>· {AR(kpis)}</em>
-        </GCell>
-        <GCell k={t("آخر تحديث", "Last update")}>
-          <span className="dt">{last}</span>
-        </GCell>
+      <DonutCard slices={d.slices} total={d.total} unit={d.unit} size={120} />
+      <div className="sx-dline">
+        <span className="l">{t("نسبة تفعيل القياس", "Measurement live %")}</span>
+        <b>{AR(pct)}٪</b>
+        <em>{`${AR(live)} ${t("من", "of")} ${AR(items.length)} ${t("جهة", "entities")}`}</em>
+        <span className="bar">
+          <i style={{ width: `${Math.max(0, Math.min(100, pct))}%` }} />
+        </span>
       </div>
     </>,
   );
@@ -2923,56 +2816,25 @@ export function CxBox({ t }: { t: T }) {
       </div>
     );
 
-  const n = st.rows.length;
-  const steps = CX_STAGES.filter((g) => g.k !== "none");
+  /* الحلقة على المستهدف لا على قائمة الملف كلها: السؤال هو كم بقي
+     من المستهدف، لا كم جهازاً في الملف */
+  const d = cxDonut(items);
   return (
-    <div className="card cxc">
-      <div className="cxc-l">
-        {st.pct === null ? (
-          <>
-            <b className="big">{AR(st.doneAgencies)}</b>
-            <b>{t("جهازاً صدر لها تقرير", "with a report")}</b>
-            <span>{t("المستهدف لم يُحدَّد بعد", "No target set")}</span>
-          </>
-        ) : (
-          <>
-            <Ring pct={st.pct} size={140} tone="hi" />
-            <b>{`${AR(st.doneAgencies)} ${t("من", "of")} ${AR(st.target)} ${t("جهازاً", "agencies")}`}</b>
-            <span>{t("المحقق من المستهدف", "Achieved of target")}</span>
-          </>
-        )}
+    <>
+      <DonutCard slices={d.slices} total={d.total} unit={d.unit} size={120} />
+      <div className="sx-dfoot">
+        <span>
+          {t("مجموع التقارير المعتمدة", "Approved reports")} <b>{AR(st.reportsTot)}</b>
+        </span>
+        <span>
+          {t("احتُسبت في المؤشر", "Counted in KPI")} <b>{AR(st.counted)}</b>
+        </span>
+        <span>
+          {t("الخدمات المخطط قياسها", "Services planned")} <b>{AR(st.servPlan)}</b> {t("من", "of")}{" "}
+          <b>{AR(st.servTot)}</b>
+        </span>
       </div>
-
-      <div className="cxc-r">
-        <div className="cxc-h">
-          {t(`توزيع الأجهزة الـ${AR(n)} على المراحل`, `The ${n} agencies by stage`)}
-        </div>
-        {steps.map((g) => {
-          const v = st.stage[g.k] || 0;
-          return (
-            <div className="cxc-b" key={g.k}>
-              <span className="l">{t(g.ar, g.en)}</span>
-              <span className="m">
-                <i style={{ width: `${n ? (v / n) * 100 : 0}%`, background: g.c }} />
-              </span>
-              <b style={{ color: g.c }}>{AR(v)}</b>
-            </div>
-          );
-        })}
-        <div className="cxc-f">
-          <span>
-            {t("مجموع التقارير المعتمدة", "Approved reports")} <b>{AR(st.reportsTot)}</b>
-          </span>
-          <span>
-            {t("احتُسبت في المؤشر", "Counted in KPI")} <b>{AR(st.counted)}</b>
-          </span>
-          <span>
-            {t("الخدمات المخطط قياسها", "Services planned")} <b>{AR(st.servPlan)}</b> {t("من", "of")}{" "}
-            <b>{AR(st.servTot)}</b>
-          </span>
-        </div>
-      </div>
-    </div>
+    </>
   );
 }
 

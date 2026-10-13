@@ -161,8 +161,10 @@ const noteOf = (lines: Line[], max = 2) =>
     .map((l) => (l.detail ? `${l.name} — ${l.detail}` : l.name))
     .join(" · ");
 
-/* ---------------- الحلقات ---------------- */
-function natDonut(items: ItemLite[]) {
+/* ---------------- الحلقات ----------------
+   مُصدَّرة لأن **صفحة «نظرة عامة» ترسم الحلقات نفسها**: حسبةٌ
+   واحدة لا حسبتان، فلا يفترق رقم التقرير عن رقم الصفحة. */
+export function natDonut(items: ItemLite[]) {
   const c = [0, 0, 0, 0];
   for (const it of items) {
     const s = Math.max(1, Math.min(4, num(it.data.stage, 1)));
@@ -180,7 +182,7 @@ function natDonut(items: ItemLite[]) {
   };
 }
 
-function instDonut(items: ItemLite[]) {
+export function instDonut(items: ItemLite[]) {
   /* قسمةٌ بأبعد مرحلةٍ بلغتها الجهة، فمجموع الشرائح = عدد الجهات.
      أما عدّادات الصفحة فمتداخلة (الجهة المفعَّل قياسها معدودةٌ في
      «عُقد اجتماعها» أيضاً)، فلا تصلح شرائحَ حلقة */
@@ -288,7 +290,7 @@ function projDom(items: ItemLite[], moved: Ach[], touched: Line[]): Dom | null {
 
 /* ---------------- حلقتا الجلسات وتجربة المستفيد ---------------- */
 /** مراحل الجلسة الستّ: `done` عدد المكتمل منها */
-function sesDonut(items: ItemLite[]) {
+export function sesDonut(items: ItemLite[]) {
   let done = 0, live = 0, none = 0;
   for (const it of items) {
     const stages = Array.isArray(it.data.stages) ? (it.data.stages as unknown[]) : [];
@@ -324,7 +326,7 @@ export function cxTarget(items: ItemLite[]): number {
   return t > 0 ? t : 69;
 }
 
-function cxDonut(items: ItemLite[]) {
+export function cxDonut(items: ItemLite[]) {
   /* صفّ الإعدادات (`cx-meta`) ليس جهازاً فلا يُعدّ */
   const rows = items.filter((it) => it.id !== "cx-meta");
   let rep = 0, live = 0;
