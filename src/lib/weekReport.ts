@@ -247,7 +247,12 @@ export function instDonut(items: ItemLite[], startedOnly = false) {
 function taskDom(tasks: TaskLite[], a: string, b: string, upd: number): Dom | null {
   const rows = tasks.filter((x) => txt(x.kind) === "assignment");
   const done = rows.filter((x) => inRange(txt(x.completedAt), a, b));
-  const fresh = rows.filter((x) => inRange(txt(x.createdAt), a, b));
+  /* «جديد» = ما ورد هذا الأسبوع **ولم يُكتمل بعد** — التكليف الذي
+     ورد وأُنجز في الأسبوع نفسه يُعدّ مكتملاً لا جديداً، وإلا عُدّ
+     مرتين في الشريط وبدا العمل أكثر مما هو */
+  const fresh = rows.filter(
+    (x) => inRange(txt(x.createdAt), a, b) && txt(x.state) !== "done" && !txt(x.completedAt),
+  );
   const open = rows.filter((x) => txt(x.state) !== "done" && txt(x.state) !== "hold");
   const late = open.filter((x) => {
     const d = day(txt(x.dueDate));
