@@ -145,11 +145,14 @@ export default function WeeklyPanel({
     [prefs, week],
   );
 
-  /* الدعم المطلوب يُكتب في بطاقته مباشرة — نصٌّ عامٌّ للإدارة
-     يُحفظ لهذا الأسبوع كما تُحفظ بقية كتابة الأسبوع */
-  const saveSupport = useCallback(
-    async (v: string) => {
-      const next: WeeklyPrefs = { ...prefs, texts: { ...prefs.texts, support: v } };
+  /* دعم كل تكليف — نصٌّ خاصٌّ به يُكتب في خلّيته، ويُحفظ لهذا
+     الأسبوع. غير «الدعم المطلوب» العام في آخر التقرير، وذاك
+     يُكتب من ⚙️ كما تُكتب الخطوات القادمة والإنجازات */
+  const saveTaskSup = useCallback(
+    async (id: string, text: string) => {
+      const key = `sup:${id}`;
+      if ((prefs.texts?.[key] || "") === text) return;
+      const next: WeeklyPrefs = { ...prefs, texts: { ...prefs.texts, [key]: text } };
       setOver(next);
       const r = await apiFetch("/api/weekly", {
         method: "PUT",
@@ -158,9 +161,9 @@ export default function WeeklyPanel({
       })
         .then((x) => x.json())
         .catch(() => ({ error: "تعذّر الحفظ" }));
-      if (r?.error) setMsg(String(r.error));
+      setMsg(r?.error ? String(r.error) : t("حُفظ الدعم المطلوب ✓", "Saved ✓"));
     },
-    [prefs, week],
+    [prefs, week, t],
   );
 
   async function save(next: WeeklyPrefs, scope: "default" | "week") {
@@ -252,7 +255,7 @@ export default function WeeklyPanel({
           report={report}
           prefs={prefs}
           onPick={canEdit ? pickTask : undefined}
-          onSupport={canEdit ? saveSupport : undefined}
+          onTaskSup={canEdit ? saveTaskSup : undefined}
         />
       )}
 

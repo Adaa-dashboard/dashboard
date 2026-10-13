@@ -2675,27 +2675,41 @@ table.matrix thead th {
   opacity: 0.42;
 }
 
-/* الدعم المطلوب — بطاقةٌ في آخر التقرير، تُكتب في مكانها */
+/* حقل دعم التكليف داخل الجدول — سطرٌ منقّط لا صندوق، فلا يثقل
+   الجدول، ويختفي خطُّه عند الطباعة */
 .wk-supin {
   width: 100%;
-  border: 1px dashed var(--line2);
-  border-radius: 8px;
+  border: none;
+  border-bottom: 1px dashed var(--border);
   background: transparent;
-  padding: 8px 10px;
-  font: inherit;
-  font-size: 11.5px;
-  line-height: 1.95;
   color: var(--ink-2);
-  resize: vertical;
+  font-family: inherit;
+  font-size: 11px;
+  padding: 2px 2px 3px;
+  border-radius: 0;
+}
+.wk-supin::placeholder {
+  color: var(--muted);
+  opacity: 0.6;
+}
+.wk-supin:hover {
+  border-bottom-color: var(--g-400);
 }
 .wk-supin:focus {
   outline: none;
-  border-color: var(--primary);
-  border-style: solid;
+  border-bottom-color: var(--g-600);
+  background: var(--soft);
 }
-.wk-supp {
-  display: none;
+@media print {
+  .wk-supin {
+    border-bottom: none;
+  }
+  .wk-supin::placeholder {
+    color: transparent;
+  }
 }
+
+/* الدعم المطلوب العام — بطاقةٌ في آخر التقرير، تُكتب من ⚙️ */
 .wk-sup2 {
   margin: 0;
   font-size: 11.5px;
@@ -3254,9 +3268,6 @@ table.matrix thead th {
   }
   body {
     background: var(--panel);
-  }
-  .wk-supp {
-    display: block !important;
   }
   .no-print,
   .rail,

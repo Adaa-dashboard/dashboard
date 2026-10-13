@@ -15,6 +15,7 @@
    ولا صفر.
    ============================================================ */
 
+import { useState } from "react";
 import { asset } from "@/lib/base";
 import { listOf, type WeeklyPrefs } from "@/lib/weeklyPrefs";
 import type { Dom, WeekReport } from "@/lib/weekReport";
@@ -81,14 +82,22 @@ function Ring({ pct }: { pct: number }) {
 function DomCard({
   d,
   on,
+  texts,
   onPick,
+  onTaskSup,
 }: {
   d: Dom;
   /** مفاتيح الإظهار — `tsk:<id>` يختار تكليفاً */
   on: Record<string, boolean>;
+  /** النصوص المحفوظة — `sup:<id>` دعمُ تكليفٍ بعينه */
+  texts: Record<string, string>;
   /** يُمرَّر لمن يملك التحرير — فيُختار ما يظهر من التكاليف */
   onPick?: (id: string, keep: boolean) => void;
+  /** دعم التكليف يُكتب في خلّيته مباشرة */
+  onTaskSup?: (id: string, text: string) => void;
 }) {
+  /* ما يُكتب الآن — قبل أن يصل الحفظ ويعود في `texts` */
+  const [draft, setDraft] = useState<Record<string, string>>({});
   return (
     <div className="wk-card">
       <div className="wk-ch">
@@ -131,6 +140,7 @@ function DomCard({
               {onPick && <th className="pick" />}
               <th>التكليف</th>
               <th>الحالة</th>
+              <th>الدعم المطلوب</th>
             </tr>
           </thead>
           <tbody>
@@ -139,6 +149,9 @@ function DomCard({
               .slice(0, 8)
               .map((r) => {
                 const keep = on[`tsk:${r.id}`] !== false;
+                /* لكل تكليف دعمه الخاص — غير «الدعم المطلوب» العام
+                   في آخر التقرير */
+                const v = draft[r.id] ?? texts[`sup:${r.id}`] ?? "";
                 return (
                   <tr key={r.id} className={keep ? "" : "off"}>
                     {onPick && (
@@ -153,6 +166,22 @@ function DomCard({
                     )}
                     <td>{r.name}</td>
                     <td className={r.tone}>{r.state}</td>
+                    <td className="sup">
+                      {onTaskSup ? (
+                        <input
+                          className="wk-supin"
+                          value={v}
+                          placeholder="اكتب الدعم المطلوب…"
+                          onChange={(e) => setDraft((x) => ({ ...x, [r.id]: e.target.value }))}
+                          onBlur={(e) => onTaskSup(r.id, e.target.value.trim())}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                          }}
+                        />
+                      ) : (
+                        v || "—"
+                      )}
+                    </td>
                   </tr>
                 );
               })}
@@ -217,14 +246,14 @@ export default function WeeklyReportView({
   report,
   prefs,
   onPick,
-  onSupport,
+  onTaskSup,
 }: {
   report: WeekReport;
   prefs: WeeklyPrefs;
   /** اختيار ما يظهر من التكاليف — لمن يملك تحرير التقرير */
   onPick?: (id: string, keep: boolean) => void;
-  /** كتابة الدعم المطلوب في بطاقته مباشرة */
-  onSupport?: (v: string) => void;
+  /** دعم كل تكليف يُكتب في جدوله مباشرة */
+  onTaskSup?: (id: string, text: string) => void;
 }) {
   const { dir, band, dept } = prefs.layout;
   const r = report;
@@ -290,7 +319,14 @@ export default function WeeklyReportView({
         {rows.map((row, i) => (
           <div className={row.length > 1 ? "wk-two" : ""} key={i}>
             {row.map((d) => (
-              <DomCard d={d} key={d.k} on={prefs.on || {}} onPick={onPick} />
+              <DomCard
+                d={d}
+                key={d.k}
+                on={prefs.on || {}}
+                texts={prefs.texts || {}}
+                onPick={onPick}
+                onTaskSup={onTaskSup}
+              />
             ))}
           </div>
         ))}
@@ -299,12 +335,10 @@ export default function WeeklyReportView({
           <div className="wk-card wk-empty">لم يُسجَّل أي تحديث في المنصة هذا الأسبوع.</div>
         )}
 
-        {(done.length > 0 || next.length > 0 || support || onSupport) && (
+        {(done.length > 0 || next.length > 0 || support) && (
           <div
             className={
-              [done.length > 0, next.length > 0, !!support || !!onSupport].filter(Boolean).length > 1
-                ? "wk-two"
-                : ""
+              [done.length > 0, next.length > 0, !!support].filter(Boolean).length > 1 ? "wk-two" : ""
             }
           >
             {prefs.on.done !== false && done.length > 0 && (
@@ -331,7 +365,8 @@ export default function WeeklyReportView({
               <div className="wk-card">
                 <div className="wk-ch">
                   <span className="wk-ci">
-                    <PIcon id="target" size={18} />
+                    {/* خارطة طريق — تدلّ على ما هو آتٍ، لا على هدفٍ قائم */}
+                    <PIcon id="map" size={18} />
                   </span>
                   <b>الخطوات القادمة</b>
                 </div>
@@ -346,7 +381,7 @@ export default function WeeklyReportView({
               </div>
             )}
 
-            {prefs.on.support !== false && (support || onSupport) && (
+            {prefs.on.support !== false && support && (
               <div className="wk-card">
                 <div className="wk-ch">
                   <span className="wk-ci warn">
@@ -354,24 +389,7 @@ export default function WeeklyReportView({
                   </span>
                   <b>الدعم المطلوب</b>
                 </div>
-                {onSupport ? (
-                  <>
-                    <textarea
-                      className="wk-supin no-print"
-                      rows={3}
-                      defaultValue={support}
-                      placeholder="اكتب ما تحتاجه الإدارة من دعم…"
-                      onBlur={(e) => {
-                        const v = e.target.value.trim();
-                        if (v !== support) onSupport(v);
-                      }}
-                    />
-                    {/* الطباعة لا تُظهر الحقل — فنسخةٌ نصّية بجانبه */}
-                    <p className="wk-sup2 wk-supp">{support}</p>
-                  </>
-                ) : (
-                  <p className="wk-sup2">{support}</p>
-                )}
+                <p className="wk-sup2">{support}</p>
               </div>
             )}
           </div>
