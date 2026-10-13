@@ -208,13 +208,6 @@ function DomCard({
         </table>
       )}
 
-      {d.big && (
-        <div className="wk-big">
-          <b>{d.big.n}</b>
-          <span>{d.big.label}</span>
-        </div>
-      )}
-
       {d.bars && (
         <div className="wk-bars">
           {d.bars

@@ -92,7 +92,6 @@ export type Dom = {
   rows?: Row[];
   /** عدد ما تغيّر في هذا المجال خلال الأسبوع */
   updates: number;
-  big?: { n: number; label: string };
   /** `base` قاعدة رسم الحلقة إن خالفت مجموع الشرائح — تُرسم
       الشرائح منسوبةً إليها ويبقى ما سواها رمادياً */
   donut?: { total: number; unit: string; slices: Slice[]; base?: number };
@@ -323,19 +322,12 @@ function projDom(items: ItemLite[], moved: Ach[], touched: Line[]): Dom | null {
   for (const m of moved)
     if (!bars.some((x) => x.name === m.name))
       bars.push({ name: m.name, pct: num((m.detail || "").split("←").pop()), plan: 0, late: false });
-  const n = moved.length ? linesOf(moved).length : touched.length;
+  /* لا رقمَ كبيراً: الأشرطة نفسها تقول أين وصل كل مشروع، وشارة
+     «ن تحديثاً» في الزاوية تقول كم تحرّك هذا الأسبوع */
   return {
     k: "proj",
     ...DOM_META.proj,
     updates: moved.length || touched.length,
-    big: n
-      ? {
-          n,
-          label: moved.length
-            ? pl(n, "مشروع تقدّم هذا الأسبوع", "مشاريع تقدّمت هذا الأسبوع")
-            : pl(n, "مشروع حُدِّث هذا الأسبوع", "مشاريع حُدِّثت هذا الأسبوع"),
-        }
-      : undefined,
     bars,
   };
 }

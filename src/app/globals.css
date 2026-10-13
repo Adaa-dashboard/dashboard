@@ -2718,29 +2718,6 @@ table.matrix thead th {
   white-space: pre-wrap;
 }
 
-/* سطر تحديث الأسبوع — **تحت الحلقة** لا فوقها، فتستوي الحلقات
-   في مستوى واحد عبر البطاقات المتجاورة */
-.wk-big {
-  text-align: center;
-  margin: 10px 0 2px;
-  padding-top: 9px;
-  border-top: 1px solid var(--line2);
-}
-.wk-card > .wk-big:first-of-type:not(:last-child) {
-  margin-bottom: 8px;
-}
-.wk-big b {
-  display: block;
-  font-family: "Noto Kufi Arabic", sans-serif;
-  font-size: 26px;
-  line-height: 1;
-  color: var(--gt-900);
-  font-variant-numeric: tabular-nums;
-}
-.wk-big span {
-  font-size: 11px;
-  color: var(--ink-2);
-}
 
 /* الحلقة وأسطورتها */
 .wk-dw {
