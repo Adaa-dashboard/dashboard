@@ -68,7 +68,13 @@ export const INST_STAGES = [
 const RAMP = ["#d7e2de", "#9ecdbb", "#5bb594", "#1b9c74", "#0b6b50"];
 
 /* ---------------- أنواع المخرجات ---------------- */
-export type Slice = { label: string; n: number; color: string };
+export type Slice = {
+  label: string;
+  n: number;
+  color: string;
+  /** ما زاد في هذه المرحلة هذا الأسبوع — يظهر سهماً أخضر في الأسطورة */
+  up?: number;
+};
 /** شريط مشروع: الإنجاز الفعلي، والمخطط له (المستهدف عند تاريخه) */
 export type Bar = { name: string; pct: number; plan: number; late: boolean };
 export type Stat = { n: number; label: string; tone: "ok" | "warn" | "mute"; icon?: string };
@@ -88,6 +94,8 @@ export type Dom = {
   /** `base` قاعدة رسم الحلقة إن خالفت مجموع الشرائح — تُرسم
       الشرائح منسوبةً إليها ويبقى ما سواها رمادياً */
   donut?: { total: number; unit: string; slices: Slice[]; base?: number };
+  /** أسماء ما تقدّم هذا الأسبوع ومرحلته الآن — تحت الحلقة */
+  ups?: Line[];
   stats?: Stat[];
   lines?: Line[];
   bars?: Bar[];
@@ -169,12 +177,35 @@ const noteOf = (lines: Line[], max = 2) =>
 /* ---------------- الحلقات ----------------
    مُصدَّرة لأن **صفحة «نظرة عامة» ترسم الحلقات نفسها**: حسبةٌ
    واحدة لا حسبتان، فلا يفترق رقم التقرير عن رقم الصفحة. */
+/* مرحلة البند الآن — تُستعمل في بناء الحلقة وفي معرفة أين وقع
+   ما تقدّم هذا الأسبوع، فلا تفترق حسبتان */
+export function natLabel(d: Rec) {
+  return NAT_STEPS[Math.max(1, Math.min(4, num(d.stage, 1))) - 1];
+}
+export function instLabel(d: Rec) {
+  const i =
+    txt(d.live) === "مفعل" ? 4
+    : txt(d.docsState) === "مكتمل" ? 3
+    : txt(d.docs) === "✓" ? 2
+    : txt(d.meet) === "تم" ? 1
+    : 0;
+  return INST_STAGES[i];
+}
+export function sesLabel(d: Rec) {
+  const stages = Array.isArray(d.stages) ? (d.stages as unknown[]) : [];
+  const full = stages.length || 6;
+  const n = num(d.done);
+  return n >= full && full > 0 ? "اكتملت جلستها" : n > 0 ? "قيد التنفيذ" : "لم تبدأ";
+}
+export function cxLabel(d: Rec) {
+  if (CX_QK.some((q) => txt(d[`${q}Issue`]) === CX_OK)) return "صدر له تقرير";
+  if (txt(d.meet) === "تم" || txt(d.survey) || txt(d.card) || txt(d.l1)) return "في المسار";
+  return "لم يبدأ بعد";
+}
+
 export function natDonut(items: ItemLite[]) {
   const c = [0, 0, 0, 0];
-  for (const it of items) {
-    const s = Math.max(1, Math.min(4, num(it.data.stage, 1)));
-    c[s - 1]++;
-  }
+  for (const it of items) c[NAT_STEPS.indexOf(natLabel(it.data))]++;
   return {
     total: items.length,
     unit: "استراتيجية",
@@ -196,16 +227,7 @@ export function instDonut(items: ItemLite[], startedOnly = false) {
      أما عدّادات الصفحة فمتداخلة (الجهة المفعَّل قياسها معدودةٌ في
      «عُقد اجتماعها» أيضاً)، فلا تصلح شرائحَ حلقة */
   const c = [0, 0, 0, 0, 0];
-  for (const it of items) {
-    const d = it.data;
-    const i =
-      txt(d.live) === "مفعل" ? 4
-      : txt(d.docsState) === "مكتمل" ? 3
-      : txt(d.docs) === "✓" ? 2
-      : txt(d.meet) === "تم" ? 1
-      : 0;
-    c[i]++;
-  }
+  for (const it of items) c[INST_STAGES.indexOf(instLabel(it.data))]++;
   const slices = INST_STAGES.map((label, i) => ({ label, n: c[i], color: RAMP[i] }));
   if (!startedOnly) return { total: items.length, unit: "جهة", slices };
   /* في التقرير تُحذف «لم يُعقد اجتماعها» من الأسطورة — فهي تقصيرٌ
@@ -321,11 +343,9 @@ function projDom(items: ItemLite[], moved: Ach[], touched: Line[]): Dom | null {
 export function sesDonut(items: ItemLite[]) {
   let done = 0, live = 0, none = 0;
   for (const it of items) {
-    const stages = Array.isArray(it.data.stages) ? (it.data.stages as unknown[]) : [];
-    const full = stages.length || 6;
-    const d = num(it.data.done);
-    if (d >= full && full > 0) done++;
-    else if (d > 0) live++;
+    const l = sesLabel(it.data);
+    if (l === "اكتملت جلستها") done++;
+    else if (l === "قيد التنفيذ") live++;
     else none++;
   }
   return {
@@ -359,9 +379,9 @@ export function cxDonut(items: ItemLite[]) {
   const rows = items.filter((it) => it.id !== "cx-meta");
   let rep = 0, live = 0;
   for (const it of rows) {
-    const d = it.data;
-    if (CX_QK.some((q) => txt(d[`${q}Issue`]) === CX_OK)) rep++;
-    else if (txt(d.meet) === "تم" || txt(d.survey) || txt(d.card) || txt(d.l1)) live++;
+    const l = cxLabel(it.data);
+    if (l === "صدر له تقرير") rep++;
+    else if (l === "في المسار") live++;
   }
   const target = cxTarget(items);
   /* ما في المسار لا يُحتسب إلا في حدود ما بقي من المستهدف */
@@ -376,6 +396,35 @@ export function cxDonut(items: ItemLite[]) {
       { label: "في المسار", n: prog, color: RAMP[2] },
       { label: "لم يبدأ بعد", n: Math.max(0, left - prog), color: RAMP[0] },
     ],
+  };
+}
+
+/** أين وقع ما تقدّم هذا الأسبوع — تُطابَق أسماء المنجزات ببنود
+    القسم، وتُقرأ مرحلةُ كلٍّ منها الآن. فالسهم الأخضر يقف عند
+    المرحلة التي صار إليها البند، والأسماء تحت الحلقة هي هي. */
+function upsIn(items: ItemLite[], lines: Line[], label: (d: Rec) => string) {
+  const byName = new Map<string, ItemLite>();
+  for (const it of items) {
+    const nm = txt(it.data.name) || txt(it.data.entity);
+    if (nm) byName.set(nm, it);
+  }
+  const count: Record<string, number> = {};
+  const named: Line[] = [];
+  for (const l of lines) {
+    const it = byName.get(l.name);
+    if (!it) continue;
+    const lab = label(it.data);
+    count[lab] = (count[lab] || 0) + 1;
+    named.push({ name: l.name, detail: lab });
+  }
+  return { count, named };
+}
+
+/** الحلقة نفسها، وقد وُسمت شرائحها بما زاد فيها هذا الأسبوع */
+function withUps<T extends { slices: Slice[] }>(donut: T, count: Record<string, number>): T {
+  return {
+    ...donut,
+    slices: donut.slices.map((x) => (count[x.label] ? { ...x, up: count[x.label] } : x)),
   };
 }
 
@@ -423,20 +472,15 @@ export function buildWeekReport(args: {
   const natT = tch("natstrat");
   if (sec("natstrat").length || nat.length) {
     const lines = nat.length ? linesOf(nat) : natT;
+    /* لا رقمَ كبيراً فوق الحلقة: التحديث يُقرأ من سهم الأسطورة
+       ومن أسماء ما تقدّم تحتها */
+    const up = upsIn(sec("natstrat"), lines, natLabel);
     add({
       k: "nat",
       ...DOM_META.nat,
       updates: nat.length || natT.length,
-      big: lines.length
-        ? {
-            n: lines.length,
-            label: nat.length
-              ? pl(lines.length, "استراتيجية تقدّمت هذا الأسبوع", "استراتيجيات تقدّمت هذا الأسبوع")
-              : pl(lines.length, "استراتيجية حُدِّثت هذا الأسبوع", "استراتيجيات حُدِّثت هذا الأسبوع"),
-          }
-        : undefined,
-      donut: natDonut(sec("natstrat")),
-      note: nat.length ? noteOf(lines) : undefined,
+      donut: withUps(natDonut(sec("natstrat")), up.count),
+      ups: up.named,
       lines,
     });
   }
@@ -446,26 +490,13 @@ export function buildWeekReport(args: {
   const instT = tch("inststrat");
   if (sec("inststrat").length || inst.length) {
     const lines = inst.length ? linesOf(inst) : instT;
-    const live = linesOf(of("live"));
+    const up = upsIn(sec("inststrat"), lines, instLabel);
     add({
       k: "inst",
       ...DOM_META.inst,
       updates: inst.length || instT.length,
-      big: live.length
-        ? {
-            n: live.length,
-            label: live.length === 1 ? "جهة فُعِّل قياسها هذا الأسبوع" : "جهات فُعِّل قياسها هذا الأسبوع",
-          }
-        : lines.length
-          ? {
-              n: lines.length,
-              label: inst.length
-                ? pl(lines.length, "جهة تقدّمت هذا الأسبوع", "جهات تقدّمت هذا الأسبوع")
-                : pl(lines.length, "جهة حُدِّثت هذا الأسبوع", "جهات حُدِّثت هذا الأسبوع"),
-            }
-          : undefined,
-      donut: instDonut(sec("inststrat"), true),
-      note: inst.length ? noteOf(lines) : undefined,
+      donut: withUps(instDonut(sec("inststrat"), true), up.count),
+      ups: up.named,
       lines,
     });
   }
@@ -475,20 +506,13 @@ export function buildWeekReport(args: {
   const sesT = tch("sessions");
   if (sec("sessions").length || sesA.length) {
     const lines = sesA.length ? linesOf(sesA) : sesT;
+    const up = upsIn(sec("sessions"), lines, sesLabel);
     add({
       k: "ses",
       ...DOM_META.ses,
       updates: sesA.length || sesT.length,
-      big: lines.length
-        ? {
-            n: lines.length,
-            label: sesA.length
-              ? pl(lines.length, "جهة تقدّمت جلستها", "جهات تقدّمت جلساتها")
-              : pl(lines.length, "جهة حُدِّثت جلستها هذا الأسبوع", "جهات حُدِّثت جلساتها هذا الأسبوع"),
-          }
-        : undefined,
-      donut: sesDonut(sec("sessions")),
-      note: sesA.length ? noteOf(lines, 3) : undefined,
+      donut: withUps(sesDonut(sec("sessions")), up.count),
+      ups: up.named,
       lines,
     });
   }
@@ -497,24 +521,14 @@ export function buildWeekReport(args: {
   const cx = domAch("cx");
   const cxT = tch("cx");
   if (sec("cx").length || cx.length) {
-    const reps = linesOf(of("cxrep"));
     const lines = cx.length ? linesOf(cx) : cxT;
+    const up = upsIn(sec("cx"), lines, cxLabel);
     add({
       k: "cx",
       ...DOM_META.cx,
       updates: cx.length || cxT.length,
-      big: reps.length
-        ? { n: reps.length, label: reps.length === 1 ? "جهاز صدر له تقرير" : "أجهزة صدرت لها تقارير" }
-        : lines.length
-          ? {
-              n: lines.length,
-              label: cx.length
-                ? pl(lines.length, "جهاز تقدّم في المسار", "أجهزة تقدّمت في المسار")
-                : pl(lines.length, "جهاز حُدِّث هذا الأسبوع", "أجهزة حُدِّثت هذا الأسبوع"),
-            }
-          : undefined,
-      donut: cxDonut(sec("cx")),
-      note: cx.length ? noteOf(lines, 3) : undefined,
+      donut: withUps(cxDonut(sec("cx")), up.count),
+      ups: up.named,
       lines,
     });
   }

@@ -137,6 +137,21 @@ function DomCard({
         </div>
       )}
 
+      {/* أسماء ما تقدّم هذا الأسبوع ومرحلته الآن — تحت الحلقة،
+          بدل الرقم الكبير الذي كان فوقها */}
+      {d.ups && d.ups.length > 0 && (
+        <ul className="wk-ups">
+          {d.ups.slice(0, 5).map((l) => (
+            <li key={l.name}>
+              <i>▲</i>
+              {l.name}
+              {l.detail ? <u>{l.detail}</u> : null}
+            </li>
+          ))}
+          {d.ups.length > 5 && <li className="more">{`و${d.ups.length - 5} غيرها`}</li>}
+        </ul>
+      )}
+
       {d.rows && d.rows.length > 0 && (
         /* جدولٌ بسيط: التكليف وحالته — العناوين فوق والتحديث تحتها.
            والمربّع يختار ما يظهر في التقرير المطبوع والمشترَك */
