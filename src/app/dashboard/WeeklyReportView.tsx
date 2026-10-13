@@ -127,7 +127,12 @@ function DomCard({
       {d.donut && (
         <div className="wk-dw">
           <DonutLegend slices={d.donut.slices} />
-          <DonutRing slices={d.donut.slices} total={d.donut.total} unit={d.donut.unit} />
+          <DonutRing
+            slices={d.donut.slices}
+            total={d.donut.total}
+            unit={d.donut.unit}
+            base={d.donut.base}
+          />
         </div>
       )}
 

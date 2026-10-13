@@ -85,7 +85,9 @@ export type Dom = {
   /** عدد ما تغيّر في هذا المجال خلال الأسبوع */
   updates: number;
   big?: { n: number; label: string };
-  donut?: { total: number; unit: string; slices: Slice[] };
+  /** `base` قاعدة رسم الحلقة إن خالفت مجموع الشرائح — تُرسم
+      الشرائح منسوبةً إليها ويبقى ما سواها رمادياً */
+  donut?: { total: number; unit: string; slices: Slice[]; base?: number };
   stats?: Stat[];
   lines?: Line[];
   bars?: Bar[];
@@ -206,11 +208,15 @@ export function instDonut(items: ItemLite[], startedOnly = false) {
   }
   const slices = INST_STAGES.map((label, i) => ({ label, n: c[i], color: RAMP[i] }));
   if (!startedOnly) return { total: items.length, unit: "جهة", slices };
-  const started = slices.slice(1);
+  /* في التقرير تُحذف «لم يُعقد اجتماعها» من الأسطورة — فهي تقصيرٌ
+     لا إنجاز — **ويبقى العدد في الوسط عدد الجهات كلها**: الحلقة
+     تقول كم جهة لدينا، والشرائح تقول أين وصل منها، وما لم يبدأ
+     يبقى فراغاً رمادياً في الحلقة */
   return {
-    total: started.reduce((n, x) => n + x.n, 0),
-    unit: "جهة في المسار",
-    slices: started,
+    total: items.length,
+    unit: "جهة",
+    slices: slices.slice(1),
+    base: items.length,
   };
 }
 

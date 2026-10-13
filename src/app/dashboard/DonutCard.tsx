@@ -16,16 +16,19 @@ export function DonutRing({
   total,
   unit,
   size = 92,
+  base,
 }: {
   slices: Slice[];
   total: number;
   unit: string;
   size?: number;
+  /** قاعدة النسبة إن خالفت مجموع الشرائح — فيبقى الباقي رمادياً */
+  base?: number;
 }) {
   const r = size * 0.37;
   const w = size * 0.141;
   const c = 2 * Math.PI * r;
-  const sum = slices.reduce((n, s) => n + s.n, 0) || 1;
+  const sum = base || slices.reduce((n, s) => n + s.n, 0) || 1;
   let off = 0;
   return (
     <span className="wk-dn" style={{ width: size, height: size }}>
