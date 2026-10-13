@@ -227,6 +227,9 @@ export default function WeeklyReportView({
   const { dir, band, dept } = prefs.layout;
   const r = report;
   const next = r.next.length ? r.next : listOf((prefs.texts || {}).next || "");
+  /* الإنجازات المحققة تُكتب يدويًا — ما تراه الإدارة جديراً بالذكر
+     فوق ما قرأته المنصة من سجلّها */
+  const done = listOf((prefs.texts || {}).done || "");
 
   /* ترتيب الصفوف: المتجاور اثنين اثنين، وما عداه وحده */
   const rows: Dom[][] = [];
@@ -298,22 +301,45 @@ export default function WeeklyReportView({
           <div className="wk-card wk-empty">لم يُسجَّل أي تحديث في المنصة هذا الأسبوع.</div>
         )}
 
-        {prefs.on.next !== false && next.length > 0 && (
-          <div className="wk-card">
-            <div className="wk-ch">
-              <span className="wk-ci">
-                <PIcon id="target" size={18} />
-              </span>
-              <b>الخطوات القادمة</b>
-            </div>
-            <ol className="wk-nx">
-              {next.map((x, i) => (
-                <li key={i}>
-                  <i>{i + 1}</i>
-                  {x}
-                </li>
-              ))}
-            </ol>
+        {(done.length > 0 || next.length > 0) && (
+          <div className={done.length > 0 && next.length > 0 ? "wk-two" : ""}>
+            {prefs.on.done !== false && done.length > 0 && (
+              <div className="wk-card">
+                <div className="wk-ch">
+                  <span className="wk-ci">
+                    <PIcon id="report" size={18} />
+                  </span>
+                  <b>الإنجازات المحققة</b>
+                </div>
+                <ol className="wk-nx">
+                  {done.map((x, i) => (
+                    <li key={i}>
+                      <i>{i + 1}</i>
+                      {x}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+
+            {prefs.on.next !== false && next.length > 0 && (
+              <div className="wk-card">
+                <div className="wk-ch">
+                  <span className="wk-ci">
+                    <PIcon id="target" size={18} />
+                  </span>
+                  <b>الخطوات القادمة</b>
+                </div>
+                <ol className="wk-nx">
+                  {next.map((x, i) => (
+                    <li key={i}>
+                      <i>{i + 1}</i>
+                      {x}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
           </div>
         )}
 
