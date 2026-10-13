@@ -307,7 +307,8 @@ export default function WeeklyReportView({
               <div className="wk-card">
                 <div className="wk-ch">
                   <span className="wk-ci">
-                    <PIcon id="report" size={18} />
+                    {/* الوسام نفسه الذي يحمله «الإنجاز الأسبوعي» في القائمة */}
+                    <PIcon id="award" size={18} />
                   </span>
                   <b>الإنجازات المحققة</b>
                 </div>
