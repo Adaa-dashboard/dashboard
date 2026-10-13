@@ -36,21 +36,54 @@ function printReport() {
   const w = window.open("", "_blank", "width=1100,height=800");
   /* منعت النوافذ المنبثقة ⇒ الطريقة القديمة خيرٌ من لا شيء */
   if (!w) return window.print();
-  const head = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
-    .map((n) => n.outerHTML)
-    .join("");
+
+  /* الأنماط **تُلصق نصّاً** لا تُستدعى بروابط: النافذة مكتوبة
+     بـ`document.write`، وانتظار تحميل روابطها فيها غير موثوق —
+     كانت معاينة الطباعة تقف على «Loading preview…» لأن الطباعة
+     تبدأ وورقة الأنماط لم تصل بعد. وما تعذّرت قراءته (خطوطٌ من
+     نطاقٍ آخر) يُنسخ رابطاً كما هو */
+  const css: string[] = [];
+  const links: string[] = [];
+  for (const node of Array.from(
+    document.querySelectorAll<HTMLStyleElement | HTMLLinkElement>('style, link[rel="stylesheet"]'),
+  )) {
+    const ss = node.sheet as CSSStyleSheet | null;
+    let text = "";
+    try {
+      text = ss ? Array.from(ss.cssRules).map((r) => r.cssText).join("\n") : "";
+    } catch {
+      text = ""; /* ورقةٌ من نطاقٍ آخر — لا تُقرأ */
+    }
+    if (text) css.push(text);
+    else if (node instanceof HTMLLinkElement) links.push(node.outerHTML);
+    else css.push(node.textContent || "");
+  }
+
   w.document.open();
   w.document.write(
     '<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8">' +
-      `<base href="${document.baseURI}"><title>الإنجاز الأسبوعي</title>${head}` +
-      "</head><body class=\"wk-printing\">" +
+      `<base href="${document.baseURI}"><title>الإنجاز الأسبوعي</title>` +
+      links.join("") +
+      `<style>${css.join("\n")}</style>` +
+      '</head><body class="wk-printing">' +
       sheet.outerHTML +
       "</body></html>",
   );
   w.document.close();
+
   const go = async () => {
-    /* الخطوط قبل الطباعة، وإلا طُبع التقرير بخطٍّ بديل */
+    /* الصور ثم الخطوط قبل الطباعة — وإلا خرجت الورقة بلا خلفية
+       أو بخطٍّ بديل، أو وقفت المعاينة تنتظرها */
     try {
+      await Promise.all(
+        Array.from(w.document.images).map((im) =>
+          im.complete
+            ? null
+            : new Promise((done) => {
+                im.onload = im.onerror = () => done(null);
+              }),
+        ),
+      );
       await (w.document as Document & { fonts?: FontFaceSet }).fonts?.ready;
     } catch {
       /* متصفحٌ قديم — نمضي */
@@ -58,8 +91,9 @@ function printReport() {
     w.focus();
     w.print();
   };
-  if (w.document.readyState === "complete") setTimeout(go, 300);
-  else w.addEventListener("load", () => setTimeout(go, 300));
+  /* لا نعتمد على حدث `load`: في نافذةٍ مكتوبة قد يكون وقع قبل أن
+     نستمع إليه، فتبقى الطباعة معلّقة بلا سبب ظاهر */
+  setTimeout(go, 120);
   w.addEventListener("afterprint", () => w.close());
 }
 
