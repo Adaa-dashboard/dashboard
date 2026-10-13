@@ -52,12 +52,14 @@ export const NAT_STEPS = [
   "معتمدة من اللجنة",
   "معتمدة من مجلس الوزراء",
 ];
-/** مسار الجهة في الاستراتيجيات المؤسسية */
+/** مسار الجهة في الاستراتيجيات المؤسسية — **بعناوين صفحة القسم
+    نفسها**، وتُحسب من حقولها لا من حقل `stage`: ملف المتابعة لا
+    يملأ `stage` أصلاً، فكانت الحلقة تخرج أصفاراً كلها */
 export const INST_STAGES = [
-  "وصلت المركز",
-  "قيد المراجعة",
-  "معالجة الملاحظات",
-  "اعتُمدت",
+  "لم يُعقد اجتماعها",
+  "عُقد الاجتماع التعريفي",
+  "الوثائق مستلمة",
+  "اكتملت الوثائق",
   "فُعِّل القياس",
 ];
 
@@ -70,6 +72,8 @@ export type Slice = { label: string; n: number; color: string };
 export type Bar = { name: string; pct: number; late: boolean };
 export type Stat = { n: number; label: string; tone: "ok" | "warn" | "mute"; icon?: string };
 export type Line = { name: string; detail?: string };
+/** مستهدف المجال: ما تحقّق منه وكم المستهدف */
+export type Goal = { n: number; of: number; label: string };
 
 export type Dom = {
   k: string;
@@ -83,6 +87,7 @@ export type Dom = {
   stats?: Stat[];
   lines?: Line[];
   bars?: Bar[];
+  goal?: Goal;
   /** سطر «أبرزها» تحت الحلقة */
   note?: string;
 };
@@ -176,10 +181,19 @@ function natDonut(items: ItemLite[]) {
 }
 
 function instDonut(items: ItemLite[]) {
+  /* قسمةٌ بأبعد مرحلةٍ بلغتها الجهة، فمجموع الشرائح = عدد الجهات.
+     أما عدّادات الصفحة فمتداخلة (الجهة المفعَّل قياسها معدودةٌ في
+     «عُقد اجتماعها» أيضاً)، فلا تصلح شرائحَ حلقة */
   const c = [0, 0, 0, 0, 0];
   for (const it of items) {
-    const s = Math.max(0, Math.min(5, num(it.data.stage)));
-    if (s > 0) c[s - 1]++;
+    const d = it.data;
+    const i =
+      txt(d.live) === "مفعل" ? 4
+      : txt(d.docsState) === "مكتمل" ? 3
+      : txt(d.docs) === "✓" ? 2
+      : txt(d.meet) === "تم" ? 1
+      : 0;
+    c[i]++;
   }
   return {
     total: items.length,
@@ -298,6 +312,14 @@ function sesDonut(items: ItemLite[]) {
     «صدر لها تقرير» = اعتُمد تقريرها في أيّ ربع، وهو تعريف الملف نفسه */
 const CX_OK = "تم الاعتماد";
 const CX_QK = ["q0", "q1", "q2", "q3", "q4"];
+/** مستهدف البكس — من صفّ الإعدادات `cx-meta`، وإن لم يُضبط بعد
+    فالمعتمد في الملف ٦٩ جهازاً */
+export function cxTarget(items: ItemLite[]): number {
+  const meta = items.find((it) => it.id === "cx-meta");
+  const t = num(meta?.data.target);
+  return t > 0 ? t : 69;
+}
+
 function cxDonut(items: ItemLite[]) {
   /* صفّ الإعدادات (`cx-meta`) ليس جهازاً فلا يُعدّ */
   const rows = items.filter((it) => it.id !== "cx-meta");
@@ -454,6 +476,11 @@ export function buildWeekReport(args: {
             }
           : undefined,
       donut: cxDonut(sec("cx")),
+      goal: {
+        n: cxDonut(sec("cx")).slices[0].n,
+        of: cxTarget(sec("cx")),
+        label: "جهازاً صدر له تقرير",
+      },
       note: cx.length ? noteOf(lines, 3) : undefined,
       lines,
     });
