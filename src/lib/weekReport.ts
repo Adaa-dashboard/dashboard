@@ -61,7 +61,7 @@ const RAMP = ["#d7e2de", "#9ecdbb", "#5bb594", "#1b9c74", "#0b6b50"];
 /* ---------------- أنواع المخرجات ---------------- */
 export type Slice = { label: string; n: number; color: string };
 export type Bar = { name: string; pct: number; late: boolean };
-export type Stat = { n: number; label: string; tone: "ok" | "warn" | "mute" };
+export type Stat = { n: number; label: string; tone: "ok" | "warn" | "mute"; icon?: string };
 export type Line = { name: string; detail?: string };
 
 export type Dom = {
@@ -95,7 +95,7 @@ export type WeekReport = {
 };
 
 /** مفاتيح المجالات — هي نفسها مفاتيح التفضيلات، فلا قائمتان تفترقان */
-export const DOM_KEYS = ["task", "nat", "inst", "ses", "cx", "proj", "crq"] as const;
+export const DOM_KEYS = ["task", "nat", "inst", "ses", "cx", "proj"] as const;
 export type DomKey = (typeof DOM_KEYS)[number];
 
 /* الأيقونة ليست هنا: الواجهة ترسمها بأيقونات المنصة نفسها
@@ -107,7 +107,6 @@ export const DOM_META: Record<DomKey, { title: string }> = {
   ses: { title: "جلسات مراجعة الأداء" },
   cx: { title: "تجربة المستفيد" },
   proj: { title: "حالة المشاريع الاستراتيجية" },
-  crq: { title: "مراجعة طلبات التغيير" },
 };
 
 /* المنجز إلى أي مجال ينتمي */
@@ -185,10 +184,11 @@ function taskDom(tasks: TaskLite[], a: string, b: string, upd: number): Dom | nu
     ...DOM_META.task,
     updates,
     stats: [
-      { n: fresh.length, label: "جديد", tone: "mute" },
-      { n: open.length, label: "قيد العمل", tone: "ok" },
-      { n: done.length, label: "مكتمل", tone: "ok" },
-      { n: late.length, label: "متأخر", tone: "warn" },
+      { n: fresh.length, label: "جديد", tone: "mute", icon: "inbox" },
+            /* سهم دائري لا ترس: `gear` في المكتبة دائرةٌ بأشعة تُقرأ شمساً */
+      { n: open.length, label: "قيد العمل", tone: "ok", icon: "cycle" },
+      { n: done.length, label: "مكتمل", tone: "ok", icon: "check" },
+      { n: late.length, label: "متأخر", tone: "warn", icon: "clock" },
     ],
     lines: done.map((x) => ({ name: txt(x.title) })),
   };
@@ -321,18 +321,9 @@ export function buildWeekReport(args: {
   /* ٦) المشاريع */
   add(projDom(args.items.projects || [], of("proj")));
 
-  /* ٧) طلبات التغيير — بلا أسماء: النسبة والعدد فقط */
+  /* طلبات التغيير **بلا بطاقة**: نسبتها وأعدادها في شريط الملخّص
+     أعلى الصفحة وحده — بطلب المستخدمة، فلا تتكرر المعلومة */
   const open = args.changes.filter((c) => !day(txt(c.closedAt))).length;
-  if (cr.n > 0 || open > 0)
-    add({
-      k: "crq",
-      ...DOM_META.crq,
-      updates: Math.max(cr.n, 1),
-      stats: [
-        { n: cr.n, label: "تم إغلاقها", tone: "ok" },
-        { n: open, label: "قيد الإجراء", tone: "mute" },
-      ],
-    });
 
   const total = ach.length + cr.n;
   const prevAch = args.logPrev ? achFromLog(args.logPrev).length + crPrev.n : null;

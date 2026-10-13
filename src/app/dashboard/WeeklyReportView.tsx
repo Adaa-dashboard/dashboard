@@ -18,31 +18,18 @@
 import { asset } from "@/lib/base";
 import { listOf, type WeeklyPrefs } from "@/lib/weeklyPrefs";
 import type { Dom, Slice, WeekReport } from "@/lib/weekReport";
-import {
-  IconAward, IconCalendar, IconCheck3, IconCx, IconInst, IconNat,
-  IconProj, IconSess, IconSwap, IconTarget,
-} from "./icons";
+import { PIcon } from "./pickicons";
 
-/* أيقونات المنصة نفسها — بيضاء محدَّدة بالأخضر، لا رموز تعبيرية
-   يرسمها كل نظامٍ بألوانه */
-type Ico = (p: { size?: number }) => React.ReactElement;
-const DOM_ICON: Record<string, Ico> = {
-  task: IconCheck3,
-  nat: IconNat,
-  inst: IconInst,
-  ses: IconSess,
-  cx: IconCx,
-  proj: IconProj,
-  crq: IconSwap,
+/* أيقونات مكتبة المنصة (`PICK_ICONS`) — خطّية خضراء بلا تعبئة،
+   لا رموز تعبيرية يرسمها كل نظامٍ بألوانه */
+const DOM_ICON: Record<string, string> = {
+  task: "clipboard",
+  nat: "bank",
+  inst: "building",
+  ses: "bars",
+  cx: "users",
+  proj: "gantt",
 };
-
-function Badge({ icon: I, lg }: { icon: Ico; lg?: boolean }) {
-  return (
-    <span className={`wk-ic ${lg ? "lg" : ""}`}>
-      <I size={lg ? 21 : 15} />
-    </span>
-  );
-}
 
 const AR_MONTHS = [
   "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
@@ -119,7 +106,9 @@ function DomCard({ d }: { d: Dom }) {
   return (
     <div className="wk-card">
       <div className="wk-ch">
-        <Badge icon={DOM_ICON[d.k] || IconAward} />
+        <span className="wk-ci">
+          <PIcon id={DOM_ICON[d.k] || "award"} size={18} />
+        </span>
         <b>{d.title}</b>
         <span className="wk-cnt">{d.updates} تحديثاً</span>
       </div>
@@ -128,6 +117,11 @@ function DomCard({ d }: { d: Dom }) {
         <div className="wk-sts">
           {d.stats.map((s) => (
             <div key={s.label}>
+              {s.icon && (
+                <span className={`wk-ci ${s.tone}`}>
+                  <PIcon id={s.icon} size={21} />
+                </span>
+              )}
               <b className={s.tone}>{s.n}</b>
               <span>{s.label}</span>
             </div>
@@ -194,7 +188,7 @@ function DomCard({ d }: { d: Dom }) {
 }
 
 /* المجالات التي تُعرض بطاقتين في الصف — وما عداها بعرض الصفحة */
-const PAIRED = new Set(["nat", "inst", "ses", "cx", "crq"]);
+const PAIRED = new Set(["nat", "inst", "ses", "cx"]);
 
 export default function WeeklyReportView({
   report,
@@ -233,14 +227,16 @@ export default function WeeklyReportView({
           <h2>الإنجاز الأسبوعي</h2>
           <div className="wkx-dept">{dept}</div>
           <div className="wkx-dt">
-            <IconCalendar size={13} />
+            <PIcon id="calendar" size={14} />
             {rangeText2(r.weekStart, r.weekEnd)}
           </div>
         </header>
 
         <div className="wk-kpi">
           <div>
-            <Badge icon={IconAward} lg />
+            <span className="wk-ic lg">
+              <PIcon id="report" size={22} />
+            </span>
             <span className="tx">
               <b>{r.total}</b>
               <span>تحديثاً هذا الأسبوع</span>
@@ -250,8 +246,10 @@ export default function WeeklyReportView({
           <div>
             <Ring pct={r.crPct ?? 0} />
             <span className="tx">
-              <b className="sm">نسبة الالتزام</b>
-              <span>في مراجعة طلبات التغيير</span>
+              <b className="sm">نسبة الالتزام في طلبات التغيير</b>
+              <span>
+                {r.crOpen} قيد الإجراء · {r.crClosed} أُغلق هذا الأسبوع
+              </span>
               {r.crPctPrev != null && <em>مقابل {r.crPctPrev}% الأسبوع الماضي</em>}
             </span>
           </div>
@@ -272,7 +270,9 @@ export default function WeeklyReportView({
         {prefs.on.next !== false && next.length > 0 && (
           <div className="wk-card">
             <div className="wk-ch">
-              <Badge icon={IconTarget} />
+              <span className="wk-ci">
+                <PIcon id="target" size={18} />
+              </span>
               <b>الخطوات القادمة</b>
             </div>
             <ol className="wk-nx">
