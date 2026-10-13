@@ -2449,18 +2449,10 @@ table.matrix thead th {
 .wk-ci.mute {
   color: var(--muted);
 }
-/* مربّع الملخّص وحده مؤطَّر: أبيض بحدٍّ أخضر */
-.wk-ic {
-  flex: 0 0 auto;
+/* أيقونة الملخّص أكبر — وبلا إطار كبقية أيقونات التقرير */
+.wk-ci.lg {
   width: 46px;
   height: 46px;
-  border-radius: 13px;
-  background: #fff;
-  border: 1.5px solid var(--g-600);
-  color: var(--g-700);
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 .wk-kpi .tx b {
   display: block;

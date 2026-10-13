@@ -257,8 +257,8 @@ export default function WeeklyReportView({
 
         <div className="wk-kpi">
           <div>
-            <span className="wk-ic lg">
-              <PIcon id="report" size={22} />
+            <span className="wk-ci lg">
+              <PIcon id="report" size={30} />
             </span>
             <span className="tx">
               <b>{r.total}</b>
