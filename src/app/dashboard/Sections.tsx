@@ -3319,12 +3319,76 @@ export function CxPage({ t, canEdit, add, gear }: SecPageProps) {
 /* ============================================================
    ٥) المشاريع الاستراتيجية
    ============================================================ */
+/* مراحل المشروع الأربع — الافتراضي حين لا تُكتب مراحلُ المشروع
+   صراحةً في بيانه. ويُكتب بدلها ما شاءت الإدارة: سطرٌ لكل مرحلة
+   أو مخرج، ونسبته بعد نقطتين («المخرج الثاني:100») */
+const PJ_STAGES = ["التهيئة", "التخطيط", "التنفيذ", "الإغلاق"];
+const PJ_COLORS = ["#0b6b50", "#1b9c74", "#5bb594", "#9ecdbb"];
+
+type PjStage = { name: string; pct: number };
+
+function pjStages(d: Rec, actual: number): PjStage[] {
+  const raw = txt(d.stages).trim();
+  if (raw) {
+    return raw
+      .split(/[\n·,،]+/)
+      .map((x) => x.trim())
+      .filter(Boolean)
+      .map((x) => {
+        const i = x.lastIndexOf(":");
+        const hasPct = i > 0 && /^\s*\d+(\.\d+)?\s*%?\s*$/.test(x.slice(i + 1));
+        return {
+          name: (hasPct ? x.slice(0, i) : x).trim(),
+          pct: hasPct ? Math.max(0, Math.min(100, numOf(x.slice(i + 1)))) : 0,
+        };
+      });
+  }
+  /* بلا بيانٍ صريح: المراحل الأربع تُملأ من الإنجاز الفعلي —
+     كل مرحلةٍ ربعُ المشروع */
+  return PJ_STAGES.map((name, i) => ({
+    name,
+    pct: Math.max(0, Math.min(100, Math.round((actual - i * 25) * 4))),
+  }));
+}
+
+/** حلقة نسبةٍ واحدة — الإنجاز الفعلي في وسط بطاقة المشروع */
+function PjRing({ pct, late }: { pct: number; late: boolean }) {
+  const r = 34;
+  const c = 2 * Math.PI * r;
+  const v = Math.max(0, Math.min(100, pct));
+  return (
+    <span className="pjx-rg">
+      <svg width="92" height="92" viewBox="0 0 92 92">
+        <circle cx="46" cy="46" r={r} fill="none" stroke="var(--line2)" strokeWidth="11" />
+        <circle
+          cx="46" cy="46" r={r} fill="none" strokeWidth="11" strokeLinecap="round"
+          stroke={late ? "var(--gold)" : "#0b6b50"}
+          strokeDasharray={`${(c * v) / 100} 999`}
+        />
+      </svg>
+      <b className={late ? "warn" : ""}>{AR(Math.round(v * 10) / 10)}٪</b>
+    </span>
+  );
+}
+
 export function Projects({ t, canEdit }: { t: T; canEdit: boolean }) {
   const { items, loaded, remove, undo, undoTop, dismissUndo, reload } = useItems("projects");
   const [edit, setEdit] = useState<Item | null>(null);
   /* النسب تُدخَل بكسور عشرية (٤١٫٣) فطرحها المباشر يعطي ٦٫٥٩٩٩٩٩٩٩٩٩٩٩٩٩٤ —
      التقريب لخانة واحدة عند العرض وحده، والقيمة المحفوظة تبقى كما أُدخلت. */
   const p1 = (n: number) => Math.round(n * 10) / 10;
+
+  /* شريط الحالة فوق البطاقات: كم مشروعاً، وأين هي من خطتها */
+  const sum = useMemo(() => {
+    let on = 0, near = 0, late = 0;
+    for (const it of items) {
+      const g = numOf(it.data.actual) - numOf(it.data.planned);
+      if (g <= -10) late++;
+      else if (g < 0) near++;
+      else on++;
+    }
+    return { on, near, late };
+  }, [items]);
 
   if (!loaded) return <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>;
   if (!items.length)
@@ -3336,7 +3400,24 @@ export function Projects({ t, canEdit }: { t: T; canEdit: boolean }) {
     );
   return (
     <>
-      <div className="sx-pjs">
+      <div className="pjx-kpi">
+        {[
+          { k: "all", n: items.length, l: t("مشاريع استراتيجية", "Projects"), ic: "rocket" },
+          { k: "on", n: sum.on, l: t("على المسار", "On track"), ic: "check" },
+          { k: "near", n: sum.near, l: t("قريب من التأخر", "At risk"), ic: "clock" },
+          { k: "late", n: sum.late, l: t("متأخر", "Late"), ic: "alert" },
+        ].map((x) => (
+          <div className={`pjx-kp ${x.k}`} key={x.k}>
+            <span className="ic">
+              <PIcon id={x.ic} size={20} />
+            </span>
+            <b>{AR(x.n)}</b>
+            <span className="l">{x.l}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="pjx-g">
         {items.map((it) => {
           const d = it.data;
           const planned = numOf(d.planned);
@@ -3344,50 +3425,114 @@ export function Projects({ t, canEdit }: { t: T; canEdit: boolean }) {
           const g = p1(actual - planned);
           // مشروع لم تصل بياناته بعد: لا نعرض «متقدم ٠٪» بل نقول ذلك صراحةً
           const blank = planned === 0 && actual === 0;
+          const left = Math.max(0, numOf(d.months) - numOf(d.elapsed));
+          const st = g <= -10 ? "late" : g < 0 ? "near" : "on";
+          const stages = pjStages(d, actual);
+          const notes = txt(d.note)
+            .split(/\n+/)
+            .map((x) => x.trim())
+            .filter(Boolean);
           return (
-            <div className="sx-pj" key={it.id}>
-              <div className="tile">
-                <b>{AR(p1(actual))}٪</b>
-                <span>{t("الإنجاز الفعلي", "Actual")}</span>
-                <em>{`${t("المخطط", "Planned")} ${AR(p1(planned))}٪`}</em>
-                {blank ? (
-                  <span className="sx-gap wait">{t("بانتظار البيانات", "Awaiting data")}</span>
-                ) : (
-                  <span className={`sx-gap ${g < 0 ? "neg" : "pos"}`}>
-                    {g < 0 ? `متأخر ${AR(Math.abs(g))}٪` : `متقدم ${AR(g)}٪`}
-                  </span>
-                )}
-              </div>
-              <div className="bd">
+            <div className="pjx" key={it.id}>
+              <div className="pjx-h">
+                <span className="wk-ci">
+                  <PIcon id="gantt" size={19} />
+                </span>
                 <h4>{txt(d.name) || "—"}</h4>
-                <div className="meta">
-                  {d.status ? <span className="sx-pill">{txt(d.status)}</span> : null}
-                  {d.owner ? <span className="m">{`${t("الراعي", "Sponsor")}: ${txt(d.owner)}`}</span> : null}
-                  {d.period ? <span className="m">{txt(d.period)}</span> : null}
-                  {numOf(d.months) > 0 ? (
-                    <span className="m">{`· ${t("الشهر", "Month")} ${AR(numOf(d.elapsed))} ${t("من", "of")} ${AR(numOf(d.months))}`}</span>
-                  ) : null}
-                </div>
-                <div className="br pl">
-                  <div className="lb">
-                    <span>{t("المخطط", "Planned")}</span>
-                    <b>{AR(p1(planned))}٪</b>
-                  </div>
-                  <div className="bar">
-                    <i style={{ width: `${Math.max(0, Math.min(100, planned))}%` }} />
-                  </div>
-                </div>
-                <div className="br ac">
-                  <div className="lb">
-                    <span>{t("الفعلي", "Actual")}</span>
-                    <b>{AR(p1(actual))}٪</b>
-                  </div>
-                  <div className="bar">
-                    <i style={{ width: `${Math.max(0, Math.min(100, actual))}%` }} />
-                  </div>
-                </div>
-                {d.note ? <p className="sx-pj-note">{txt(d.note)}</p> : null}
+                <span className={`pjx-st ${st}`}>
+                  <i />
+                  {txt(d.status) ||
+                    (st === "late" ? t("متأخر", "Late") : st === "near" ? t("قريب من التأخر", "At risk") : t("على المسار", "On track"))}
+                </span>
               </div>
+
+              {(d.period || numOf(d.months) > 0) && (
+                <div className="pjx-dt">
+                  <PIcon id="calendar" size={14} />
+                  {txt(d.period) ||
+                    `${t("الشهر", "Month")} ${AR(numOf(d.elapsed))} ${t("من", "of")} ${AR(numOf(d.months))}`}
+                </div>
+              )}
+
+              <div className="pjx-k">
+                <div className="pjx-ring">
+                  <PjRing pct={actual} late={st !== "on"} />
+                  <span>{t("الإنجاز الفعلي", "Actual")}</span>
+                </div>
+                <div className="pjx-t">
+                  <span className="ic">
+                    <PIcon id="calendar" size={18} />
+                  </span>
+                  <b>{AR(left)}</b>
+                  <span className="l">{t("المدة المتبقية (شهر)", "Months left")}</span>
+                </div>
+                <div className="pjx-t">
+                  <span className="ic">
+                    <PIcon id="bars" size={18} />
+                  </span>
+                  <b>{AR(p1(planned))}٪</b>
+                  <span className="l">{t("المخطط", "Planned")}</span>
+                </div>
+                <div className="pjx-t">
+                  <span className="ic">
+                    <PIcon id="target" size={18} />
+                  </span>
+                  {blank ? (
+                    <>
+                      <b className="mute">—</b>
+                      <span className="l">{t("بانتظار البيانات", "Awaiting data")}</span>
+                    </>
+                  ) : (
+                    <>
+                      <b className={g < 0 ? "warn" : "ok"}>{`${g < 0 ? "−" : "+"}${AR(Math.abs(g))}٪`}</b>
+                      <span className="l">{g < 0 ? t("متأخر عن الخطة", "Behind plan") : t("متقدم على الخطة", "Ahead of plan")}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="pjx-sg">
+                <div className="hd">{t("توزيع مراحل المشروع", "Project stages")}</div>
+                <div className="bar">
+                  {stages.map((x, i) => (
+                    <span className="seg" key={x.name + i}>
+                      <i
+                        style={{
+                          width: `${x.pct}%`,
+                          background: PJ_COLORS[i % PJ_COLORS.length],
+                        }}
+                      />
+                    </span>
+                  ))}
+                </div>
+                <div className="lg">
+                  {stages.map((x, i) => (
+                    <span key={x.name + i}>
+                      <i style={{ background: PJ_COLORS[i % PJ_COLORS.length] }} />
+                      {x.name}
+                      <u>{AR(Math.round(x.pct))}٪</u>
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {notes.length > 0 && (
+                <div className="pjx-up">
+                  <div className="hd">
+                    <PIcon id="note" size={15} />
+                    {t("أبرز المستجدات", "Highlights")}
+                  </div>
+                  <ul>
+                    {notes.map((x, i) => (
+                      <li key={i}>
+                        <i />
+                        {x}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {canEdit && (
                 <div className="sx-pj-x">
                   <button className="rowx" title={t("تعديل", "Edit")} onClick={() => setEdit(it)}>
@@ -4120,7 +4265,12 @@ const FIELDS: Record<Exclude<SectionKey, "outputs" | "opplan">, Field[]> = {
     { k: "period", label: "الفترة" },
     { k: "months", label: "مدة المشروع (شهر)", kind: "num" },
     { k: "elapsed", label: "الشهر الحالي", kind: "num" },
-    { k: "note", label: "ملاحظة", kind: "area" },
+    {
+      k: "stages",
+      label: "مراحل المشروع (سطر لكل مرحلة أو مخرج، ونسبته بعد نقطتين — مثال: المخرج الثاني:100)",
+      kind: "area",
+    },
+    { k: "note", label: "أبرز المستجدات (سطر لكل مستجد)", kind: "area" },
   ],
 };
 
