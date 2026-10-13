@@ -66,9 +66,9 @@ export function DonutLegend({ slices }: { slices: Slice[] }) {
         <div key={s.label}>
           <i style={{ background: s.color }} />
           {s.label}
+          {/* ما زاد في هذه المرحلة هذا الأسبوع — سهمٌ أخضر عقب اسمها */}
+          {s.up ? <em className="up">+{s.up} ▲</em> : null}
           <u>{s.n}</u>
-          {/* ما زاد في هذه المرحلة هذا الأسبوع — سهمٌ أخضر وعدد */}
-          {s.up ? <em className="up">▲ {s.up}+</em> : null}
         </div>
       ))}
     </div>

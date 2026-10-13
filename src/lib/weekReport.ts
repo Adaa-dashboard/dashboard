@@ -79,6 +79,8 @@ export type Slice = {
 export type Bar = { name: string; pct: number; plan: number; late: boolean };
 export type Stat = { n: number; label: string; tone: "ok" | "warn" | "mute"; icon?: string };
 export type Line = { name: string; detail?: string };
+/** بندٌ تقدّم هذا الأسبوع — لونه لون شريحته في الحلقة */
+export type Up = { name: string; label: string; color: string };
 
 /** صفٌّ في جدول التكليفات: التكليف وحالته وما يحتاجه */
 export type Row = { id: string; name: string; state: string; tone: "ok" | "warn" | "mute" };
@@ -94,8 +96,8 @@ export type Dom = {
   /** `base` قاعدة رسم الحلقة إن خالفت مجموع الشرائح — تُرسم
       الشرائح منسوبةً إليها ويبقى ما سواها رمادياً */
   donut?: { total: number; unit: string; slices: Slice[]; base?: number };
-  /** أسماء ما تقدّم هذا الأسبوع ومرحلته الآن — تحت الحلقة */
-  ups?: Line[];
+  /** ما تقدّم هذا الأسبوع: الاسم ولون مرحلته — تحت الحلقة */
+  ups?: Up[];
   stats?: Stat[];
   lines?: Line[];
   bars?: Bar[];
@@ -402,20 +404,26 @@ export function cxDonut(items: ItemLite[]) {
 /** أين وقع ما تقدّم هذا الأسبوع — تُطابَق أسماء المنجزات ببنود
     القسم، وتُقرأ مرحلةُ كلٍّ منها الآن. فالسهم الأخضر يقف عند
     المرحلة التي صار إليها البند، والأسماء تحت الحلقة هي هي. */
-function upsIn(items: ItemLite[], lines: Line[], label: (d: Rec) => string) {
+function upsIn(
+  items: ItemLite[],
+  lines: Line[],
+  label: (d: Rec) => string,
+  slices: Slice[],
+) {
   const byName = new Map<string, ItemLite>();
   for (const it of items) {
     const nm = txt(it.data.name) || txt(it.data.entity);
     if (nm) byName.set(nm, it);
   }
+  const color = new Map(slices.map((x) => [x.label, x.color]));
   const count: Record<string, number> = {};
-  const named: Line[] = [];
+  const named: Up[] = [];
   for (const l of lines) {
     const it = byName.get(l.name);
     if (!it) continue;
     const lab = label(it.data);
     count[lab] = (count[lab] || 0) + 1;
-    named.push({ name: l.name, detail: lab });
+    named.push({ name: l.name, label: lab, color: color.get(lab) || "#1b9c74" });
   }
   return { count, named };
 }
@@ -474,12 +482,13 @@ export function buildWeekReport(args: {
     const lines = nat.length ? linesOf(nat) : natT;
     /* لا رقمَ كبيراً فوق الحلقة: التحديث يُقرأ من سهم الأسطورة
        ومن أسماء ما تقدّم تحتها */
-    const up = upsIn(sec("natstrat"), lines, natLabel);
+    const dn = natDonut(sec("natstrat"));
+    const up = upsIn(sec("natstrat"), lines, natLabel, dn.slices);
     add({
       k: "nat",
       ...DOM_META.nat,
       updates: nat.length || natT.length,
-      donut: withUps(natDonut(sec("natstrat")), up.count),
+      donut: withUps(dn, up.count),
       ups: up.named,
       lines,
     });
@@ -490,12 +499,13 @@ export function buildWeekReport(args: {
   const instT = tch("inststrat");
   if (sec("inststrat").length || inst.length) {
     const lines = inst.length ? linesOf(inst) : instT;
-    const up = upsIn(sec("inststrat"), lines, instLabel);
+    const dn = instDonut(sec("inststrat"), true);
+    const up = upsIn(sec("inststrat"), lines, instLabel, dn.slices);
     add({
       k: "inst",
       ...DOM_META.inst,
       updates: inst.length || instT.length,
-      donut: withUps(instDonut(sec("inststrat"), true), up.count),
+      donut: withUps(dn, up.count),
       ups: up.named,
       lines,
     });
@@ -506,12 +516,13 @@ export function buildWeekReport(args: {
   const sesT = tch("sessions");
   if (sec("sessions").length || sesA.length) {
     const lines = sesA.length ? linesOf(sesA) : sesT;
-    const up = upsIn(sec("sessions"), lines, sesLabel);
+    const dn = sesDonut(sec("sessions"));
+    const up = upsIn(sec("sessions"), lines, sesLabel, dn.slices);
     add({
       k: "ses",
       ...DOM_META.ses,
       updates: sesA.length || sesT.length,
-      donut: withUps(sesDonut(sec("sessions")), up.count),
+      donut: withUps(dn, up.count),
       ups: up.named,
       lines,
     });
@@ -522,12 +533,13 @@ export function buildWeekReport(args: {
   const cxT = tch("cx");
   if (sec("cx").length || cx.length) {
     const lines = cx.length ? linesOf(cx) : cxT;
-    const up = upsIn(sec("cx"), lines, cxLabel);
+    const dn = cxDonut(sec("cx"));
+    const up = upsIn(sec("cx"), lines, cxLabel, dn.slices);
     add({
       k: "cx",
       ...DOM_META.cx,
       updates: cx.length || cxT.length,
-      donut: withUps(cxDonut(sec("cx")), up.count),
+      donut: withUps(dn, up.count),
       ups: up.named,
       lines,
     });

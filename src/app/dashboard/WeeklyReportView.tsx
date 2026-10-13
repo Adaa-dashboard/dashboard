@@ -137,18 +137,16 @@ function DomCard({
         </div>
       )}
 
-      {/* أسماء ما تقدّم هذا الأسبوع ومرحلته الآن — تحت الحلقة،
-          بدل الرقم الكبير الذي كان فوقها */}
+      {/* ما تقدّم هذا الأسبوع — نقطةٌ بلون مرحلته الجديدة ثم اسمه */}
       {d.ups && d.ups.length > 0 && (
         <ul className="wk-ups">
-          {d.ups.slice(0, 5).map((l) => (
+          {d.ups.slice(0, 6).map((l) => (
             <li key={l.name}>
-              <i>▲</i>
+              <i style={{ background: l.color }} />
               {l.name}
-              {l.detail ? <u>{l.detail}</u> : null}
             </li>
           ))}
-          {d.ups.length > 5 && <li className="more">{`و${d.ups.length - 5} غيرها`}</li>}
+          {d.ups.length > 6 && <li className="more">{`و${d.ups.length - 6} غيرها`}</li>}
         </ul>
       )}
 
@@ -252,7 +250,7 @@ function DomCard({
         </div>
       )}
 
-      {d.note ? (
+      {d.ups && d.ups.length > 0 ? null : d.note ? (
         <div className="wk-note2">
           <b>أبرزها:</b> {d.note}
         </div>
