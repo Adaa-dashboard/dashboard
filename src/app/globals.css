@@ -3252,6 +3252,13 @@ table.matrix thead th {
   }
 }
 
+/* نافذة التصدير المستقلة — فيها الورقة وحدها */
+.wk-printing {
+  margin: 0;
+  padding: 20px 14px;
+  background: var(--bg);
+}
+
 /* الطباعة / تصدير PDF — يُطبع التقرير وحده.
    الاتجاه من صنف التقرير عبر صفحةٍ مسمّاة، فـ@page لا تقرأ الأصناف */
 @media print {

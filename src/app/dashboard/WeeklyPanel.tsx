@@ -21,6 +21,48 @@ type ShareRow = {
   lastView: string | null;
 };
 
+/* ============================================================
+   تصدير PDF — من **نافذةٍ مستقلة فيها ورقة التقرير وحدها**.
+   `window.print()` على الصفحة كما هي كانت تُعلّق المتصفح: فهو
+   يُعيد تخطيط اللوحة كلها (الشريط والأقسام وجداولها) على مقاس
+   الورق قبل أن يفتح نافذة الطباعة، وذلك تخطيطٌ ثقيل بلا طائل
+   لأن كل ذلك مخفيٌّ في الطباعة أصلاً.
+   فننسخ ورقة `.wkx` وأوراق الأنماط نفسها إلى نافذةٍ جديدة
+   ونطبعها — فلا يُخطَّط إلا ما يُطبع.
+   ============================================================ */
+function printReport() {
+  const sheet = document.querySelector(".wkx");
+  if (!sheet) return window.print();
+  const w = window.open("", "_blank", "width=1100,height=800");
+  /* منعت النوافذ المنبثقة ⇒ الطريقة القديمة خيرٌ من لا شيء */
+  if (!w) return window.print();
+  const head = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+    .map((n) => n.outerHTML)
+    .join("");
+  w.document.open();
+  w.document.write(
+    '<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8">' +
+      `<base href="${document.baseURI}"><title>الإنجاز الأسبوعي</title>${head}` +
+      "</head><body class=\"wk-printing\">" +
+      sheet.outerHTML +
+      "</body></html>",
+  );
+  w.document.close();
+  const go = async () => {
+    /* الخطوط قبل الطباعة، وإلا طُبع التقرير بخطٍّ بديل */
+    try {
+      await (w.document as Document & { fonts?: FontFaceSet }).fonts?.ready;
+    } catch {
+      /* متصفحٌ قديم — نمضي */
+    }
+    w.focus();
+    w.print();
+  };
+  if (w.document.readyState === "complete") setTimeout(go, 300);
+  else w.addEventListener("load", () => setTimeout(go, 300));
+  w.addEventListener("afterprint", () => w.close());
+}
+
 export default function WeeklyPanel({
   t,
   canEdit = false,
@@ -231,7 +273,7 @@ export default function WeeklyPanel({
           <button className="btn btn-ghost" onClick={() => setTune(true)}>
             ⚙️ {t("إعدادات التقرير", "Report settings")}
           </button>
-          <button className="btn" onClick={() => window.print()}>
+          <button className="btn" onClick={printReport}>
             {t("تصدير PDF", "Export PDF")}
           </button>
         </div>
