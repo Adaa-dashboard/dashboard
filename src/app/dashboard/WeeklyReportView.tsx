@@ -42,6 +42,15 @@ export function arDate2(iso: string): string {
   return `${d} ${AR_MONTHS[m - 1]} ${y}`;
 }
 
+/** عدد الطلبات الواردة في الأسبوع بصيغةٍ عربية سليمة */
+function crNewText(n: number): string {
+  if (!n) return "لم يرد طلبٌ هذا الأسبوع";
+  if (n === 1) return "طلبٌ واحد ورد هذا الأسبوع";
+  if (n === 2) return "طلبان وردا هذا الأسبوع";
+  if (n <= 10) return `${n} طلبات وردت هذا الأسبوع`;
+  return `${n} طلباً ورد هذا الأسبوع`;
+}
+
 export function rangeText2(a: string, b: string): string {
   if (!a || !b) return "—";
   return a.slice(0, 7) === b.slice(0, 7)
@@ -292,9 +301,7 @@ export default function WeeklyReportView({
             <Ring pct={r.crPct ?? 0} />
             <span className="tx">
               <b className="sm">نسبة الالتزام في طلبات التغيير</b>
-              <span>
-                {r.crOpen} قيد الإجراء · {r.crClosed} أُغلق هذا الأسبوع
-              </span>
+              <span>{crNewText(r.crNew)}</span>
               {r.crPctPrev != null && <em>مقابل {r.crPctPrev}% الأسبوع الماضي</em>}
             </span>
           </div>

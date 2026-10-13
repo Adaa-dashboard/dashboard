@@ -58,6 +58,7 @@ function Shared() {
         workDays: r.work_days == null ? null : Number(r.work_days),
         status: String(r.status || ""),
         closedAt: String(r.closed_at || ""),
+        firstSeen: String(r.first_seen || ""),
       }));
       const tasks = ((data.tasks || []) as Record<string, unknown>[]).map<TaskLite>((r) => ({
         id: String(r.id || ""),

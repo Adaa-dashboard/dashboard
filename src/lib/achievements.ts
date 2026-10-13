@@ -180,6 +180,8 @@ export type ChangeLite = {
   code?: string; owner?: string; itemName?: string;
   sla?: number | null; workDays?: number | null;
   status?: string; closedAt?: string;
+  /** أول ظهورٍ للطلب في الملف اليومي — أي تاريخ وروده */
+  firstSeen?: string;
 };
 export type TaskLite = {
   id?: string; title?: string; kind?: string; state?: string;
