@@ -1,194 +1,182 @@
 "use client";
 
 /* ============================================================
-   تخصيص التقرير الأسبوعي.
+   إعدادات التقرير الأسبوعي — لوحةٌ واحدة بأربع مجموعات:
+   الشكل · ما يظهر · كتابة الأسبوع · المشاركة.
 
-   كل أقسام التقرير معروضة، والمؤشَّر عليه هو ما يظهر. وتحتها
-   الخانات المكتوبة يدويًا: الخطوات القادمة والدعم المطلوب
-   والتحديات وأولويات الأسبوع القادم — وهي أيضاً ضمن الاختيار.
+   كانت الإعدادات مبعثرة: مربّعٌ بلا عنوان يفتح صفحةً فيها
+   الأقسام والنصوص، والمشاركة في نافذةٍ أخرى، ولا خيار للشكل
+   أصلاً. وجُمعت هنا لأن المستخدم يضبطها في جلسةٍ واحدة.
 
-   الحفظ على مستويين: «افتراضي لكل أسبوع» و«هذا الأسبوع وحده».
-   الافتراضي هو الأساس، وتغيير الأسبوع يُبنى فوقه — فلا يضيع
-   الافتراضي بتعديل أسبوع واحد.
+   والحفظ على مستويين: «افتراضي لكل أسبوع» و«هذا الأسبوع وحده» —
+   فالافتراضي أساسٌ لا يضيع بتعديل أسبوع.
    ============================================================ */
 
-import { useMemo, useState } from "react";
-import { WEEK_BLOCKS, type WeeklyPrefs } from "@/lib/weeklyPrefs";
-import type { WeeklyAsg } from "@/lib/weeklyReport";
+import { useMemo, useState, type ReactNode } from "react";
+import { WEEK_BLOCKS, DEFAULT_LAYOUT, type WeeklyPrefs } from "@/lib/weeklyPrefs";
 import { rangeText2 } from "./WeeklyReportView";
 
 type T = (ar: string, en: string) => string;
+
+function Grp({ icon, title, extra, children }: { icon: string; title: string; extra?: ReactNode; children: ReactNode }) {
+  return (
+    <div className="wcx-g">
+      <div className="wcx-gt">
+        <i>{icon}</i>
+        {title}
+        {extra && <span className="wcx-ge">{extra}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
 
 export default function WeeklyCustomize({
   prefs,
   weekStart,
   weekEnd,
-  asg,
   canEdit,
   busy,
   onSave,
   onClose,
+  share,
   t,
 }: {
   prefs: WeeklyPrefs;
   weekStart: string;
   weekEnd: string;
-  asg: WeeklyAsg[];
   canEdit: boolean;
   busy: boolean;
-  /** scope: الافتراضي لكل أسبوع، أو هذا الأسبوع وحده */
   onSave: (next: WeeklyPrefs, scope: "default" | "week") => void;
   onClose: () => void;
+  /** مجموعة المشاركة — تُمرَّر من اللوحة لمن يملكها */
+  share?: ReactNode;
   t: T;
 }) {
   const [draft, setDraft] = useState<WeeklyPrefs>({
     on: { ...prefs.on },
     texts: { ...prefs.texts },
+    layout: { ...DEFAULT_LAYOUT, ...prefs.layout },
   });
 
-  const nOn = useMemo(() => WEEK_BLOCKS.filter((b) => draft.on[b.k]).length, [draft.on]);
+  /* المنجزات وحدها في قائمة المفاتيح — الترويسة ثابتة، والنصوص
+     لها مجموعتها */
+  const kinds = useMemo(() => WEEK_BLOCKS.filter((b) => b.kind === "auto" && !b.fixed), []);
+  const writable = useMemo(() => WEEK_BLOCKS.filter((b) => b.kind !== "auto"), []);
+  const nOn = kinds.filter((b) => draft.on[b.k] !== false).length;
 
-  const toggle = (k: string) =>
-    setDraft((d) => ({ ...d, on: { ...d.on, [k]: !d.on[k] } }));
-  const setText = (k: string, v: string) =>
-    setDraft((d) => ({ ...d, texts: { ...d.texts, [k]: v } }));
+  const toggle = (k: string) => setDraft((d) => ({ ...d, on: { ...d.on, [k]: d.on[k] === false } }));
+  const setText = (k: string, v: string) => setDraft((d) => ({ ...d, texts: { ...d.texts, [k]: v } }));
+  const setLay = (p: Partial<WeeklyPrefs["layout"]>) =>
+    setDraft((d) => ({ ...d, layout: { ...d.layout, ...p } }));
   const setAll = (v: boolean) =>
-    setDraft((d) => ({
-      ...d,
-      on: Object.fromEntries(WEEK_BLOCKS.map((b) => [b.k, b.fixed ? true : v])),
-    }));
-
-  const writable = WEEK_BLOCKS.filter((b) => b.kind !== "auto");
+    setDraft((d) => ({ ...d, on: { ...d.on, ...Object.fromEntries(kinds.map((b) => [b.k, v])) } }));
 
   return (
-    <div className="wc">
-      <div className="wc-bar no-print">
+    <div className="wcx">
+      <div className="wcx-bar no-print">
         <button className="btn btn-ghost" onClick={onClose}>
           ‹ {t("رجوع إلى التقرير", "Back to the report")}
         </button>
-        <b className="wc-week">{rangeText2(weekStart, weekEnd)}</b>
+        <b className="wcx-week">{rangeText2(weekStart, weekEnd)}</b>
       </div>
 
-      {!canEdit && (
-        <div className="alert">
-{t("العرض فقط.", "View only.")}
-        </div>
-      )}
+      {!canEdit && <div className="alert">{t("العرض فقط.", "View only.")}</div>}
 
-      <div className="wc-hd">
-        <div>
-          <h3>{t("أقسام التقرير", "Report sections")}</h3>
-          <span>
-            {nOn} {t("من", "of")} {WEEK_BLOCKS.length} {t("قسمًا مُفعّل", "sections on")}
+      <Grp icon="📄" title={t("شكل التقرير", "Layout")}>
+        <div className="wcx-f">
+          <span className="wcx-l">{t("اتجاه الصفحة", "Orientation")}</span>
+          <span className="wcx-seg">
+            <button className={draft.layout.dir === "v" ? "on" : ""} onClick={() => setLay({ dir: "v" })} disabled={!canEdit}>
+              {t("عمودي", "Portrait")}
+            </button>
+            <button className={draft.layout.dir === "h" ? "on" : ""} onClick={() => setLay({ dir: "h" })} disabled={!canEdit}>
+              {t("أفقي", "Landscape")}
+            </button>
           </span>
         </div>
-        {canEdit && (
-          <div className="wc-acts">
-            <button className="btn btn-ghost btn-sm" onClick={() => setAll(true)}>
-              {t("الكل", "All")}
+        <div className="wcx-f">
+          <span className="wcx-l">{t("شريط الهوية", "Identity band")}</span>
+          <span className="wcx-seg">
+            <button className={draft.layout.band ? "on" : ""} onClick={() => setLay({ band: true })} disabled={!canEdit}>
+              {t("بالخلفية", "With image")}
             </button>
-            <button className="btn btn-ghost btn-sm" onClick={() => setAll(false)}>
-              {t("إلغاء الكل", "None")}
+            <button className={!draft.layout.band ? "on" : ""} onClick={() => setLay({ band: false })} disabled={!canEdit}>
+              {t("بلا", "Plain")}
             </button>
-          </div>
-        )}
-      </div>
+          </span>
+        </div>
+        <div className="wcx-f">
+          <span className="wcx-l">{t("اسم الإدارة", "Department")}</span>
+          <input
+            className="wcx-in"
+            value={draft.layout.dept}
+            onChange={(e) => setLay({ dept: e.target.value })}
+            disabled={!canEdit}
+          />
+        </div>
+      </Grp>
 
-      <div className="wc-ops">
-        {WEEK_BLOCKS.map((b) => (
-          <button
-            key={b.k}
-            className={`wc-op ${draft.on[b.k] ? "on" : ""}`}
-            disabled={!canEdit || !!b.fixed}
-            onClick={() => toggle(b.k)}
-          >
-            <span className={`wc-bx ${draft.on[b.k] ? "on" : ""}`}>{draft.on[b.k] ? "✓" : ""}</span>
-            <span className="wc-tt">
-              <b>{b.name}</b>
-              <span>{b.note}</span>
-            </span>
-            {b.fixed && <span className="wc-lk">{t("ثابت", "fixed")}</span>}
-          </button>
-        ))}
-      </div>
+      <Grp
+        icon="✓"
+        title={t("ما يظهر من المنجزات", "Achievements shown")}
+        extra={
+          <>
+            <span className="muted">{`${nOn} ${t("من", "of")} ${kinds.length}`}</span>
+            {canEdit && (
+              <>
+                <button className="btn btn-ghost btn-sm" onClick={() => setAll(true)}>{t("الكل", "All")}</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setAll(false)}>{t("لا شيء", "None")}</button>
+              </>
+            )}
+          </>
+        }
+      >
+        <div className="wcx-tg">
+          {kinds.map((b) => (
+            <button
+              key={b.k}
+              className={`wcx-t ${draft.on[b.k] !== false ? "on" : ""}`}
+              onClick={() => canEdit && toggle(b.k)}
+              title={b.note}
+              disabled={!canEdit}
+            >
+              <span className="sw" />
+              <span className="nm">{b.name}</span>
+            </button>
+          ))}
+        </div>
+      </Grp>
 
-      <h3 className="wc-h">
-        {t("الخانات المكتوبة يدويًا", "Written by hand")}
-        <em>{t("تظهر في التقرير كما تُكتب هنا", "They appear in the report as written")}</em>
-      </h3>
-      <div className="wc-wr">
+      <Grp icon="✎" title={t("كتابة هذا الأسبوع", "This week's notes")}>
         {writable.map((b) => (
-          <div className={`wc-wb ${draft.on[b.k] ? "" : "off"}`} key={b.k}>
-            <label>
+          <div className="wcx-f col" key={b.k}>
+            <span className="wcx-l">
               {b.name}
-              {!draft.on[b.k] && <em>{t("مُطفأ — لن يظهر", "off — hidden")}</em>}
-            </label>
+              <em>{b.hint}</em>
+            </span>
             <textarea
+              className="wcx-ta"
               rows={b.kind === "list" ? 4 : 3}
               value={draft.texts[b.k] || ""}
-              placeholder={b.hint}
-              disabled={!canEdit}
               onChange={(e) => setText(b.k, e.target.value)}
+              disabled={!canEdit}
             />
           </div>
         ))}
-      </div>
+      </Grp>
 
-      {draft.on.asg && (
-        <>
-          <h3 className="wc-h">
-            {t("التكاليف الواردة للمركز", "Assignments")}
-            <em>{t("ما يُكتب هنا يظهر تحت كل تكليف", "Shown under each assignment")}</em>
-          </h3>
-          {asg.length === 0 ? (
-            <div className="empty">{t("لا توجد تكاليف مفتوحة هذا الأسبوع.", "No open assignments this week.")}</div>
-          ) : (
-            <div className="wc-asg">
-              {asg.map((a) => (
-                <div className="wc-a" key={a.id}>
-                  <div className="wc-at">
-                    <b>{a.title}</b>
-                    <span>{a.stateAr}</span>
-                  </div>
-                  <div className="wc-af">
-                    {[
-                      ["next", t("الخطوات القادمة", "Next steps")],
-                      ["challenge", t("التحدي", "Challenge")],
-                      ["support", t("الدعم المطلوب", "Support needed")],
-                    ].map(([f, label]) => (
-                      <label key={f}>
-                        {label}
-                        <textarea
-                          rows={2}
-                          value={draft.texts[`asg:${a.id}:${f}`] || ""}
-                          disabled={!canEdit}
-                          onChange={(e) => setText(`asg:${a.id}:${f}`, e.target.value)}
-                        />
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      )}
-
-      <p className="wc-note">
-        {t(
-          "ما لا يُؤشَّر عليه لا يظهر في التقرير ولا في الـPDF ولا في الرابط المشترَك.",
-          "Unchecked sections never appear — not in the report, the PDF, or the shared link.",
-        )}
-      </p>
+      {share && <Grp icon="🔗" title={t("المشاركة", "Sharing")}>{share}</Grp>}
 
       {canEdit && (
-        <div className="wc-save no-print">
-          <button className="btn" disabled={busy} onClick={() => onSave(draft, "default")}>
-            {busy ? t("جارٍ الحفظ...", "Saving...") : t("حفظ كافتراضي لكل أسبوع", "Save as the default")}
+        <div className="wcx-save no-print">
+          <button className="btn" disabled={busy} onClick={() => onSave(draft, "week")}>
+            {busy ? t("جارٍ الحفظ…", "Saving…") : t("حفظ لهذا الأسبوع", "Save for this week")}
           </button>
-          <button className="btn btn-ghost" disabled={busy} onClick={() => onSave(draft, "week")}>
-            {t("لهذا الأسبوع وحده", "This week only")}
+          <button className="btn btn-ghost" disabled={busy} onClick={() => onSave(draft, "default")}>
+            {t("حفظ كافتراضي لكل أسبوع", "Save as the default")}
           </button>
+          <span className="muted">{t("يُطبَّق فوراً على المعاينة", "Applies to the preview at once")}</span>
         </div>
       )}
     </div>

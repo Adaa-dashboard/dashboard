@@ -24,14 +24,21 @@ export type Block = {
 
 export const WEEK_BLOCKS: Block[] = [
   { k: "head", name: "ترويسة التقرير والفترة", note: "اسم التقرير والإدارة والفترة الزمنية", kind: "auto", fixed: true },
-  { k: "perf", name: "الأداء العام وحقائق الأسبوع", note: "الدائرة والنسبة والحقائق الثلاث أعلى التقرير", kind: "auto" },
-  { k: "sessions", name: "جلسات مراجعة الأداء", note: "يُقرأ آليًا من صفحة الجلسات", kind: "auto" },
-  { k: "natstrat", name: "الاستراتيجيات الوطنية", note: "يُقرأ آليًا من صفحة الاستراتيجيات الوطنية", kind: "auto" },
-  { k: "inststrat", name: "الاستراتيجيات المؤسسية", note: "يُقرأ آليًا من صفحة الاستراتيجيات المؤسسية", kind: "auto" },
-  { k: "outputs", name: "المخرجات الوطنية", note: "يُقرأ آليًا من صفحة المخرجات", kind: "auto" },
-  { k: "cx", name: "أعمال قياس تجربة المستفيد", note: "يُقرأ آليًا من صفحة تجربة المستفيد", kind: "auto" },
-  { k: "projects", name: "المشاريع الاستراتيجية", note: "يُقرأ آليًا من صفحة المشاريع", kind: "auto" },
-  { k: "asg", name: "التكاليف الواردة للمركز", note: "الموضوع والحالة وما كُتب لكل تكليف", kind: "auto" },
+  /* المنجزات — تُقرأ من سجلّ تغييرات المنصة، مفتاحها مفتاح نوعها
+     في `lib/achievements.ts` فلا قائمتان تفترقان */
+  { k: "meas", name: "رفع قابلية القياس", note: "استراتيجية وطنية ارتفعت نسبة قابلية قياسها", kind: "auto" },
+  { k: "natstage", name: "تقدّم اعتماد الاستراتيجيات", note: "انتقال الاستراتيجية إلى مرحلة اعتمادٍ أعلى", kind: "auto" },
+  { k: "tech", name: "القبول الفني", note: "استراتيجية صارت مقبولة فنياً", kind: "auto" },
+  { k: "live", name: "تفعيل قياس الجهات", note: "جهة مؤسسية فُعِّل قياسها", kind: "auto" },
+  { k: "instep", name: "تقدّم مسار التفعيل", note: "تسمية ممثل · اجتماع تعريفي · وثائق", kind: "auto" },
+  { k: "session", name: "تقدّم جلسات مراجعة الأداء", note: "اكتمال مرحلة من مراحل الجلسة", kind: "auto" },
+  { k: "cxrep", name: "تقارير تجربة المستفيد", note: "صدور تقرير لجهاز", kind: "auto" },
+  { k: "cxstep", name: "تقدّم مسار تجربة المستفيد", note: "حصر الخدمات · بطاقة القياس · الاستبيان", kind: "auto" },
+  { k: "proj", name: "تقدّم المشاريع الاستراتيجية", note: "ارتفاع نسبة الإنجاز الفعلي", kind: "auto" },
+  { k: "notesq", name: "جودة ملاحظات الأداء", note: "رفع بيانات ربعٍ جديد", kind: "auto" },
+  { k: "review", name: "مراجعة بيانات الجهات", note: "المراجعة الربعية لجهات التواصل", kind: "auto" },
+  { k: "cr", name: "مراجعة طلبات التغيير", note: "ما أُغلق منها في الأسبوع ونسبة الالتزام", kind: "auto" },
+  { k: "task", name: "التكاليف المكتملة", note: "تكليفٌ وارد للمركز أُنجز", kind: "auto" },
   {
     k: "next", name: "الخطوات القادمة", note: "تُكتب يدويًا — نص حر", kind: "text",
     hint: "ما ستعمل عليه الإدارة الأسبوع القادم، في سطرين أو ثلاثة.",
@@ -53,17 +60,32 @@ export const WEEK_BLOCKS: Block[] = [
 /** المفاتيح المقروءة آليًا من أقسام المنصة */
 export const AUTO_SECTIONS = ["sessions", "natstrat", "inststrat", "outputs", "cx", "projects"] as const;
 
+/** شكل التقرير: اتجاه الصفحة وشريط الخلفية واسم الإدارة */
+export type WeeklyLayout = {
+  dir: "v" | "h";
+  band: boolean;
+  dept: string;
+};
+
+export const DEFAULT_LAYOUT: WeeklyLayout = {
+  dir: "v",
+  band: true,
+  dept: "إدارة عمليات الأداء",
+};
+
 export type WeeklyPrefs = {
   /** المؤشَّر عليه — المفتاح الغائب يعني «مُطفأ» */
   on: Record<string, boolean>;
   /** الخانات المكتوبة يدويًا */
   texts: Record<string, string>;
+  layout: WeeklyLayout;
 };
 
-/** الافتراضي: كل شيء ظاهر ما عدا المخرجات (لم تُعتمد بياناتها بعد) */
+/** الافتراضي: كل المنجزات ظاهرة */
 export const DEFAULT_PREFS: WeeklyPrefs = {
-  on: Object.fromEntries(WEEK_BLOCKS.map((b) => [b.k, b.k !== "outputs"])),
+  on: Object.fromEntries(WEEK_BLOCKS.map((b) => [b.k, true])),
   texts: {},
+  layout: DEFAULT_LAYOUT,
 };
 
 export const weekPrefKey = (weekStart: string) => `weekly_wk_${weekStart}`;
@@ -79,7 +101,14 @@ function clean(v: unknown): Partial<WeeklyPrefs> {
   if (o.texts && typeof o.texts === "object")
     for (const [k, s] of Object.entries(o.texts as Record<string, unknown>))
       texts[k] = s == null ? "" : String(s);
-  return { on, texts };
+  const layout: Partial<WeeklyLayout> = {};
+  if (o.layout && typeof o.layout === "object") {
+    const l = o.layout as Record<string, unknown>;
+    if (l.dir === "v" || l.dir === "h") layout.dir = l.dir;
+    if (typeof l.band === "boolean") layout.band = l.band;
+    if (typeof l.dept === "string" && l.dept.trim()) layout.dept = l.dept.trim();
+  }
+  return { on, texts, layout: layout as WeeklyLayout };
 }
 
 /** الافتراضي ثم فوقه استثناء الأسبوع — الغائب يرث ما تحته */
@@ -89,7 +118,11 @@ export function mergePrefs(base: unknown, week: unknown): WeeklyPrefs {
   const on: Record<string, boolean> = { ...DEFAULT_PREFS.on, ...(b.on || {}), ...(w.on || {}) };
   /* الترويسة ثابتة مهما كُتب في القاعدة */
   for (const blk of WEEK_BLOCKS) if (blk.fixed) on[blk.k] = true;
-  return { on, texts: { ...(b.texts || {}), ...(w.texts || {}) } };
+  return {
+    on,
+    texts: { ...(b.texts || {}), ...(w.texts || {}) },
+    layout: { ...DEFAULT_LAYOUT, ...(b.layout || {}), ...(w.layout || {}) },
+  };
 }
 
 /** أسطر «أولويات الأسبوع القادم» من نصّها الحر */

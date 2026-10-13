@@ -6,15 +6,16 @@ import { BASE } from "@/lib/base";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import WeeklyReportView, { arDate2 } from "./WeeklyReportView";
 import WeeklyCustomize from "./WeeklyCustomize";
-import { weekSummary, type Item, type SectionKey, type WeekSum } from "./Sections";
+import { weekStartOf, shiftDays } from "@/lib/weeklyReport";
+import { mergePrefs, type WeeklyPrefs } from "@/lib/weeklyPrefs";
 import {
-  buildWeekly2,
-  weekStartOf,
-  shiftDays,
-  type AsgRow,
-  type WeeklyReport2,
-} from "@/lib/weeklyReport";
-import { AUTO_SECTIONS, mergePrefs, type WeeklyPrefs } from "@/lib/weeklyPrefs";
+  buildWeekAch,
+  type ChangeLite,
+  type ContactLite,
+  type LogRow,
+  type TaskLite,
+  type WeekAch,
+} from "@/lib/achievements";
 
 type ShareRow = {
   token: string;
@@ -34,39 +35,51 @@ export default function WeeklyPanel({
 }) {
   const thisWeek = weekStartOf(new Date().toISOString().slice(0, 10));
   const [week, setWeek] = useState(thisWeek);
-  const [sections, setSections] = useState<Partial<Record<SectionKey, Item[]>>>({});
-  const [asgRows, setAsgRows] = useState<AsgRow[]>([]);
+  const weekEnd = shiftDays(week, 6);
+  /* مصادر المنجزات: سجلّ تغييرات المنصة، وما له تاريخٌ أصلاً */
+  const [log, setLog] = useState<LogRow[]>([]);
+  const [changes, setChanges] = useState<ChangeLite[]>([]);
+  const [tasks, setTasks] = useState<TaskLite[]>([]);
+  const [contacts, setContacts] = useState<ContactLite[]>([]);
+  const [logErr, setLogErr] = useState("");
   const [base, setBase] = useState<unknown>(null);
   const [over, setOver] = useState<unknown>(null);
   const [canShare, setCanShare] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [shareOpen, setShareOpen] = useState(false);
   const [tune, setTune] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
 
-  /* الأقسام والتكاليف تُقرأ مرة واحدة — لا تتغيّر بتغيّر الأسبوع،
-     فالتنقّل بين الأسابيع لا يعيد تحميلها. */
+  /* التكاليف وجهات التواصل تُقرأ مرة واحدة — لا تتغيّر بتغيّر
+     الأسبوع. والسجلّ وحده يُعاد طلبه لأنه مقيَّد بمداه. */
   const loadData = useCallback(async () => {
-    setLoading(true);
-    const [secs, tk, me] = await Promise.all([
-      Promise.all(
-        AUTO_SECTIONS.map((k) =>
-          apiFetch(`/api/items?section=${k}`).then((r) => r.json()).catch(() => ({})),
-        ),
-      ),
+    const [tk, me, ch, en] = await Promise.all([
       apiFetch("/api/tasks").then((r) => r.json()).catch(() => ({})),
       apiFetch("/api/me").then((r) => r.json()).catch(() => ({})),
+      apiFetch("/api/changes").then((r) => r.json()).catch(() => ({})),
+      apiFetch("/api/entities").then((r) => r.json()).catch(() => ({})),
     ]);
-    const map: Partial<Record<SectionKey, Item[]>> = {};
-    AUTO_SECTIONS.forEach((k, i) => {
-      map[k] = (secs[i]?.items || []) as Item[];
-    });
-    setSections(map);
-    setAsgRows((tk.tasks || []) as AsgRow[]);
+    setTasks((tk.tasks || []) as TaskLite[]);
+    setChanges((ch.changes || []) as ChangeLite[]);
+    type Ent = { name?: string; ours?: { reviewedAt?: string }[]; theirs?: { reviewedAt?: string }[] };
+    const cts: ContactLite[] = [];
+    for (const e of (en.entities || []) as Ent[])
+      for (const c of [...(e.ours || []), ...(e.theirs || [])])
+        if (c.reviewedAt) cts.push({ entity: e.name || "", reviewedAt: c.reviewedAt });
+    setContacts(cts);
     setCanShare(me?.user?.role === "admin");
-    setLoading(false);
   }, []);
+
+  const loadLog = useCallback(async () => {
+    setLoading(true);
+    /* المدى يوم كامل: من بداية الأحد إلى نهاية السبت */
+    const r = await apiFetch(
+      `/api/itemlog?from=${week}T00:00:00&to=${shiftDays(week, 7)}T00:00:00`,
+    ).then((x) => x.json()).catch(() => ({}));
+    setLog((r.log || []) as LogRow[]);
+    setLogErr(r.error ? String(r.error) : "");
+    setLoading(false);
+  }, [week]);
 
   const loadPrefs = useCallback(async () => {
     const r = await apiFetch(`/api/weekly?week=${week}`).then((x) => x.json()).catch(() => ({}));
@@ -78,28 +91,26 @@ export default function WeeklyPanel({
     void loadData();
   }, [loadData]);
   useEffect(() => {
+    void loadLog();
+  }, [loadLog]);
+  useEffect(() => {
     void loadPrefs();
   }, [loadPrefs]);
 
   const prefs: WeeklyPrefs = useMemo(() => mergePrefs(base, over), [base, over]);
 
-  const summaries = useMemo(() => {
-    const out: Partial<Record<SectionKey, WeekSum>> = {};
-    for (const k of AUTO_SECTIONS) out[k] = weekSummary(k, sections[k] || []);
-    return out;
-  }, [sections]);
-
-  const report: WeeklyReport2 = useMemo(
+  const report: WeekAch = useMemo(
     () =>
-      buildWeekly2(
-        week,
-        sections,
-        summaries,
-        asgRows,
-        prefs,
-        new Date().toISOString().slice(0, 10),
-      ),
-    [week, sections, summaries, asgRows, prefs],
+      buildWeekAch({
+        weekStart: week,
+        weekEnd,
+        log,
+        changes,
+        tasks,
+        contacts,
+        on: prefs.on,
+      }),
+    [week, weekEnd, log, changes, tasks, contacts, prefs.on],
   );
 
   async function save(next: WeeklyPrefs, scope: "default" | "week") {
@@ -130,11 +141,11 @@ export default function WeeklyPanel({
           prefs={prefs}
           weekStart={report.weekStart}
           weekEnd={report.weekEnd}
-          asg={report.asg}
           canEdit={canEdit}
           busy={busy}
           onSave={save}
           onClose={() => setTune(false)}
+          share={canShare ? <ShareBox week={week} t={t} /> : undefined}
           t={t}
         />
       </div>
@@ -162,30 +173,27 @@ export default function WeeklyPanel({
           )}
         </div>
         <div className="wk-acts">
-          {/* المربع الصغير: يفتح صفحة اختيار ما يظهر في التقرير */}
-          <button
-            className="wk-tune"
-            onClick={() => setTune(true)}
-            title={t("تخصيص التقرير", "Customise the report")}
-            aria-label={t("تخصيص التقرير", "Customise the report")}
-          >
-            <span />
-            <span />
-            <span />
-            <span />
+          {/* زرٌّ صريح بدل المربّع الصغير — والمشاركة صارت مجموعةً
+              داخل اللوحة لا نافذةً منفصلة */}
+          <button className="btn btn-ghost" onClick={() => setTune(true)}>
+            ⚙️ {t("إعدادات التقرير", "Report settings")}
           </button>
           <button className="btn" onClick={() => window.print()}>
             {t("تصدير PDF", "Export PDF")}
           </button>
-          {canShare && (
-            <button className="btn btn-ghost" onClick={() => setShareOpen(true)}>
-              {t("مشاركة رابط", "Share link")}
-            </button>
-          )}
         </div>
       </div>
 
       {msg && <div className="alert no-print">{msg}</div>}
+
+      {logErr && (
+        <div className="alert no-print">
+          {t(
+            "سجلّ التغييرات غير مركَّب في قاعدة البيانات بعد — شغّلي supabase/perf-item-log.sql، وستظهر المنجزات تلقائياً بعدها.",
+            "The change log is not installed yet.",
+          )}
+        </div>
+      )}
 
       {loading ? (
         <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>
@@ -193,18 +201,15 @@ export default function WeeklyPanel({
         <WeeklyReportView report={report} prefs={prefs} />
       )}
 
-      {shareOpen && <ShareModal week={week} onClose={() => setShareOpen(false)} t={t} />}
     </div>
   );
 }
 
-function ShareModal({
+function ShareBox({
   week,
-  onClose,
   t,
 }: {
   week: string;
-  onClose: () => void;
   t: (ar: string, en: string) => string;
 }) {
   const [rows, setRows] = useState<ShareRow[]>([]);
@@ -254,15 +259,8 @@ function ShareModal({
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal task-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="m-h">
-          <h3>{t("مشاركة التقرير", "Share the report")}</h3>
-          <button className="mx" onClick={onClose} aria-label="close">
-            ✕
-          </button>
-        </div>
-        <div className="m-b">
+    <div className="wk-share">
+        <div>
           <p className="wk-note">
             {t(
               "الرابط يفتح تقرير هذا الأسبوع للاطّلاع فقط — بلا حساب وبلا أي صلاحية تعديل.",
@@ -320,7 +318,6 @@ function ShareModal({
             </table>
           )}
         </div>
-      </div>
     </div>
   );
 }

@@ -1300,6 +1300,34 @@ export async function apiFetch(path: string, init: Init = {}) {
       if (error) return err(error.message, 403);
       return ok({ items: (data || []).map(rowItem) });
     }
+    /* سجلّ تغييرات البنود — منه يُبنى «الإنجاز الأسبوعي».
+       يُكتب من trigger في القاعدة، فلا يُزوَّر من الواجهة. */
+    if (p === "/api/itemlog" && method === "GET") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const from = q.get("from") || "";
+      const to = q.get("to") || "";
+      let sel = s.from("perf_item_log").select("*").order("at", { ascending: true }).limit(4000);
+      if (from) sel = sel.gte("at", from);
+      if (to) sel = sel.lt("at", to);
+      const { data, error } = await sel;
+      /* الجدول غير مركَّب بعد ⇒ لا تُسقط الصفحة: تقرير بلا منجزات
+         أهون من شاشة خطأ */
+      if (error) return ok({ log: [], error: error.message });
+      return ok({
+        log: (data || []).map((r: Record<string, unknown>) => ({
+          at: String(r.at || ""),
+          section: String(r.section || ""),
+          itemId: String(r.item_id || ""),
+          name: String(r.name || ""),
+          field: String(r.field || ""),
+          oldVal: r.old_val === null || r.old_val === undefined ? "" : String(r.old_val),
+          newVal: r.new_val === null || r.new_val === undefined ? "" : String(r.new_val),
+          byName: String(r.by_name || ""),
+        })),
+      });
+    }
+
     if (p === "/api/items" && (method === "POST" || method === "PUT")) {
       const me = await whoAmI();
       if (!me) return err("غير مصرّح", 401);

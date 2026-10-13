@@ -5,9 +5,15 @@ import { asset } from "@/lib/base";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ensureAnon, sb } from "@/lib/supa";
-import { buildWeekly2, type AsgRow, type WeeklyReport2 } from "@/lib/weeklyReport";
-import { AUTO_SECTIONS, mergePrefs, type WeeklyPrefs } from "@/lib/weeklyPrefs";
-import { weekSummary, type Item, type SectionKey, type WeekSum } from "@/app/dashboard/Sections";
+import { mergePrefs, type WeeklyPrefs } from "@/lib/weeklyPrefs";
+import {
+  buildWeekAch,
+  type ChangeLite,
+  type ContactLite,
+  type LogRow,
+  type TaskLite,
+  type WeekAch,
+} from "@/lib/achievements";
 import WeeklyReportView from "@/app/dashboard/WeeklyReportView";
 
 /* صفحة عامة: تُفتح برمز في الرابط بلا أي حساب.
@@ -16,7 +22,7 @@ import WeeklyReportView from "@/app/dashboard/WeeklyReportView";
    ما تراه الإدارة، بما في ذلك الأقسام المخفاة من «تخصيص التقرير». */
 function Shared() {
   const token = useSearchParams().get("t") || "";
-  const [report, setReport] = useState<WeeklyReport2 | null>(null);
+  const [report, setReport] = useState<WeekAch | null>(null);
   const [prefs, setPrefs] = useState<WeeklyPrefs | null>(null);
   const [state, setState] = useState<"loading" | "gone" | "ready">("loading");
 
@@ -28,32 +34,47 @@ function Shared() {
       if (error || !data) return setState("gone");
 
       const weekStart = String(data.weekStart);
-      const rows = (data.items || []) as { section: string; id: string; data: Record<string, unknown>; updated_at?: string }[];
-      const sections: Partial<Record<SectionKey, Item[]>> = {};
-      const summaries: Partial<Record<SectionKey, WeekSum>> = {};
-      for (const k of AUTO_SECTIONS) {
-        const list = rows
-          .filter((r) => r.section === k)
-          .map((r) => ({ id: r.id, ord: 100, data: r.data || {}, updatedAt: r.updated_at }));
-        sections[k] = list as Item[];
-        summaries[k] = weekSummary(k, list as Item[]);
-      }
-
       const settings = (data.settings || {}) as Record<string, unknown>;
       const p = mergePrefs(settings["weekly_prefs"], settings[`weekly_wk_${weekStart}`]);
 
-      const asg = ((data.tasks || []) as Record<string, unknown>[]).map((r) => ({
-        id: String(r.id),
+      /* الأسبوع كاملاً: من الأحد إلى السبت */
+      const d = new Date(weekStart + "T00:00:00Z");
+      d.setUTCDate(d.getUTCDate() + 6);
+      const weekEnd = d.toISOString().slice(0, 10);
+
+      const log = ((data.log || []) as Record<string, unknown>[]).map<LogRow>((r) => ({
+        at: String(r.at || ""),
+        section: String(r.section || ""),
+        itemId: String(r.item_id || ""),
+        name: String(r.name || ""),
+        field: String(r.field || ""),
+        oldVal: r.old_val == null ? "" : String(r.old_val),
+        newVal: r.new_val == null ? "" : String(r.new_val),
+        byName: String(r.by_name || ""),
+      }));
+      const changes = ((data.changes || []) as Record<string, unknown>[]).map<ChangeLite>((r) => ({
+        code: String(r.code || ""),
+        owner: String(r.owner_entity || ""),
+        itemName: String(r.item_name || ""),
+        sla: r.sla_days == null ? null : Number(r.sla_days),
+        workDays: r.work_days == null ? null : Number(r.work_days),
+        status: String(r.status || ""),
+        closedAt: String(r.closed_at || ""),
+      }));
+      const tasks = ((data.tasks || []) as Record<string, unknown>[]).map<TaskLite>((r) => ({
+        id: String(r.id || ""),
         title: String(r.title || ""),
         kind: String(r.kind || "task"),
         state: String(r.state || ""),
-        dueDate: (r.due_date as string) || "",
-        createdAt: (r.created_at as string) || "",
-        completedAt: (r.completed_at as string) || "",
-      })) as AsgRow[];
+        completedAt: String(r.completed_at || ""),
+      }));
+      const contacts = ((data.contacts || []) as Record<string, unknown>[]).map<ContactLite>((r) => ({
+        entity: String(r.entity || ""),
+        reviewedAt: String(r.reviewedAt || ""),
+      }));
 
       setPrefs(p);
-      setReport(buildWeekly2(weekStart, sections, summaries, asg, p, new Date().toISOString().slice(0, 10)));
+      setReport(buildWeekAch({ weekStart, weekEnd, log, changes, tasks, contacts, on: p.on }));
       setState("ready");
     })();
   }, [token]);
