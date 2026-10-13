@@ -6594,6 +6594,15 @@ table.matrix thead th {
   grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
   gap: 14px;
 }
+/* بطاقةٌ وحدها بعرض الصف */
+.sx-two.one {
+  grid-template-columns: 1fr;
+}
+/* أيقونة القسم في رأس البطاقة — بحجم العنوان لا أكبر */
+.sx-box .hd .wk-ci {
+  width: 20px;
+  height: 20px;
+}
 .sx-box {
   border: 1px solid var(--border);
   border-radius: 16px;

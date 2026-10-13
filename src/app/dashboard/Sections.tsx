@@ -15,6 +15,7 @@ import { initials, toneOf } from "@/lib/entlogo";
 import { IconGear, IconDown, IconUp } from "./icons";
 import SectionSettings from "./SectionSettings";
 import DonutCard from "./DonutCard";
+import { PIcon } from "./pickicons";
 import { natDonut, instDonut, sesDonut, cxDonut } from "@/lib/weekReport";
 
 /* ============================================================
@@ -2042,6 +2043,17 @@ const BAR_INNER: Record<string, string> = {
   "متابعة الإجراءات": "حتى إغلاق الإجراء",
 };
 
+/** أيقونة كل قسم في «نظرة عامة» — هي أيقونته في التقرير الأسبوعي */
+const SEC_ICON: Partial<Record<SectionKey, string>> = {
+  sessions: "bars",
+  natstrat: "bank",
+  inststrat: "building",
+  cx: "users",
+  outputs: "layers",
+  projects: "gantt",
+  notesq: "checklist",
+};
+
 export function StatusBars({
   section,
   t,
@@ -2060,6 +2072,9 @@ export function StatusBars({
     <div className={`sx-box ${open ? "" : "closed"}`}>
       <div className="hd">
         <CollapseBtn open={open} toggle={toggle} t={t} />
+        <span className="wk-ci">
+          <PIcon id={SEC_ICON[section] || "layers"} size={17} />
+        </span>
         <h3>{t(title[0], title[1])}</h3>
         {onOpen && (
           <button className="lnk" onClick={onOpen}>
@@ -2134,6 +2149,9 @@ export function SessionsBox({ t, onOpen }: { t: T; onOpen?: () => void }) {
     <div className={`sx-box ${open ? "" : "closed"}`}>
       <div className="hd">
         <CollapseBtn open={open} toggle={toggle} t={t} />
+        <span className="wk-ci">
+          <PIcon id={SEC_ICON.sessions || "bars"} size={17} />
+        </span>
         <h3>{t(title[0], title[1])}</h3>
         {onOpen && (
           <button className="lnk" onClick={onOpen}>
@@ -2188,6 +2206,9 @@ export function StrategyBox({
     <div className={`sx-box ${open ? "" : "closed"}`}>
       <div className="hd">
         <CollapseBtn open={open} toggle={toggle} t={t} />
+        <span className="wk-ci">
+          <PIcon id={SEC_ICON[section] || "bank"} size={17} />
+        </span>
         <h3>{t(title[0], title[1])}</h3>
         {onOpen && (
           <button className="lnk" onClick={onOpen}>
@@ -2804,22 +2825,43 @@ function cxStats(items: Item[]) {
 /* البطاقة داخل «نظرة عامة» — بلا إطار خاص بها: يلفّها <Sec> في
    لوحة نظرة عامة كما يلفّ «المخرجات الوطنية» و«المشاريع»، فيتوحّد
    حجم العنوان وزرّ الطيّ مع بقية الأقسام (كان ١٤px بدل ١٨px). */
-export function CxBox({ t }: { t: T }) {
+export function CxBox({ t, onOpen }: { t: T; onOpen?: () => void }) {
   const { items, loaded } = useItems("cx");
-  if (!loaded) return <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>;
+  const title = SECTION_TITLE.cx;
+  const { open, toggle } = useCollapse("cx");
+
+  const box = (body: ReactNode) => (
+    <div className={`sx-box ${open ? "" : "closed"}`}>
+      <div className="hd">
+        <CollapseBtn open={open} toggle={toggle} t={t} />
+        <span className="wk-ci">
+          <PIcon id={SEC_ICON.cx || "users"} size={17} />
+        </span>
+        <h3>{t(title[0], title[1])}</h3>
+        {onOpen && (
+          <button className="lnk" onClick={onOpen}>
+            {t("التفاصيل", "Details")} ‹
+          </button>
+        )}
+      </div>
+      {open && <div className="bd">{body}</div>}
+    </div>
+  );
+
+  if (!loaded) return box(<div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>);
 
   const st = cxStats(items);
   if (!st.rows.length)
-    return (
+    return box(
       <div className="sx-none">
         {t("لا توجد بيانات بعد — تُرفع من صفحة القسم بملف المتابعة.", "No data yet.")}
-      </div>
+      </div>,
     );
 
   /* الحلقة على المستهدف لا على قائمة الملف كلها: السؤال هو كم بقي
      من المستهدف، لا كم جهازاً في الملف */
   const d = cxDonut(items);
-  return (
+  return box(
     <>
       <DonutCard slices={d.slices} total={d.total} unit={d.unit} size={120} />
       <div className="sx-dfoot">
@@ -2834,7 +2876,7 @@ export function CxBox({ t }: { t: T }) {
           <b>{AR(st.servTot)}</b>
         </span>
       </div>
-    </>
+    </>,
   );
 }
 

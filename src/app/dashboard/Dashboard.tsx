@@ -1469,21 +1469,8 @@ function Overview({
       {/* ملخّصات الأقسام يراها كل من يفتح «نظرة عامة» — بطلب المستخدمة.
           وزرّ «المزيد من التفاصيل» وحده يُحجب عمّن لا يملك صلاحية القسم،
           فالصفحة التفصيلية تبقى لأصحابها. */}
-      {/* الجلسات والمخرجات جنب بعض: الحالات أشرطةً بنسبتها وعددها */}
-      <div className="sx-two" style={{ marginTop: 28 }}>
-        <SessionsBox
-          t={t}
-          onOpen={hasScope(me.scopes, "sessions") ? () => onOpenTab("sessions") : undefined}
-        />
-        <StatusBars
-          section="outputs"
-          t={t}
-          onOpen={hasScope(me.scopes, "outputs") ? () => onOpenTab("outputs") : undefined}
-        />
-      </div>
-
-      {/* الاستراتيجيتان جنب بعض: معلومات عامة فقط، والأسماء
-          والتفاصيل كلها في صفحة كل قسم */}
+      {/* الترتيب بطلب صاحبة المنصة: الاستراتيجيتان، ثم الجلسات
+          وبجانبها تجربة المستفيد، وأخيراً المخرجات الوطنية */}
       <div className="sx-two" style={{ marginTop: 28 }}>
         <StrategyBox
           section="natstrat"
@@ -1497,11 +1484,24 @@ function Overview({
         />
       </div>
 
-      {/* قياس تجربة المستفيد — فوق المشاريع بطلب المستخدمة.
-          داخل <Sec> نفسه ليتوحّد عنوانه مع بقية عناوين نظرة عامة */}
-      <Sec id="cx" title={t(SECTION_TITLE.cx[0], SECTION_TITLE.cx[1])} extra={<MoreLink k="cx" scopes={me.scopes} onOpen={onOpenTab} />}>
-        <CxBox t={t} />
-      </Sec>
+      <div className="sx-two" style={{ marginTop: 28 }}>
+        <SessionsBox
+          t={t}
+          onOpen={hasScope(me.scopes, "sessions") ? () => onOpenTab("sessions") : undefined}
+        />
+        <CxBox
+          t={t}
+          onOpen={hasScope(me.scopes, "cx") ? () => onOpenTab("cx") : undefined}
+        />
+      </div>
+
+      <div className="sx-two one" style={{ marginTop: 28 }}>
+        <StatusBars
+          section="outputs"
+          t={t}
+          onOpen={hasScope(me.scopes, "outputs") ? () => onOpenTab("outputs") : undefined}
+        />
+      </div>
 
       <Sec
         id="projects"
