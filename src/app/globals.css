@@ -6092,6 +6092,31 @@ table.matrix thead th {
 }
 
 /* المشاريع الاستراتيجية */
+/* خليةٌ تُكتب في مكانها داخل بطاقة الاستراتيجية الوطنية */
+.ncard .n-in {
+  width: 100%;
+  border: none;
+  border-bottom: 1px dashed var(--border);
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 11.5px;
+  padding: 1px 2px 2px;
+  border-radius: 0;
+}
+.ncard .n-in::placeholder {
+  color: var(--muted);
+  opacity: 0.55;
+}
+.ncard .n-in:hover {
+  border-bottom-color: var(--g-400);
+}
+.ncard .n-in:focus {
+  outline: none;
+  border-bottom-color: var(--g-600);
+  background: var(--soft);
+}
+
 /* ===== خلفية الهوية في «نظرة عامة» =====
    صورةٌ ثابتة في يسار الصفحة خلف المحتوى، بشفافيةٍ خفيفة وتلاشٍ
    نحو اليمين فلا تزاحم البطاقات ولا تُتعب القراءة. */

@@ -125,10 +125,18 @@ const PERF_BANDS: { min: number; label: string; tone: "hi" | "mid" | "low"; hex:
 const perfBand = (v: number) => PERF_BANDS.find((b) => v >= b.min) || PERF_BANDS[2];
 /* حالة اعتماد الاستراتيجية الوطنية — أربع محطات */
 const NAT_STEPS = ["طور الإعداد/التحديث", "قيد المراجعة", "معتمدة من اللجنة", "معتمدة من مجلس الوزراء"];
+/* عبارات «حالة الاعتماد» كما تُكتب في ملف المتابعة — تُستعمل في
+   التنزيل فيعود الملف إلى المنصة بلا تحويل */
+const NAT_STAGE_XL = [
+  "إعداد/ تحديث الاستراتيجية (لدى الجهة المالكة للاستراتيجية)",
+  "مراجعة الاستراتيجية المحدثة والعرض على اللجنة الاستراتيجية (لدى اللجنة الاستراتيجية)",
+  "استراتيجية معتمدة من اللجنة الاستراتيجية",
+  "معتمدة من مجلس الوزراء",
+];
 const NAT_WHERE = ["لدى الجهة المالكة", "لدى اللجنة الاستراتيجية", "اللجنة الاستراتيجية", "اعتماد نهائي"];
 /* مسار المراجعة الأربع — مسار مستقل عن «حالة الاعتماد»:
    لكل مرحلة حالتها (لم يبدأ · قيد التنفيذ · مكتمل) كما في عرض الإدارة */
-const NAT_TRACK = ["استلام الوثيقة", "استلام الحصر", "المراجعة الفنية", "معالجة الملاحظات"];
+const NAT_TRACK = ["استلام الوثيقة", "استلام نموذج الحصر", "المراجعة الفنية", "اعتماد نموذج الحصر"];
 const TRACK_STATE = ["لم يبدأ", "قيد التنفيذ", "مكتمل"];
 /** حالات المراحل الأربع — الافتراضي «لم يبدأ» ولا يُستنتج من غيره */
 function natTrack(d: Rec): number[] {
@@ -1508,6 +1516,25 @@ function NatCard({
     await save(it.id, { ...d, track: cur, demo: false }, it.ord);
   }
 
+  /** خليةٌ تُكتب في مكانها لمن يملك التعديل، ونصٌّ لغيره */
+  const cell = (k: "period" | "approvedAt", ph: string) =>
+    canEdit && save ? (
+      <input
+        className="n-in"
+        defaultValue={txt(d[k])}
+        placeholder={ph}
+        onBlur={(e) => {
+          const v = e.target.value.trim();
+          if (v !== txt(d[k])) void save(it.id, { ...d, [k]: v }, it.ord);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        }}
+      />
+    ) : (
+      <em>{txt(d[k]) || "—"}</em>
+    );
+
   return (
     <div className="ncard">
       <div className="hd">
@@ -1541,17 +1568,15 @@ function NatCard({
               {AR(numOf(d.initRep))} <em>{`${t("من", "of")} ${AR(numOf(d.initTot))}`}</em>
             </div>
           </div>
+          {/* الفترة وتاريخ الاعتماد ليسا في ملف المتابعة، فيُكتبان
+              هنا مباشرة — و«—» حين لا يوجد */}
           <div className="n">
             <div className="k">{t("فترة الاستراتيجية", "Period")}</div>
-            <div className="v">
-              <em>{txt(d.period) || "—"}</em>
-            </div>
+            <div className="v">{cell("period", "2025م حتى 2030م")}</div>
           </div>
           <div className="n">
             <div className="k">{t("تاريخ الاعتماد", "Approved on")}</div>
-            <div className="v">
-              <em>{txt(d.approvedAt) || t("لم تُعتمد", "Not approved")}</em>
-            </div>
+            <div className="v">{cell("approvedAt", "1447/06/04هـ - 2025/11/25م")}</div>
           </div>
         </div>
       </div>
@@ -1604,6 +1629,9 @@ function natKeyOf(head: string): string {
      في «مقبولة فنياً» و«ملاحظة» */
   if (h.includes("هل تم") || h.includes("هل تمت")) {
     if (h.includes("وثيقه")) return "track0";
+    /* «اعتماد نموذج الحصر» قبل «استلام نموذج الحصر»: كلاهما يحوي
+       «حصر»، ولو سبق الاستلامُ لابتلع العمودين وضاع الاعتماد */
+    if (h.includes("حصر") && (h.includes("اعتماد") || h.includes("معتمد"))) return "track3";
     if (h.includes("حصر")) return "track1";
     if (h.includes("فني") || h.includes("مراجع")) return "track2";
     if (h.includes("ملاحظ")) return "track3";
@@ -1612,7 +1640,9 @@ function natKeyOf(head: string): string {
      «المعتمدة» أو «المقبولة»، وما عداه إجمالي. وكان «عدد المبادرات
      المعتمدة» يقع في «إجمالي المبادرات» فيُهمَل (العمود الأول يفوز)
      فيبقى المنجز صفراً */
-  const isRep = h.includes("ممثل") || h.includes("معتمد") || h.includes("مقبول") || h.includes("منجز");
+  const isRep =
+    h.includes("ممثل") || h.includes("ممتثل") || h.includes("معتمد") ||
+    h.includes("مقبول") || h.includes("منجز");
   if (h.includes("مؤشر")) return isRep ? "kpisRep" : "kpisTot";
   if (h.includes("مبادر")) return isRep ? "initRep" : "initTot";
   if (h.includes("قابلي")) return "meas";
@@ -1660,6 +1690,13 @@ function natVal(k: string, raw: string): unknown {
     const n = Number(v);
     if (n >= 1 && n <= NAT_STEPS.length) return n;
     const h = natNorm(v);
+    /* عبارات الملف طويلة ولا تطابق أسماء المراحل حرفياً:
+       «إعداد/ تحديث الاستراتيجية (لدى الجهة المالكة…)» و«مراجعة
+       الاستراتيجية المحدثة والعرض على اللجنة…» — فالمطابقة بكلماتها */
+    if (h.includes("مجلس الوزرا")) return 4;
+    if (h.includes("معتمد") && h.includes("لجنه")) return 3;
+    if (h.includes("مراجع") || h.includes("العرض علي اللجنه")) return 2;
+    if (h.includes("اعداد") || h.includes("تحديث") || h.includes("الجهه المالكه")) return 1;
     const exact = NAT_STEPS.findIndex((x) => natNorm(x) === h);
     if (exact >= 0) return exact + 1;
     const near = NAT_STEPS.findIndex((x) => natNorm(x).includes(h) || h.includes(natNorm(x)));
@@ -1869,19 +1906,28 @@ function NationalPage({ t, canEdit, add, gear }: SecPageProps) {
     return all.filter((x) => n.has(x)).map((x) => ({ v: x, l: `${x} (${AR(n.get(x) || 0)})` }));
   }, [items]);
 
+  /* **التنزيل بشكل ملف المتابعة نفسه** — أعمدته وعباراته كما هي،
+     فما يُنزَّل يُرفع كما هو بلا تحويل. والفترة وتاريخ الاعتماد
+     والملاحظات ليست من أعمدته: تبقى في المنصة وتُكتب في البطاقة،
+     ورفعُ الملف لا يمسّها لأن ما لا عمود له لا يُغيَّر. */
   function exportXl() {
-    const head = ["الاستراتيجية", "الجهة", "القطاع", "حالة الاعتماد", "قابلية القياس ٪", "المؤشرات الممثلة",
-      "إجمالي المؤشرات", "المبادرات الممثلة", "إجمالي المبادرات", "المراجعة الفنية",
-      "فترة الاستراتيجية", "تاريخ الاعتماد", "أبرز الملاحظات",
-      "الوضع الحالي", "التحديات", "الخطوات القادمة", "الدعم المطلوب"];
-    const body = items.map((it) => {
+    const head = ["v", "أسم الاستراتيجية", "نسبة قابلية قياس الاستراتيجية", "حالة الاعتماد", "القطاع",
+      "هل تم استلام الوثيقة الاستراتيجية؟", "هل تم استلام نموذج الحصر",
+      "هل تم الانتهاء من المراجعة الفنية", "هل تم اعتماد نموذج الحصر",
+      "اجمالي مؤشرات", "عدد المؤشرات الممتثلة", "اجمالي المبادرات", "عدد المبادرات المعتمدة"];
+    const yn = (n: number) => (n >= 2 ? "نعم" : n === 1 ? "جارٍ" : "لا");
+    const body = items.map((it, i) => {
       const d = it.data;
-      return [txt(d.name), txt(d.owner), txt(d.sector), NAT_STEPS[natStage(d) - 1], numOf(d.meas),
-        numOf(d.kpisRep), numOf(d.kpisTot), numOf(d.initRep), numOf(d.initTot),
-        d.tech ? "مقبولة فنياً" : "غير مقبولة فنياً", txt(d.period), txt(d.approvedAt), txt(d.note),
-        txt(d.current), txt(d.challenge), txt(d.next), txt(d.support)];
+      const tr = natTrack(d);
+      /* النسبة تُكتب كسراً كما في الملف الأصلي (100% = 1)، فيعود
+         الملف إلى المنصة بالقيمة نفسها بلا التباس */
+      return [i + 1, txt(d.name), Math.round(numOf(d.meas) * 100) / 10000,
+        NAT_STAGE_XL[natStage(d) - 1], txt(d.sector),
+        yn(tr[0]), yn(tr[1]), yn(tr[2]), yn(tr[3]),
+        numOf(d.kpisTot), numOf(d.kpisRep), numOf(d.initTot), numOf(d.initRep)];
     });
-    download("الاستراتيجيات-الوطنية.xlsx", writeXlsx([{ name: "الوطنية", rows: [head, ...body] }]));
+    download("قائمة-الاستراتيجيات-الوطنية.xlsx",
+      writeXlsx([{ name: "تفاصيل الاستراتيجيات", rows: [head, ...body] }]));
   }
 
   if (!loaded) return <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>;
@@ -2001,7 +2047,7 @@ function NationalDetail({
           </div>
           <div className="box">
             <div className="k">{t("تاريخ الاعتماد", "Approved on")}</div>
-            <div className="v">{txt(d.approvedAt) || t("لم تُعتمد", "Not approved")}</div>
+            <div className="v">{txt(d.approvedAt) || "—"}</div>
           </div>
         </div>
         <div className="two">
