@@ -156,7 +156,11 @@ function natTech(d: Rec): boolean {
 /** حالات المراحل الأربع — الافتراضي «لم يبدأ» ولا يُستنتج من غيره */
 function natTrack(d: Rec): number[] {
   const raw = Array.isArray(d.track) ? d.track : [];
-  return NAT_TRACK.map((_, i) => Math.max(0, Math.min(2, numOf(raw[i], 0))));
+  /* `track0..3` بقايا رفعٍ قديم كانت تُحفظ مفاتيحَ مفردة قبل أن
+     تُجمَّع في مصفوفة — تُقرأ هنا فلا يحتاج الملف رفعاً ثانياً */
+  return NAT_TRACK.map((_, i) =>
+    Math.max(0, Math.min(2, numOf(raw[i] ?? d[`track${i}`], 0))),
+  );
 }
 const INST_STAGES = ["وصلت المركز", "قيد المراجعة", "معالجة الملاحظات", "اعتُمدت", "فُعِّل القياس"];
 
@@ -1190,14 +1194,6 @@ function SessImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => v
           }
           const key = natNorm(nm);
           const cur = byName.get(key);
-          /* المفاتيح الأربع تصير مصفوفةً واحدة، وما لم يأتِ في الملف
-             يبقى على حاله المحفوظ فلا يُصفَّر عمودٌ غائب */
-          const tk = [0, 1, 2, 3].map((i) => patch[`track${i}`]);
-          if (tk.some((v) => v !== undefined)) {
-            const base = natTrack((cur?.data ?? {}) as Rec);
-            patch.track = base.map((b, i) => (tk[i] === undefined ? b : numOf(tk[i])));
-          }
-          for (let i = 0; i < 4; i++) delete patch[`track${i}`];
           if (cur) {
             if (!Object.keys(patch).length) continue;
             const prev = upd.get(key);
@@ -1810,6 +1806,14 @@ function NatImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => vo
           }
           const key = natNorm(nm);
           const cur = byName.get(key);
+          /* أعمدة «هل تم …؟» الأربع تصير مصفوفة `track` واحدة، وما
+             لم يأتِ عمودُه في الملف يبقى على حاله فلا يُصفَّر */
+          const tk = [0, 1, 2, 3].map((i) => patch[`track${i}`]);
+          if (tk.some((v) => v !== undefined)) {
+            const base = natTrack((cur?.data ?? {}) as Rec);
+            patch.track = base.map((b, i) => (tk[i] === undefined ? b : numOf(tk[i])));
+          }
+          for (let i = 0; i < 4; i++) delete patch[`track${i}`];
           if (cur) {
             if (!Object.keys(patch).length) continue;
             /* الاسم قد يتكرّر على أكثر من شريحة بأعمدة مختلفة، فتُجمَّع */

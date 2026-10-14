@@ -10669,6 +10669,9 @@ input.cell-date {
   min-width: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
+  /* صفّان متساويان: المربّعات الأربعة بقياسٍ واحد ومستوىً واحد
+     مهما طال ما فيها — كان ارتفاع كلٍّ بقدر محتواه فتتفاوت */
+  grid-template-rows: 1fr 1fr;
   gap: 7px;
   align-content: center;
 }
@@ -10678,6 +10681,10 @@ input.cell-date {
   border-radius: 10px;
   padding: 6px 9px;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
 }
 .ncard .n .k { font-size: 10.5px; color: var(--muted); }
 .ncard .n .v {
