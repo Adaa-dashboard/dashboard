@@ -247,17 +247,20 @@ export function instDonut(items: ItemLite[], startedOnly = false) {
 function taskDom(tasks: TaskLite[], a: string, b: string, upd: number): Dom | null {
   const rows = tasks.filter((x) => txt(x.kind) === "assignment");
   const done = rows.filter((x) => inRange(txt(x.completedAt), a, b));
-  /* «جديد» = ما ورد هذا الأسبوع **ولم يُكتمل بعد** — التكليف الذي
-     ورد وأُنجز في الأسبوع نفسه يُعدّ مكتملاً لا جديداً، وإلا عُدّ
-     مرتين في الشريط وبدا العمل أكثر مما هو */
-  const fresh = rows.filter(
-    (x) => inRange(txt(x.createdAt), a, b) && txt(x.state) !== "done" && !txt(x.completedAt),
-  );
   const open = rows.filter((x) => txt(x.state) !== "done" && txt(x.state) !== "hold");
   const late = open.filter((x) => {
     const d = day(txt(x.dueDate));
     return !!d && d < day(new Date().toISOString());
   });
+  /* **الحالات الأربع لا تتداخل**: التكليف يُعدّ مرةً واحدة.
+     و«جديد» = ما **ورد** هذا الأسبوع لا ما أُدخل المنصة فيه:
+     تكليفٌ قديم يُدخَل اليوم ليس جديداً — إن مضى موعده فهو متأخر،
+     وإلا فهو قيد العمل. فإن غاب تاريخ الورود رجعنا إلى تاريخ
+     الإدخال، وهو ما كان يسبّب الالتباس */
+  const fresh = open.filter(
+    (x) => !late.includes(x) && inRange(txt(x.assignedAt) || txt(x.createdAt), a, b),
+  );
+  const doing = open.filter((x) => !late.includes(x) && !fresh.includes(x));
   if (!rows.length) return null;
   const updates = done.length + fresh.length + upd;
 
@@ -281,7 +284,8 @@ function taskDom(tasks: TaskLite[], a: string, b: string, upd: number): Dom | nu
   };
   for (const x of late) push(x, `متأخر ${arDays(lateDays(x))}`, "warn");
   for (const x of done) push(x, "مكتمل", "ok");
-  for (const x of fresh) push(x, "جديد", "mute");
+  for (const x of fresh) push(x, "ورد هذا الأسبوع", "mute");
+  for (const x of doing) push(x, "قيد العمل", "mute");
   return {
     k: "task",
     ...DOM_META.task,
@@ -289,7 +293,7 @@ function taskDom(tasks: TaskLite[], a: string, b: string, upd: number): Dom | nu
     stats: [
       { n: fresh.length, label: "جديد", tone: "mute", icon: "inbox" },
             /* سهم دائري لا ترس: `gear` في المكتبة دائرةٌ بأشعة تُقرأ شمساً */
-      { n: open.length, label: "قيد العمل", tone: "ok", icon: "cycle" },
+      { n: doing.length, label: "قيد العمل", tone: "ok", icon: "cycle" },
       { n: done.length, label: "مكتمل", tone: "ok", icon: "check" },
       { n: late.length, label: "متأخر", tone: "warn", icon: "clock" },
     ],

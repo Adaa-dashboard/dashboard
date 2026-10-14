@@ -158,7 +158,8 @@ function DomCard({
             <tr>
               {onPick && <th className="pick" />}
               <th>التكليف</th>
-              <th>الحالة</th>
+              {/* ما طرأ على التكليف هذا الأسبوع لا حالته المجرّدة */}
+              <th>التحديث</th>
               <th>الدعم المطلوب</th>
             </tr>
           </thead>

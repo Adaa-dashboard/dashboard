@@ -92,6 +92,9 @@ const rowTask = (r: Record<string, unknown>) => ({
   kind: r.kind === "assignment" ? "assignment" : "task",
   updates: Array.isArray(r.updates) ? r.updates : [],
   createdById: r.created_by_id, createdAt: r.created_at,
+  /* تاريخ ورود التكليف — غير تاريخ إدخاله المنصة. وقد يغيب في
+     العمود القديم فيُستعاض عنه بتاريخ الإدخال عند القراءة */
+  assignedAt: r.assigned_at ?? undefined,
   completedAt: r.completed_at ?? undefined,
 });
 const rowNote = (r: Record<string, unknown>) => ({
@@ -490,6 +493,7 @@ export async function apiFetch(path: string, init: Init = {}) {
         assignee_id: body.assigneeId,
         priority: body.priority === "high" ? "high" : "mid",
         due_date: body.dueDate, indicator_id: body.indicatorId || null,
+        assigned_at: body.assignedAt || null,
         kind: body.kind === "assignment" ? "assignment" : "task",
         state: "ok", updates: [], created_by_id: me?.id || "",
       });
@@ -595,6 +599,7 @@ export async function apiFetch(path: string, init: Init = {}) {
           });
         }
         const patch: Record<string, unknown> = { updates };
+        if (body.assignedAt !== undefined) patch.assigned_at = body.assignedAt || null;
         if (body.state) {
           // الحالات الأربع لا غيرها — قيد القاعدة يرفض ما عداها برسالة غامضة
           if (!["ok", "risk", "hold", "done"].includes(String(body.state)))

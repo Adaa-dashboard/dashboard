@@ -77,6 +77,11 @@ function Shared() {
         kind: String(r.kind || "task"),
         state: String(r.state || ""),
         completedAt: String(r.completed_at || ""),
+        /* الصفحة العامة تقرأ أعمدة القاعدة كما هي، فكانت تنقص
+           الجدولَ مواعيدُه فيظهر كل تكليفٍ بلا حالة */
+        createdAt: String(r.created_at || ""),
+        assignedAt: String(r.assigned_at || ""),
+        dueDate: String(r.due_date || ""),
       }));
       const contacts = ((data.contacts || []) as Record<string, unknown>[]).map<ContactLite>((r) => ({
         entity: String(r.entity || ""),

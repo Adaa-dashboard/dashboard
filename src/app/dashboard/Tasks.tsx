@@ -25,6 +25,8 @@ type Task = {
   updates: Update[];
   createdById: string;
   createdAt: string;
+  /** تاريخ ورود التكليف — إن غاب فتاريخ الإدخال */
+  assignedAt?: string;
   completedAt?: string;
 };
 type Person = { id: string; name: string; role: string };
@@ -631,6 +633,9 @@ function NewTask({
   const [description, setDescription] = useState("");
   const [assigneeId, setAssigneeId] = useState(people[0]?.id || "");
   const [dueDate, setDueDate] = useState(todayISO());
+  /* تاريخ ورود التكليف — غير تاريخ إدخاله المنصة. تكليفٌ قديم
+     يُدخَل اليوم ليس «جديداً»، فهذا التاريخ هو ما يحكم */
+  const [assignedAt, setAssignedAt] = useState(todayISO());
   const [priority, setPriority] = useState<Priority>("mid");
   const [indicatorId, setIndicatorId] = useState("");
   const [err, setErr] = useState("");
@@ -642,7 +647,10 @@ function NewTask({
     const r = await apiFetch("/api/tasks", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ title, description, assigneeId, dueDate, priority, indicatorId, kind }),
+      body: JSON.stringify({
+        title, description, assigneeId, dueDate, priority, indicatorId, kind,
+        assignedAt: asg ? assignedAt : "",
+      }),
     }).then((x) => x.json());
     setBusy(false);
     if (r.error) {
@@ -690,6 +698,16 @@ function NewTask({
               <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
             </div>
           </div>
+
+          {asg && (
+            <>
+              <label>
+                {t("تاريخ ورود التكليف", "Assigned on")}{" "}
+                <span className="opt">{t("غير تاريخ الإدخال", "not the entry date")}</span>
+              </label>
+              <input type="date" value={assignedAt} onChange={(e) => setAssignedAt(e.target.value)} />
+            </>
+          )}
 
           <label>{t("الأهمية", "Priority")}</label>
           <div className="segs">

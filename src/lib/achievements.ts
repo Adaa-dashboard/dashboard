@@ -188,6 +188,8 @@ export type ChangeLite = {
 export type TaskLite = {
   id?: string; title?: string; kind?: string; state?: string;
   completedAt?: string; createdAt?: string; dueDate?: string;
+  /** تاريخ ورود التكليف — غير تاريخ إدخاله المنصة */
+  assignedAt?: string;
 };
 export type ContactLite = { entity?: string; reviewedAt?: string };
 
