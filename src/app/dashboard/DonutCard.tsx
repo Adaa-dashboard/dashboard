@@ -67,7 +67,7 @@ export function DonutLegend({ slices }: { slices: Slice[] }) {
           <i style={{ background: s.color }} />
           {s.label}
           {/* ما زاد في هذه المرحلة هذا الأسبوع — سهمٌ أخضر عقب اسمها */}
-          {s.up ? <em className="up">+{s.up} ▲</em> : null}
+          {s.up ? <em className="upx">+{s.up} ▲</em> : null}
           <u>{s.n}</u>
         </div>
       ))}

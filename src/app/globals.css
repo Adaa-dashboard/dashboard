@@ -2759,29 +2759,42 @@ table.matrix thead th {
 }
 .wk-lg u {
   text-decoration: none;
-  margin-inline-start: auto;
+  /* في التقرير تُجمع الكلمة وشارتها وعددها معاً: عرض الورقة ضيّق،
+     ودفعُ العدد إلى آخر السطر كان يفرّق السطر ويبدّد العرض.
+     أما في «نظرة عامة» فالبطاقة أوسع، وهناك يُدفع إلى الطرف */
+  margin-inline-start: 7px;
   font-weight: 700;
   color: var(--gt-900);
   font-variant-numeric: tabular-nums;
 }
 /* سهم الزيادة في الأسطورة — «+٢» بالأخضر جنب اسم المرحلة */
-.wk-lg em.up {
+/* `upx` لا `up`: الأخيرة صنفٌ معرَّفٌ في الملف (صفُّ تحديثٍ
+   بحشوة 11px) فكان يضاعف ارتفاع سطر الأسطورة */
+.wk-lg em.upx {
   font-style: normal;
   border: none;
   font-size: 9.5px;
   font-weight: 800;
   color: #1b9c74;
-  margin-inline-start: 5px;
+  margin-inline-start: 4px;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
 /* ما تقدّم هذا الأسبوع — تحت الحلقة: نقطةٌ بلون مرحلته ثم اسمه */
+/* عمودان ما دام العرض يحتمل: القائمة الطويلة في عمودٍ واحد تُطيل
+   البطاقة ويبقى نصفها بياضاً */
 .wk-ups {
   list-style: none;
   margin: 9px 0 0;
   padding: 8px 0 0;
   border-top: 1px solid var(--line2);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
+  gap: 0 14px;
+}
+.wk-ups li.more {
+  grid-column: 1 / -1;
 }
 .wk-ups li {
   display: flex;
@@ -2939,6 +2952,12 @@ table.matrix thead th {
   list-style: none;
   margin: 0;
   padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
+  gap: 0 14px;
+}
+.wk-lst li.more {
+  grid-column: 1 / -1;
 }
 .wk-lst li {
   position: relative;

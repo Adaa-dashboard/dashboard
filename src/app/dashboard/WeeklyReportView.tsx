@@ -140,13 +140,13 @@ function DomCard({
       {/* ما تقدّم هذا الأسبوع — نقطةٌ بلون مرحلته الجديدة ثم اسمه */}
       {d.ups && d.ups.length > 0 && (
         <ul className="wk-ups">
-          {d.ups.slice(0, 6).map((l) => (
+          {d.ups.slice(0, 8).map((l) => (
             <li key={l.name}>
               <i style={{ background: l.color }} />
               {l.name}
             </li>
           ))}
-          {d.ups.length > 6 && <li className="more">{`و${d.ups.length - 6} غيرها`}</li>}
+          {d.ups.length > 8 && <li className="more">{`و${d.ups.length - 8} غيرها`}</li>}
         </ul>
       )}
 
