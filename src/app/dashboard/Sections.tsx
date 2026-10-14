@@ -1167,6 +1167,14 @@ function SessImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => v
           }
           const key = natNorm(nm);
           const cur = byName.get(key);
+          /* المفاتيح الأربع تصير مصفوفةً واحدة، وما لم يأتِ في الملف
+             يبقى على حاله المحفوظ فلا يُصفَّر عمودٌ غائب */
+          const tk = [0, 1, 2, 3].map((i) => patch[`track${i}`]);
+          if (tk.some((v) => v !== undefined)) {
+            const base = natTrack((cur?.data ?? {}) as Rec);
+            patch.track = base.map((b, i) => (tk[i] === undefined ? b : numOf(tk[i])));
+          }
+          for (let i = 0; i < 4; i++) delete patch[`track${i}`];
           if (cur) {
             if (!Object.keys(patch).length) continue;
             const prev = upd.get(key);
@@ -1588,6 +1596,16 @@ function natKeyOf(head: string): string {
   const h = natNorm(head);
   if (!h) return "";
   const has = (...w: string[]) => w.every((x) => h.includes(x));
+  /* أعمدة «هل تم …؟» الأربع = مسار المراجعة. تُقرأ **قبل** القواعد
+     العامة: «هل تم الانتهاء من المراجعة الفنية» يحوي «فني»،
+     و«هل تم معالجة الملاحظات» يحوي «ملاحظ»، فلولا الأسبقية لوقعا
+     في «مقبولة فنياً» و«ملاحظة» */
+  if (h.includes("هل تم") || h.includes("هل تمت")) {
+    if (h.includes("وثيقه")) return "track0";
+    if (h.includes("حصر")) return "track1";
+    if (h.includes("فني") || h.includes("مراجع")) return "track2";
+    if (h.includes("ملاحظ")) return "track3";
+  }
   if (has("مؤشر", "ممثل")) return "kpisRep";
   if (h.includes("مؤشر")) return "kpisTot";
   if (has("مبادر", "ممثل")) return "initRep";
@@ -1625,6 +1643,12 @@ function natVal(k: string, raw: string): unknown {
       return Math.round(n * 1000) / 10;
     }
     return n;
+  }
+  if (/^track[0-3]$/.test(k)) {
+    const h = natNorm(v);
+    if (/^(نعم|تم|تمت|مكتمل|منجز|yes|y|true|✓|✔|1)$/i.test(h)) return 2;
+    if (/^(جار|جاري|جاريه|قيد|جزئي|جزئيا|partial)/i.test(h)) return 1;
+    return 0;
   }
   if (k === "tech") return !/^(غير|لا|no|false|0)/i.test(natNorm(v));
   if (k === "stage") {
