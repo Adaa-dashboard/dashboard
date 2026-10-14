@@ -12172,6 +12172,19 @@ input.cell-date {
    حوافّها السفلى مهما اختلف ما فوقها. */
 .ncards.eq { align-items: stretch; }
 .ncards.eq .ncard { display: flex; flex-direction: column; }
+/* alleq — كل البطاقات بقياسٍ واحد لا بقياس محتواها:
+   صفوف الشبكة متساوية (1fr) فبطاقتا جهتين مختلفتين تتساويان،
+   ومسار المحطات يُدفع لأسفل البطاقة فيصطفّ في كل البطاقات.
+   والملاحظة تُقصَّ في ثلاثة أسطر (نصّها كاملٌ في التلميح) وإلا
+   أطالت ملاحظةٌ واحدةٌ طويلة كل البطاقات معها */
+.ncards.alleq { grid-auto-rows: 1fr; }
+.ncards.alleq .ncard .trk { margin-top: auto; }
+.ncards.alleq .ncard .note {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
 .ncards.eq .ncard .sn,
 .ncards.eq .ncard .sn-add,
 .ncards.eq .ncard .sn-gap { margin-top: auto; }

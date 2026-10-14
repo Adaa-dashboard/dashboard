@@ -157,10 +157,19 @@ function natTech(d: Rec): boolean {
 function natTrack(d: Rec): number[] {
   const raw = Array.isArray(d.track) ? d.track : [];
   /* `track0..3` بقايا رفعٍ قديم كانت تُحفظ مفاتيحَ مفردة قبل أن
-     تُجمَّع في مصفوفة — تُقرأ هنا فلا يحتاج الملف رفعاً ثانياً */
+     تُجمَّع في مصفوفة — تُقرأ هنا فلا يحتاج الملف رفعاً ثانياً.
+     والأعلى من الاثنين هو المعتمد: البندُ قد يحمل مصفوفةً قديمة
+     («قيد التنفيذ» من تدويرٍ يدوي) ومفاتيحَ مفردةً أحدثَ منها جاءت
+     من الملف، فلو قُدِّمت المصفوفةُ وحدها بقيت المحطات صفراءَ والملف
+     كلُّه «نعم». وتدويرُ المحطة يدوياً يمسح المفاتيح المفردة فيعود
+     القرار لمن يعدّل */
   return NAT_TRACK.map((_, i) =>
-    Math.max(0, Math.min(2, numOf(raw[i] ?? d[`track${i}`], 0))),
+    Math.max(0, Math.min(2, Math.max(numOf(raw[i], 0), numOf(d[`track${i}`], 0)))),
   );
+}
+/** يُسقِط مفاتيح `track0..3` القديمة عند الحفظ — `undefined` تختفي من JSON */
+function natNoLegacy(d: Rec): Rec {
+  return { ...d, track0: undefined, track1: undefined, track2: undefined, track3: undefined };
 }
 const INST_STAGES = ["وصلت المركز", "قيد المراجعة", "معالجة الملاحظات", "اعتُمدت", "فُعِّل القياس"];
 
@@ -1524,7 +1533,7 @@ function NatCard({
     if (!canEdit || !save) return;
     const cur = [...track];
     cur[i] = (cur[i] + 1) % 3;
-    await save(it.id, { ...d, track: cur, demo: false }, it.ord);
+    await save(it.id, { ...natNoLegacy(d), track: cur, demo: false }, it.ord);
   }
 
   /** خليةٌ تُكتب في مكانها لمن يملك التعديل، ونصٌّ لغيره */
@@ -1609,7 +1618,9 @@ function NatCard({
         ))}
       </div>
 
-      <div className="note">{txt(d.note) || t("لا توجد ملاحظات مسجّلة", "No notes")}</div>
+      <div className="note" title={txt(d.note)}>
+        {txt(d.note) || t("لا توجد ملاحظات مسجّلة", "No notes")}
+      </div>
     </div>
   );
 }
@@ -1813,7 +1824,9 @@ function NatImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => vo
             const base = natTrack((cur?.data ?? {}) as Rec);
             patch.track = base.map((b, i) => (tk[i] === undefined ? b : numOf(tk[i])));
           }
-          for (let i = 0; i < 4; i++) delete patch[`track${i}`];
+          /* `undefined` لا `delete`: الحقل يُكتب فوق القديم في البيانات
+             المدموجة ثم يسقط من JSON، فلا تبقى بقايا المفاتيح المفردة */
+          for (let i = 0; i < 4; i++) patch[`track${i}`] = undefined;
           if (cur) {
             if (!Object.keys(patch).length) continue;
             /* الاسم قد يتكرّر على أكثر من شريحة بأعمدة مختلفة، فتُجمَّع */
@@ -2021,7 +2034,9 @@ function NationalPage({ t, canEdit, add, gear }: SecPageProps) {
       <div className="stab-doing">{q ? `${t("نتائج البحث", "Search results")} · ${AR(rows.length)}` : NAT_DOING[tab]}</div>
 
       {rows.length ? (
-        <div className="ncards">
+        /* alleq: كل البطاقات بقياسٍ واحد ومستوىً واحد — بطاقتا جهتين
+           مختلفتين لا تتفاوتان في الطول */
+        <div className="ncards eq alleq">
           {rows.map((it) => (
             <NatCard
               key={it.id}
@@ -2060,7 +2075,7 @@ function NationalDetail({
     if (!canEdit || !save) return;
     const cur = [...track];
     cur[i] = (cur[i] + 1) % 3;
-    await save(it.id, { ...d, track: cur, demo: false }, it.ord);
+    await save(it.id, { ...natNoLegacy(d), track: cur, demo: false }, it.ord);
   }
 
   return (
