@@ -99,6 +99,9 @@ function DomCard({
 }) {
   /* ما يُكتب الآن — قبل أن يصل الحفظ ويعود في `texts` */
   const [draft, setDraft] = useState<Record<string, string>>({});
+  /* عمود «الدعم المطلوب» يُخفى بضغطة × ويُعاد بزرّه — واختياره
+     محفوظٌ مع بقية مفاتيح الأسبوع */
+  const sup = on["col:sup"] !== false;
   return (
     <div className="wk-card">
       <div className="wk-ch">
@@ -141,7 +144,7 @@ function DomCard({
       {d.ups && d.ups.length > 0 && (
         <ul className="wk-ups">
           {d.ups.slice(0, 8).map((l) => (
-            <li key={l.name}>
+            <li key={l.name} title={l.name}>
               <i style={{ background: l.color }} />
               {l.name}
             </li>
@@ -158,9 +161,24 @@ function DomCard({
             <tr>
               {onPick && <th className="pick" />}
               <th>التكليف</th>
-              {/* ما طرأ على التكليف هذا الأسبوع لا حالته المجرّدة */}
+              {/* آخر ما كُتب على التكليف لا حالته المجرّدة */}
               <th>التحديث</th>
-              <th>الدعم المطلوب</th>
+              {sup && (
+                <th>
+                  الدعم المطلوب
+                  {/* × صغيرة تُخفي العمود كله حين لا يُحتاج */}
+                  {onPick && (
+                    <button className="colx" title="إخفاء العمود" onClick={() => onPick("col:sup", false)}>
+                      ✕
+                    </button>
+                  )}
+                </th>
+              )}
+              {!sup && onPick && (
+                <th className="colback">
+                  <button onClick={() => onPick("col:sup", true)}>+ الدعم المطلوب</button>
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -186,6 +204,8 @@ function DomCard({
                     )}
                     <td>{r.name}</td>
                     <td className={r.tone}>{r.state}</td>
+                    {!sup && onPick && <td className="colback" />}
+                    {sup && (
                     <td className="sup">
                       {onTaskSup ? (
                         <>
@@ -206,6 +226,7 @@ function DomCard({
                         v || "—"
                       )}
                     </td>
+                    )}
                   </tr>
                 );
               })}

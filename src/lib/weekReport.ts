@@ -274,13 +274,31 @@ function taskDom(tasks: TaskLite[], a: string, b: string, upd: number): Dom | nu
   };
   const seen = new Set<string>();
   const tbl: Row[] = [];
+  /** آخر تحديثٍ كُتب على التكليف — وهو ما يُعرض في عمود «التحديث»،
+      فإن لم يُكتب شيء عُرضت حالته المحسوبة */
+  const lastUpd = (x: TaskLite) => {
+    const u = Array.isArray(x.updates) ? x.updates : [];
+    let best = "";
+    let at = "";
+    for (const r of u) {
+      const t2 = txt(r?.text).trim();
+      if (!t2) continue;
+      const a2 = txt(r?.at);
+      if (!best || a2 >= at) {
+        best = t2;
+        at = a2;
+      }
+    }
+    return best.replace(/\s+/g, " ");
+  };
   const push = (x: TaskLite, state: string, tone: "ok" | "warn" | "mute") => {
     const nm = txt(x.title);
     const key = txt(x.id) || nm;
     if (!nm || seen.has(key)) return;
     seen.add(key);
+    const u = lastUpd(x);
     /* المعرّف يثبت بين الأسابيع، فالدعم المكتوب يلتصق بالتكليف نفسه */
-    tbl.push({ id: key, name: nm, state, tone });
+    tbl.push({ id: key, name: nm, state: u || state, tone: u ? "mute" : tone });
   };
   for (const x of late) push(x, `متأخر ${arDays(lateDays(x))}`, "warn");
   for (const x of done) push(x, "مكتمل", "ok");
@@ -290,12 +308,15 @@ function taskDom(tasks: TaskLite[], a: string, b: string, upd: number): Dom | nu
     k: "task",
     ...DOM_META.task,
     updates,
+    /* الشريط: كم تكليفاً لدينا، ثم أين هي منه — بطلب المستخدمة.
+       و«على المسار» تجمع الوارد حديثاً وما هو قيد العمل، فالمربّع
+       الأول صار عدداً كلياً لا حالة */
     stats: [
-      { n: fresh.length, label: "جديد", tone: "mute", icon: "inbox" },
-            /* سهم دائري لا ترس: `gear` في المكتبة دائرةٌ بأشعة تُقرأ شمساً */
-      { n: doing.length, label: "قيد العمل", tone: "ok", icon: "cycle" },
-      { n: done.length, label: "مكتمل", tone: "ok", icon: "check" },
+      { n: rows.length, label: "عدد التكاليف", tone: "mute", icon: "clipboard" },
+      /* سهم دائري لا ترس: `gear` في المكتبة دائرةٌ بأشعة تُقرأ شمساً */
+      { n: fresh.length + doing.length, label: "على المسار", tone: "ok", icon: "cycle" },
       { n: late.length, label: "متأخر", tone: "warn", icon: "clock" },
+      { n: done.length, label: "مكتمل", tone: "ok", icon: "check" },
     ],
     rows: tbl.length ? tbl : undefined,
   };
@@ -410,6 +431,8 @@ function upsIn(
   lines: Line[],
   label: (d: Rec) => string,
   slices: Slice[],
+  /** مراحلُ تُذكر أسماؤها دون غيرها — بلا قائمة تُذكر كلها */
+  only?: string[],
 ) {
   /* المطابقة **بالمعرّف أولاً**: اسم البند في السجلّ قد يختلف عن
      اسمه في الجدول (تسميةٌ من جدول الجهات، أو مسافةٌ زائدة)، فكان
@@ -428,6 +451,7 @@ function upsIn(
     const lab = it ? label(it.data) : "";
     /* بندٌ لم يعد في الجدول (حُذف مثلاً): يبقى اسمه بلا لون شريحة */
     if (lab) count[lab] = (count[lab] || 0) + 1;
+    if (only && !only.includes(lab)) continue;
     named.push({
       name: it ? txt(it.data.name) || txt(it.data.entity) || l.name : l.name,
       label: lab,
@@ -492,7 +516,9 @@ export function buildWeekReport(args: {
     /* لا رقمَ كبيراً فوق الحلقة: التحديث يُقرأ من سهم الأسطورة
        ومن أسماء ما تقدّم تحتها */
     const dn = natDonut(sec("natstrat"));
-    const up = upsIn(sec("natstrat"), lines, natLabel, dn.slices);
+    /* تحت الحلقة أسماءُ ما بلغ الاعتماد وحدها — وهي الأهمّ،
+       وقائمةُ كل ما تحرّك كانت تطول بلا طائل */
+    const up = upsIn(sec("natstrat"), lines, natLabel, dn.slices, NAT_STEPS.slice(2));
     add({
       k: "nat",
       ...DOM_META.nat,
@@ -509,7 +535,8 @@ export function buildWeekReport(args: {
   if (sec("inststrat").length || inst.length) {
     const lines = inst.length ? linesOf(inst) : instT;
     const dn = instDonut(sec("inststrat"), true);
-    const up = upsIn(sec("inststrat"), lines, instLabel, dn.slices);
+    /* المؤسسية: مَن فُعِّل قياسها وحدها */
+    const up = upsIn(sec("inststrat"), lines, instLabel, dn.slices, [INST_STAGES[4]]);
     add({
       k: "inst",
       ...DOM_META.inst,

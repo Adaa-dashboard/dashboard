@@ -190,6 +190,8 @@ export type TaskLite = {
   completedAt?: string; createdAt?: string; dueDate?: string;
   /** تاريخ ورود التكليف — غير تاريخ إدخاله المنصة */
   assignedAt?: string;
+  /** التحديثات المكتوبة على التكليف — آخرها هو ما يظهر في التقرير */
+  updates?: { text?: string; at?: string }[];
 };
 export type ContactLite = { entity?: string; reviewedAt?: string };
 

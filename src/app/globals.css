@@ -2622,7 +2622,7 @@ table.matrix thead th {
 }
 .wk-tb th {
   text-align: start;
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 700;
   color: var(--muted);
   padding: 0 8px 6px;
@@ -2630,9 +2630,11 @@ table.matrix thead th {
   white-space: nowrap;
 }
 .wk-tb td {
-  font-size: 11px;
+  /* أصغر قليلاً: اسم التكليف وتحديثه طويلان، والعمود ضيّق */
+  font-size: 10px;
   color: var(--ink-2);
-  padding: 7px 8px;
+  padding: 6px 7px;
+  overflow-wrap: anywhere;
   border-bottom: 1px solid var(--line2);
   line-height: 1.6;
   vertical-align: top;
@@ -2646,7 +2648,6 @@ table.matrix thead th {
 }
 .wk-tb td.ok {
   color: var(--gt-700);
-  white-space: nowrap;
 }
 .wk-tb td.warn {
   color: var(--gold);
@@ -2655,7 +2656,6 @@ table.matrix thead th {
 }
 .wk-tb td.mute {
   color: var(--muted);
-  white-space: nowrap;
 }
 .wk-tb td.sup {
   color: var(--muted);
@@ -2673,6 +2673,36 @@ table.matrix thead th {
 .wk-shot .wk-tb td.sup .sup-txt {
   display: block;
 }
+/* × إخفاء عمود «الدعم المطلوب»، وزرّ إعادته حين يُخفى */
+.wk-tb th .colx {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1;
+  padding: 0 4px;
+  cursor: pointer;
+  opacity: 0.6;
+}
+.wk-tb th .colx:hover {
+  opacity: 1;
+  color: #c0392b;
+}
+.wk-tb th.colback {
+  width: 1px;
+  white-space: nowrap;
+}
+.wk-tb th.colback button {
+  border: 1px dashed var(--line2);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 9px;
+  border-radius: 7px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
 /* مربّع اختيار ما يظهر من التكاليف */
 .wk-tb th.pick,
 .wk-tb td.pick {
@@ -2794,8 +2824,11 @@ table.matrix thead th {
   grid-template-columns: 1fr 1fr;
   gap: 0 12px;
 }
+/* سطرٌ واحد لكل اسم: الالتفاف كان يفكّ انتظام العمودين */
 .wk-ups li {
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .wk-ups li.more {
   grid-column: 1 / -1;
@@ -2807,6 +2840,7 @@ table.matrix thead th {
   font-size: 10px;
   color: var(--text);
   line-height: 1.6;
+  min-width: 0;
 }
 /* نقطةٌ أصغر من نقاط الأسطورة فوقها، فلا تُخلط بها */
 .wk-ups li i {
@@ -3337,7 +3371,10 @@ table.matrix thead th {
    ولا صفوفَ مستبعَدة */
 .wk-shot .wk-tb th.pick,
 .wk-shot .wk-tb td.pick,
-.wk-shot .wk-pr .pick {
+.wk-shot .wk-pr .pick,
+.wk-shot .wk-tb th .colx,
+.wk-shot .wk-tb th.colback,
+.wk-shot .wk-tb td.colback {
   display: none !important;
 }
 .wk-shot .wk-tb tr.off,
@@ -3416,6 +3453,9 @@ table.matrix thead th {
   .wk-tb th.pick,
   .wk-tb td.pick,
   .wk-pr .pick,
+  .wk-tb th .colx,
+  .wk-tb th.colback,
+  .wk-tb td.colback,
   .wk-tb td.sup .wk-supin {
     display: none !important;
   }

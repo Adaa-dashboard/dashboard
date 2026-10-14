@@ -82,6 +82,11 @@ function Shared() {
         createdAt: String(r.created_at || ""),
         assignedAt: String(r.assigned_at || ""),
         dueDate: String(r.due_date || ""),
+        /* آخر تحديثٍ مكتوب هو ما يظهر في عمود «التحديث» */
+        updates: (Array.isArray(r.updates) ? r.updates : []).map((u) => {
+          const x = (u || {}) as Record<string, unknown>;
+          return { text: String(x.text || ""), at: String(x.at || "") };
+        }),
       }));
       const contacts = ((data.contacts || []) as Record<string, unknown>[]).map<ContactLite>((r) => ({
         entity: String(r.entity || ""),
