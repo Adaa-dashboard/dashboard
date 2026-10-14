@@ -349,6 +349,24 @@ export function useItems(section: SectionKey, enabled = true) {
     void load();
   }, [load]);
 
+  /* **التحديث الحيّ** — ما يُغيَّر في جهازٍ أو صفحةٍ أخرى يظهر هنا
+     بلا إعادة تحميل: عند العودة إلى التبويب، وكل ٢٥ ثانية والصفحة
+     ظاهرة. ولا طلبَ والصفحة في الخلفية. */
+  useEffect(() => {
+    if (!enabled) return;
+    const tick = () => {
+      if (!document.hidden) void load();
+    };
+    const iv = setInterval(tick, 25000);
+    window.addEventListener("focus", tick);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      clearInterval(iv);
+      window.removeEventListener("focus", tick);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, [load, enabled]);
+
   /* التراجع: قبل كل حفظ أو حذف نلتقط الحالة السابقة للبند.
      المكدّس في الذاكرة — يُفرَّغ بإعادة تحميل الصفحة، والسجل
      الدائم هو audit_log في قاعدة البيانات. */
@@ -1528,12 +1546,17 @@ function NatCard({
   const d = it.data;
   const meas = numOf(d.meas);
   const track = natTrack(d);
+  /* سببُ تعذّر الحفظ يُقال: كان يُبتلع صامتاً، فتبدو المحطة كأنها
+     لا تتغيّر بلا بيانِ سبب */
+  const [trkErr, setTrkErr] = useState("");
 
   async function cycle(i: number) {
     if (!canEdit || !save) return;
     const cur = [...track];
     cur[i] = (cur[i] + 1) % 3;
-    await save(it.id, { ...natNoLegacy(d), track: cur, demo: false }, it.ord);
+    setTrkErr("");
+    const e = await save(it.id, { ...natNoLegacy(d), track: cur, demo: false }, it.ord);
+    if (e) setTrkErr(e);
   }
 
   /** خليةٌ تُكتب في مكانها لمن يملك التعديل، ونصٌّ لغيره */
@@ -1617,6 +1640,7 @@ function NatCard({
           </button>
         ))}
       </div>
+      {trkErr && <div className="ncard-err">{trkErr}</div>}
 
       <div className="note" title={txt(d.note)}>
         {txt(d.note) || t("لا توجد ملاحظات مسجّلة", "No notes")}
@@ -1938,6 +1962,34 @@ function NatImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => vo
 function NationalPage({ t, canEdit, add, gear }: SecPageProps) {
   const { items, loaded, save, remove, reload, undo, undoTop, dismissUndo } = useItems("natstrat");
   const [q, setQ] = useState("");
+  /* **ترحيلٌ لمرّة واحدة**: مفاتيح `track0..3` المفردة — بقايا رفعٍ
+     قديم — تُدمج في مصفوفة `track` ثم تُمحى. وجودها كان يجعل حالة
+     المحطة أعلى القيمتين، فتغييرُ المحطة إلى حالةٍ أدنى لا يظهر
+     ويبقى القبول الفنّي على ما كان. الكتابة مباشرةً بلا خطوة تراجع */
+  const fixedTrk = useRef(false);
+  useEffect(() => {
+    if (!canEdit || !loaded || fixedTrk.current) return;
+    const old = items.filter((it) =>
+      [0, 1, 2, 3].some((i) => (it.data as Rec)[`track${i}`] !== undefined),
+    );
+    if (!old.length) return;
+    fixedTrk.current = true;
+    void (async () => {
+      for (const it of old) {
+        await apiFetch("/api/items", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            section: "natstrat",
+            id: it.id,
+            ord: it.ord,
+            data: { ...natNoLegacy(it.data), track: natTrack(it.data) },
+          }),
+        });
+      }
+      await reload();
+    })();
+  }, [items, loaded, canEdit, reload]);
   /* القطاع المختار من الفلتر — فارغٌ = كل القطاعات */
   const [sec, setSec] = useState("");
   /* التبويب المختار — حالة الاعتماد */
@@ -4330,7 +4382,7 @@ export function SectionPage({
 /* جدول تحرير مبسّط أسفل الصفحة — لمن يملك «تحرير بيانات هذه الأقسام» */
 
 /* ---------------- نافذة إدخال/تعديل بند ---------------- */
-type Field = { k: string; label: string; kind?: "num" | "text" | "date" | "bool" | "area" };
+type Field = { k: string; label: string; kind?: "num" | "text" | "date" | "bool" | "area" | "trk" };
 
 const FIELDS: Record<Exclude<SectionKey, "outputs" | "opplan">, Field[]> = {
   /* صفٌّ واحد يصلح للصورتين: عنصرٌ متعثر بمعاييره الأربعة، أو جهةٌ
@@ -4366,7 +4418,10 @@ const FIELDS: Record<Exclude<SectionKey, "outputs" | "opplan">, Field[]> = {
     { k: "sector", label: "القطاع (المالي والاقتصادي · البنية التحتية · الخدمات الاجتماعية · الشؤون الحكومية)" },
     { k: "domain", label: "النطاق (التوطين · الحج · الفضاء…)" },
     { k: "stage", label: "حالة الاعتماد (1 إعداد · 2 مراجعة · 3 اللجنة · 4 مجلس الوزراء)", kind: "num" },
-    /* «مقبولة فنياً» لا تُكتب: تُشتقّ من اكتمال المحطات الأربع */
+    /* «مقبولة فنياً» لا تُكتب: تُشتقّ من اكتمال المحطات الأربع —
+       ولهذا تُحرَّر المحطات من النموذج أيضاً لا من نقاط البطاقة
+       وحدها، فمن يفتح «تعديل» لا يجد فيه ما يغيّر القبول الفنّي */
+    { k: "track", label: "محطات المراجعة", kind: "trk" },
     { k: "meas", label: "قابلية القياس ٪", kind: "num" },
     { k: "note", label: "أبرز الملاحظات", kind: "area" },
     { k: "period", label: "فترة الاستراتيجية" },
@@ -4444,6 +4499,9 @@ function ItemForm({
       ? raw.map((x: Rec) => ({ n: txt(x.n), d: txt(x.d) }))
       : SESS_STAGES.map((n) => ({ n, d: "" }));
   });
+  /* محطات الاستراتيجية الوطنية — تُحرَّر من النموذج كما تُحرَّر
+     بالضغط على نقاط البطاقة، والقبول الفنّي يُشتقّ منها */
+  const [trk, setTrk] = useState<number[]>(() => natTrack(item?.data || {}));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const { save } = useItems(section, false);
@@ -4455,6 +4513,10 @@ function ItemForm({
     const data: Rec = { ...form };
     for (const f of fields) if (f.kind === "num") data[f.k] = numOf(data[f.k]);
     if (section === "sessions") data.stages = stages;
+    if (fields.some((f) => f.kind === "trk")) {
+      /* المصفوفة وحدها، وتُمحى المفاتيح المفردة القديمة */
+      Object.assign(data, natNoLegacy(data), { track: trk });
+    }
     // علامة صريحة أن الصف صار من إدخال الإدارة، فلا يكتب عليه
     // تحديثُ البيانات المبدئية عند إعادة تشغيل ملف SQL
     data.demo = false;
@@ -4478,7 +4540,30 @@ function ItemForm({
         </div>
         <div className="sx-form">
           {fields.map((f) =>
-            f.kind === "bool" ? (
+            f.kind === "trk" ? (
+              <div key={f.k} className="trk-form">
+                <span className="trk-h">{f.label}</span>
+                <div className="trk-row">
+                  {NAT_TRACK.map((n, i) => (
+                    <label key={n}>
+                      <span>{n}</span>
+                      <select
+                        value={trk[i]}
+                        onChange={(e) =>
+                          setTrk(trk.map((v, j) => (j === i ? Number(e.target.value) : v)))
+                        }
+                      >
+                        {TRACK_STATE.map((lab, v) => (
+                          <option key={lab} value={v}>
+                            {lab}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ) : f.kind === "bool" ? (
               <label key={f.k} className="ck">
                 <input
                   type="checkbox"
