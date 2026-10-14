@@ -138,6 +138,21 @@ const NAT_WHERE = ["لدى الجهة المالكة", "لدى اللجنة ال
    لكل مرحلة حالتها (لم يبدأ · قيد التنفيذ · مكتمل) كما في عرض الإدارة */
 const NAT_TRACK = ["استلام الوثيقة", "استلام نموذج الحصر", "المراجعة الفنية", "اعتماد نموذج الحصر"];
 const TRACK_STATE = ["لم يبدأ", "قيد التنفيذ", "مكتمل"];
+/** كم محطةً اكتملت من الأربع */
+function natDoneSteps(d: Rec): number {
+  return natTrack(d).filter((v) => v === 2).length;
+}
+/** مستوى الاستيفاء: الأربع كلها ⇒ مقبولة فنياً وخضراء · ثلاثٌ ⇒ صفراء
+    · ما دونها ⇒ حمراء. وكلّ ما لم يكتمل الأربع غيرُ مقبولٍ فنياً —
+    فالقبول يُشتقّ من المحطات لا يُكتب يدوياً */
+function natLevel(d: Rec): "ok" | "warn" | "bad" {
+  const n = natDoneSteps(d);
+  return n >= 4 ? "ok" : n === 3 ? "warn" : "bad";
+}
+function natTech(d: Rec): boolean {
+  return natDoneSteps(d) >= 4;
+}
+
 /** حالات المراحل الأربع — الافتراضي «لم يبدأ» ولا يُستنتج من غيره */
 function natTrack(d: Rec): number[] {
   const raw = Array.isArray(d.track) ? d.track : [];
@@ -1543,14 +1558,16 @@ function NatCard({
           <img className="lg" src={asset(`/logos/${logo}`)} alt="" loading="lazy" />
         )}
         <b>{txt(d.name)}</b>
-        <span className={`tg ${d.tech ? "ok" : "no"}`}>
-          {d.tech ? t("مقبولة فنياً", "Accepted") : t("غير مقبولة فنياً", "Not accepted")}
+        <span className={`tg ${natTech(d) ? "ok" : "no"}`}>
+          {natTech(d) ? t("مقبولة فنياً", "Accepted") : t("غير مقبولة فنياً", "Not accepted")}
         </span>
         <DelCard it={it} name={txt(d.name)} canEdit={canEdit} remove={remove} t={t} />
       </div>
       <div className="own">
-        {txt(d.owner) || "—"} · {NAT_STEPS[natStage(d) - 1]}
-        {txt(d.sector) ? ` · ${txt(d.sector)}` : ""}
+        {/* القطاع إلى جوار الجهة المالكة — وكان يقع بعد المرحلة
+            فيظهر في بعض البطاقات ويغيب في غيرها */}
+        {txt(d.owner) || "—"}
+        {txt(d.sector) ? ` · ${txt(d.sector)}` : ""} · {NAT_STEPS[natStage(d) - 1]}
       </div>
 
       <div className="bd">
@@ -1581,7 +1598,7 @@ function NatCard({
         </div>
       </div>
 
-      <div className="trk">
+      <div className={`trk lvl-${natLevel(d)}`}>
         {NAT_TRACK.map((n, i) => (
           <button
             key={n}
@@ -1814,7 +1831,12 @@ function NatImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => vo
         }
       }
 
-      if (!upd.size && !add.size) {
+      /* ما في المنصة وليس في الملف — يُحذف باختيارٍ صريح وحده، فالملف
+         قد يكون جزئياً ولا يصحّ أن يمحو ما لم يذكره */
+      const seenKeys = new Set([...upd.keys(), ...add.keys()]);
+      const gone = items.filter((it) => !seenKeys.has(natNorm(txt(it.data.name))));
+
+      if (!upd.size && !add.size && !gone.length) {
         setMsg(t("لم يتغيّر شيء — الملف مطابق لما في المنصة", "Nothing changed"));
         return;
       }
@@ -1826,13 +1848,27 @@ function NatImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => vo
       if (
         !confirm(
           t(
-            `سيُحدَّث ${upd.size} استراتيجية من الملف.\nلا يُحذف شيء، والخانة الفارغة تُبقي القيمة الحالية كما هي.${extra}\n\nمتابعة؟`,
+            `سيُحدَّث ${upd.size} استراتيجية من الملف.\nالخانة الفارغة تُبقي القيمة الحالية كما هي.${extra}\n\nمتابعة؟`,
             `Update ${upd.size} strategies?`,
           ),
         )
       ) {
         setMsg("");
         return;
+      }
+      let del: Item[] = [];
+      if (gone.length) {
+        del = confirm(
+          t(
+            `في المنصة ${gone.length} استراتيجية ليست في الملف:\n• ${gone
+              .slice(0, 8)
+              .map((x) => txt(x.data.name))
+              .join("\n• ")}${gone.length > 8 ? "\n• …" : ""}\n\nهل تُحذف لتطابق المنصةُ الملف؟\n(إلغاء = تبقى كما هي)`,
+            `Delete ${gone.length} strategies missing from the file?`,
+          ),
+        )
+          ? gone
+          : [];
       }
 
       const all = [...upd.values(), ...add.values()];
@@ -1848,9 +1884,20 @@ function NatImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => vo
           return;
         }
       }
+      for (const it of del) {
+        const r = await apiFetch(
+          `/api/items?section=natstrat&id=${encodeURIComponent(it.id)}`,
+          { method: "DELETE" },
+        );
+        if (!r.ok) {
+          setMsg(t("تعذّر حذف بعض الاستراتيجيات", "Some deletions failed"));
+          break;
+        }
+      }
       setMsg(
         t(
-          `تم تحديث ${upd.size} استراتيجية${add.size ? ` · وأُضيفت ${add.size}` : ""}`,
+          `تم تحديث ${upd.size} استراتيجية${add.size ? ` · وأُضيفت ${add.size}` : ""}` +
+            (del.length ? ` · وحُذفت ${del.length}` : ""),
           `Updated ${upd.size}`,
         ),
       );
@@ -2021,7 +2068,7 @@ function NationalDetail({
         </div>
         <div className="box">
           <div className="k">{t("مراحل المراجعة", "Review stages")}</div>
-          <div className="nat-track">
+          <div className={`nat-track lvl-${natLevel(d)}`}>
             {NAT_TRACK.map((n, i) => (
               <button
                 key={n}
@@ -2325,9 +2372,10 @@ export function StrategyBox({
        يُعتمد بعدُ فقائمة مؤشراته غير نهائية، فإدخاله في النسبة
        يخفضها بما لم يحن دوره */
     const appr = items.filter((x) => natStage(x.data) === NAT_STEPS.length);
-    const rep = appr.reduce((a, x) => a + numOf(x.data.kpisRep), 0);
-    const all = appr.reduce((a, x) => a + numOf(x.data.kpisTot), 0);
-    const pct = all ? Math.round((rep / all) * 100) : 0;
+    /* النسبة من الملف (`meas`) لا من عدد المؤشرات — والمعتمدة من
+       مجلس الوزراء وحدها هي المؤشر المسقط على الإدارة */
+    const all = appr.length;
+    const pct = all ? Math.round((appr.reduce((a, x) => a + numOf(x.data.meas), 0) / all) * 10) / 10 : 0;
     return box(
       <>
         <DonutCard slices={d.slices} total={d.total} unit={d.unit} size={DONUT} />
@@ -2338,7 +2386,7 @@ export function StrategyBox({
                وبلا شريط، كما في بطاقة المؤسسية */
             <>
               <b>{AR(pct)}٪</b>
-              <em>{`${AR(appr.length)} ${t("جهة", "entities")}`}</em>
+              <em>{`${AR(appr.length)} ${t("استراتيجية", "strategies")}`}</em>
             </>
           ) : (
             <em>{t("لا توجد استراتيجية معتمدة من مجلس الوزراء بعد", "None approved yet")}</em>
@@ -4299,7 +4347,7 @@ const FIELDS: Record<Exclude<SectionKey, "outputs" | "opplan">, Field[]> = {
     { k: "sector", label: "القطاع (المالي والاقتصادي · البنية التحتية · الخدمات الاجتماعية · الشؤون الحكومية)" },
     { k: "domain", label: "النطاق (التوطين · الحج · الفضاء…)" },
     { k: "stage", label: "حالة الاعتماد (1 إعداد · 2 مراجعة · 3 اللجنة · 4 مجلس الوزراء)", kind: "num" },
-    { k: "tech", label: "مقبولة فنياً؟", kind: "bool" },
+    /* «مقبولة فنياً» لا تُكتب: تُشتقّ من اكتمال المحطات الأربع */
     { k: "meas", label: "قابلية القياس ٪", kind: "num" },
     { k: "note", label: "أبرز الملاحظات", kind: "area" },
     { k: "period", label: "فترة الاستراتيجية" },
@@ -4525,14 +4573,16 @@ export function sectionKpi(section: SectionKey, items: Item[]): SecKpi {
   }
 
   if (section === "natstrat") {
+    /* **المعتمدة من مجلس الوزراء وحدها**، والنسبة هي المكتوبة في
+       ملف المتابعة (`meas`) لا المحسوبة من عدد المؤشرات — فالملف
+       هو المرجع */
     const appr = items.filter((it) => natStage(it.data) === NAT_STEPS.length);
-    const rep = appr.reduce((a, x) => a + numOf(x.data.kpisRep), 0);
-    const all = appr.reduce((a, x) => a + numOf(x.data.kpisTot), 0);
-    if (!all) return none;
+    if (!appr.length) return none;
+    const avg = appr.reduce((a, x) => a + numOf(x.data.meas), 0) / appr.length;
     return {
-      pct: Math.round((rep / all) * 100),
+      pct: Math.round(avg * 10) / 10,
       count: null,
-      note: `${AR(rep)} مؤشراً ممثَّلاً من ${AR(all)} في ${AR(appr.length)} استراتيجية معتمدة من مجلس الوزراء`,
+      note: `متوسط قابلية القياس في ${AR(appr.length)} استراتيجية معتمدة من مجلس الوزراء`,
     };
   }
 

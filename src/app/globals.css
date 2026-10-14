@@ -10532,6 +10532,11 @@ input.cell-date {
 .stg-c.s1 i { background: var(--warn); box-shadow: 0 0 0 1px var(--warn); }
 .stg-c.s2 i { background: var(--g-700); box-shadow: 0 0 0 1px var(--g-700); }
 .stg-c.ed:hover i { box-shadow: 0 0 0 4px rgba(1, 107, 95, 0.16); }
+/* لون المحطات المكتملة يتبع **مستوى الاستيفاء كله** لا كلَّ محطةٍ
+   وحدها: الأربع ⇒ أخضر ومقبولة فنياً · ثلاثٌ ⇒ أصفر · ما دونها ⇒
+   أحمر — وكلّها غير مقبولةٍ فنياً ما لم تكتمل الأربع */
+.lvl-warn .stg-c.s2 i { background: #e0a526; box-shadow: 0 0 0 1px #e0a526; }
+.lvl-bad .stg-c.s2 i { background: #c0392b; box-shadow: 0 0 0 1px #c0392b; }
 .stg-c span { display: block; font-size: 10.5px; color: var(--muted); line-height: 1.5; }
 .stg-c em {
   display: block;
