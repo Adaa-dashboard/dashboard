@@ -1616,7 +1616,15 @@ function natVal(k: string, raw: string): unknown {
   if (!v) return undefined;
   if (NAT_NUM_KEYS.has(k)) {
     const n = Number(v.replace(/[٪%,\s]/g, ""));
-    return Number.isFinite(n) ? n : undefined;
+    if (!Number.isFinite(n)) return undefined;
+    /* **خلية النسبة في إكسل كسرٌ لا عدد**: «100%» تُقرأ 1 و«25%»
+       تُقرأ 0.25 حين تكون الخلية منسّقةً نسبةً. فكان القياس 100%
+       يُحفظ 1 ويُعرض «١٪». فما كان ≤ 1 بلا علامة ٪ يُضرب في مئة،
+       وما جاء مكتوباً «100%» يبقى كما هو */
+    if (k === "meas" && !/[٪%]/.test(v) && n > 0 && n <= 1) {
+      return Math.round(n * 1000) / 10;
+    }
+    return n;
   }
   if (k === "tech") return !/^(غير|لا|no|false|0)/i.test(natNorm(v));
   if (k === "stage") {
