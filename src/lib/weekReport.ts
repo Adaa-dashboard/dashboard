@@ -473,11 +473,13 @@ function upsIn(
   return { count, named };
 }
 
-/** أسماء الاستراتيجيات المعتمدة — مجلس الوزراء أولاً ثم اللجنة،
-    ولون كلٍّ لون شريحتها في الحلقة */
+/** أسماء الاستراتيجيات المعتمدة من مجلس الوزراء — بلون شريحتها
+    في الحلقة */
 function approvedNames(items: ItemLite[], slices: Slice[]): Up[] {
   const color = new Map(slices.map((x) => [x.label, x.color]));
-  const order = [NAT_STEPS[3], NAT_STEPS[2]];
+  /* المعتمدة من مجلس الوزراء وحدها — وهي الأهمّ، وذكرُ المعتمدة
+     من اللجنة معها كان يطيل القائمة بما ليس مقصوداً */
+  const order = [NAT_STEPS[3]];
   const out: Up[] = [];
   for (const lab of order) {
     for (const it of items) {

@@ -2861,24 +2861,25 @@ textarea.wk-updin:focus {
   margin: 9px 0 0;
   padding: 8px 0 0;
   border-top: 1px solid var(--line2);
-  /* عمودان دائماً — البطاقة في التقرير نصفُ عرض الورقة، وقياسٌ
-     أدنى للعمود كان يُسقطها إلى عمودٍ واحد على الشاشات المتوسطة */
+  /* **عمودٌ واحد**: الجهة سطرٌ واحد لا سطران — وعمودان كانا
+     يضيّقان السطر فينكسر اسم الجهة الطويل على سطرٍ ثانٍ */
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0 12px;
+  grid-template-columns: 1fr;
+  gap: 0;
 }
-/* الاسم كاملاً: القصُّ بالنقاط كان يُخفي آخر اسم الجهة، والاسم
-   الناقص لا يُعرَف صاحبُه. يلتفّ على سطرٍ ثانٍ عند الحاجة
-   والنقطة تبقى في أعلى السطر الأول */
+/* سطرٌ واحد لكل جهة — العمود بعرض البطاقة كلها فيسع الاسم كاملاً،
+   والقصُّ بالنقاط لا يقع إلا على اسمٍ طويلٍ طولاً غير معهود */
 .wk-ups li {
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .wk-ups li.more {
   grid-column: 1 / -1;
 }
 .wk-ups li {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 6px;
   font-size: 10px;
   color: var(--text);
@@ -2891,8 +2892,6 @@ textarea.wk-updin:focus {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  /* النقطة في منتصف السطر الأول مهما التفّ الاسم */
-  margin-top: 5px;
 }
 .wk-ups li.more {
   color: var(--muted);
