@@ -1584,6 +1584,8 @@ function NatCard({
 const natNorm = (v: string) =>
   String(v || "")
     .replace(/[\n\r▼]/g, " ")
+    /* التشكيل والتطويل يكسران المطابقة: «الممثّلة» لا تحوي «ممثل» */
+    .replace(/[\u064B-\u0652\u0670\u0640]/g, "")
     .replace(/[أإآ]/g, "ا")
     .replace(/ة/g, "ه")
     .replace(/ى/g, "ي")
@@ -1606,10 +1608,13 @@ function natKeyOf(head: string): string {
     if (h.includes("فني") || h.includes("مراجع")) return "track2";
     if (h.includes("ملاحظ")) return "track3";
   }
-  if (has("مؤشر", "ممثل")) return "kpisRep";
-  if (h.includes("مؤشر")) return "kpisTot";
-  if (has("مبادر", "ممثل")) return "initRep";
-  if (h.includes("مبادر")) return "initTot";
+  /* المنجز من المؤشرات والمبادرات يُسمّى في الملفات: «الممثلة» أو
+     «المعتمدة» أو «المقبولة»، وما عداه إجمالي. وكان «عدد المبادرات
+     المعتمدة» يقع في «إجمالي المبادرات» فيُهمَل (العمود الأول يفوز)
+     فيبقى المنجز صفراً */
+  const isRep = h.includes("ممثل") || h.includes("معتمد") || h.includes("مقبول") || h.includes("منجز");
+  if (h.includes("مؤشر")) return isRep ? "kpisRep" : "kpisTot";
+  if (h.includes("مبادر")) return isRep ? "initRep" : "initTot";
   if (h.includes("قابلي")) return "meas";
   if (h.includes("فتر")) return "period";
   if (has("تاريخ", "اعتماد")) return "approvedAt";
