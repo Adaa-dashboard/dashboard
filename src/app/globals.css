@@ -2612,6 +2612,11 @@ table.matrix thead th {
 .wk-sts b.mute {
   color: var(--muted);
 }
+/* «على المسار» و«مكتمل» بالأخضر رقماً وأيقونةً — الرقم كان
+   بلون الحبر فلا يُفرَّق عن «عدد التكاليف» */
+.wk-sts b.ok {
+  color: var(--g-700);
+}
 .wk-sts span {
   display: block;
   font-size: 10.5px;
@@ -2624,6 +2629,18 @@ table.matrix thead th {
   width: 100%;
   border-collapse: collapse;
   margin-top: 10px;
+  /* أعرضٌ ثابتة بالنسبة: اسم التكليف كان يبتلع عرض الجدول
+     فينزل التحديث في عمودٍ ضيّقٍ طويل */
+  table-layout: fixed;
+}
+.wk-tb th.nm {
+  width: 32%;
+}
+.wk-tb th.upd {
+  width: 44%;
+}
+.wk-tb th.sup {
+  width: 24%;
 }
 .wk-tb th {
   text-align: start;
@@ -2755,6 +2772,12 @@ textarea.wk-updin {
   line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  /* ثلاثة أسطر في الجدول مهما طال التحديث — وعند الكتابة يتمدّد
+     الحقل فيظهر الكلام كله */
+  max-height: 4.8em;
+}
+textarea.wk-updin:focus {
+  max-height: none;
 }
 .wk-supin:hover {
   border-bottom-color: var(--g-400);
@@ -2844,18 +2867,18 @@ textarea.wk-updin {
   grid-template-columns: 1fr 1fr;
   gap: 0 12px;
 }
-/* سطرٌ واحد لكل اسم: الالتفاف كان يفكّ انتظام العمودين */
+/* الاسم كاملاً: القصُّ بالنقاط كان يُخفي آخر اسم الجهة، والاسم
+   الناقص لا يُعرَف صاحبُه. يلتفّ على سطرٍ ثانٍ عند الحاجة
+   والنقطة تبقى في أعلى السطر الأول */
 .wk-ups li {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .wk-ups li.more {
   grid-column: 1 / -1;
 }
 .wk-ups li {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   font-size: 10px;
   color: var(--text);
@@ -2868,6 +2891,8 @@ textarea.wk-updin {
   width: 5px;
   height: 5px;
   border-radius: 50%;
+  /* النقطة في منتصف السطر الأول مهما التفّ الاسم */
+  margin-top: 5px;
 }
 .wk-ups li.more {
   color: var(--muted);

@@ -153,13 +153,13 @@ function DomCard({
       {/* ما تقدّم هذا الأسبوع — نقطةٌ بلون مرحلته الجديدة ثم اسمه */}
       {d.ups && d.ups.length > 0 && (
         <ul className="wk-ups">
-          {d.ups.slice(0, 8).map((l) => (
+          {d.ups.slice(0, 12).map((l) => (
             <li key={l.name} title={l.name}>
               <i style={{ background: l.color }} />
               {l.name}
             </li>
           ))}
-          {d.ups.length > 8 && <li className="more">{`و${d.ups.length - 8} غيرها`}</li>}
+          {d.ups.length > 12 && <li className="more">{`و${d.ups.length - 12} غيرها`}</li>}
         </ul>
       )}
 
@@ -170,11 +170,11 @@ function DomCard({
           <thead>
             <tr>
               {onPick && <th className="pick" />}
-              <th>التكليف</th>
+              <th className="nm">التكليف</th>
               {/* آخر ما كُتب على التكليف لا حالته المجرّدة */}
-              <th>التحديث</th>
+              <th className="upd">التحديث</th>
               {sup && (
-                <th>
+                <th className="sup">
                   الدعم المطلوب
                   {/* × صغيرة تُخفي العمود كله حين لا يُحتاج */}
                   {onPick && (
@@ -202,10 +202,12 @@ function DomCard({
                 const sk = `sup:${r.id}`;
                 const v = draft[sk] ?? texts[sk] ?? "";
                 /* التحديث: ما كُتب هنا يغلب المنقولَ من صفحة
-                   التكاليف، وإفراغُ الخانة يُرجع المنقول */
+                   التكاليف. **وجودُ المفتاح** هو الاستثناء لا امتلاؤه،
+                   فمسحُ الخانة يمسحها فعلاً ولا يُرجع المنقول */
                 const uk = `upd:${r.id}`;
+                const own = uk in draft || uk in texts;
                 const uv = draft[uk] ?? texts[uk] ?? "";
-                const ushow = uv.trim() ? uv : r.state;
+                const ushow = own ? uv : r.state;
                 return (
                   <tr key={r.id} className={keep ? "" : "off"}>
                     {onPick && (
@@ -218,8 +220,8 @@ function DomCard({
                         />
                       </td>
                     )}
-                    <td>{r.name}</td>
-                    <td className={`upd ${uv.trim() ? "" : r.tone}`}>
+                    <td className="nm">{r.name}</td>
+                    <td className={`upd ${own ? "" : r.tone}`}>
                       {onTaskText ? (
                         <>
                           <textarea
@@ -233,11 +235,12 @@ function DomCard({
                               setDraft((x) => ({ ...x, [uk]: e.target.value }));
                             }}
                             onBlur={(e) => {
-                              /* ما لم يتغيّر عن المنقول لا يُحفظ
-                                 استثناءً: الخانة تبقى تابعةً لصفحة
-                                 التكاليف فتتحدّث معها */
+                              /* ما لم يُمسّ أصلاً لا يُحفظ استثناءً:
+                                 الخانة تبقى تابعةً لصفحة التكاليف
+                                 فتتحدّث معها */
                               const nv = e.target.value.trim();
-                              onTaskText(uk, nv === (r.state || "").trim() ? "" : nv);
+                              if (!own && nv === (r.state || "").trim()) return;
+                              onTaskText(uk, nv);
                             }}
                           />
                           {/* نصّاً لا حقلاً في الملف المصدَّر */}

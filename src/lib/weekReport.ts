@@ -251,6 +251,9 @@ export function instDonut(items: ItemLite[], startedOnly = false) {
 function taskDom(tasks: TaskLite[], a: string, b: string, upd: number): Dom | null {
   const rows = tasks.filter((x) => txt(x.kind) === "assignment");
   const done = rows.filter((x) => inRange(txt(x.completedAt), a, b));
+  /* المعلَّق حالةٌ قائمة بنفسها — لها مربّعها، فلا تختفي من العدّ
+     كما كانت (٢ + ٠ + ٠ لا تساوي ٣) */
+  const held = rows.filter((x) => txt(x.state) === "hold");
   const open = rows.filter((x) => txt(x.state) !== "done" && txt(x.state) !== "hold");
   const late = open.filter((x) => {
     const d = day(txt(x.dueDate));
@@ -308,6 +311,7 @@ function taskDom(tasks: TaskLite[], a: string, b: string, upd: number): Dom | nu
   for (const x of done) push(x, "مكتمل", "ok");
   for (const x of fresh) push(x, "ورد هذا الأسبوع", "mute");
   for (const x of doing) push(x, "قيد العمل", "mute");
+  for (const x of held) push(x, "معلَّق", "warn");
   return {
     k: "task",
     ...DOM_META.task,
@@ -315,11 +319,14 @@ function taskDom(tasks: TaskLite[], a: string, b: string, upd: number): Dom | nu
     /* الشريط: كم تكليفاً لدينا، ثم أين هي منه — بطلب المستخدمة.
        و«على المسار» تجمع الوارد حديثاً وما هو قيد العمل، فالمربّع
        الأول صار عدداً كلياً لا حالة */
+    /* المربّعات الأربعة تستوعب كل تكليف مرةً واحدة:
+       العدد = على المسار + معلَّق + مكتمل. والمتأخر يبقى ظاهراً
+       في عمود «التحديث» بلونه حين لم يُكتب تحديثٌ بعد */
     stats: [
       { n: rows.length, label: "عدد التكاليف", tone: "mute", icon: "clipboard" },
-      /* سهم دائري لا ترس: `gear` في المكتبة دائرةٌ بأشعة تُقرأ شمساً */
-      { n: fresh.length + doing.length, label: "على المسار", tone: "ok", icon: "cycle" },
-      { n: late.length, label: "متأخر", tone: "warn", icon: "clock" },
+      /* خطٌّ صاعد: «على المسار» حالٌ لا دورة */
+      { n: open.length, label: "على المسار", tone: "ok", icon: "trend" },
+      { n: held.length, label: "معلَّق", tone: "warn", icon: "hourglass" },
       { n: done.length, label: "مكتمل", tone: "ok", icon: "check" },
     ],
     rows: tbl.length ? tbl : undefined,
@@ -418,7 +425,8 @@ export function cxDonut(items: ItemLite[]) {
   return {
     /* تجاوُز المستهدف لا يُخفى: الوسط يصير العدد المحقَّق نفسه */
     total: Math.max(target, rep),
-    unit: rep >= target ? "جهاز" : "المستهدف",
+    /* الوحدة «جهاز» دائماً: الرقم في الوسط عددُ أجهزة لا اسمُ هدف */
+    unit: "جهاز",
     slices: [
       { label: "صدر له تقرير", n: rep, color: RAMP[4] },
       { label: "في المسار", n: prog, color: RAMP[2] },
@@ -463,6 +471,22 @@ function upsIn(
     });
   }
   return { count, named };
+}
+
+/** أسماء الاستراتيجيات المعتمدة — مجلس الوزراء أولاً ثم اللجنة،
+    ولون كلٍّ لون شريحتها في الحلقة */
+function approvedNames(items: ItemLite[], slices: Slice[]): Up[] {
+  const color = new Map(slices.map((x) => [x.label, x.color]));
+  const order = [NAT_STEPS[3], NAT_STEPS[2]];
+  const out: Up[] = [];
+  for (const lab of order) {
+    for (const it of items) {
+      if (natLabel(it.data) !== lab) continue;
+      const nm = txt(it.data.name) || txt(it.data.entity);
+      if (nm) out.push({ name: nm, label: lab, color: color.get(lab) || "#9aa6a2" });
+    }
+  }
+  return out;
 }
 
 /** الحلقة نفسها، وقد وُسمت شرائحها بما زاد فيها هذا الأسبوع */
@@ -528,8 +552,10 @@ export function buildWeekReport(args: {
       ...DOM_META.nat,
       updates: nat.length || natT.length,
       donut: withUps(dn, up.count),
-      ups: up.named,
-      /* الأسماء المذكورة: المعتمدة من اللجنة ومن مجلس الوزراء وحدها */
+      /* **كل** المعتمدة تُذكر بأسمائها لا ما تحرّك منها هذا الأسبوع
+         وحده: المعتمدة من مجلس الوزراء أولاً ثم المعتمدة من اللجنة —
+         وهي أهمّ ما في التقرير، فلا تغيب لأنها لم تتغيّر */
+      ups: approvedNames(sec("natstrat"), dn.slices),
       upsOnly: true,
       lines,
     });
