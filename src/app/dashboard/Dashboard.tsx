@@ -1463,8 +1463,9 @@ function Overview({
             indicators={refData.indicators.map((i) => ({ id: i.id, name: i.name }))}
             t={t}
             kind="assignment"
+            /* كل التكاليف لا بنود الشهر وحدها — بطلب المستخدمة.
+               و«عرض الكل» يفتح ما زاد على ثلاثة في كل عمود */
             limit={3}
-            monthOnly
             onlyMine={false}
             focusId={asgFocus}
             onFocusDone={() => setAsgFocus(null)}
