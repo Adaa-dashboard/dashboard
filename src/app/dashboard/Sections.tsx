@@ -699,7 +699,7 @@ function Toolbar({
   /** زرّ رفع الملف — يقف بجانب زرّ التنزيل لا في سطرٍ فوقه،
       فالعملان على الملف نفسه وموضعهما واحد.
       والتسمية بطلب صاحبة المنصة: **السهم هو الذي يقول الاتجاه** —
-      «تنزيل إكسل ⬇» يأخذ الملف، و«تصدير إكسل ⬆» يردّه إلى المنصة. */
+      «تنزيل إكسل ⬇» يأخذ الملف، و«رفع إكسل ⬆» يردّه إلى المنصة. */
   upload?: ReactNode;
   /** زرّ «إضافة» — في صدر الشريط */
   add?: ReactNode;
@@ -1252,7 +1252,7 @@ function SessImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => v
   return (
     <span className="seedb">
       <button className="btn btn-sm" onClick={() => ref.current?.click()}>
-        <IconUp size={15} /> {t("تصدير إكسل", "Export Excel")}
+        <IconUp size={15} /> {t("رفع إكسل", "Upload Excel")}
       </button>
       <input ref={ref} type="file" accept=".xlsx,.pptx" hidden onChange={pick} />
       {msg && <em>{msg}</em>}
@@ -1863,7 +1863,7 @@ function NatImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () => vo
   return (
     <span className="seedb">
       <button className="btn btn-sm" onClick={() => ref.current?.click()}>
-        <IconUp size={15} /> {t("تصدير إكسل", "Export Excel")}
+        <IconUp size={15} /> {t("رفع إكسل", "Upload Excel")}
       </button>
       <input ref={ref} type="file" accept=".xlsx,.pptx" hidden onChange={pick} />
       {msg && <em>{msg}</em>}
@@ -3093,7 +3093,7 @@ function CxImport({ t, onDone }: { t: T; onDone: () => void }) {
   return (
     <span className="seedb">
       <button className="btn btn-sm" onClick={() => ref.current?.click()}>
-        <IconUp size={15} /> {t("تصدير إكسل", "Export Excel")}
+        <IconUp size={15} /> {t("رفع إكسل", "Upload Excel")}
       </button>
       <input ref={ref} type="file" accept=".xlsx" hidden onChange={pick} />
       {msg && <em>{msg}</em>}
@@ -3858,7 +3858,7 @@ function NotesQPage({ t, canEdit, add, gear }: SecPageProps) {
       {!items.length ? (
         <Empty
           title={t("لا توجد بيانات بعد", "Nothing yet")}
-          note={t("تُرفع من «تصدير إكسل» أو تُضاف من زر «إضافة».", "Upload the file or add rows.")}
+          note={t("تُرفع من «رفع إكسل» أو تُضاف من زر «إضافة».", "Upload the file or add rows.")}
         />
       ) : (
         <>
@@ -4136,7 +4136,7 @@ function NotesQImport({ items, t, onDone }: { items: Item[]; t: T; onDone: () =>
   return (
     <>
       <button className="btn btn-sm" onClick={() => ref.current?.click()}>
-        <IconUp size={15} /> {t("تصدير إكسل", "Export Excel")}
+        <IconUp size={15} /> {t("رفع إكسل", "Upload Excel")}
       </button>
       <input ref={ref} type="file" accept=".xlsx,.xls" hidden onChange={pick} />
       {msg && <span className="sx-msg">{msg}</span>}

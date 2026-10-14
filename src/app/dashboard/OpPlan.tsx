@@ -887,7 +887,7 @@ function OpXlsx({
       {canEdit && (
         <>
           <button className="btn btn-sm" onClick={() => file.current?.click()}>
-            <IconUp size={15} /> {t("تصدير إكسل", "Export Excel")}
+            <IconUp size={15} /> {t("رفع إكسل", "Upload Excel")}
           </button>
           <input
             ref={file}
