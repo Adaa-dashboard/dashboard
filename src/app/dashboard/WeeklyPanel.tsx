@@ -180,12 +180,12 @@ export default function WeeklyPanel({
     [prefs, week],
   );
 
-  /* دعم كل تكليف — نصٌّ خاصٌّ به يُكتب في خلّيته، ويُحفظ لهذا
-     الأسبوع. غير «الدعم المطلوب» العام في آخر التقرير، وذاك
-     يُكتب من ⚙️ كما تُكتب الخطوات القادمة والإنجازات */
-  const saveTaskSup = useCallback(
-    async (id: string, text: string) => {
-      const key = `sup:${id}`;
+  /* خانتا «التحديث» و«الدعم المطلوب» في جدول التكاليف — تُكتبان
+     في مكانهما وتُحفظان لهذا الأسبوع وحده. التحديث المكتوب هنا
+     يغلب المنقولَ من صفحة التكاليف، وإفراغُه يُرجع المنقول.
+     و«الدعم المطلوب» العام في آخر التقرير شيءٌ آخر يُكتب من ⚙️ */
+  const saveTaskText = useCallback(
+    async (key: string, text: string) => {
       if ((prefs.texts?.[key] || "") === text) return;
       const next: WeeklyPrefs = { ...prefs, texts: { ...prefs.texts, [key]: text } };
       setOver(next);
@@ -196,7 +196,13 @@ export default function WeeklyPanel({
       })
         .then((x) => x.json())
         .catch(() => ({ error: "تعذّر الحفظ" }));
-      setMsg(r?.error ? String(r.error) : t("حُفظ الدعم المطلوب ✓", "Saved ✓"));
+      setMsg(
+        r?.error
+          ? String(r.error)
+          : key.startsWith("upd:")
+            ? t("حُفظ التحديث ✓", "Saved ✓")
+            : t("حُفظ الدعم المطلوب ✓", "Saved ✓"),
+      );
     },
     [prefs, week, t],
   );
@@ -304,7 +310,7 @@ export default function WeeklyPanel({
           report={report}
           prefs={prefs}
           onPick={canEdit ? pickRow : undefined}
-          onTaskSup={canEdit ? saveTaskSup : undefined}
+          onTaskText={canEdit ? saveTaskText : undefined}
         />
       )}
 

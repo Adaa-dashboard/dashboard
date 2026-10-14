@@ -2667,17 +2667,20 @@ table.matrix thead th {
 .wk-tb td.sup {
   color: var(--muted);
 }
-/* الدعم نصّاً لا حقلاً عند التصوير والطباعة: الحقل يُظهر ما يسعه
-   سطرٌ واحد ويبدأ من حيث وقف المؤشر، فيخرج الكلام مقطوعاً */
-.wk-tb td.sup .sup-txt {
+/* الدعم والتحديث نصّاً لا حقلاً عند التصوير والطباعة: الحقل يُظهر
+   ما يسعه سطرٌ واحد ويبدأ من حيث وقف المؤشر، فيخرج الكلام مقطوعاً */
+.wk-tb td.sup .sup-txt,
+.wk-tb td.upd .sup-txt {
   display: none;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.wk-shot .wk-tb td.sup .wk-supin {
+.wk-shot .wk-tb td.sup .wk-supin,
+.wk-shot .wk-tb td.upd .wk-supin {
   display: none;
 }
-.wk-shot .wk-tb td.sup .sup-txt {
+.wk-shot .wk-tb td.sup .sup-txt,
+.wk-shot .wk-tb td.upd .sup-txt {
   display: block;
 }
 /* × إخفاء عمود «الدعم المطلوب»، وزرّ إعادته حين يُخفى */
@@ -2742,6 +2745,16 @@ table.matrix thead th {
 .wk-supin::placeholder {
   color: var(--muted);
   opacity: 0.6;
+}
+/* خانة التحديث حقلٌ متعدّد الأسطر يعلو بقدر ما فيه (`grow`)،
+   فالتحديث المكتوب نقاطاً يُقرأ كاملاً ويُحرَّر في مكانه */
+textarea.wk-updin {
+  display: block;
+  resize: none;
+  overflow: hidden;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .wk-supin:hover {
   border-bottom-color: var(--g-400);

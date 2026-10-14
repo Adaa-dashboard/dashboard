@@ -78,24 +78,34 @@ function Ring({ pct }: { pct: number }) {
   );
 }
 
+/** الحقل يعلو بقدر سطوره: التحديث يُكتب نقاطاً في أسطر، و`rows=1`
+    وحدها تُخفي ما بعد السطر الأول */
+function grow(el: HTMLTextAreaElement | null) {
+  if (!el) return;
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight}px`;
+}
+
 /* ---------- بطاقة مجال ---------- */
 function DomCard({
   d,
   on,
   texts,
   onPick,
-  onTaskSup,
+  onTaskText,
 }: {
   d: Dom;
   /** مفاتيح الإظهار — `tsk:<id>` يختار تكليفاً */
   on: Record<string, boolean>;
-  /** النصوص المحفوظة — `sup:<id>` دعمُ تكليفٍ بعينه */
+  /** النصوص المحفوظة — `sup:<id>` دعمُ تكليفٍ بعينه،
+      و`upd:<id>` تحديثُه إن كُتب هنا بدل المنقول من صفحة التكاليف */
   texts: Record<string, string>;
   /** يُمرَّر لمن يملك التحرير — فيُختار ما يظهر من التكاليف
       والمشاريع. المفتاح كامل: `tsk:<id>` أو `prj:<name>` */
   onPick?: (key: string, keep: boolean) => void;
-  /** دعم التكليف يُكتب في خلّيته مباشرة */
-  onTaskSup?: (id: string, text: string) => void;
+  /** خانتا «التحديث» و«الدعم المطلوب» تُكتبان في مكانهما —
+      المفتاح كامل: `upd:<id>` أو `sup:<id>` */
+  onTaskText?: (key: string, text: string) => void;
 }) {
   /* ما يُكتب الآن — قبل أن يصل الحفظ ويعود في `texts` */
   const [draft, setDraft] = useState<Record<string, string>>({});
@@ -189,7 +199,13 @@ function DomCard({
                 const keep = on[`tsk:${r.id}`] !== false;
                 /* لكل تكليف دعمه الخاص — غير «الدعم المطلوب» العام
                    في آخر التقرير */
-                const v = draft[r.id] ?? texts[`sup:${r.id}`] ?? "";
+                const sk = `sup:${r.id}`;
+                const v = draft[sk] ?? texts[sk] ?? "";
+                /* التحديث: ما كُتب هنا يغلب المنقولَ من صفحة
+                   التكاليف، وإفراغُ الخانة يُرجع المنقول */
+                const uk = `upd:${r.id}`;
+                const uv = draft[uk] ?? texts[uk] ?? "";
+                const ushow = uv.trim() ? uv : r.state;
                 return (
                   <tr key={r.id} className={keep ? "" : "off"}>
                     {onPick && (
@@ -203,18 +219,45 @@ function DomCard({
                       </td>
                     )}
                     <td>{r.name}</td>
-                    <td className={r.tone}>{r.state}</td>
+                    <td className={`upd ${uv.trim() ? "" : r.tone}`}>
+                      {onTaskText ? (
+                        <>
+                          <textarea
+                            className="wk-supin wk-updin"
+                            rows={1}
+                            ref={grow}
+                            value={ushow}
+                            placeholder="اكتب التحديث…"
+                            onChange={(e) => {
+                              grow(e.target);
+                              setDraft((x) => ({ ...x, [uk]: e.target.value }));
+                            }}
+                            onBlur={(e) => {
+                              /* ما لم يتغيّر عن المنقول لا يُحفظ
+                                 استثناءً: الخانة تبقى تابعةً لصفحة
+                                 التكاليف فتتحدّث معها */
+                              const nv = e.target.value.trim();
+                              onTaskText(uk, nv === (r.state || "").trim() ? "" : nv);
+                            }}
+                          />
+                          {/* نصّاً لا حقلاً في الملف المصدَّر */}
+                          <span className="sup-txt">{ushow || "—"}</span>
+                        </>
+                      ) : (
+                        ushow
+                      )}
+                    </td>
                     {!sup && onPick && <td className="colback" />}
                     {sup && (
                     <td className="sup">
-                      {onTaskSup ? (
+                      {onTaskText ? (
                         <>
                           <input
                             className="wk-supin"
                             value={v}
                             placeholder="اكتب الدعم المطلوب…"
-                            onChange={(e) => setDraft((x) => ({ ...x, [r.id]: e.target.value }))}
-                            onBlur={(e) => onTaskSup(r.id, e.target.value.trim())}
+                            onChange={(e) => setDraft((x) => ({ ...x, [sk]: e.target.value }))}
+                            onBlur={(e) => onTaskText(sk, e.target.value.trim())}
                             onKeyDown={(e) => {
                               if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                             }}
@@ -301,14 +344,15 @@ export default function WeeklyReportView({
   report,
   prefs,
   onPick,
-  onTaskSup,
+  onTaskText,
 }: {
   report: WeekReport;
   prefs: WeeklyPrefs;
   /** اختيار ما يظهر من التكاليف والمشاريع — لمن يملك التحرير */
   onPick?: (key: string, keep: boolean) => void;
-  /** دعم كل تكليف يُكتب في جدوله مباشرة */
-  onTaskSup?: (id: string, text: string) => void;
+  /** خانتا «التحديث» و«الدعم المطلوب» تُكتبان في جدول التكاليف
+      مباشرة — المفتاح `upd:<id>` أو `sup:<id>` */
+  onTaskText?: (key: string, text: string) => void;
 }) {
   const { dir, band, dept } = prefs.layout;
   const r = report;
@@ -380,7 +424,7 @@ export default function WeeklyReportView({
                 on={prefs.on || {}}
                 texts={prefs.texts || {}}
                 onPick={onPick}
-                onTaskSup={onTaskSup}
+                onTaskText={onTaskText}
               />
             ))}
           </div>
