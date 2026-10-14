@@ -97,6 +97,10 @@ export type Dom = {
   donut?: { total: number; unit: string; slices: Slice[]; base?: number };
   /** ما تقدّم هذا الأسبوع: الاسم ولون مرحلته — تحت الحلقة */
   ups?: Up[];
+  /** لا تُذكر أسماءٌ غير `ups`: المجال اختير له أن يُسمّي مراحلَ
+      بعينها، فسطرُ «أبرزها» أو قائمةُ ما تحرّك يُدخلان أسماءً من
+      مراحلَ أخرى — وهي ما لا يُراد ذكره */
+  upsOnly?: boolean;
   stats?: Stat[];
   lines?: Line[];
   bars?: Bar[];
@@ -525,6 +529,8 @@ export function buildWeekReport(args: {
       updates: nat.length || natT.length,
       donut: withUps(dn, up.count),
       ups: up.named,
+      /* الأسماء المذكورة: المعتمدة من اللجنة ومن مجلس الوزراء وحدها */
+      upsOnly: true,
       lines,
     });
   }
@@ -543,6 +549,8 @@ export function buildWeekReport(args: {
       updates: inst.length || instT.length,
       donut: withUps(dn, up.count),
       ups: up.named,
+      /* المؤسسية كذلك: مَن فُعِّل قياسها وحدها تُذكر بالاسم */
+      upsOnly: true,
       lines,
     });
   }

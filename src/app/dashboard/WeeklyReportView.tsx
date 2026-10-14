@@ -269,7 +269,10 @@ function DomCard({
         </div>
       )}
 
-      {d.ups && d.ups.length > 0 ? null : d.note ? (
+      {/* `upsOnly` ⇒ لا أسماءَ إلا المرحلة المطلوبة: سطر «أبرزها»
+          وقائمة ما تحرّك كانا يظهران حين لا يتقدّم شيءٌ في تلك
+          المرحلة، فيُذكر اسمُ استراتيجيةٍ لم تُعتمد بعد */}
+      {(d.ups && d.ups.length > 0) || d.upsOnly ? null : d.note ? (
         <div className="wk-note2">
           <b>أبرزها:</b> {d.note}
         </div>
