@@ -473,18 +473,22 @@ function upsIn(
   return { count, named };
 }
 
-/** أسماء الاستراتيجيات المعتمدة من مجلس الوزراء — بلون شريحتها
-    في الحلقة */
-function approvedNames(items: ItemLite[], slices: Slice[]): Up[] {
+/** أسماء **كل** مَن بلغ المرحلة المطلوبة — لا ما تحرّك منها هذا
+    الأسبوع وحده: الجهة التي فُعِّل قياسها الأسبوع الماضي لا تغيب
+    من تقرير هذا الأسبوع. ولون كلٍّ لون شريحتها في الحلقة. */
+function stageNames(
+  items: ItemLite[],
+  label: (d: Rec) => string,
+  slices: Slice[],
+  /** المراحل المطلوبة بترتيب ذكرها */
+  only: string[],
+): Up[] {
   const color = new Map(slices.map((x) => [x.label, x.color]));
-  /* المعتمدة من مجلس الوزراء وحدها — وهي الأهمّ، وذكرُ المعتمدة
-     من اللجنة معها كان يطيل القائمة بما ليس مقصوداً */
-  const order = [NAT_STEPS[3]];
   const out: Up[] = [];
-  for (const lab of order) {
+  for (const lab of only) {
     for (const it of items) {
-      if (natLabel(it.data) !== lab) continue;
-      const nm = txt(it.data.name) || txt(it.data.entity);
+      if (label(it.data) !== lab) continue;
+      const nm = txt(it.data.name) || txt(it.data.entity) || txt(it.data.owner);
       if (nm) out.push({ name: nm, label: lab, color: color.get(lab) || "#9aa6a2" });
     }
   }
@@ -557,7 +561,7 @@ export function buildWeekReport(args: {
       /* **كل** المعتمدة تُذكر بأسمائها لا ما تحرّك منها هذا الأسبوع
          وحده: المعتمدة من مجلس الوزراء أولاً ثم المعتمدة من اللجنة —
          وهي أهمّ ما في التقرير، فلا تغيب لأنها لم تتغيّر */
-      ups: approvedNames(sec("natstrat"), dn.slices),
+      ups: stageNames(sec("natstrat"), natLabel, dn.slices, [NAT_STEPS[3]]),
       upsOnly: true,
       lines,
     });
@@ -576,8 +580,9 @@ export function buildWeekReport(args: {
       ...DOM_META.inst,
       updates: inst.length || instT.length,
       donut: withUps(dn, up.count),
-      ups: up.named,
-      /* المؤسسية كذلك: مَن فُعِّل قياسها وحدها تُذكر بالاسم */
+      /* **كل** جهة فُعِّل قياسها تُذكر بالاسم لا ما تحرّك منها هذا
+         الأسبوع وحده — فالجهة التي فُعِّلت قبل أسبوع كانت تغيب */
+      ups: stageNames(sec("inststrat"), instLabel, dn.slices, [INST_STAGES[4]]),
       upsOnly: true,
       lines,
     });
