@@ -2172,6 +2172,11 @@ table.matrix thead th {
   margin: 2px 0 0;
   font-size: 12.5px;
   color: var(--ink-2);
+  /* التحديث يُكتب نقاطاً في أسطر — `pre-wrap` يُبقي الأسطر كما
+     كُتبت، وبدونها تلتصق النقاط كلها في سطرٍ واحد */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.8;
 }
 .note-i {
   margin-top: 16px;
@@ -2635,6 +2640,8 @@ table.matrix thead th {
   color: var(--ink-2);
   padding: 6px 7px;
   overflow-wrap: anywhere;
+  /* التحديث المكتوب نقاطاً يبقى أسطراً كما كُتب */
+  white-space: pre-wrap;
   border-bottom: 1px solid var(--line2);
   line-height: 1.6;
   vertical-align: top;
@@ -5230,6 +5237,9 @@ table.matrix thead th {
   margin: 2px 0 0;
   font-size: 12.5px;
   line-height: 1.7;
+  /* الردّ كذلك: أسطرُه كما كُتبت */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .rp-box {
   margin-top: 8px;
