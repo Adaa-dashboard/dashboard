@@ -85,6 +85,8 @@ export type Stat = {
   label: string;
   tone: "ok" | "warn" | "mute";
   icon?: string;
+  /** سطرٌ صغير تحت العنوان — كالفترة التي يخصّها الرقم */
+  sub?: string;
   /** مربّعٌ أبرز من إخوته — الرقم أكبر، كالمستهدف الذي تُنسب إليه
       بقيةُ الأعداد */
   big?: boolean;
@@ -444,21 +446,32 @@ function cxStats(items: ItemLite[]): Stat[] {
       else repNo++;
     }
   }
+  /* عدد تقارير الربع الثاني — من صفّ الإعدادات `cx-meta` (الحقل
+     `repQ2`) فيُغيَّر من صفحة القسم بلا تعديل برمجي، وإلا ٦٠ وهو
+     المعتمد الآن. بيانات مؤشر الرضا في الملف ناقصة، فالعدّ منها
+     (repRes + repNo) لا يُعتمد بعد — وهو محسوبٌ أعلاه وجاهز */
+  const meta = items.find((it) => it.id === "cx-meta");
+  const repQ2 = num(meta?.data.repQ2) || 60;
+  void repRes;
+  void repNo;
   return [
-    /* المستهدف أولاً وأبرزُها: الأعداد بعده تُقرأ منسوبةً إليه */
+    /* المستهدف أولاً وأبرزُها: الأعداد بعده تُقرأ منسوبةً إليه —
+       بلا أيقونة، فالرقم وحده أوضح */
     {
       n: cxTarget(items),
       label: "الأجهزة المستهدف قياسها",
       tone: "ok",
-      icon: "target",
       big: true,
     },
-    { n: prep, label: "أنهت التهيئة", tone: "mute", icon: "user-check" },
-    { n: plan, label: "أنهت التخطيط", tone: "mute", icon: "map" },
-    /* **بنتائج وبلا نتائج مجموعتان في رقمٍ واحد** حتى تستقيم
-       بيانات مؤشر الرضا في الملف — ثم يُفصلان كما كانا:
-       repRes / repNo محسوبتان أعلاه وجاهزتان للفصل */
-    { n: repRes + repNo, label: "صدرت لها تقارير الرضا", tone: "ok", icon: "report" },
+    { n: prep, label: "أنهت مرحلة التهيئة", tone: "mute", icon: "user-check" },
+    { n: plan, label: "أنهت مرحلة التخطيط", tone: "mute", icon: "map" },
+    {
+      n: repQ2,
+      label: "صدرت لها تقارير الرضا",
+      sub: "للربع الثاني 2026م",
+      tone: "ok",
+      icon: "report",
+    },
   ];
 }
 

@@ -2597,6 +2597,14 @@ table.matrix thead th {
 }
 /* المربّع الأبرز: رقمه أكبر وعنوانه أوضح — المستهدف الذي تُنسب
    إليه بقية الأعداد */
+/* الفترة التي يخصّها الرقم — سطرٌ أصغر تحت العنوان */
+.wk-sts span em.sub {
+  display: block;
+  font-style: normal;
+  font-size: 9px;
+  color: var(--muted);
+  margin-top: 1px;
+}
 .wk-sts > div.big {
   /* أعرضُ قليلاً: عنوانه أطول من إخوته فلا ينكسر ثلاثة أسطر */
   flex: 1.4;
