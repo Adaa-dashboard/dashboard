@@ -433,6 +433,8 @@ function cxStats(items: ItemLite[]): Stat[] {
     }
   }
   return [
+    /* المستهدف أولاً: الأعداد بعده تُقرأ منسوبةً إليه */
+    { n: cxTarget(items), label: "المستهدف قياسها", tone: "mute", icon: "target" },
     { n: prep, label: "أنهت التهيئة", tone: "mute", icon: "user-check" },
     { n: plan, label: "أنهت التخطيط", tone: "mute", icon: "map" },
     { n: repRes, label: "تقرير رضا بنتائج", tone: "ok", icon: "report" },
@@ -641,16 +643,14 @@ export function buildWeekReport(args: {
   const cxT = tch("cx");
   if (sec("cx").length || cx.length) {
     const lines = cx.length ? linesOf(cx) : cxT;
-    const dn = cxDonut(sec("cx"));
-    const up = upsIn(sec("cx"), lines, cxLabel, dn.slices);
     add({
       k: "cx",
       ...DOM_META.cx,
       updates: cx.length || cxT.length,
-      /* أعداد الأجهزة في محطات الملف قبل الحلقة — بطلب المستخدمة */
+      /* المربّعات وحدها — لا حلقة ولا قائمة أسماء تحتها، بطلب
+         المستخدمة: الأعداد تقول ما تقوله الحلقة وزيادة */
       stats: cxStats(sec("cx")),
-      donut: withUps(dn, up.count),
-      ups: up.named,
+      upsOnly: true,
       lines,
     });
   }

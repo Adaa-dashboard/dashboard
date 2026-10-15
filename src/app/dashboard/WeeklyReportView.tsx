@@ -123,7 +123,8 @@ function DomCard({
       </div>
 
       {d.stats && (
-        <div className="wk-sts">
+        /* خمسة مربّعات أو أكثر: خطٌّ أصغر وإلا انكسرت العناوين */
+        <div className={`wk-sts ${d.stats.length > 4 ? "five" : ""}`}>
           {d.stats.map((s) => (
             <div key={s.label}>
               {s.icon && (
