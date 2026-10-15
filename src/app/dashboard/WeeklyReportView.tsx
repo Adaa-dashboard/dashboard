@@ -152,6 +152,7 @@ function DomCard({
             total={d.donut.total}
             unit={d.donut.unit}
             base={d.donut.base}
+            nested={d.donut.nested}
           />
         </div>
       )}

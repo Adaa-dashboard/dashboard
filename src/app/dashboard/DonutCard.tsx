@@ -17,6 +17,7 @@ export function DonutRing({
   unit,
   size = 92,
   base,
+  nested,
 }: {
   slices: Slice[];
   total: number;
@@ -24,17 +25,22 @@ export function DonutRing({
   size?: number;
   /** قاعدة النسبة إن خالفت مجموع الشرائح — فيبقى الباقي رمادياً */
   base?: number;
+  /** شرائحُ متداخلة: كلٌّ تبدأ من أول الحلقة فتُرسم قُمعاً، والأصغر
+      فوق الأكبر. تُستعمل حين تكون الأعداد تراكمية لا متقاسمة */
+  nested?: boolean;
 }) {
   const r = size * 0.37;
   const w = size * 0.141;
   const c = 2 * Math.PI * r;
   const sum = base || slices.reduce((n, s) => n + s.n, 0) || 1;
+  /* المتداخلة تُرسم من الأكبر إلى الأصغر، وإلا غطّى الأكبرُ ما تحته */
+  const list = nested ? [...slices].sort((a, b) => b.n - a.n) : slices;
   let off = 0;
   return (
     <span className="wk-dn" style={{ width: size, height: size }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--line2)" strokeWidth={w} />
-        {slices
+        {list
           .filter((s) => s.n > 0)
           .map((s) => {
             const len = (c * s.n) / sum;
@@ -46,7 +52,7 @@ export function DonutRing({
                 strokeDashoffset={-off}
               />
             );
-            off += len;
+            if (!nested) off += len;
             return el;
           })}
       </svg>

@@ -107,7 +107,16 @@ export type Dom = {
   updates: number;
   /** `base` قاعدة رسم الحلقة إن خالفت مجموع الشرائح — تُرسم
       الشرائح منسوبةً إليها ويبقى ما سواها رمادياً */
-  donut?: { total: number; unit: string; slices: Slice[]; base?: number };
+  donut?: {
+    total: number;
+    unit: string;
+    slices: Slice[];
+    base?: number;
+    /** شرائحُ متداخلة لا متتابعة: كلٌّ تبدأ من أول الحلقة فتُرسم
+        قُمعاً — ٤٤ عُقد اجتماعها، منها ٢١ استُلمت وثائقها، منها ٢
+        فُعِّل قياسها. تُرتَّب من الأكبر إلى الأصغر */
+    nested?: boolean;
+  };
   /** ما تقدّم هذا الأسبوع: الاسم ولون مرحلته — تحت الحلقة */
   ups?: Up[];
   /** لا تُذكر أسماءٌ غير `ups`: المجال اختير له أن يُسمّي مراحلَ
@@ -539,19 +548,31 @@ function upsIn(
   return { count, named };
 }
 
-/** العددان المصحَّحان مؤقّتاً — المفتاح عنوان المرحلة */
+/** الأعداد المصحَّحة مؤقّتاً — المفتاح عنوان المرحلة */
 const INST_FIX: Record<string, number> | null = {
   "عُقد الاجتماع التعريفي": 44,
   "الوثائق المستلمة": 21,
 };
-/** يضع الأعداد المصحَّحة مكان المحسوبة، ويعيد ضبط وسط الحلقة
-    وقاعدتها على مجموعها حتى لا تتجاوز الشرائحُ الحلقةَ نفسها */
-function instFix<T extends { total: number; slices: Slice[]; base?: number }>(dn: T): T {
-  if (!INST_FIX) return dn;
-  const slices = dn.slices.map((x) => (x.label in INST_FIX ? { ...x, n: INST_FIX[x.label] } : x));
-  const sum = slices.reduce((a, x) => a + x.n, 0);
-  const base = Math.max(dn.base ?? dn.total, sum);
-  return { ...dn, slices, total: base, base };
+/** **أعدادُ المؤسسية متداخلة لا متقاسمة**: الجهات ٤٤ وكلها عُقد
+    لها الاجتماع التعريفي، ومنها ٢١ استُلمت وثائقها، ومنها جهتان
+    فُعِّل قياسهما. فالحلقة تُرسم قُمعاً (`nested`) ووسطُها أكبر
+    الأعداد — لا مجموعها، فذاك يَعُدّ الجهة مرّتين وثلاثاً */
+function instFunnel(items: ItemLite[]) {
+  /* عدٌّ تراكمي: الجهة تُعدّ في مرحلتها وفي كل ما قبلها — فمن
+     فُعِّل قياسها عُقد اجتماعها واستُلمت وثائقها بداهةً */
+  const n = [0, 0, 0];
+  for (const it of items) {
+    const i = INST_STAGES.indexOf(instLabel(it.data));
+    for (let k = 0; k < 3; k++) if (i >= k + 1) n[k]++;
+  }
+  const slices: Slice[] = INST_STAGES.slice(1).map((label, k) => ({
+    label,
+    n: INST_FIX && label in INST_FIX ? INST_FIX[label] : n[k],
+    color: INST_RAMP[k + 1],
+  }));
+  /* وسط الحلقة عدد الجهات — وإن تجاوزه عددٌ مصحَّحٌ مؤقّتاً أخذناه */
+  const base = Math.max(items.length, ...slices.map((x) => x.n));
+  return { total: base, unit: "جهة", slices, base, nested: true };
 }
 
 /** أسماء **كل** مَن بلغ المرحلة المطلوبة — لا ما تحرّك منها هذا
@@ -657,7 +678,7 @@ export function buildWeekReport(args: {
   const instT = tch("inststrat");
   if (sec("inststrat").length || inst.length) {
     const lines = inst.length ? linesOf(inst) : instT;
-    const dn = instFix(instDonut(sec("inststrat"), true));
+    const dn = instFunnel(sec("inststrat"));
     /* المؤسسية: مَن فُعِّل قياسها وحدها */
     const up = upsIn(sec("inststrat"), lines, instLabel, dn.slices, [INST_STAGES[3]]);
     add({
