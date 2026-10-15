@@ -58,10 +58,13 @@ export const NAT_STEPS = [
 export const INST_STAGES = [
   "لم يُعقد اجتماعها",
   "عُقد الاجتماع التعريفي",
-  "الوثائق مستلمة",
-  "اكتملت الوثائق",
+  /* «اكتملت الوثائق» أُزيلت ودُمجت هنا بطلب المستخدمة: الوثائق
+     مستلمةٌ أو غير مستلمة، وتمامُها تفصيلٌ يُقرأ من صفحة القسم */
+  "الوثائق المستلمة",
   "فُعِّل القياس",
 ];
+/* ألوان المراحل — الأخيرة تبقى أغمق الأخضر وإن قلّت المراحل */
+const INST_RAMP = ["#d7e2de", "#9ecdbb", "#5bb594", "#0b6b50"];
 
 /* تدرّج لوني واحد: الأخضر للمنجَز ثم يفتح، والذهبي للمتأخر،
    والرمادي لما لم يبدأ — فالحلقة تُقرأ بلا أسطورة أيضاً */
@@ -196,10 +199,11 @@ export function natLabel(d: Rec) {
   return NAT_STEPS[Math.max(1, Math.min(4, num(d.stage, 1))) - 1];
 }
 export function instLabel(d: Rec) {
+  /* «اكتملت الوثائق» و«الوثائق مستلمة» مرحلةٌ واحدة: تمامُ الوثائق
+     يعني استلامها، فلا تنزل جهةٌ مرحلةً لأن حقل الحالة فارغ */
   const i =
-    txt(d.live) === "مفعل" ? 4
-    : txt(d.docsState) === "مكتمل" ? 3
-    : txt(d.docs) === "✓" ? 2
+    txt(d.live) === "مفعل" ? 3
+    : txt(d.docs) === "✓" || txt(d.docsState) === "مكتمل" ? 2
     : txt(d.meet) === "تم" ? 1
     : 0;
   return INST_STAGES[i];
@@ -239,9 +243,9 @@ export function instDonut(items: ItemLite[], startedOnly = false) {
   /* قسمةٌ بأبعد مرحلةٍ بلغتها الجهة، فمجموع الشرائح = عدد الجهات.
      أما عدّادات الصفحة فمتداخلة (الجهة المفعَّل قياسها معدودةٌ في
      «عُقد اجتماعها» أيضاً)، فلا تصلح شرائحَ حلقة */
-  const c = [0, 0, 0, 0, 0];
+  const c = [0, 0, 0, 0];
   for (const it of items) c[INST_STAGES.indexOf(instLabel(it.data))]++;
-  const slices = INST_STAGES.map((label, i) => ({ label, n: c[i], color: RAMP[i] }));
+  const slices = INST_STAGES.map((label, i) => ({ label, n: c[i], color: INST_RAMP[i] }));
   if (!startedOnly) return { total: items.length, unit: "جهة", slices };
   /* في التقرير تُحذف «لم يُعقد اجتماعها» من الأسطورة — فهي تقصيرٌ
      لا إنجاز — **ويبقى العدد في الوسط عدد الجهات كلها**: الحلقة
@@ -623,7 +627,7 @@ export function buildWeekReport(args: {
     const lines = inst.length ? linesOf(inst) : instT;
     const dn = instDonut(sec("inststrat"), true);
     /* المؤسسية: مَن فُعِّل قياسها وحدها */
-    const up = upsIn(sec("inststrat"), lines, instLabel, dn.slices, [INST_STAGES[4]]);
+    const up = upsIn(sec("inststrat"), lines, instLabel, dn.slices, [INST_STAGES[3]]);
     add({
       k: "inst",
       ...DOM_META.inst,
@@ -631,7 +635,7 @@ export function buildWeekReport(args: {
       donut: withUps(dn, up.count),
       /* **كل** جهة فُعِّل قياسها تُذكر بالاسم لا ما تحرّك منها هذا
          الأسبوع وحده — فالجهة التي فُعِّلت قبل أسبوع كانت تغيب */
-      ups: stageNames(sec("inststrat"), instLabel, dn.slices, [INST_STAGES[4]]),
+      ups: stageNames(sec("inststrat"), instLabel, dn.slices, [INST_STAGES[3]]),
       upsOnly: true,
       lines,
     });
