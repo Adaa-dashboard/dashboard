@@ -409,6 +409,37 @@ export function cxTarget(items: ItemLite[]): number {
   return t > 0 ? t : 69;
 }
 
+/** مربّعات بطاقة تجربة المستفيد — أعدادُ الأجهزة في أربع محطات،
+    بنفس حقول ملف المتابعة:
+    التهيئة انتهت   = عُقد الاجتماع التعريفي واعتُمد حصر الخدمات
+    التخطيط انتهى   = اعتُمدت بطاقة القياس واستبيان لفل 1 معاً
+    تقرير بنتائج    = صدر تقريرٌ معتمد في ربعٍ ما ومعه مؤشر رضا
+    تقرير بلا نتائج = صدر التقرير ولم يُسجَّل له مؤشر رضا في أيّ ربع
+    والأخيرتان تقسمان «صدر له تقرير» قسمين لا ثالث لهما. */
+function cxStats(items: ItemLite[]): Stat[] {
+  const rows = items.filter((it) => it.id !== "cx-meta");
+  const ok = (v: unknown) => txt(v) === CX_OK;
+  let prep = 0, plan = 0, repRes = 0, repNo = 0;
+  for (const it of rows) {
+    const d = it.data;
+    if (txt(d.meet) === "تم" && ok(d.survey)) prep++;
+    if (ok(d.survey) && ok(d.card) && ok(d.l1)) plan++;
+    const issued = CX_QK.some((q) => ok(d[`${q}Issue`]));
+    if (issued) {
+      /* «بنتائج» = مؤشر رضا مسجَّل في أيّ ربع — لا مجرّد عدد خدمات */
+      const res = CX_QK.some((q) => num(d[`${q}Sat`]) > 0);
+      if (res) repRes++;
+      else repNo++;
+    }
+  }
+  return [
+    { n: prep, label: "أنهت التهيئة", tone: "mute", icon: "user-check" },
+    { n: plan, label: "أنهت التخطيط", tone: "mute", icon: "map" },
+    { n: repRes, label: "تقرير رضا بنتائج", tone: "ok", icon: "report" },
+    { n: repNo, label: "تقرير رضا بلا نتائج", tone: "warn", icon: "doc" },
+  ];
+}
+
 export function cxDonut(items: ItemLite[]) {
   /* صفّ الإعدادات (`cx-meta`) ليس جهازاً فلا يُعدّ */
   const rows = items.filter((it) => it.id !== "cx-meta");
@@ -616,6 +647,8 @@ export function buildWeekReport(args: {
       k: "cx",
       ...DOM_META.cx,
       updates: cx.length || cxT.length,
+      /* أعداد الأجهزة في محطات الملف قبل الحلقة — بطلب المستخدمة */
+      stats: cxStats(sec("cx")),
       donut: withUps(dn, up.count),
       ups: up.named,
       lines,
