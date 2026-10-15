@@ -539,6 +539,21 @@ function upsIn(
   return { count, named };
 }
 
+/** العددان المصحَّحان مؤقّتاً — المفتاح عنوان المرحلة */
+const INST_FIX: Record<string, number> | null = {
+  "عُقد الاجتماع التعريفي": 44,
+  "الوثائق المستلمة": 21,
+};
+/** يضع الأعداد المصحَّحة مكان المحسوبة، ويعيد ضبط وسط الحلقة
+    وقاعدتها على مجموعها حتى لا تتجاوز الشرائحُ الحلقةَ نفسها */
+function instFix<T extends { total: number; slices: Slice[]; base?: number }>(dn: T): T {
+  if (!INST_FIX) return dn;
+  const slices = dn.slices.map((x) => (x.label in INST_FIX ? { ...x, n: INST_FIX[x.label] } : x));
+  const sum = slices.reduce((a, x) => a + x.n, 0);
+  const base = Math.max(dn.base ?? dn.total, sum);
+  return { ...dn, slices, total: base, base };
+}
+
 /** أسماء **كل** مَن بلغ المرحلة المطلوبة — لا ما تحرّك منها هذا
     الأسبوع وحده: الجهة التي فُعِّل قياسها الأسبوع الماضي لا تغيب
     من تقرير هذا الأسبوع. ولون كلٍّ لون شريحتها في الحلقة. */
@@ -634,11 +649,15 @@ export function buildWeekReport(args: {
   }
 
   /* ٣) الاستراتيجيات المؤسسية */
+  /* **تصحيحٌ مؤقّت** لعددَي المرحلتين الأوليين: ملف القسم لم
+     يُحدَّث بعد، والرقمان الصحيحان اليوم ٤٤ و٢١ بطلب المستخدمة.
+     يُحذف هذا الثابت فور تحديث صفحة القسم فتعود الأعداد محسوبةً
+     من الجدول وحده. (`null` = بلا تصحيح) */
   const inst = domAch("inst");
   const instT = tch("inststrat");
   if (sec("inststrat").length || inst.length) {
     const lines = inst.length ? linesOf(inst) : instT;
-    const dn = instDonut(sec("inststrat"), true);
+    const dn = instFix(instDonut(sec("inststrat"), true));
     /* المؤسسية: مَن فُعِّل قياسها وحدها */
     const up = upsIn(sec("inststrat"), lines, instLabel, dn.slices, [INST_STAGES[3]]);
     add({
