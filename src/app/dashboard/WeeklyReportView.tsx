@@ -126,10 +126,10 @@ function DomCard({
         /* خمسة مربّعات أو أكثر: خطٌّ أصغر وإلا انكسرت العناوين */
         <div className={`wk-sts ${d.stats.length > 4 ? "five" : ""}`}>
           {d.stats.map((s) => (
-            <div key={s.label}>
+            <div key={s.label} className={s.big ? "big" : ""}>
               {s.icon && (
                 <span className={`wk-ci ${s.tone}`}>
-                  <PIcon id={s.icon} size={21} />
+                  <PIcon id={s.icon} size={s.big ? 25 : 21} />
                 </span>
               )}
               <b className={s.tone}>{s.n}</b>

@@ -77,7 +77,15 @@ export type Slice = {
 };
 /** شريط مشروع: الإنجاز الفعلي، والمخطط له (المستهدف عند تاريخه) */
 export type Bar = { name: string; pct: number; plan: number; late: boolean };
-export type Stat = { n: number; label: string; tone: "ok" | "warn" | "mute"; icon?: string };
+export type Stat = {
+  n: number;
+  label: string;
+  tone: "ok" | "warn" | "mute";
+  icon?: string;
+  /** مربّعٌ أبرز من إخوته — الرقم أكبر، كالمستهدف الذي تُنسب إليه
+      بقيةُ الأعداد */
+  big?: boolean;
+};
 export type Line = { name: string; detail?: string; id?: string };
 /** بندٌ تقدّم هذا الأسبوع — لونه لون شريحته في الحلقة */
 export type Up = { name: string; label: string; color: string };
@@ -137,7 +145,7 @@ export const DOM_META: Record<DomKey, { title: string }> = {
   nat: { title: "الاستراتيجيات الوطنية" },
   inst: { title: "الاستراتيجيات المؤسسية" },
   ses: { title: "جلسات مراجعة الأداء" },
-  cx: { title: "تجربة المستفيد" },
+  cx: { title: "أعمال قياس تجربة المستفيد" },
   proj: { title: "حالة المشاريع الاستراتيجية" },
 };
 
@@ -433,12 +441,20 @@ function cxStats(items: ItemLite[]): Stat[] {
     }
   }
   return [
-    /* المستهدف أولاً: الأعداد بعده تُقرأ منسوبةً إليه */
-    { n: cxTarget(items), label: "المستهدف قياسها", tone: "mute", icon: "target" },
+    /* المستهدف أولاً وأبرزُها: الأعداد بعده تُقرأ منسوبةً إليه */
+    {
+      n: cxTarget(items),
+      label: "الأجهزة المستهدف قياسها",
+      tone: "ok",
+      icon: "target",
+      big: true,
+    },
     { n: prep, label: "أنهت التهيئة", tone: "mute", icon: "user-check" },
     { n: plan, label: "أنهت التخطيط", tone: "mute", icon: "map" },
-    { n: repRes, label: "تقرير رضا بنتائج", tone: "ok", icon: "report" },
-    { n: repNo, label: "تقرير رضا بلا نتائج", tone: "warn", icon: "doc" },
+    /* **بنتائج وبلا نتائج مجموعتان في رقمٍ واحد** حتى تستقيم
+       بيانات مؤشر الرضا في الملف — ثم يُفصلان كما كانا:
+       repRes / repNo محسوبتان أعلاه وجاهزتان للفصل */
+    { n: repRes + repNo, label: "صدرت لها تقارير الرضا", tone: "ok", icon: "report" },
   ];
 }
 

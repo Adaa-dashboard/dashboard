@@ -2595,6 +2595,20 @@ table.matrix thead th {
 .wk-sts.five > div {
   padding-inline: 2px;
 }
+/* المربّع الأبرز: رقمه أكبر وعنوانه أوضح — المستهدف الذي تُنسب
+   إليه بقية الأعداد */
+.wk-sts > div.big {
+  /* أعرضُ قليلاً: عنوانه أطول من إخوته فلا ينكسر ثلاثة أسطر */
+  flex: 1.4;
+}
+.wk-sts > div.big b {
+  font-size: 27px;
+}
+.wk-sts > div.big span {
+  font-size: 11px;
+  color: var(--gt-700);
+  font-weight: 700;
+}
 .wk-sts > div {
   flex: 1;
   text-align: center;
