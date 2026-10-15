@@ -127,14 +127,12 @@ function DomCard({
         <div className={`wk-sts ${d.stats.length > 4 ? "five" : ""}`}>
           {d.stats.map((s) => (
             <div key={s.label} className={s.big ? "big" : ""}>
-              {s.icon ? (
+              {/* المربّع بلا أيقونة لا يُترك فراغُها: الرقم يرتفع
+                  إلى أعلى المربّع فلا تبقى مساحةٌ بيضاء فوقه */}
+              {s.icon && (
                 <span className={`wk-ci ${s.tone}`}>
                   <PIcon id={s.icon} size={s.big ? 25 : 21} />
                 </span>
-              ) : (
-                /* فراغٌ بقَدر الأيقونة: المربّع بلا أيقونة يبقى على
-                   مستوى إخوته فلا يرتفع رقمه عنها */
-                <span className="wk-ci" style={{ height: s.big ? 25 : 21 }} />
               )}
               <b className={s.tone}>{s.n}</b>
               <span>

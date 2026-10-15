@@ -2608,6 +2608,8 @@ table.matrix thead th {
 .wk-sts > div.big {
   /* أعرضُ قليلاً: عنوانه أطول من إخوته فلا ينكسر ثلاثة أسطر */
   flex: 1.4;
+  /* فراغٌ يسيرٌ فوق الرقم بدل فراغ الأيقونة كاملاً */
+  padding-top: 10px;
 }
 .wk-sts > div.big b {
   font-size: 27px;
