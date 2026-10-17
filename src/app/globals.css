@@ -6539,6 +6539,73 @@ textarea.wk-updin:focus {
   font-variant-numeric: tabular-nums;
 }
 
+/* مخرجات المشروع — صفٌّ لكل مخرج: اسمُه ونسبتُه، شريطُه، ثم
+   «المحقق من المستهدف». على هيئة بقية بطاقات المنصة لا على هيئة
+   لوحة متابعة المشروع. */
+.pjx-out {
+  margin-top: 13px;
+}
+.pjx-out .hd {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--gt-900);
+  margin-bottom: 9px;
+}
+.pjx-out .o {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--soft);
+}
+.pjx-out .o + .o {
+  margin-top: 7px;
+}
+.pjx-out .t {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.pjx-out .t b {
+  flex: 1;
+  min-width: 0;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.pjx-out .t u {
+  text-decoration: none;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--gt-900);
+  font-variant-numeric: tabular-nums;
+}
+.pjx-out .b {
+  display: block;
+  height: 8px;
+  border-radius: 5px;
+  background: var(--line2);
+  overflow: hidden;
+}
+.pjx-out .b i {
+  display: block;
+  height: 100%;
+  border-radius: 5px;
+}
+.pjx-out .n {
+  margin-top: 5px;
+  font-size: 10.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.pjx-out .n .d {
+  font-weight: 800;
+  color: var(--gt-700);
+  font-size: 12px;
+}
+
 /* أبرز المستجدات */
 .pjx-up {
   margin-top: 13px;

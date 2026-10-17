@@ -3527,7 +3527,7 @@ export function CxPage({ t, canEdit, add, gear }: SecPageProps) {
 const PJ_STAGES = ["التهيئة", "التخطيط", "التنفيذ", "الإغلاق"];
 const PJ_COLORS = ["#0b6b50", "#1b9c74", "#5bb594", "#9ecdbb"];
 
-type PjStage = { name: string; pct: number };
+type PjStage = { name: string; pct: number; done?: number; total?: number; unit?: string };
 
 function pjStages(d: Rec, actual: number): PjStage[] {
   const raw = txt(d.stages).trim();
@@ -3538,10 +3538,26 @@ function pjStages(d: Rec, actual: number): PjStage[] {
       .filter(Boolean)
       .map((x) => {
         const i = x.lastIndexOf(":");
-        const hasPct = i > 0 && /^\s*\d+(\.\d+)?\s*%?\s*$/.test(x.slice(i + 1));
+        const val = i > 0 ? x.slice(i + 1).trim() : "";
+        const name = (i > 0 ? x.slice(0, i) : x).trim();
+        /* «محقق/مستهدف وحدة» — مخرجٌ له كمية، فالنسبة تُشتقّ منها
+           ويظهر العددان كما في لوحة متابعة المشروع */
+        const q = val.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s*(.*)$/);
+        if (q) {
+          const done = numOf(q[1]);
+          const total = numOf(q[2]);
+          return {
+            name,
+            done,
+            total,
+            unit: q[3].trim(),
+            pct: total > 0 ? Math.max(0, Math.min(100, (done / total) * 100)) : 0,
+          };
+        }
+        const hasPct = /^\d+(\.\d+)?\s*%?$/.test(val);
         return {
-          name: (hasPct ? x.slice(0, i) : x).trim(),
-          pct: hasPct ? Math.max(0, Math.min(100, numOf(x.slice(i + 1)))) : 0,
+          name: hasPct ? name : x.trim(),
+          pct: hasPct ? Math.max(0, Math.min(100, numOf(val))) : 0,
         };
       });
   }
@@ -3693,6 +3709,35 @@ export function Projects({ t, canEdit }: { t: T; canEdit: boolean }) {
                 </div>
               </div>
 
+              {/* مخرجاتٌ لها كميات ⇒ صفٌّ لكل مخرج فيه شريطُه وعدداه،
+                  كما في لوحة متابعة المشروع. وإلا فشريط المراحل كما كان */}
+              {stages.some((x) => x.total) ? (
+                <div className="pjx-out">
+                  <div className="hd">{t("مخرجات المشروع", "Project outputs")}</div>
+                  {stages.map((x, i) => (
+                    <div className="o" key={x.name + i}>
+                      <div className="t">
+                        <b>{x.name}</b>
+                        <u>{AR(Math.round(x.pct * 10) / 10)}٪</u>
+                      </div>
+                      <span className="b">
+                        <i
+                          style={{
+                            width: `${x.pct}%`,
+                            background: PJ_COLORS[i % PJ_COLORS.length],
+                          }}
+                        />
+                      </span>
+                      <div className="n">
+                        <span className="d">{AR(x.done ?? 0)}</span>
+                        {` ${t("من", "of")} `}
+                        {AR(x.total ?? 0)}
+                        {x.unit ? ` ${x.unit}` : ""}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
               <div className="pjx-sg">
                 <div className="hd">{t("توزيع مراحل المشروع", "Project stages")}</div>
                 <div className="bar">
@@ -3717,6 +3762,7 @@ export function Projects({ t, canEdit }: { t: T; canEdit: boolean }) {
                   ))}
                 </div>
               </div>
+              )}
 
               {notes.length > 0 && (
                 <div className="pjx-up">
@@ -4472,7 +4518,10 @@ const FIELDS: Record<Exclude<SectionKey, "outputs" | "opplan">, Field[]> = {
     { k: "elapsed", label: "الشهر الحالي", kind: "num" },
     {
       k: "stages",
-      label: "مراحل المشروع (سطر لكل مرحلة أو مخرج، ونسبته بعد نقطتين — مثال: المخرج الثاني:100)",
+      label:
+        "مراحل المشروع أو مخرجاته — سطر لكل واحد. بعد النقطتين: نسبة " +
+        "(المخرج الثاني:100) أو محقق/مستهدف ووحدته (المخرج الأول:31/60 تقرير) " +
+        "فتُحسب النسبة ويظهر العددان",
       kind: "area",
     },
     { k: "note", label: "أبرز المستجدات (سطر لكل مستجد)", kind: "area" },
