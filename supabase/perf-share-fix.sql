@@ -75,7 +75,11 @@ begin
     'periods',      (select coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) from public.perf_periods x),
     'targets',      (select coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) from public.perf_targets x),
     'measurements', (select coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) from public.perf_measurements x),
-    'tasks',        (select coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) from public.perf_tasks x),
+    /* **التكاليف وحدها**: المهمة الشخصية خاصّةٌ بصاحبها، وكانت
+       تخرج كلُّها في حمولة الرابط العام ولو لم تُعرض فيه */
+    'tasks',        (select coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb)
+                       from public.perf_tasks x
+                      where coalesce(x.kind, 'task') = 'assignment'),
     'items',        (select coalesce(jsonb_agg(to_jsonb(x) order by x.ord), '[]'::jsonb) from public.perf_items x),
     'settings',     (select coalesce(jsonb_object_agg(key, value), '{}'::jsonb) from public.perf_settings),
     'log',      v_log,

@@ -114,6 +114,11 @@ export default function Tasks({
   onFocusDone?: () => void;
 }) {
   const asg = kind === "assignment";
+  /* **المهمة الشخصية لا تُشارَك**: يراها صاحبها ومن أسندها فقط،
+     مهما كانت صلاحية المُطّلع — فصلاحية «كل المهام» (`tasks:all`)
+     كانت تُظهر مهام كل موظف في صفحة المهام. والتكاليف تبقى مشتركة
+     فهي واردةٌ للمركز لا مهامُ أشخاص. (الحماية الحقيقية في RLS) */
+  const mineOnly = onlyMine || !asg;
   const L = {
     one: asg ? t("تكليف", "Assignment") : t("مهمة", "Task"),
     many: asg ? t("التكاليف", "Assignments") : t("المهام", "Tasks"),
@@ -140,11 +145,11 @@ export default function Tasks({
     setTasks(
       all
         .filter((x) => (x.kind === "assignment" ? "assignment" : "task") === kind)
-        .filter((x) => !onlyMine || x.assigneeId === meId || x.createdById === meId)
+        .filter((x) => !mineOnly || x.assigneeId === meId || x.createdById === meId)
     );
     setPeople(r.people || []);
     setLoaded(true);
-  }, [kind, onlyMine, meId]);
+  }, [kind, mineOnly, meId]);
 
   useEffect(() => {
     load();
@@ -211,7 +216,7 @@ export default function Tasks({
     setTasks(
       all
         .filter((x) => (x.kind === "assignment" ? "assignment" : "task") === kind)
-        .filter((x) => !onlyMine || x.assigneeId === meId || x.createdById === meId)
+        .filter((x) => !mineOnly || x.assigneeId === meId || x.createdById === meId)
     );
     setOpen(all.find((x) => x.id === task.id) || null);
   }
