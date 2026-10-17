@@ -17,6 +17,7 @@ import SectionSettings from "./SectionSettings";
 import DonutCard from "./DonutCard";
 import { PIcon } from "./pickicons";
 import { natDonut, instDonut, sesDonut, cxDonut } from "@/lib/weekReport";
+import { loadProjectOutputs, type PdSummary } from "@/lib/pdash";
 
 /* ============================================================
    الأقسام الخمسة المتفرّعة من المؤشرات التفصيلية:
@@ -3589,9 +3590,27 @@ function PjRing({ pct, late }: { pct: number; late: boolean }) {
   );
 }
 
+/** مشروعٌ مربوطٌ بلوحة متابعة المشروع — أرقامه تُقرأ منها لا تُكتب */
+const isPdash = (d: Rec) => /^(نعم|yes|y|1|true)$/i.test(txt(d.pdash).trim());
+
 export function Projects({ t, canEdit }: { t: T; canEdit: boolean }) {
   const { items, loaded, remove, undo, undoTop, dismissUndo, reload } = useItems("projects");
   const [edit, setEdit] = useState<Item | null>(null);
+  /* أرقام لوحة متابعة المشروع — تُقرأ مرةً عند فتح الصفحة، وتُعاد
+     القراءة كلما تغيّرت البنود. وتعذُّرُها لا يكسر شيئاً: تبقى
+     المراحل المكتوبة يدوياً */
+  const [pdash, setPdash] = useState<PdSummary | null>(null);
+  const linked = items.some((x) => isPdash(x.data));
+  useEffect(() => {
+    if (!linked) return;
+    let on = true;
+    void loadProjectOutputs().then((x) => {
+      if (on) setPdash(x);
+    });
+    return () => {
+      on = false;
+    };
+  }, [linked]);
   /* النسب تُدخَل بكسور عشرية (٤١٫٣) فطرحها المباشر يعطي ٦٫٥٩٩٩٩٩٩٩٩٩٩٩٩٩٤ —
      التقريب لخانة واحدة عند العرض وحده، والقيمة المحفوظة تبقى كما أُدخلت. */
   const p1 = (n: number) => Math.round(n * 10) / 10;
@@ -3638,14 +3657,18 @@ export function Projects({ t, canEdit }: { t: T; canEdit: boolean }) {
       <div className="pjx-g">
         {items.map((it) => {
           const d = it.data;
+          const live = isPdash(d) ? pdash : null;
           const planned = numOf(d.planned);
-          const actual = numOf(d.actual);
+          /* الإنجاز الفعلي من اللوحة إن كان المشروع مربوطاً بها */
+          const actual = live ? live.pct : numOf(d.actual);
           const g = p1(actual - planned);
           // مشروع لم تصل بياناته بعد: لا نعرض «متقدم ٠٪» بل نقول ذلك صراحةً
           const blank = planned === 0 && actual === 0;
           const left = Math.max(0, numOf(d.months) - numOf(d.elapsed));
           const st = g <= -10 ? "late" : g < 0 ? "near" : "on";
-          const stages = pjStages(d, actual);
+          const stages: PjStage[] = live
+            ? live.outs.map((o) => ({ name: o.name, pct: o.pct, done: o.done, total: o.total, unit: o.unit }))
+            : pjStages(d, actual);
           const notes = txt(d.note)
             .split(/\n+/)
             .map((x) => x.trim())
@@ -3713,7 +3736,15 @@ export function Projects({ t, canEdit }: { t: T; canEdit: boolean }) {
                   كما في لوحة متابعة المشروع. وإلا فشريط المراحل كما كان */}
               {stages.some((x) => x.total) ? (
                 <div className="pjx-out">
-                  <div className="hd">{t("مخرجات المشروع", "Project outputs")}</div>
+                  <div className="hd">
+                    {t("مخرجات المشروع", "Project outputs")}
+                    {live && (
+                      <em>
+                        {t("من لوحة متابعة المشروع", "From the project dashboard")}
+                        {live.updatedAt ? ` · ${live.updatedAt}` : ""}
+                      </em>
+                    )}
+                  </div>
                   {stages.map((x, i) => (
                     <div className="o" key={x.name + i}>
                       <div className="t">
@@ -4516,6 +4547,10 @@ const FIELDS: Record<Exclude<SectionKey, "outputs" | "opplan">, Field[]> = {
     { k: "period", label: "الفترة" },
     { k: "months", label: "مدة المشروع (شهر)", kind: "num" },
     { k: "elapsed", label: "الشهر الحالي", kind: "num" },
+    {
+      k: "pdash",
+      label: "ربط بلوحة متابعة المشروع (نعم) — تُقرأ المخرجات ونسبة الإنجاز منها",
+    },
     {
       k: "stages",
       label:
