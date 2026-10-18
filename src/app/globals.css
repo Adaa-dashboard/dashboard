@@ -13260,8 +13260,8 @@ input.cell-date {
 .cb-sum .r.as { color: var(--g-700); border-color: color-mix(in srgb, var(--g-700) 30%, var(--line2)); }
 .cb-sum .r.as b { color: var(--g-700); }
 /* بنود محفظة مديرها — دورٌ ثالث إلى جوار الراعي والمسؤول */
-.cb-sum .r.ow { color: #a5720c; border-color: rgba(224, 151, 26, 0.35); }
-.cb-sum .r.ow b { color: #a5720c; }
+.cb-sum .r.ow { color: #1f6fb2; border-color: rgba(43, 127, 212, 0.32); }
+.cb-sum .r.ow b { color: #1f6fb2; }
 .cb-sum .r.ok { color: var(--ok-tx); background: var(--ok-bg); border-color: transparent; }
 .cb-sum .r.ok b { color: var(--ok-tx); }
 .cb-sum .r.no { color: var(--dgr-tx); background: var(--dgr-bg); border-color: transparent; }
@@ -13278,6 +13278,21 @@ input.cell-date {
 .cb-li .rr i.sp { color: #5b3ea8; background: rgba(122, 92, 209, .14); }
 .cb-li .rr i.as { color: var(--g-800); background: var(--g-100); }
 .cb-li .rr i.ct { color: #8a5a00; background: rgba(224, 151, 26, .16); }
+/* شارات الدور داخل سطر البند — كانت `<i>` بلا تنسيق فتظهر مائلةً
+   بحجم النص، فيطغى الدورُ على اسم البند */
+.cb-li .mt > i {
+  font-style: normal;
+  font-size: 8.5px;
+  font-weight: 800;
+  border-radius: 999px;
+  padding: 2px 6px;
+  color: var(--muted);
+  background: var(--soft);
+}
+.cb-li .mt > i.sp { color: #5b3ea8; background: rgba(122, 92, 209, 0.14); }
+.cb-li .mt > i.as { color: var(--g-800); background: var(--g-100); }
+.cb-li .mt > i.ct { color: #8a5a00; background: rgba(224, 151, 26, 0.16); }
+.cb-li .mt > i.ow { color: #1f6fb2; background: rgba(43, 127, 212, 0.14); }
 .cb-li .stc {
   font-size: 8.5px; font-weight: 800; border-radius: 999px; padding: 2px 6px;
   color: var(--muted); background: var(--soft);
