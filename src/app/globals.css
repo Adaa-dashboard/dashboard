@@ -6747,7 +6747,9 @@ textarea.wk-updin:focus {
   inset-inline-end: 8px;
   display: flex;
   gap: 4px;
-  opacity: 0;
+  /* باهتٌ لا مخفيّ: المخفيُّ لا يُعرف مكانه على الجوال، والمرورُ
+     وحده لا يكشفه هناك */
+  opacity: 0.45;
   transition: opacity 0.15s;
 }
 .sx-pj:hover .sx-pj-x,
@@ -6758,10 +6760,26 @@ textarea.wk-updin:focus {
 .pjx:focus-within .sx-pj-x {
   opacity: 1;
 }
-/* على اللمس لا مرورَ: تبقى ظاهرةً باهتة */
-@media (hover: none) {
-  .sx-pj-x {
-    opacity: 0.75;
+/* على اللمس لا مرورَ: الزرّان يخرجان من زاوية البطاقة إلى سطرٍ
+   مستقلٍّ في أسفلها — الزاوية يزاحمها عنوانُ المشروع وشارةُ حالته
+   على الشاشة الضيّقة، فيتعذّر الضغط عليهما */
+@media (hover: none), (max-width: 820px) {
+  .pjx .sx-pj-x {
+    position: static;
+    opacity: 1;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  .pjx .sx-pj-x .rowx {
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--soft);
+    padding: 7px 14px;
+    font-size: 15px;
+    line-height: 1;
   }
 }
 
