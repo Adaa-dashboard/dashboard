@@ -14102,9 +14102,10 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
   padding: 0;
   min-width: 0;
 }
+/* النقطة أولاً قبل الاسم — لا ملتصقةً بالعدد في وسط السطر */
 .opk.v .opv-lg > span {
   display: grid;
-  grid-template-columns: 1fr 10px 26px;
+  grid-template-columns: 10px 1fr 26px;
   align-items: center;
   gap: 8px;
   white-space: normal;

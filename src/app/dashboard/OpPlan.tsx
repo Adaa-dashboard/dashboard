@@ -1275,8 +1275,8 @@ export function OpPlanCard({ t }: { t: T }) {
               <span className="opv-lg">
                 {sts.map((x) => (
                   <span key={x}>
-                    <em>{x}</em>
                     <i style={{ background: ST_COLOR[x] }} />
+                    <em>{x}</em>
                     <b>{sc(x)}</b>
                   </span>
                 ))}
