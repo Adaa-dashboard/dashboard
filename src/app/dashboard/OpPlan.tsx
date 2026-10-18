@@ -286,18 +286,25 @@ function OpKind({
       <span className="nl">{t(`إجمالي ${KIND_LABEL[k][0]}`, `Total ${KIND_LABEL[k][1]}`)}</span>
       <span className="bd">
         <span className="lg">
+          {/* النقطة أولاً قبل اسم الحالة — لا ملتصقةً بعددها */}
           {sts.map((x) => (
             <span key={x}>
-              <em>{x}</em>
               <i style={{ background: ST_COLOR[x] }} />
+              <em>{x}</em>
               <b>{sc(x)}</b>
             </span>
           ))}
         </span>
         <span className="dw">
-          <Donut size={96} w={12} parts={sts.map((x) => ({ v: sc(x), c: ST_COLOR[x] }))} />
-          {/* الرمز في قلب الحلقة — خارج الـsvg فلا يدور مع دورانها */}
-          <span className="mid" aria-hidden><Ic size={22} /></span>
+          {/* **العدد الإجمالي في قلب الحلقة** لا رمز النوع: الرمز
+              في رأس البطاقة فوقُ، وتكراره هنا لا يضيف خبراً */}
+          <Donut
+            size={96}
+            w={12}
+            parts={sts.map((x) => ({ v: sc(x), c: ST_COLOR[x] }))}
+            mid={String(n)}
+            sub={t("بنداً", "items")}
+          />
         </span>
       </span>
     </button>

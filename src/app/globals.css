@@ -14028,8 +14028,8 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
   border-top: 1px solid var(--border); margin-top: 14px; padding-top: 14px;
 }
 .opk .lg { flex: 1; display: flex; flex-direction: column; gap: 7px; min-width: 0; }
-/* ثلاثة أعمدة: الاسم يملأ، ثم النقطة في عمودٍ ثابت فتصطفّ، ثم العدد */
-.opk .lg > span { display: grid; grid-template-columns: 1fr 10px 26px; align-items: center; gap: 8px; }
+/* ثلاثة أعمدة: النقطة أولاً فتصطفّ، ثم الاسم يملأ، ثم العدد */
+.opk .lg > span { display: grid; grid-template-columns: 10px 1fr 26px; align-items: center; gap: 8px; }
 .opk .lg em { font-style: normal; font-size: 11.5px; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .opk .lg i { width: 9px; height: 9px; border-radius: 50%; }
 .opk .lg b { font-family: "Noto Kufi Arabic", sans-serif; font-size: 13px; font-weight: 800; color: var(--text); text-align: end; }
