@@ -1566,6 +1566,9 @@ export async function apiFetch(path: string, init: Init = {}) {
       type Item = {
         id: string; kind: string; tone: string; title: string; sub: string;
         at: string; unread: boolean;
+        /** من قام بالتحديث — يُعرض بخطٍّ صغير إلى جوار الوقت، فلا
+            يزاحم اسمُه العنوانَ ويُعرف صاحب كل تحديث */
+        by?: string;
         sectorId?: string; indicatorId?: string; taskId?: string; section?: string;
       };
       const items: Item[] = [];
@@ -1582,8 +1585,9 @@ export async function apiFetch(path: string, init: Init = {}) {
           items.push({
             id: "m" + m.id, kind: "measurement", tone: "info",
             title: n > 1
-              ? `${m.updated_by ? `${m.updated_by} حدّث` : "تحديث"} ${arCount(n, "قياساً", "قياسين", "قياسات", "قياساً")}`
+              ? `تحديث ${arCount(n, "قياساً", "قياسين", "قياسات", "قياساً")}`
               : `تحديث ${indName.get(m.indicator_id) || ""}`,
+            by: m.updated_by || "",
             sub: n > 1
               ? `${secName.get(m.sector_id) || ""} · دفعة واحدة`
               : `${secName.get(m.sector_id) || ""} · ${m.actual}`,
@@ -1606,6 +1610,7 @@ export async function apiFetch(path: string, init: Init = {}) {
               ? `ملاحظتك على ${indName.get(n.indicator_id) || ""}`
               : `${n.by_name} ذكرك في ملاحظة`,
           sub: `${secName.get(n.sector_id) || ""} · ${indName.get(n.indicator_id) || ""}`,
+          by: n.by_name || "",
           at: n.at, unread: !since || n.at > since,
           sectorId: n.sector_id, indicatorId: n.indicator_id,
         });
@@ -1638,15 +1643,15 @@ export async function apiFetch(path: string, init: Init = {}) {
         for (const g of groups) {
           const head = g[0];
           const n = g.length;
-          const who = head.updated_by ? `${head.updated_by} حدّث` : "تحديث";
           const sect = SEC_AR[head.section] || head.section;
           const nm = itemName(head.data);
           items.push({
             id: "i" + head.section + head.id,
             kind: "section",
             tone: "info",
-            title: n > 1 ? `${who} ${sect} — ${arCount(n, "بند", "بندان", "بنود", "بنداً")}` : `${who} ${sect}`,
+            title: n > 1 ? `تحديث ${sect} — ${arCount(n, "بند", "بندان", "بنود", "بنداً")}` : `تحديث ${sect}`,
             sub: n > 1 ? (nm ? `${nm} و${n - 1} غيره` : "دفعة واحدة") : nm || "بند",
+            by: head.updated_by || "",
             at: head.updated_at,
             unread: !since || head.updated_at > since,
             section: head.section,
@@ -1716,11 +1721,12 @@ export async function apiFetch(path: string, init: Init = {}) {
             tone: "info",
             title:
               n > 1
-                ? `${mineAdd ? "أضفتَ" : `${e.added_by_name} أضاف`} ${arCount(n, "جهة", "جهتين", "جهات", "جهة")}`
+                ? `${mineAdd ? "أضفتَ" : "أُضيفت"} ${arCount(n, "جهة", "جهتين", "جهات", "جهة")}`
                 : mineAdd
                   ? `أضفتَ جهة: ${e.name}`
-                  : `${e.added_by_name} أضاف جهة: ${e.name}`,
+                  : `جهة جديدة: ${e.name}`,
             sub: n > 1 ? `${e.name} و${n - 1} غيرها` : String(e.sector || "") || "الجهات ونقاط التواصل",
+            by: mineAdd ? "" : e.added_by_name || "",
             at: e.at,
             unread: !since || String(e.at) > since,
             section: "entities",
@@ -1755,8 +1761,9 @@ export async function apiFetch(path: string, init: Init = {}) {
           id: "s" + k.id,
           kind: "sticky",
           tone: "warn",
-          title: `${k.by_name || "أحدهم"} علّق على ${PAGE_AR[k.page] || k.page}`,
+          title: `تعليق على ${PAGE_AR[k.page] || k.page}`,
           sub: String(k.body || "").slice(0, 90),
+          by: k.by_name || "",
           at: k.at,
           unread: !since || k.at > since,
           section: k.page,
@@ -1778,8 +1785,9 @@ export async function apiFetch(path: string, init: Init = {}) {
           id: "u" + t.id + (last.id || ""),
           kind: t.kind === "assignment" ? "assignment" : "task",
           tone: "info",
-          title: `${last.byName || "أحدهم"} ردّ على ${t.kind === "assignment" ? "التكليف" : "المهمة"}: ${t.title}`,
+          title: `ردٌّ على ${t.kind === "assignment" ? "التكليف" : "المهمة"}: ${t.title}`,
           sub: String(last.text).slice(0, 90),
+          by: last.byName || "",
           at: last.at || t.created_at,
           unread: !since || (last.at || "") > since,
           taskId: t.id,
@@ -1792,8 +1800,9 @@ export async function apiFetch(path: string, init: Init = {}) {
       for (const g of tlog.data || []) {
         items.push({
           id: "g" + g.id, kind: "target", tone: "warn",
-          title: `${g.by_name} عدّل مستهدف ${indName.get(g.indicator_id) || ""}`,
+          title: `تعديل مستهدف ${indName.get(g.indicator_id) || ""}`,
           sub: `${secName.get(g.sector_id) || ""} · من ${fmtT(g.old_value)} إلى ${fmtT(g.new_value)}`,
+          by: g.by_name || "",
           at: g.at, unread: !since || g.at > since,
           sectorId: g.sector_id, indicatorId: g.indicator_id,
         });

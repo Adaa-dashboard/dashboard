@@ -12,6 +12,8 @@ export type Item = {
   sub: string;
   at: string;
   unread: boolean;
+  /** من قام بالتحديث — بخطٍّ صغير إلى جوار الوقت */
+  by?: string;
   sectorId?: string;
   indicatorId?: string;
   taskId?: string;
@@ -140,6 +142,7 @@ export default function Activity({
                     {x.sub}
                     {x.sub ? " · " : ""}
                     {when(x.at)}
+                    {x.by ? <em className="by">{x.by}</em> : null}
                   </span>
                 </span>
                 {onOpen && (x.indicatorId || x.taskId || x.section) && (

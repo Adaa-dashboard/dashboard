@@ -1843,6 +1843,18 @@ table.matrix thead th {
   font-size: 11.5px;
   color: var(--muted);
 }
+/* اسم من حدّث — أصغر من الوقت وإلى جواره، فيُعرف صاحبُ التحديث
+   بلا أن يزاحم اسمُه عنوانَه */
+.up .s em.by {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--gt-700);
+  background: var(--soft);
+  border-radius: 6px;
+  padding: 1px 6px;
+  margin-inline-start: 7px;
+  white-space: nowrap;
+}
 .up .tg {
   background: var(--g-700);
   color: #fff;

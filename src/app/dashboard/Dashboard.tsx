@@ -1293,16 +1293,9 @@ function Overview({
       className="ov-wrap"
       style={{ ["--ovbg" as string]: `url(${asset("/wk-cover-v.jpg")})` }}
     >
-      <div className="toolbar">
-        {/* اختيار النطاق أُزيل بطلب المستخدمة — الصفحة على السنة
-            كاملة، والأرباع في صفحة «المؤشرات التفصيلية» */}
-        <div style={{ flex: 1 }} />
-        <button className="btn btn-ghost btn-sm" onClick={() => void load()}>
-          {t("تحديث", "Refresh")}
-        </button>
-        {/* «تصدير Excel» أُزيل بطلب صاحبة المنصة — لا داعي له هنا،
-            والتصدير في كل صفحةِ قسمٍ على حدة */}
-      </div>
+      {/* الشريط العلوي أُزيل بطلب صاحبة المنصة: زرّ «تحديث» لا
+          يُحتاج — الصفحة تُعيد الجلب عند العودة إليها وكل ٢٠ ثانية.
+          و«تصدير Excel» و«اختيار النطاق» أُزيلا قبله. */}
 
       <div className="ov-top">
         <div className="card">
