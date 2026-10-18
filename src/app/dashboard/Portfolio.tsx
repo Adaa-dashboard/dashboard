@@ -5258,8 +5258,17 @@ export default function Portfolio({
         return {
           count: myContrib.length,
           pct: 0,
+          /* ومدير المحفظة يُذكر دورُه كما يُذكر الراعي والمسؤول،
+             وإلا بدا المربّع خالياً من سبب ظهور بنوده */
           sub: myContrib.length
-            ? `${role("راعي")} راعٍ · ${role("مسؤول")} مسؤول — ${n("kpi")} مؤشرات · ${n("init")} مبادرات · ${n("win")} مكاسب`
+            ? [
+                role("راعي") ? `${role("راعي")} راعٍ` : "",
+                role("مسؤول") ? `${role("مسؤول")} مسؤول` : "",
+                role("صاحب المحفظة") ? `${role("صاحب المحفظة")} في محفظتك` : "",
+              ]
+                .filter(Boolean)
+                .join(" · ") +
+              ` — ${n("kpi")} مؤشرات · ${n("init")} مبادرات · ${n("win")} مكاسب`
             : t("لا يخصّك بندٌ في الخطة بعد", "Nothing yet"),
           warn: late
             ? t(`${late} متأخرة`, `${late} late`)
