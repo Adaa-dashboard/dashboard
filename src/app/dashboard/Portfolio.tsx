@@ -2779,8 +2779,8 @@ function Contrib({ rows, meName, t }: { rows: Row[]; meName: string; t: T }) {
       <div className="cb-h">
         <span>
           {t(
-            "كل بندٍ في الخطة التشغيلية أنت راعيه أو المسؤول عنه يظهر هنا. التحديث من هنا يصل صفحة «الخطة التشغيلية» مباشرة.",
-            "Every plan item you sponsor or own. Updates here reach the plan page.",
+            "كل بندٍ في الخطة التشغيلية أنت راعيه أو المسؤول عنه أو صاحبُ محفظته يظهر هنا. التحديث من هنا يصل صفحة «الخطة التشغيلية» مباشرة.",
+            "Every plan item you sponsor, own, or hold in your portfolio. Updates here reach the plan page.",
           )}
         </span>
         <button
@@ -2802,6 +2802,12 @@ function Contrib({ rows, meName, t }: { rows: Row[]; meName: string; t: T }) {
         <div className="brk">
           <span className="r sp">{t("راعٍ", "Sponsor")} <b>{nRole("راعي")}</b></span>
           <span className="r as">{t("مسؤول", "Owner")} <b>{nRole("مسؤول")}</b></span>
+          {/* مدير المحفظة: بنود محفظته التي ليس هو راعيها ولا المسؤول عنها */}
+          {nRole("صاحب المحفظة") > 0 && (
+            <span className="r ow">
+              {t("في محفظتك", "Your portfolio")} <b>{nRole("صاحب المحفظة")}</b>
+            </span>
+          )}
           {CONTRIB_KINDS.map(({ k, label }) => (
             <span className="r kd" key={k}>
               {label} <b>{mine.filter((x) => txt(x.data.kind) === k).length}</b>
