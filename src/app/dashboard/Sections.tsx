@@ -3661,13 +3661,17 @@ export function Projects({
             <span className="ic">
               <PIcon id={x.ic} size={20} />
             </span>
-            <b>{AR(x.n)}</b>
-            <span className="l">{x.l}</span>
+            {/* الرقم وعنوانه معاً إلى جوار الأيقونة — كانا يُدفعان
+                إلى الطرف الآخر فيبتعد الكلام عن أيقونته */}
+            <span className="tx">
+              <b>{AR(x.n)}</b>
+              <span className="l">{x.l}</span>
+            </span>
           </div>
         ))}
       </div>
 
-      <div className="pjx-g">
+      <div className={`pjx-g ${compact ? "lite" : ""}`}>
         {items.map((it) => {
           const d = it.data;
           const live = isPdash(d) ? pdash : null;
@@ -3812,7 +3816,8 @@ export function Projects({
               </div>
               )}
 
-              {notes.length > 0 && (
+              {/* «أبرز المستجدات» تفصيلٌ لا موجز: لا تظهر في نظرة عامة */}
+              {!compact && notes.length > 0 && (
                 <div className="pjx-up">
                   <div className="hd">
                     <PIcon id="note" size={15} />

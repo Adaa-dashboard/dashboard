@@ -6328,13 +6328,21 @@ textarea.wk-updin:focus {
   color: var(--gt-700);
   flex: 0 0 auto;
 }
+/* الرقم وعنوانه عمودٌ واحد إلى جوار الأيقونة */
+.pjx-kp .tx {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: start;
+  gap: 4px;
+  min-width: 0;
+}
 .pjx-kp b {
   font-family: "Noto Kufi Arabic", sans-serif;
   font-size: 22px;
   font-weight: 800;
   color: var(--gt-900);
   line-height: 1;
-  margin-inline-start: auto;
 }
 .pjx-kp .l {
   font-size: 11.5px;
@@ -6359,6 +6367,26 @@ textarea.wk-updin:focus {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+}
+/* موجز «نظرة عامة»: البطاقتان بقياسٍ واحد وشريط المراحل في أسفل
+   كلٍّ منهما، فيصطفّان على مستوىً واحد مهما اختلف ما فوقهما */
+.pjx-g.lite {
+  align-items: stretch;
+  grid-auto-rows: 1fr;
+}
+.pjx-g.lite .pjx {
+  display: flex;
+  flex-direction: column;
+}
+.pjx-g.lite .pjx-sg {
+  margin-top: auto;
+}
+/* أسطورةُ الموجز عمودان ثابتان: أربعة أسماء في سطرين في البطاقتين
+   معاً، فيقع الشريطان على مستوىً واحد لا يفرّقهما التفاف اسمٍ طويل */
+.pjx-g.lite .pjx-sg .lg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px 14px;
 }
 .pjx {
   position: relative;
