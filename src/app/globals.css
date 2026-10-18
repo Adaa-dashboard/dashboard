@@ -6751,8 +6751,18 @@ textarea.wk-updin:focus {
   transition: opacity 0.15s;
 }
 .sx-pj:hover .sx-pj-x,
-.sx-pj:focus-within .sx-pj-x {
+.sx-pj:focus-within .sx-pj-x,
+/* بطاقة المشروع الجديدة `.pjx`: أزرارها كانت تبقى شفافةً أبداً
+   لأن القاعدة كانت على `.sx-pj` وحدها، فلا يُرى زرّ التعديل */
+.pjx:hover .sx-pj-x,
+.pjx:focus-within .sx-pj-x {
   opacity: 1;
+}
+/* على اللمس لا مرورَ: تبقى ظاهرةً باهتة */
+@media (hover: none) {
+  .sx-pj-x {
+    opacity: 0.75;
+  }
 }
 
 /* ملاحظة المشروع — سطر هادئ أسفل الشريطين */
