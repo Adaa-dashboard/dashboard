@@ -1516,7 +1516,9 @@ function Overview({
         title={t(SECTION_TITLE.projects[0], SECTION_TITLE.projects[1])}
         extra={<MoreLink k="projects" scopes={me.scopes} onOpen={onOpenTab} />}
       >
-        <Projects t={t} canEdit={false} />
+        {/* موجزٌ لا تفصيل: المخرجات بأسمائها ونسبها، والكميات
+            تبقى في صفحة المشاريع لمن يفتحها */}
+        <Projects t={t} canEdit={false} compact />
       </Sec>
 
       {hasScope(me.scopes, "changes") && (

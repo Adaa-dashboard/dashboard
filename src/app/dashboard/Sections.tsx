@@ -3593,7 +3593,20 @@ function PjRing({ pct, late }: { pct: number; late: boolean }) {
 /** مشروعٌ مربوطٌ بلوحة متابعة المشروع — أرقامه تُقرأ منها لا تُكتب */
 const isPdash = (d: Rec) => /^(نعم|yes|y|1|true)$/i.test(txt(d.pdash).trim());
 
-export function Projects({ t, canEdit }: { t: T; canEdit: boolean }) {
+/** الاسم المختصر للمخرج — ما قبل الشَّرطة: «المخرج الأول» */
+const shortOut = (n: string) => (n.split(/[—–]/)[0] || n).trim() || n;
+
+export function Projects({
+  t,
+  canEdit,
+  /* **في «نظرة عامة» موجزٌ لا تفصيل**: شريط المراحل بأسماء المخرجات
+     ونسبها وحدها — بلا كميات ولا أعداد، فليست لكل من يفتح الصفحة */
+  compact = false,
+}: {
+  t: T;
+  canEdit: boolean;
+  compact?: boolean;
+}) {
   const { items, loaded, remove, undo, undoTop, dismissUndo, reload } = useItems("projects");
   const [edit, setEdit] = useState<Item | null>(null);
   /* أرقام لوحة متابعة المشروع — تُقرأ مرةً عند فتح الصفحة، وتُعاد
@@ -3734,7 +3747,7 @@ export function Projects({ t, canEdit }: { t: T; canEdit: boolean }) {
 
               {/* مخرجاتٌ لها كميات ⇒ صفٌّ لكل مخرج فيه شريطُه وعدداه،
                   كما في لوحة متابعة المشروع. وإلا فشريط المراحل كما كان */}
-              {stages.some((x) => x.total) ? (
+              {stages.some((x) => x.total) && !compact ? (
                 <div className="pjx-out">
                   <div className="hd">
                     {t("مخرجات المشروع", "Project outputs")}
@@ -3770,7 +3783,11 @@ export function Projects({ t, canEdit }: { t: T; canEdit: boolean }) {
                 </div>
               ) : (
               <div className="pjx-sg">
-                <div className="hd">{t("توزيع مراحل المشروع", "Project stages")}</div>
+                <div className="hd">
+                  {live
+                    ? t("مخرجات المشروع", "Project outputs")
+                    : t("توزيع مراحل المشروع", "Project stages")}
+                </div>
                 <div className="bar">
                   {stages.map((x, i) => (
                     <span className="seg" key={x.name + i}>
@@ -3787,7 +3804,7 @@ export function Projects({ t, canEdit }: { t: T; canEdit: boolean }) {
                   {stages.map((x, i) => (
                     <span key={x.name + i}>
                       <i style={{ background: PJ_COLORS[i % PJ_COLORS.length] }} />
-                      {x.name}
+                      {compact ? shortOut(x.name) : x.name}
                       <u>{AR(Math.round(x.pct))}٪</u>
                     </span>
                   ))}
