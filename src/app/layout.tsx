@@ -1,9 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
+/* بلا `description`: معاينةُ الرابط في المحادثات تعرضها سطراً
+   تحت العنوان، والمطلوب اسمُ المنصة وحده — بطلب صاحبة المنصة */
 export const metadata: Metadata = {
   title: "إدارة عمليات الأداء",
-  description: "لوحة قياس أداء القطاعات — المستهدف والمنجز أسبوعيًا",
 };
 
 export const viewport: Viewport = {
