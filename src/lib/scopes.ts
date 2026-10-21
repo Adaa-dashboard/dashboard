@@ -20,6 +20,7 @@ export type Scope =
   | "projects"
   | "opplan"
   | "opplan:edit"
+  | "opplan:mine"
   | "cx"
   | "notesq"
   | "notesq:edit"
@@ -77,7 +78,12 @@ export const SCOPE_GROUPS: { title: string; items: { key: Scope; label: string; 
        تحريره. فمدير القطاع يرى الأقسام كلها ولا يحدّث إلا قسمه. */
     title: "تحرير بيانات الأقسام",
     items: [
-      { key: "opplan:edit", label: "تحرير الخطة التشغيلية", note: "صاحب المحفظة يحدّث بنوده" },
+      { key: "opplan:edit", label: "تحرير الخطة التشغيلية", note: "الخطة كلها: البنود والمستهدفات والمحافظ" },
+      {
+        key: "opplan:mine",
+        label: "تحديث محفظتي في الخطة التشغيلية",
+        note: "بنود محفظته وحدها: الحالة والفعلي الربعي والملاحظة — لا المستهدفات",
+      },
       { key: "sessions:edit", label: "تحرير جلسات مراجعة الأداء" },
       { key: "natstrat:edit", label: "تحرير الاستراتيجيات الوطنية" },
       { key: "inststrat:edit", label: "تحرير الاستراتيجيات المؤسسية" },

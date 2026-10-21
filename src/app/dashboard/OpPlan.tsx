@@ -550,7 +550,21 @@ function OpPeople({
   );
 }
 
-export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
+export default function OpPlan({
+  t,
+  canEdit,
+  /** **تحديث محفظته وحدها** (`opplan:mine`): لمن لا يحرّر الخطة
+      كلها — الحالة والفعلي الربعي والملاحظة لبنودٍ هو صاحب محفظتها
+      أو راعيها أو المسؤول عنها. والتحقّق الحقيقي في دالّة القاعدة
+      `perf_opplan_mine_save` بالاسم، لا في هذا الوسيط */
+  canMine = false,
+  meName = "",
+}: {
+  t: T;
+  canEdit: boolean;
+  canMine?: boolean;
+  meName?: string;
+}) {
   const { items, loaded, save, remove, reload } = useItems("opplan");
   const [own, setOwn] = useState("");
   /* نوعٌ واحد معروض، أو الثلاثة. يُختار من شريحة البطاقة أو من
@@ -581,6 +595,8 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
       .catch(() => {});
   }, []);
   const [edit, setEdit] = useState<Item | null>(null);
+  /* البند الذي يُحدّثه صاحب المحفظة — نافذةٌ أضيق من نافذة التحرير */
+  const [mine, setMine] = useState<Item | null>(null);
   /* بندٌ جديد لم يُحفَظ بعد — نفس نافذة التعديل، والفرق أن الحذف
      يُخفى والعنوان يقول «إضافة» */
   const [add, setAdd] = useState<Item | null>(null);
@@ -624,6 +640,9 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
       ...(k === "init" ? { itype: INIT_TYPES[0] } : {}),
     },
   });
+
+  /* يخصّه البند؟ — صاحب محفظته أو راعيه أو المسؤول عنه */
+  const isMine = (d: Rec) => canMine && !canEdit && !!meName && opRoles(d, meName).length > 0;
 
   const shown = own ? rows.filter((r) => txt(r.data.owner) === own) : rows;
   const of = (k: string) => shown.filter((r) => txt(r.data.kind) === k);
@@ -766,7 +785,15 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
               <b>{of(k).length}</b>
             </h3>
             {of(k).map((r) => (
-              <OpCard key={r.id} r={r} canEdit={canEdit} t={t} onEdit={() => setEdit(r)} />
+              <OpCard
+                key={r.id}
+                r={r}
+                canEdit={canEdit}
+                mine={isMine(r.data)}
+                onMine={() => setMine(r)}
+                t={t}
+                onEdit={() => setEdit(r)}
+              />
             ))}
             {!of(k).length && <div className="op-none">{t("لا توجد بنود", "Nothing here")}</div>}
             {/* الإضافة من ذيل العمود لا من رأس الصفحة: النوع يصير
@@ -780,6 +807,18 @@ export default function OpPlan({ t, canEdit }: { t: T; canEdit: boolean }) {
         ))}
       </div>
        </>
+      )}
+
+      {mine && (
+        <OpMine
+          it={mine}
+          t={t}
+          onClose={() => setMine(null)}
+          onSaved={() => {
+            setMine(null);
+            void reload();
+          }}
+        />
       )}
 
       {add && (
@@ -958,12 +997,15 @@ function OpXlsx({
 
 /* ---------------- بطاقة بند ---------------- */
 function OpCard({
-  r, canEdit, t, onEdit,
+  r, canEdit, t, onEdit, mine = false, onMine,
 }: {
   r: { id: string; ord: number; data: Rec; updatedAt?: string };
   canEdit: boolean;
   t: T;
   onEdit: () => void;
+  /** بندٌ يخصّ القارئ ويملك تحديث محفظته */
+  mine?: boolean;
+  onMine?: () => void;
 }) {
   const d = r.data;
   const kind = txt(d.kind);
@@ -992,11 +1034,17 @@ function OpCard({
             {t(`مساهمة · ${txt(d.contributor)}`, txt(d.contributor))}
           </span>
         )}
-        {canEdit && (
+        {canEdit ? (
           <button className="op-pen" title={t("تعديل", "Edit")} onClick={onEdit}>
             ✎
           </button>
-        )}
+        ) : mine && onMine ? (
+          /* لمن يحدّث محفظته: زرٌّ صريحٌ لا قلم — فما يفتحه أضيق
+             من التحرير: الحالة والفعلي والملاحظة */
+          <button className="op-up" onClick={onMine}>
+            {t("تحديث", "Update")}
+          </button>
+        ) : null}
       </div>
 
       {kind === "kpi" && (
@@ -1043,6 +1091,129 @@ function OpCard({
 }
 
 /* ---------------- نافذة التعديل ---------------- */
+/* ------------------------------------------------------------
+   نافذة صاحب المحفظة — أضيق من نافذة التحرير عمداً:
+   الحالة والفعلي الربعي والملاحظة لا غير. والمستهدفات واسم البند
+   ومحفظته بنودُ خطةٍ معتمدة، لا تُمسّ إلا بصلاحية تحرير الخطة.
+   والحفظ عبر `/api/opplan/mine` — دالّةٌ في القاعدة تتحقّق بنفسها
+   أن البند يخصّ صاحب الجلسة، فالواجهة لا تمنح أحداً شيئاً.
+   ------------------------------------------------------------ */
+function OpMine({
+  it, t, onClose, onSaved,
+}: {
+  it: Item;
+  t: T;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [f, setF] = useState<Rec>({ ...(it.data as Rec) });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const kind = txt(it.data.kind);
+  const unit = txt(it.data.unit) === "عدد" ? "" : "٪";
+  const set = (k: string, v: unknown) => setF((o) => ({ ...o, [k]: v }));
+  const val = (k: string) => {
+    const v = f[k];
+    return v === undefined || v === null || v === "" ? "" : String(v);
+  };
+
+  async function submit() {
+    setBusy(true);
+    setErr("");
+    const patch: Rec = {
+      status: txt(f.status),
+      note: txt(f.note),
+    };
+    for (const i of [1, 2, 3, 4]) {
+      const k = `q${i}a`;
+      const v = val(k);
+      patch[k] = v.trim() === "" ? null : Number(v);
+    }
+    const r = await apiFetch("/api/opplan/mine", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: it.id, patch }),
+    });
+    const j = await r.json().catch(() => ({}));
+    setBusy(false);
+    if (!r.ok) {
+      setErr(txt(j.error) || t("تعذّر الحفظ", "Save failed"));
+      return;
+    }
+    onSaved();
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <div className="m-h">
+          <h3>{t("تحديث بند الخطة", "Update plan item")}</h3>
+          <button className="mx" onClick={onClose} aria-label="close">✕</button>
+        </div>
+
+        <div className="cb-ed">
+          <p className="nm">{txt(it.data.name)}</p>
+          <p className="mt">
+            <span>
+              {t("محفظة", "Portfolio")} <b>{txt(it.data.owner) || "—"}</b>
+            </span>
+            {has(it.data.sponsor) && (
+              <span>
+                {t("الراعي", "Sponsor")} <b>{txt(it.data.sponsor)}</b>
+              </span>
+            )}
+            {has(it.data.assignee) && (
+              <span>
+                {t("المسؤول", "Owner")} <b>{txt(it.data.assignee)}</b>
+              </span>
+            )}
+          </p>
+        </div>
+
+        <div className="op-f">
+          <label>
+            <span>{t("الحالة", "Status")}</span>
+            <select value={txt(f.status)} onChange={(e) => set("status", e.target.value)}>
+              <option value="">
+                {kind === "kpi" ? t("تلقائي من الأرباع", "Auto") : t("— اختر —", "— pick —")}
+              </option>
+              {statusesOf(kind).map((x: string) => (
+                <option key={x} value={x}>{x}</option>
+              ))}
+            </select>
+          </label>
+          {[1, 2, 3, 4].map((i) => (
+            <label key={i}>
+              <span>{t(`الفعلي Q${i}`, `Actual Q${i}`)} {unit}</span>
+              <input
+                type="number"
+                value={val(`q${i}a`)}
+                onChange={(e) => set(`q${i}a`, e.target.value)}
+              />
+            </label>
+          ))}
+          <label className="wide">
+            <span>{t("ملاحظة", "Note")}</span>
+            <textarea rows={2} value={txt(f.note)} onChange={(e) => set("note", e.target.value)} />
+          </label>
+        </div>
+
+        {err && <div className="alert alert-error">{err}</div>}
+
+        <div className="m-f">
+          <div style={{ flex: 1 }} />
+          <button className="btn btn-ghost btn-sm" onClick={onClose}>
+            {t("إلغاء", "Cancel")}
+          </button>
+          <button className="btn btn-sm" onClick={() => void submit()} disabled={busy}>
+            {busy ? t("جارٍ الحفظ…", "Saving…") : t("حفظ", "Save")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OpEdit({
   it, t, owners, onClose, onSave, onDelete, isNew,
 }: {

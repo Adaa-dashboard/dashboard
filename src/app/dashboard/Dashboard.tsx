@@ -823,7 +823,13 @@ export default function Dashboard({ me }: { me: Me }) {
                 />
               )}
               {tab === "opplan" && can("opplan") && (
-                <OpPlan t={t} canEdit={can("opplan:edit")} />
+                <OpPlan
+                  t={t}
+                  canEdit={can("opplan:edit")}
+                  /* صاحب المحفظة يحدّث بنوده من الصفحة نفسها */
+                  canMine={can("opplan:mine")}
+                  meName={me.name || ""}
+                />
               )}
               {tab === "changes" && can("changes") && (
                 <Changes
