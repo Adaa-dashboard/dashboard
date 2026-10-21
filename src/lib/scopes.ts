@@ -106,7 +106,14 @@ export const SCOPE_GROUPS: { title: string; items: { key: Scope; label: string; 
     items: [
       { key: "details:all", label: "كل القطاعات", note: "بدل قطاعاته وحدها" },
       { key: "targets", label: "تعديل المستهدفات", note: "في قطاعاته — لمدير القطاع" },
-      { key: "tasks:all", label: "كل المهام", note: "بدل مهامه وحدها" },
+      /* بعد أن صارت المهمة الشخصية خاصّةً بصاحبها، لم تعد هذه
+         الصلاحية تفتح مهام أحد — وإنما التكاليف الواردة للإدارة.
+         فاسمها يقول ما تفعله */
+      {
+        key: "tasks:all",
+        label: "كل التكاليف",
+        note: "كل التكاليف الواردة للإدارة، لا ما أُسند إليه وحده — والمهام الشخصية تبقى لأصحابها",
+      },
     ],
   },
   {
@@ -150,7 +157,7 @@ export const PAGE_ROWS: { title: string; rows: PageRow[] }[] = [
       },
       {
         view: "tasks", label: "المهام", note: "مهامه في محفظتي · والصفحة المستقلة لمن يُسند",
-        extra: { key: "tasks:all", label: "كل المهام" },
+        extra: { key: "tasks:all", label: "كل التكاليف" },
       },
       {
         view: "weekly", label: "الإنجاز الأسبوعي", note: "للمدراء ومدير الإدارة",
