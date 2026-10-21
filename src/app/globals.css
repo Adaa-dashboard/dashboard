@@ -12110,6 +12110,67 @@ button.cr-p.tm-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px 
 .lp-note {
   margin: -6px 2px 16px; font-size: 11.5px; line-height: 1.8; color: var(--muted);
 }
+/* رأسُ المدير في المعاينة — كرأس محفظته، بلا أزرار تعديل */
+.lp-hero { margin-bottom: 10px; }
+.lp-hero .joined { pointer-events: none; }
+/* التقويم والملاحظات: مكانُهما يُشار إليه ولا يُعرض محتواه */
+.lp-priv { display: flex; gap: 10px; margin: 0 0 14px; flex-wrap: wrap; }
+.lp-priv > div {
+  flex: 1 1 220px; border: 1px dashed var(--border); border-radius: 14px;
+  padding: 12px 15px; background: var(--soft); color: var(--muted);
+  font-size: 11.5px; line-height: 1.7;
+}
+.lp-priv b { display: block; font-size: 12.5px; color: var(--gt-700); margin-bottom: 3px; }
+/* عنوانُ مجموعةٍ داخل المعاينة */
+.sec-h {
+  margin: 16px 2px 8px; font-size: 13px; font-weight: 800; color: var(--gt-900);
+  font-family: "Noto Kufi Arabic", sans-serif;
+}
+
+/* بطاقات القطاع المصغَّرة — عددُها أكبر فلا تحتمل مقاس المنصّة */
+.pf-team-c.sm { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.pf-team-c.sm .cr-p { padding: 11px 8px 8px; border-radius: 14px; gap: 1px; }
+.pf-team-c.sm .av2 { width: 40px; height: 40px; font-size: 15px; border-width: 2px; margin-bottom: 3px; }
+.pf-team-c.sm .mark { width: 84px; height: 84px; inset-block-start: -16px; inset-inline-start: -18px; }
+.pf-team-c.sm b { font-size: 11.5px; }
+.pf-team-c.sm em { font-size: 16px; }
+.pf-team-c.sm i { font-size: 9px; }
+.pf-team-c.sm .rk { font-size: 9.5px; padding: 4px 0; margin-top: 6px; border-radius: 8px; }
+
+/* ------------------------------------------------------------
+   صفحة زميلٍ يُطَّلع عليها: مربّعاتٌ بالترتيب، ويُفتح واحدٌ منها
+   ------------------------------------------------------------ */
+.sh-tiles {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px; margin: 0 0 16px;
+}
+@media (max-width: 1100px) { .sh-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .sh-tiles { grid-template-columns: 1fr; } }
+.sh-tile {
+  font: inherit; text-align: start; cursor: pointer;
+  display: flex; flex-direction: column; gap: 3px;
+  border: 1px solid var(--border); border-radius: 14px;
+  background: var(--panel); padding: 11px 13px;
+  border-top: 3px solid var(--c);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.sh-tile:hover { box-shadow: 0 4px 14px rgba(0, 60, 50, 0.1); }
+.sh-tile.on { border-color: var(--c); box-shadow: 0 4px 14px rgba(0, 60, 50, 0.14); }
+.sh-tile .k { font-size: 12px; font-weight: 700; color: var(--gt-900); line-height: 1.5; }
+.sh-tile .v {
+  font-family: "Noto Kufi Arabic", sans-serif; font-size: 20px; font-weight: 800; color: var(--gt-900);
+}
+.sh-tile .s { font-size: 10.5px; color: var(--muted); }
+
+/* ملاحظة الموظف على مؤشرٍ من أهدافه */
+.gl-nt2 { margin-top: 7px; }
+.gl-nt2 textarea { width: 100%; }
+.gl-nt2.ro {
+  font-size: 11.5px; line-height: 1.8; color: var(--gt-700);
+  background: var(--soft); border: 1px solid var(--border);
+  border-radius: 9px; padding: 7px 10px;
+}
+.gl-nt2.ro b { color: var(--muted); font-weight: 700; }
 
 /* ------------------------------------------------------------
    طلبات التغيير: خطّ الفترات وأعمدة القطاعات

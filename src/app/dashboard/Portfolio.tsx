@@ -191,6 +191,9 @@ type Prefs = {
   /** مؤشرات يضيفها صاحب المحفظة فوق السبعة المشتركة — للمدير
       مؤشراتٌ زائدة على مؤشرات موظفيه */
   ownGoals?: OwnGoal[];
+  /** ملاحظة صاحب المحفظة على كل مؤشر — يقرؤها مديرُ قطاعه في
+      صفحته، فيُعرف سببُ الرقم لا الرقم وحده */
+  goalNotes?: Record<string, string>;
   /** علامة ترحيل الترتيب الافتراضي الجديد */
   v2?: boolean;
   /** علامة ترحيل هيكل «الأعمال الرئيسية» */
@@ -2197,7 +2200,7 @@ function DevPlan({
 
 
 function MainWork({
-  sec, rows, all, sess, loaded, extras, canEdit, t, onExtra, onPatch, onReload, full,
+  sec, rows, all, sess, loaded, extras, canEdit, t, onExtra, onPatch, onReload, full, readOnly,
 }: {
   sec: MainSec;
   /** بنود جهاتي في هذا القسم — تُقرأ مرّةً في الصفحة وتُمرَّر هنا */
@@ -2217,6 +2220,8 @@ function MainWork({
   onReload: () => void;
   /** داخل النافذة: الجدول كاملاً. وفي البطاقة: أول ثلاثة صفوف */
   full?: boolean;
+  /** صفحةُ زميلٍ يُطَّلع عليها — بلا إضافةٍ ولا ربط */
+  readOnly?: boolean;
 }) {
   const [msg, setMsg] = useState("");
   const [yr, setYr] = useState(YR_NOW);
@@ -2364,9 +2369,11 @@ function MainWork({
             ))}
           </select>
           <b>{t(`${rows.length} جهة`, `${rows.length} entities`)}</b>
-          <button className="mw-add" onClick={() => setAdd({ entity: "", title: "" })}>
-            + {t("إضافة أو ربط", "Add or link")}
-          </button>
+          {!readOnly && (
+            <button className="mw-add" onClick={() => setAdd({ entity: "", title: "" })}>
+              + {t("إضافة أو ربط", "Add or link")}
+            </button>
+          )}
         </div>
       )}
       {!rows.length && (
@@ -4045,6 +4052,18 @@ type Grant = { userId: string; name: string; jobTitle?: string; scopes: string[]
    صفراً — كما في بطاقة الأهداف تماماً: يُرجَّح المرصود وحده،
    ويُقال كم رُصد منه.
    ============================================================ */
+export type PGRow = {
+  id: string;
+  kpi: string;
+  target: number;
+  weight: number;
+  unit: "عدد" | "%";
+  got: number | null;
+  pct: number | null;
+  src: string;
+  note: string;
+};
+
 function personGoals(a: {
   name: string;
   /** أسماء جهاته مُطبَّعة — هو نقطة تواصلها الأساسية */
@@ -4053,7 +4072,10 @@ function personGoals(a: {
   commit?: CommitRow;
   /** صفوف آخر ربعٍ في جودة ملاحظات الأداء */
   nq: { rows: { data: Rec }[]; q: string } | null;
-}): { pct: number | null; have: number } {
+  /** نسخةُ أهدافه المحفوظة في محفظته — الأرقام المُدخَلة
+      والتعديلات والمؤشرات المضافة والملاحظات */
+  mirror?: Rec;
+}): { pct: number | null; have: number; rows: PGRow[] } {
   const mineOf = (k: MainSec) =>
     a.all[k].filter((it) => {
       const c = txt(it.data.consultant).trim();
@@ -4069,14 +4091,47 @@ function personGoals(a: {
     commit: a.commit ? a.commit.pct : null,
     opplan: nqSt ? nqSt.pct : null,
   };
-  const parts = ANNUAL_GOALS.filter((g) => g.from in got).map((g) => {
-    const v = got[g.from];
-    return { w: g.weight, p: v === null || v === undefined || g.target <= 0 ? null : Math.min(100, Math.round((v / g.target) * 100)) };
+  const SRC: Record<string, string> = {
+    inststrat: "من صفحة الاستراتيجيات المؤسسية",
+    cx: "من صفحة تجربة المستفيد",
+    natstrat: "من صفحة الاستراتيجيات الوطنية",
+    commit: "من جدول طلبات التغيير",
+    opplan: "من صفحة جودة ملاحظات الأداء",
+  };
+
+  /* تعديلاتُه على السبعة ومؤشراتُه المضافة — من نسخته المحفوظة */
+  const mir = a.mirror || {};
+  const ed = (mir.goalEdits || {}) as Record<string, GoalEdit>;
+  const man = (mir.goals || {}) as Record<string, number>;
+  const notes = (mir.goalNotes || {}) as Record<string, string>;
+  const own = (Array.isArray(mir.ownGoals) ? mir.ownGoals : []) as OwnGoal[];
+  const list = [
+    ...ANNUAL_GOALS.filter((g) => !ed[g.id]?.off).map((g) => editedGoal(g, ed[g.id])),
+    ...own.map(ownAsGoal),
+  ];
+
+  const rows: PGRow[] = list.map((g) => {
+    const auto = g.from in got;
+    const v = auto ? (got[g.from] as number | null) : man[g.id] === undefined ? null : num(man[g.id]);
+    return {
+      id: g.id,
+      kpi: g.kpi,
+      target: g.target,
+      weight: g.weight,
+      unit: g.unit,
+      got: v,
+      pct: v === null || g.target <= 0 ? null : Math.min(100, Math.round((v / g.target) * 100)),
+      src: auto ? `${SRC[g.from]} — تُقرأ آلياً` : "يُدخل رقمه صاحب المحفظة",
+      note: txt(notes[g.id]),
+    };
   });
-  const have = parts.filter((x) => x.p !== null);
-  const w = have.reduce((x, r) => x + r.w, 0);
-  if (!w) return { pct: null, have: 0 };
-  return { pct: Math.round(have.reduce((x, r) => x + (r.p as number) * r.w, 0) / w), have: have.length };
+  const have = rows.filter((r) => r.pct !== null);
+  const w = have.reduce((x, r) => x + r.weight, 0);
+  return {
+    pct: w ? Math.round(have.reduce((x, r) => x + (r.pct as number) * r.weight, 0) / w) : null,
+    have: have.length,
+    rows,
+  };
 }
 
 /** تدرّج بطاقات الفريق — كبطاقات «أعلى الاستشاريين التزاماً» */
@@ -4101,7 +4156,9 @@ const SHARE_OPTS: { k: string; label: string }[] = [
 /* أقسامٌ لا تُعرض جدولاً في محفظةٍ مُطَّلَعٍ عليها: `mainx` بياناتٌ
    مساعدة مفاتيحها «القسم:معرّف البند»، فجدولُها صفوفُ رموز بلا
    معنى — تُعرض داخل «الأعمال الرئيسية» في مكانها الصحيح */
-const SH_SKIP = new Set(["mainx"]);
+/* و`goals` نسخةُ أهدافه المقروءة لمديره — تُعرض في مربّعها لا
+   جدولاً من رموز */
+const SH_SKIP = new Set(["mainx", "goals"]);
 
 function GrantsBox({ prefs, meId, t }: { prefs: Prefs; meId: string; t: T }) {
   const [grants, setGrants] = useState<Grant[]>([]);
@@ -4235,35 +4292,27 @@ function GrantsBox({ prefs, meId, t }: { prefs: Prefs; meId: string; t: T }) {
 }
 
 /* ============================================================
-   الأعمال الرئيسية في محفظةٍ مُطَّلَعٍ عليها
+   أعمال صاحب المحفظة الرئيسية — تُقرأ لمن يطّلع على صفحته
    ------------------------------------------------------------
    بنودُها ليست في `perf_portfolio` بل في `perf_items`، تُنتقى
-   بجهات صاحبها. فكان المدير يفتح محفظة استشاريٍّ فلا يرى **أهمّ**
-   ما فيها: استراتيجياته وجهاته — يرى طلباته ومهامه فقط.
-
-   جهاتُ صاحب المحفظة تُستنتج من سجلّ الجهات: نقطةُ تواصلٍ من
-   المركز مسندةٌ إليه بدور «أساسي». بلا دالةٍ جديدة في القاعدة.
+   بجهات صاحبها: نقطةُ تواصلٍ من المركز مسندةٌ إليه بدور «أساسي»،
+   أو اسمُه مكتوبٌ في البند استشارياً. بلا دالةٍ جديدة في القاعدة.
    ============================================================ */
-function SharedMain({
-  ownerId, ownerName, extras, t,
-}: {
-  ownerId: string;
-  ownerName: string;
-  /** بيانات المحفظة المساعدة لصاحبها — الأرباع والملاحظات */
-  extras: Record<string, Rec>;
-  t: T;
-}) {
+function useOwnerMain(ownerId: string, ownerName: string) {
   const [items, setItems] = useState<Record<MainSec, MineRow[]>>({ natstrat: [], inststrat: [], cx: [] });
+  const [ents, setEnts] = useState<Set<string>>(new Set());
+  const [op, setOp] = useState<MyOp[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let live = true;
     void (async () => {
-      const [en, ...secs] = await Promise.all([
+      const [en, nat, inst, cx, opp] = await Promise.all([
         apiFetch("/api/entities").then((r) => r.json()).catch(() => ({})),
-        ...(["natstrat", "inststrat", "cx"] as MainSec[]).map((k) =>
-          apiFetch(`/api/items?section=${k}`).then((r) => r.json()).catch(() => ({})),
-        ),
+        apiFetch("/api/items?section=natstrat").then((r) => r.json()).catch(() => ({})),
+        apiFetch("/api/items?section=inststrat").then((r) => r.json()).catch(() => ({})),
+        apiFetch("/api/items?section=cx").then((r) => r.json()).catch(() => ({})),
+        apiFetch("/api/items?section=opplan").then((r) => r.json()).catch(() => ({})),
       ]);
       if (!live) return;
       const names = new Set<string>();
@@ -4272,9 +4321,10 @@ function SharedMain({
         if (ours.some((c) => String(c.userId || "") === ownerId && txt(c.role || "أساسي") === "أساسي"))
           names.add(nrm(txt(e.name)));
       }
+      const src: Record<MainSec, Rec> = { natstrat: nat, inststrat: inst, cx };
       const out = { natstrat: [], inststrat: [], cx: [] } as Record<MainSec, MineRow[]>;
-      (["natstrat", "inststrat", "cx"] as MainSec[]).forEach((k, i) => {
-        const all = (Array.isArray(secs[i]?.items) ? secs[i].items : []) as MineRow[];
+      (["natstrat", "inststrat", "cx"] as MainSec[]).forEach((k) => {
+        const all = (Array.isArray(src[k].items) ? src[k].items : []) as MineRow[];
         out[k] = all.filter((it) => {
           const c = txt(it.data.consultant).trim();
           if (c && nrm(c) === nrm(ownerName)) return true;
@@ -4282,6 +4332,8 @@ function SharedMain({
         });
       });
       setItems(out);
+      setEnts(names);
+      setOp(myOpItems((Array.isArray(opp.items) ? opp.items : []) as { id: string; data: Rec }[], ownerName));
       setLoaded(true);
     })();
     return () => {
@@ -4289,66 +4341,40 @@ function SharedMain({
     };
   }, [ownerId, ownerName]);
 
-  if (!loaded) return null;
-  const any = (["natstrat", "inststrat", "cx"] as MainSec[]).some((k) => items[k].length);
-  if (!any) return null;
-
-  return (
-    <>
-      {(["natstrat", "inststrat", "cx"] as MainSec[]).map((k) =>
-        items[k].length ? (
-          <div className="sh-sec" key={k}>
-            <h3>
-              {t(WIDGETS.find((w) => w.key === k)?.label || k, k)} <b>{items[k].length}</b>
-            </h3>
-            <div className="tblwrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>{t("البند", "Item")}</th>
-                    {MAIN_FIELDS[k].slice(0, 4).map((f) => (
-                      <th key={f.k}>{f.label}</th>
-                    ))}
-                    <th>{t("الأرباع", "Quarters")}</th>
-                    <th>{t("ملاحظات", "Notes")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items[k].map((it) => {
-                    const ex = extras[`${k}:${it.id}`] || {};
-                    const q = qOf(ex, YR_NOW);
-                    return (
-                      <tr key={it.id}>
-                        <td>{txt(it.data[MAIN_TITLE[k]]) || txt(it.data[MAIN_ENT[k]]) || "—"}</td>
-                        {MAIN_FIELDS[k].slice(0, 4).map((f) => (
-                          <td key={f.k}>{txt(it.data[f.k]) || "—"}</td>
-                        ))}
-                        <td>{q.some(Boolean) ? q.map((v, i) => (v ? `Q${i + 1}` : null)).filter(Boolean).join(" · ") : "—"}</td>
-                        <td>{txt(ex.note) || "—"}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ) : null,
-      )}
-    </>
-  );
+  return { items, ents, op, loaded };
 }
 
-/* ---------------- محفظة شورِكت معي (اطّلاع فقط) ---------------- */
+/** أقسام «الأعمال التشغيلية» في المحفظة — تُجمع في مربّع واحد */
+const OPS_SECS = ["changes", "reverse", "workflow"];
+/** أنواع بنود الخطة التشغيلية بالعربية */
+const OP_KIND: Record<string, string> = { kpi: "مؤشر", init: "مبادرة", win: "مكسب سريع" };
+
+/* ============================================================
+   صفحة زميلٍ كما يفتحها مديرُه (أو من مُنح الاطّلاع)
+   ------------------------------------------------------------
+   مربّعاتٌ بالترتيب الذي طلبته صاحبة المنصة: الأهداف الفردية أولاً،
+   ثم الأعمال الرئيسية الثلاثة، ثم مساهماته في الخطة، ثم أعماله
+   التشغيلية ومشاريعه، ثم ما أضافه هو من أقسام. يُفتح المربّع
+   فتظهر تفاصيله تحته — والأهداف مفتوحةٌ أول ما تُفتح الصفحة.
+
+   **ولا تقويمَ ولا ملاحظات**: جدولهما `perf_user_data` مقصورٌ على
+   صاحبه بسياسة القاعدة، فلا يصلان أحداً مهما كانت صلاحيته.
+   ============================================================ */
 function SharedView({
-  owner, score, t, onBack,
+  owner, score, goalsOf, t, onBack,
 }: {
   owner: Grant;
-  /** نسبة أهدافه الفردية — تأتي من بطاقته في «فريقي» */
+  /** نسبة أهدافه — تأتي محسوبةً من بطاقته في «فريقي» */
   score?: { pct: number | null; have: number } | null;
+  /** صفوف أهدافه، تُحسب بنسخته المحفوظة في محفظته */
+  goalsOf?: (mirror: Rec) => { pct: number | null; have: number; rows: PGRow[] };
   t: T;
   onBack: () => void;
 }) {
   const pf = usePortfolio(owner.userId);
+  const mn = useOwnerMain(owner.userId, owner.name);
+  const [open, setOpen] = useState("goals");
+
   const bySection = useMemo(() => {
     const m: Record<string, Row[]> = {};
     for (const r of pf.rows) if (!SH_SKIP.has(r.section)) (m[r.section] = m[r.section] || []).push(r);
@@ -4359,65 +4385,268 @@ function SharedView({
     for (const r of pf.rows) if (r.section === "mainx") m[r.id] = r.data;
     return m;
   }, [pf.rows]);
+  /** نسخةُ أهدافه المحفوظة في محفظته */
+  const mirror = useMemo(() => pf.rows.find((r) => r.section === "goals")?.data || {}, [pf.rows]);
+  const goals = useMemo(() => (goalsOf ? goalsOf(mirror) : null), [goalsOf, mirror]);
 
   const secLabel = (k: string) => SHARE_OPTS.find((o) => o.k === k)?.label || k;
+  const nOf = (k: string) => (bySection[k] || []).length;
+  const opsRows = OPS_SECS.flatMap((k) => (bySection[k] || []).map((r) => ({ ...r, sec: k })));
+  /* أقسامٌ أضافها هو — تأتي بعد المعروفة بترتيبها */
+  const rest = Object.keys(bySection).filter(
+    (k) => ![...OPS_SECS, "projects", "contrib", "entities", "tasks"].includes(k),
+  );
+
+  const TILES: { k: string; label: string; color: string; v: string; sub: string; n: number }[] = [
+    {
+      k: "goals",
+      label: t("الأهداف الفردية", "Individual goals"),
+      color: "#016b5f",
+      v: (goals ? goals.pct : (score?.pct ?? null)) === null ? "—" : `${goals ? goals.pct : score?.pct}%`,
+      sub: goals
+        ? t(`${goals.rows.length} مؤشرات · ${goals.have} مرصودة`, `${goals.have} recorded`)
+        : t("نسبة التحقيق المرجَّحة", "Weighted"),
+      n: 1,
+    },
+    {
+      k: "natstrat", label: t("الاستراتيجيات الوطنية", "National strategies"), color: "#00584c",
+      v: String(mn.items.natstrat.length), sub: t("استراتيجية", "strategies"), n: mn.items.natstrat.length,
+    },
+    {
+      k: "inststrat", label: t("الاستراتيجيات المؤسسية", "Institutional"), color: "#016b5f",
+      v: String(mn.items.inststrat.length), sub: t("جهة", "entities"), n: mn.items.inststrat.length,
+    },
+    {
+      k: "cx", label: t("قياس تجربة المستفيد", "BEX"), color: "#008b84",
+      v: String(mn.items.cx.length), sub: t("جهة", "entities"), n: mn.items.cx.length,
+    },
+    {
+      k: "contrib", label: t("المساهمات في الخطة التشغيلية", "Op-plan contributions"), color: "#7a5cd1",
+      v: String(mn.op.length), sub: t("بنداً يساهم فيه", "items"), n: mn.op.length,
+    },
+    {
+      k: "ops", label: t("الأعمال التشغيلية", "Operations"), color: "#c9a020",
+      v: String(opsRows.length), sub: t("طلب تغيير · عكس · توثيق", "requests"), n: opsRows.length,
+    },
+    {
+      k: "projects", label: t("المشاريع الاستراتيجية", "Projects"), color: "#0f8a8a",
+      v: String(nOf("projects")), sub: t("مشروعاً", "projects"), n: nOf("projects"),
+    },
+    ...rest.map((k) => ({
+      k, label: secLabel(k), color: "#a24160",
+      v: String(nOf(k)), sub: t("قسمٌ أضافه بنفسه", "Own section"), n: nOf(k),
+    })),
+  ].filter((x) => x.n > 0);
+
+  /** جدول بنود قسمٍ من أقسام المحفظة */
+  const tbl = (rows: (Row & { sec?: string })[], sec: string) => {
+    const cols = COLS[sec] || [{ k: "name", label: "البند" }];
+    return (
+      <div className="tblwrap">
+        <table>
+          <thead>
+            <tr>
+              {sec === "ops" && <th>{t("القسم", "Section")}</th>}
+              {cols.map((c) => (
+                <th key={c.k}>{c.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={`${r.sec || sec}:${r.id}`}>
+                {sec === "ops" && <td>{secLabel(r.sec || "")}</td>}
+                {cols.map((c) => (
+                  <td key={c.k}>{txt(r.data?.[c.k]) || "—"}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
+  const nil = () => {};
+  const mainBox = (k: MainSec) => (
+    <MainWork
+      sec={k}
+      rows={mn.items[k]}
+      all={mn.items[k]}
+      sess={[]}
+      loaded={mn.loaded}
+      extras={extras}
+      canEdit={() => false}
+      readOnly
+      t={t}
+      full
+      onExtra={nil}
+      onPatch={nil}
+      onReload={nil}
+    />
+  );
 
   return (
-    <div className="pf shared">
+    <div className="pf shared sh-one">
       <div className="sh-head">
         <button className="btn2" onClick={onBack}>
-          ← {t("رجوع لمحفظتي", "Back")}
+          ← {t("رجوع", "Back")}
         </button>
         <div>
           <b>{owner.name}</b>
           {owner.jobTitle && <em>{owner.jobTitle}</em>}
         </div>
-        {score && (
-          <span className="sh-score" title={t(`${score.have} مؤشرات مرصودة`, `${score.have} recorded`)}>
+        {(goals || score) && (
+          <span className="sh-score">
             {t("تحقيق الأهداف الفردية", "Individual goals")}
-            <b>{score.pct === null ? "—" : `${score.pct}%`}</b>
+            <b>{(goals ? goals.pct : score?.pct) === null ? "—" : `${goals ? goals.pct : score?.pct}%`}</b>
           </span>
         )}
         <span className="sh-tag">{t("اطّلاع فقط", "Read only")}</span>
       </div>
 
-      <SharedMain ownerId={owner.userId} ownerName={owner.name} extras={extras} t={t} />
+      <div className="sh-tiles">
+        {TILES.map((x) => (
+          <button
+            key={x.k}
+            className={`sh-tile ${open === x.k ? "on" : ""}`}
+            style={{ ["--c" as string]: x.color }}
+            onClick={() => setOpen(open === x.k ? "" : x.k)}
+          >
+            <span className="k">{x.label}</span>
+            <span className="v">{x.v}</span>
+            <span className="s">{x.sub}</span>
+          </button>
+        ))}
+      </div>
 
-      {!pf.loaded ? (
+      {!pf.loaded || !mn.loaded ? (
         <div className="pf-none">{t("جارٍ التحميل...", "Loading...")}</div>
-      ) : !Object.keys(bySection).length ? (
-        <div className="pf-none">{t("لا توجد بنودٌ أضافها في الأقسام المشتركة معك.", "Nothing shared yet.")}</div>
+      ) : !TILES.length ? (
+        <div className="pf-none">{t("لا توجد بنودٌ في محفظته بعد.", "Nothing yet.")}</div>
       ) : (
-        Object.entries(bySection).map(([sec, rows]) => {
-          const cols = COLS[sec] || [{ k: "name", label: "البند" }];
-          return (
-            <div className="sh-sec" key={sec}>
+        <>
+          {open === "goals" && goals && (
+            <div className="sh-sec">
               <h3>
-                {secLabel(sec)} <b>{rows.length}</b>
+                {t("الأهداف الفردية", "Individual goals")} <b>{goals.rows.length}</b>
+              </h3>
+              <div className="gl-sum">
+                <div className="gl-big">
+                  <b>{goals.pct === null ? "—" : `${goals.pct}%`}</b>
+                  <span>{t("نسبة التحقيق المرجَّحة", "Weighted achievement")}</span>
+                </div>
+                <div className="gl-note">
+                  {t(
+                    `محسوبة على ${goals.have} من ${goals.rows.length} مؤشرات رُصدت. والمؤشر الذي لم يُرصد لا يُحتسب صفراً.`,
+                    `Over ${goals.have}/${goals.rows.length} recorded KPIs.`,
+                  )}
+                </div>
+              </div>
+              <div className="gl-list">
+                {goals.rows.map((g, i) => (
+                  <div
+                    className={`gl-i ${
+                      g.pct === null ? "gl-nt" : g.pct >= 100 ? "gl-ok" : g.pct >= 60 ? "gl-nw" : "gl-no"
+                    }`}
+                    key={g.id}
+                  >
+                    <div className="gl-t">
+                      <span className="n">
+                        {i + 1}. {g.kpi}
+                      </span>
+                      <span className="w">
+                        {t("الوزن", "Weight")} {g.weight}
+                      </span>
+                    </div>
+                    <div className="gl-m">
+                      <em>
+                        {t("المستهدف", "Target")}{" "}
+                        <b>
+                          {g.target}
+                          {g.unit === "%" ? "%" : ""}
+                        </b>
+                      </em>
+                      <em>
+                        {t("المحقّق", "Achieved")}{" "}
+                        <b>{g.got === null ? "—" : `${g.got}${g.unit === "%" ? "%" : ""}`}</b>
+                      </em>
+                      <em className="p">{g.pct === null ? "—" : `${g.pct}%`}</em>
+                    </div>
+                    <div className="gl-bar">
+                      <i style={{ width: `${g.pct ?? 0}%` }} />
+                    </div>
+                    <div className="gl-src">{g.src}</div>
+                    {g.note && (
+                      <div className="gl-nt2 ro">
+                        <b>{t("ملاحظة الموظف:", "Their note:")}</b> {g.note}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {(["natstrat", "inststrat", "cx"] as MainSec[]).map((k) =>
+            open === k ? (
+              <div className="sh-sec" key={k}>
+                <h3>
+                  {t(WIDGETS.find((w) => w.key === k)?.label || k, k)} <b>{mn.items[k].length}</b>
+                </h3>
+                {mainBox(k)}
+              </div>
+            ) : null,
+          )}
+
+          {open === "contrib" && (
+            <div className="sh-sec">
+              <h3>
+                {t("المساهمات في الخطة التشغيلية", "Op-plan contributions")} <b>{mn.op.length}</b>
               </h3>
               <div className="tblwrap">
                 <table>
                   <thead>
                     <tr>
-                      {cols.map((c) => (
-                        <th key={c.k}>{c.label}</th>
-                      ))}
+                      <th>{t("البند", "Item")}</th>
+                      <th>{t("النوع", "Kind")}</th>
+                      <th>{t("دوره", "Role")}</th>
+                      <th>{t("الحالة", "Status")}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((r) => (
-                      <tr key={r.id}>
-                        {cols.map((c) => (
-                          <td key={c.k}>{txt(r.data?.[c.k]) || "—"}</td>
-                        ))}
+                    {mn.op.map((x) => (
+                      <tr key={x.id}>
+                        <td>{txt(x.data.name) || "—"}</td>
+                        <td>{OP_KIND[txt(x.data.kind)] || txt(x.data.kind) || "—"}</td>
+                        <td>{x.roles.join(" · ") || "—"}</td>
+                        <td>{opStatus(x.data) || "—"}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             </div>
-          );
-        })
+          )}
+
+          {open === "ops" && (
+            <div className="sh-sec">
+              <h3>
+                {t("الأعمال التشغيلية", "Operations")} <b>{opsRows.length}</b>
+              </h3>
+              {tbl(opsRows, "ops")}
+            </div>
+          )}
+
+          {open !== "goals" && open !== "contrib" && open !== "ops" && !["natstrat", "inststrat", "cx"].includes(open) && bySection[open] && (
+            <div className="sh-sec">
+              <h3>
+                {secLabel(open)} <b>{nOf(open)}</b>
+              </h3>
+              {tbl(bySection[open], open)}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -4531,6 +4760,8 @@ function GoalsModal({
   onOwn,
   edits,
   onEdit,
+  notes,
+  onNote,
 }: {
   rows: GoalRow[];
   score: { pct: number | null; have: number; weight: number };
@@ -4543,6 +4774,9 @@ function GoalsModal({
   /** ما غيّره صاحب المحفظة في السبعة المشتركة */
   edits: Record<string, GoalEdit>;
   onEdit: (id: string, e: GoalEdit | null) => void;
+  /** ملاحظة صاحب المحفظة على كل مؤشر — يقرؤها مديرُه */
+  notes?: Record<string, string>;
+  onNote?: (id: string, v: string) => void;
 }) {
   const mine = new Set(own.map((x) => x.id));
   const [add, setAdd] = useState(false);
@@ -4692,6 +4926,17 @@ function GoalsModal({
                 <i style={{ width: `${g.pct ?? 0}%` }} />
               </div>
               <div className="gl-src">{g.src}</div>
+              {/* ملاحظةٌ على المؤشر: سببُ الرقم أو ما أُنجز فيه —
+                  تظهر لمدير القطاع في صفحتك، فلا يُقرأ الرقم مجرّداً */}
+              {onNote && (
+                <div className="gl-nt2">
+                  <NoteBox
+                    value={txt(notes?.[g.id])}
+                    ph={t("ملاحظتك على هذا المؤشر… (يقرؤها مدير قطاعك)", "Your note on this KPI…")}
+                    onSave={(v) => onNote(g.id, v)}
+                  />
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -5133,6 +5378,12 @@ function LeadPreview({ t, onBack }: { t: T; onBack: () => void }) {
     [team, entsByOwner, secs, commitAll, nq],
   );
 
+  /** أسماء القطاع: المدير وفريقه — بها تُنتقى بنود الأقسام */
+  const secNames = useMemo(
+    () => new Set([...(person ? [person.name] : []), ...team.map((x) => x.name)].map(nrm).filter(Boolean)),
+    [person, team],
+  );
+
   /* أرقام المدير = أرقام فريقه مجموعةً: جهاتهم كلها، والتزامهم
      كلّه — لا رقمه هو، فهو ليس نقطةَ تواصل جهةٍ غالباً */
   const teamEnts = useMemo(() => {
@@ -5159,8 +5410,74 @@ function LeadPreview({ t, onBack }: { t: T; onBack: () => void }) {
     [person, teamEnts, secs, teamCommit, nq],
   );
 
+  /** بنود الأقسام الثلاثة في القطاع كلّه — لا جهات المدير وحده */
+  const secRows = useMemo(() => {
+    const pick = (k: MainSec) =>
+      secs[k].filter((it) => {
+        const c = txt(it.data.consultant).trim();
+        if (c && secNames.has(nrm(c))) return true;
+        return teamEnts.has(nrm(txt(it.data[MAIN_ENT[k]])));
+      });
+    return { natstrat: pick("natstrat"), inststrat: pick("inststrat"), cx: pick("cx") } as Record<MainSec, MineRow[]>;
+  }, [secs, secNames, teamEnts]);
+
+  /* التقارير الربعية: بنود «جهاتي» في محفظة كل فردٍ من القطاع —
+     سياسةُ القاعدة تتيح لمديره قراءتها، فتُجمع هنا كما يجمعها هو */
+  const [qRows, setQRows] = useState<{ name: string; who: string; q: number[] }[]>([]);
+  useEffect(() => {
+    if (!person) return;
+    let live = true;
+    const ids = [person, ...team].map((x) => ({ id: String(x.id), name: x.name }));
+    void Promise.all(
+      ids.map(async (u) => {
+        const r = await apiFetch(`/api/portfolio?user=${u.id}&section=entities`)
+          .then((x) => x.json())
+          .catch(() => ({}));
+        return ((Array.isArray(r.items) ? r.items : []) as Row[]).map((it) => ({
+          name: txt(it.data.name),
+          who: u.name,
+          q: Array.isArray(it.data.q) ? (it.data.q as number[]) : [],
+        }));
+      }),
+    ).then((all) => live && setQRows(all.flat()));
+    return () => {
+      live = false;
+    };
+  }, [person, team]);
+  const qStat = useMemo(() => {
+    const total = qRows.length * 4 || 1;
+    const done = qRows.reduce((a, r) => a + r.q.filter(Boolean).length, 0);
+    const cq = Math.floor(new Date().getMonth() / 3);
+    return {
+      count: qRows.length,
+      pct: Math.round((done / total) * 100),
+      late: qRows.filter((r) => !r.q[cq]).length,
+      q: cq + 1,
+    };
+  }, [qRows]);
+
+  /** المربّع المفتوح من الأعمال الرئيسية — واحدٌ في كل مرة */
+  const [openSec, setOpenSec] = useState("");
+
   if (open)
-    return <SharedView owner={open.g} score={open.score} t={t} onBack={() => setOpen(null)} />;
+    return (
+      <SharedView
+        owner={open.g}
+        score={open.score}
+        goalsOf={(mir) =>
+          personGoals({
+            name: open.g.name,
+            ents: entsByOwner.get(nrm(open.g.name)) || new Set<string>(),
+            all: secs,
+            commit: commitAll.find((r) => nrm(r.name) === nrm(open.g.name)),
+            nq,
+            mirror: mir,
+          })
+        }
+        t={t}
+        onBack={() => setOpen(null)}
+      />
+    );
 
   return (
     <div className="pf shared lead-prev">
@@ -5185,10 +5502,38 @@ function LeadPreview({ t, onBack }: { t: T; onBack: () => void }) {
 
       <p className="lp-note">
         {t(
-          "هذه معاينةٌ لما يراه المديرُ في محفظته: أرقامُ فريقه وبطاقاتُهم. قراءةٌ فقط — لا تُحفظ منها تفضيلات، ولا تظهر فيها ملاحظاتُ أحدٍ ولا تقويمه.",
-          "A preview of a manager's portfolio. Read-only.",
+          "صفحة المدير هي صفحتكم نفسها: الشريط العلوي واسمه ومسماه وتاريخ انضمامه، وتقويمه وملاحظاته ومهامه. والفرق أنّ أرقامه أرقامُ قطاعه، وأنّ عنده بطاقات موظفيه. وهذه معاينةٌ للقراءة فقط.",
+          "A manager's page is the same page as yours; the preview is read-only.",
         )}
       </p>
+
+      {person && (
+        <>
+          <div className="pf-hero lp-hero">
+            <span className="av">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {person.photoUrl ? <img src={person.photoUrl} alt="" /> : (person.name || "?").trim().charAt(0)}
+            </span>
+            <div className="who">
+              <h1>{person.name}</h1>
+              <div className="sb">{person.jobTitle || t("مدير قطاع", "Sector lead")}</div>
+              <span className="joined">{t("تاريخ انضمامه لأداء يكتبه هو في محفظته", "Join date is his own")}</span>
+            </div>
+          </div>
+          {/* التقويم والملاحظات: يراهما في محفظته كما ترونهما، ولا
+              يظهر محتواهما هنا — جدولهما مقصورٌ على صاحبه */}
+          <div className="lp-priv">
+            <div>
+              <b>{t("التقويم", "Calendar")}</b>
+              {t("يظهر له في محفظته كما يظهر لكم — ومحتواه لا يظهر هنا.", "Shown to him only.")}
+            </div>
+            <div>
+              <b>{t("ملاحظاتي", "My notes")}</b>
+              {t("تظهر له وحده — في جدولٍ لا يقرؤه مديرٌ ولا مالك المنصة.", "Private to him.")}
+            </div>
+          </div>
+        </>
+      )}
 
       {!loaded ? (
         <div className="pf-none">{t("جارٍ التحميل…", "Loading…")}</div>
@@ -5201,16 +5546,19 @@ function LeadPreview({ t, onBack }: { t: T; onBack: () => void }) {
               <div className="k">{t("نسبة تحقيق الأهداف السنوية", "Annual goals")}</div>
               <div className="v">{score.pct === null ? "—" : `${score.pct}%`}</div>
             </div>
-            <div className="kp">
-              <div className="k">{t("جهات فريقه", "Team entities")}</div>
+            <div
+              className="kp clickable"
+              onClick={() => setOpenSec(openSec === "ents" ? "" : "ents")}
+            >
+              <div className="k">{t("جهات القطاع", "Sector entities")}</div>
               <div className="v">{teamEnts.size}</div>
             </div>
             <div className="kp">
-              <div className="k">{t("التزام فريقه بمراجعة طلبات التغيير", "Team on-time rate")}</div>
+              <div className="k">{t("التزام القطاع بمراجعة طلبات التغيير", "Sector on-time rate")}</div>
               <div className="v">{teamCommit ? `${teamCommit.pct}%` : "—"}</div>
             </div>
             <div className="kp">
-              <div className="k">{t("جودة ملاحظات أداء فريقه", "Team notes quality")}</div>
+              <div className="k">{t("جودة ملاحظات القطاع", "Sector notes quality")}</div>
               <div className="v">{teamNq ? `${teamNq.pct}%` : "0%"}</div>
             </div>
           </div>
@@ -5225,11 +5573,11 @@ function LeadPreview({ t, onBack }: { t: T; onBack: () => void }) {
           ) : (
             <div className="pf-team">
               <div className="pf-team-h">
-                <b>{t("فريقه", "Their team")}</b>
-                <span className="pf-team-n">{t(`${team.length} من قطاعه`, `${team.length}`)}</span>
+                <b>{t("موظفو القطاع", "Sector staff")}</b>
+                <span className="pf-team-n">{t(`${team.length}`, `${team.length}`)}</span>
                 <span className="pf-team-tag">{t("الضغط يفتح صفحة الموظف", "Click to open")}</span>
               </div>
-              <div className="cr-podium pf-team-c">
+              <div className="cr-podium pf-team-c sm">
                 {cards.map((x, i) => (
                   <button
                     key={x.id}
@@ -5262,32 +5610,143 @@ function LeadPreview({ t, onBack }: { t: T; onBack: () => void }) {
             </div>
           )}
 
-          <div className="sh-sec">
-            <h3>
-              {t("جهات فريقه", "Team entities")} <b>{teamEnts.size}</b>
-            </h3>
-            <div className="tblwrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>{t("الجهة", "Entity")}</th>
-                    <th>{t("نقطة التواصل", "Owner")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ents
-                    .filter((e) => teamEnts.has(nrm(txt(e.name))))
-                    .sort((a, b) => txt(a.name).localeCompare(txt(b.name), "ar"))
-                    .map((e) => (
-                      <tr key={txt(e.name)}>
-                        <td>{txt(e.name)}</td>
-                        <td>{owners.get(nrm(txt(e.name)))?.name || "—"}</td>
+          {/* الأعمال الرئيسية — بنفس مربّعات محفظتكم، وأرقامُها
+              أرقامُ القطاع كلّه لا جهات المدير وحده */}
+          <div className="sec-h">{t("الأعمال الرئيسية — على مستوى القطاع", "Main work — sector-wide")}</div>
+          <div className="tiles lay-two">
+            {(["natstrat", "inststrat", "cx"] as MainSec[]).map((k) => {
+              const w = WIDGETS.find((x) => x.key === k)!;
+              const chips = mainChips(k, secRows[k]);
+              const done = chips[0]?.v || 0;
+              return (
+                <Tile
+                  key={k}
+                  w={w}
+                  count={secRows[k].length}
+                  sub={k === "natstrat" ? t("استراتيجية", "strategies") : t("جهة", "entities")}
+                  pct={secRows[k].length ? Math.round((done / secRows[k].length) * 100) : 0}
+                  chips={chips}
+                  onOpen={() => setOpenSec(openSec === k ? "" : k)}
+                  onHide={() => {}}
+                  dragProps={{}}
+                />
+              );
+            })}
+            <Tile
+              w={WIDGETS.find((x) => x.key === "quarterly")!}
+              count={qStat.count}
+              sub={`${t("الربع", "Q")} ${qStat.q}`}
+              pct={qStat.pct}
+              warn={qStat.late ? `${qStat.late} ${t("متأخرة", "late")}` : undefined}
+              onOpen={() => setOpenSec(openSec === "q" ? "" : "q")}
+              onHide={() => {}}
+              dragProps={{}}
+            />
+          </div>
+
+          {(["natstrat", "inststrat", "cx"] as MainSec[]).map((k) =>
+            openSec === k ? (
+              <div className="sh-sec" key={k}>
+                <h3>
+                  {t(WIDGETS.find((x) => x.key === k)?.label || k, k)} <b>{secRows[k].length}</b>
+                </h3>
+                <MainWork
+                  sec={k}
+                  rows={secRows[k]}
+                  all={secRows[k]}
+                  sess={[]}
+                  loaded
+                  extras={{}}
+                  canEdit={() => false}
+                  readOnly
+                  t={t}
+                  full
+                  onExtra={() => {}}
+                  onPatch={() => {}}
+                  onReload={() => {}}
+                />
+              </div>
+            ) : null,
+          )}
+
+          {openSec === "q" && (
+            <div className="sh-sec">
+              <h3>
+                {t("التقارير الربعية في القطاع", "Sector quarterly reports")} <b>{qStat.count}</b>
+              </h3>
+              <div className="tblwrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>{t("الجهة", "Entity")}</th>
+                      <th>{t("الاستشاري", "Consultant")}</th>
+                      {QLABS.map((q) => (
+                        <th key={q}>{q}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {qRows.map((r, i) => (
+                      <tr key={`${r.who}:${r.name}:${i}`}>
+                        <td>{r.name || "—"}</td>
+                        <td>{r.who}</td>
+                        {QLABS.map((q, j) => (
+                          <td key={q}>{r.q[j] ? "✓" : "—"}</td>
+                        ))}
                       </tr>
                     ))}
-                </tbody>
-              </table>
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          )}
+
+          {openSec === "ents" && (
+            <div className="sh-sec">
+              <h3>
+                {t("جهات القطاع", "Sector entities")} <b>{teamEnts.size}</b>
+              </h3>
+              <div className="tblwrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>{t("الجهة", "Entity")}</th>
+                      <th>{t("القطاع", "Sector")}</th>
+                      <th>{t("الاستشاري", "Consultant")}</th>
+                      <th>{t("البديل", "Alternate")}</th>
+                      <th>{t("نقطة التواصل من الجهة", "Their contact")}</th>
+                      <th>{t("البريد", "Email")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ents
+                      .filter((e) => teamEnts.has(nrm(txt(e.name))))
+                      .sort((a, b) => txt(a.name).localeCompare(txt(b.name), "ar"))
+                      .map((e) => {
+                        const ours = (Array.isArray(e.ours) ? e.ours : []) as Rec[];
+                        const they = (Array.isArray(e.theirs) ? e.theirs : []) as Rec[];
+                        const prim = ours.find((c) => txt(c.role || "أساسي") === "أساسي");
+                        const alt = ours.find((c) => txt(c.role) === "بديل");
+                        const th = they[0];
+                        return (
+                          <tr key={txt(e.name)}>
+                            <td>{txt(e.name)}</td>
+                            <td>{txt(e.sector) || "—"}</td>
+                            <td>{txt(prim?.userName) || txt(prim?.name) || "—"}</td>
+                            <td>{txt(alt?.userName) || txt(alt?.name) || "—"}</td>
+                            <td>
+                              {txt(th?.name) || "—"}
+                              {txt(th?.jobTitle) ? ` — ${txt(th?.jobTitle)}` : ""}
+                            </td>
+                            <td dir="ltr">{txt(th?.email) || "—"}</td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
@@ -5416,6 +5875,9 @@ export default function Portfolio({
         void saveUserData("portfolio", p);
       }
       setPrefs(p);
+      /* بذرةُ النسخة المقروءة لمديره: من فتح صفحته مرّةً صارت
+         أهدافُه مقروءةً له، بلا انتظار أوّل تعديل */
+      goalMirror(p);
       setReady(true);
     });
   }, []);
@@ -5847,6 +6309,36 @@ export default function Portfolio({
       .sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1) || a.name.localeCompare(b.name, "ar"));
   }, [team, entsByOwner, mw.all, commitAll, nq]);
   /** إضافة مؤشرٍ من عند صاحب المحفظة أو حذفه — `null` يحذف */
+  /* ============================================================
+     نسخةُ الأهداف التي يقرؤها مديرُ القطاع
+     ------------------------------------------------------------
+     أرقامُ الأهداف وملاحظاتها كانت في المخزن الشخصي (`perf_user_data`)
+     المقصور على صاحبه بسياسة القاعدة — فلا يقرؤها مديرُه ولو فتح
+     صفحته. وهي **عملٌ لا خصوصية**، بخلاف الملاحظات والتقويم.
+
+     فتُكتب نسخةٌ منها في جدول المحفظة (`perf_portfolio`) الذي تقرؤه
+     سياسةُ «مدير القطاع» أصلاً — شريحةُ الأهداف وحدها: الأرقام
+     المُدخَلة والتعديلات والمؤشرات المضافة والملاحظات. ولا يُنقل
+     معها شيءٌ آخر، فالمخزن الشخصي يبقى مغلقاً كما هو.
+     ============================================================ */
+  const goalMirror = useCallback((p: Prefs) => {
+    void apiFetch("/api/portfolio", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        section: "goals",
+        id: "me",
+        ord: 1,
+        data: {
+          goals: p.goals || {},
+          goalEdits: p.goalEdits || {},
+          ownGoals: p.ownGoals || [],
+          goalNotes: p.goalNotes || {},
+        },
+      }),
+    });
+  }, []);
+
   const setOwnGoal = useCallback((g: OwnGoal | null, id?: string) => {
     setPrefs((old) => {
       const list = [...(old.ownGoals || [])];
@@ -5859,9 +6351,10 @@ export default function Portfolio({
       if (!g && id) delete vals[id];
       const out = { ...old, ownGoals: list, goals: vals };
       void saveUserData("portfolio", out);
+      goalMirror(out);
       return out;
     });
-  }, []);
+  }, [goalMirror]);
 
   /** تعديل مؤشرٍ من السبعة — أو إطفاؤه إن لم يكن من عمله */
   const setGoalEdit = useCallback((id: string, e: GoalEdit | null) => {
@@ -5871,9 +6364,26 @@ export default function Portfolio({
       else ed[id] = { ...(ed[id] || {}), ...e };
       const out = { ...old, goalEdits: ed };
       void saveUserData("portfolio", out);
+      goalMirror(out);
       return out;
     });
-  }, []);
+  }, [goalMirror]);
+
+  /** ملاحظةٌ على مؤشرٍ من أهدافه — يقرؤها مديرُ قطاعه */
+  const setGoalNote = useCallback(
+    (id: string, v: string) => {
+      setPrefs((old) => {
+        const m = { ...(old.goalNotes || {}) };
+        if (!v.trim()) delete m[id];
+        else m[id] = v.trim();
+        const out = { ...old, goalNotes: m };
+        void saveUserData("portfolio", out);
+        goalMirror(out);
+        return out;
+      });
+    },
+    [goalMirror],
+  );
 
   /** رقمٌ يُدخله صاحب المحفظة لمؤشرٍ لا مصدر له */
   const setGoal = useCallback(
@@ -5884,10 +6394,11 @@ export default function Portfolio({
         else m[id] = v;
         const out = { ...old, goals: m };
         void saveUserData("portfolio", out);
+        goalMirror(out);
         return out;
       });
     },
-    [],
+    [goalMirror],
   );
 
   function stat(k: WKey): { count: number; pct: number; sub: string; warn?: string; chips?: { k: string; v: number }[] } {
@@ -6161,6 +6672,16 @@ export default function Portfolio({
       <SharedView
         owner={viewing}
         score={viewScore}
+        goalsOf={(mir) =>
+          personGoals({
+            name: viewing.name,
+            ents: entsByOwner.get(nrm(viewing.name)) || new Set<string>(),
+            all: mw.all,
+            commit: commitAll.find((r) => nrm(r.name) === nrm(viewing.name)),
+            nq,
+            mirror: mir,
+          })
+        }
         t={t}
         onBack={() => {
           setViewing(null);
@@ -6451,6 +6972,8 @@ export default function Portfolio({
           onOwn={setOwnGoal}
           edits={prefs.goalEdits || {}}
           onEdit={setGoalEdit}
+          notes={prefs.goalNotes || {}}
+          onNote={setGoalNote}
         />
       )}
 
