@@ -5017,6 +5017,283 @@ function CustomModal({
 /* ============================================================
    الصفحة
    ============================================================ */
+/* ============================================================
+   معاينة صفحة مدير — صفحةٌ تجريبية تُفتح من محفظتي
+   ------------------------------------------------------------
+   «أرِني كيف تبدو صفحة المدير» — وصاحبةُ المنصة ليست مديرةَ قطاع،
+   فلا تظهر لها بطاقات الفريق في محفظتها. فهذه معاينةٌ تُركّب ما
+   يراه المديرُ من البيانات نفسها التي يراها هو: فريقُه من سجلّ
+   المستخدمين (مشاركةُ القطاع)، وجهاتُ فريقه من سجلّ الجهات،
+   وأرقامُهم من صفحات الأقسام.
+
+   **قراءةٌ محضة ولا كتابة فيها**: لا تُحفظ تفضيلاتٌ ولا تُقرأ
+   ملاحظاتُ أحد ولا تقويمُه — فهي في `perf_user_data` المقصورة على
+   صاحبها. وحذفُها متى استُغني عنها حذفُ هذا المكوّن وزرِّه وحدهما.
+   ============================================================ */
+type PPerson = {
+  id: string; name: string; jobTitle?: string; photoUrl?: string;
+  isLead?: boolean; sectorIds?: string[]; role?: string;
+};
+
+function LeadPreview({ t, onBack }: { t: T; onBack: () => void }) {
+  const [people, setPeople] = useState<PPerson[]>([]);
+  const [who, setWho] = useState("");
+  const [ents, setEnts] = useState<Rec[]>([]);
+  const [chg, setChg] = useState<{ owner: string; sla: number | null; workDays: number | null }[]>([]);
+  const [secs, setSecs] = useState<Record<MainSec, MineRow[]>>({ natstrat: [], inststrat: [], cx: [] });
+  const [nq, setNq] = useState<{ rows: { data: Rec }[]; q: string } | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  /* الضغط على بطاقة فردٍ يفتح صفحته كما تُفتح من محفظة مديره */
+  const [open, setOpen] = useState<{ g: Grant; score: { pct: number | null; have: number } } | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      const [pp, en, ch, nat, inst, cx, nqr] = await Promise.all([
+        apiFetch("/api/people").then((r) => r.json()).catch(() => ({})),
+        apiFetch("/api/entities").then((r) => r.json()).catch(() => ({})),
+        apiFetch("/api/changes").then((r) => r.json()).catch(() => ({})),
+        apiFetch("/api/items?section=natstrat").then((r) => r.json()).catch(() => ({})),
+        apiFetch("/api/items?section=inststrat").then((r) => r.json()).catch(() => ({})),
+        apiFetch("/api/items?section=cx").then((r) => r.json()).catch(() => ({})),
+        apiFetch("/api/items?section=notesq").then((r) => r.json()).catch(() => ({})),
+      ]);
+      if (!live) return;
+      const list = (Array.isArray(pp.people) ? pp.people : []) as PPerson[];
+      setPeople(list);
+      setEnts((Array.isArray(en.entities) ? en.entities : []) as Rec[]);
+      setChg(Array.isArray(ch.changes) ? ch.changes : []);
+      setSecs({
+        natstrat: (Array.isArray(nat.items) ? nat.items : []) as MineRow[],
+        inststrat: (Array.isArray(inst.items) ? inst.items : []) as MineRow[],
+        cx: (Array.isArray(cx.items) ? cx.items : []) as MineRow[],
+      });
+      const rows = (Array.isArray(nqr.items) ? nqr.items : []) as { data: Rec }[];
+      const qs = nqQuarters(rows);
+      const last = qs[qs.length - 1]?.q || "";
+      setNq(last ? { rows: nqOfQuarter(rows, last), q: last } : null);
+      /* الافتراضي: عمر العتيق إن وُجد، وإلا أول مديرٍ في القائمة */
+      const leads = list.filter((x) => x.isLead);
+      const omar = leads.find((x) => nrm(x.name).includes(nrm("عمر العتيق")));
+      setWho(String(omar?.id || leads[0]?.id || list[0]?.id || ""));
+      setLoaded(true);
+    })();
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const person = people.find((x) => String(x.id) === who) || null;
+  const owners = useMemo(() => ownerMap(ents as Parameters<typeof ownerMap>[0]), [ents]);
+  const commitAll = useMemo(() => commitStats(chg, owners), [chg, owners]);
+
+  /** فريقُه: من يشاركه قطاعاً — نفس قاعدة `/api/portfolio/team` */
+  const team = useMemo(() => {
+    if (!person) return [] as PPerson[];
+    const mine = new Set((person.sectorIds || []).map(String));
+    if (!mine.size) return [];
+    return people.filter(
+      (u) => String(u.id) !== String(person.id) && (u.sectorIds || []).some((x) => mine.has(String(x))),
+    );
+  }, [people, person]);
+
+  /** جهات كل زميل — هو نقطة تواصلها الأساسية */
+  const entsByOwner = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const e of ents) {
+      const n = nrm(txt(e.name));
+      if (!n) continue;
+      const ow = nrm(owners.get(n)?.name || "");
+      if (!ow) continue;
+      const set = m.get(ow) || new Set<string>();
+      set.add(n);
+      m.set(ow, set);
+    }
+    return m;
+  }, [ents, owners]);
+
+  const cards = useMemo(
+    () =>
+      team
+        .map((x) => {
+          const mySet = entsByOwner.get(nrm(x.name)) || new Set<string>();
+          return {
+            ...x,
+            ents: mySet.size,
+            ...personGoals({
+              name: x.name,
+              ents: mySet,
+              all: secs,
+              commit: commitAll.find((r) => nrm(r.name) === nrm(x.name)),
+              nq,
+            }),
+          };
+        })
+        .sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1) || a.name.localeCompare(b.name, "ar")),
+    [team, entsByOwner, secs, commitAll, nq],
+  );
+
+  /* أرقام المدير = أرقام فريقه مجموعةً: جهاتهم كلها، والتزامهم
+     كلّه — لا رقمه هو، فهو ليس نقطةَ تواصل جهةٍ غالباً */
+  const teamEnts = useMemo(() => {
+    const s = new Set<string>();
+    for (const x of [...(person ? [person] : []), ...team])
+      for (const n of entsByOwner.get(nrm(x.name)) || []) s.add(n);
+    return s;
+  }, [team, person, entsByOwner]);
+  const teamCommit = useMemo(() => {
+    const names = new Set([...(person ? [person.name] : []), ...team.map((x) => x.name)].map(nrm));
+    const rows = commitAll.filter((r) => names.has(nrm(r.name)));
+    if (!rows.length) return undefined;
+    const total = rows.reduce((a, r) => a + r.total, 0);
+    const late = rows.reduce((a, r) => a + r.late, 0);
+    const pct = total ? Math.round(((total - late) / total) * 100) : 0;
+    return { name: "", photo: "", total, late, ok: total - late, raw: pct, pct, avg: 0 } as CommitRow;
+  }, [commitAll, team, person]);
+  const teamNq = useMemo(
+    () => (nq && teamEnts.size ? nqForEntities(nq.rows, [...teamEnts]) : null),
+    [nq, teamEnts],
+  );
+  const score = useMemo(
+    () => personGoals({ name: person?.name || "", ents: teamEnts, all: secs, commit: teamCommit, nq }),
+    [person, teamEnts, secs, teamCommit, nq],
+  );
+
+  if (open)
+    return <SharedView owner={open.g} score={open.score} t={t} onBack={() => setOpen(null)} />;
+
+  return (
+    <div className="pf shared lead-prev">
+      <div className="sh-head">
+        <button className="btn2" onClick={onBack}>
+          ← {t("رجوع لمحفظتي", "Back")}
+        </button>
+        <div>
+          <b>{person?.name || "—"}</b>
+          <em>{person?.jobTitle || t("مدير قطاع", "Sector lead")}</em>
+        </div>
+        <select className="lp-pick" value={who} onChange={(e) => setWho(e.target.value)}>
+          {[...people].sort((a, b) => Number(!!b.isLead) - Number(!!a.isLead)).map((x) => (
+            <option key={x.id} value={x.id}>
+              {x.name}
+              {x.isLead ? " — مدير" : ""}
+            </option>
+          ))}
+        </select>
+        <span className="sh-tag lp-tag">{t("معاينة تجريبية", "Preview")}</span>
+      </div>
+
+      <p className="lp-note">
+        {t(
+          "هذه معاينةٌ لما يراه المديرُ في محفظته: أرقامُ فريقه وبطاقاتُهم. قراءةٌ فقط — لا تُحفظ منها تفضيلات، ولا تظهر فيها ملاحظاتُ أحدٍ ولا تقويمه.",
+          "A preview of a manager's portfolio. Read-only.",
+        )}
+      </p>
+
+      {!loaded ? (
+        <div className="pf-none">{t("جارٍ التحميل…", "Loading…")}</div>
+      ) : !person ? (
+        <div className="pf-none">{t("لا يوجد مستخدمون.", "No users.")}</div>
+      ) : (
+        <>
+          <div className="kpis">
+            <div className="kp">
+              <div className="k">{t("نسبة تحقيق الأهداف السنوية", "Annual goals")}</div>
+              <div className="v">{score.pct === null ? "—" : `${score.pct}%`}</div>
+            </div>
+            <div className="kp">
+              <div className="k">{t("جهات فريقه", "Team entities")}</div>
+              <div className="v">{teamEnts.size}</div>
+            </div>
+            <div className="kp">
+              <div className="k">{t("التزام فريقه بمراجعة طلبات التغيير", "Team on-time rate")}</div>
+              <div className="v">{teamCommit ? `${teamCommit.pct}%` : "—"}</div>
+            </div>
+            <div className="kp">
+              <div className="k">{t("جودة ملاحظات أداء فريقه", "Team notes quality")}</div>
+              <div className="v">{teamNq ? `${teamNq.pct}%` : "0%"}</div>
+            </div>
+          </div>
+
+          {!team.length ? (
+            <div className="pf-none">
+              {t(
+                "لا يشارك أحدٌ هذا الحساب قطاعَه — فلا تظهر له بطاقات فريق. تُضبط القطاعات من «المستخدمون والصلاحيات».",
+                "Nobody shares this account's sector.",
+              )}
+            </div>
+          ) : (
+            <div className="pf-team">
+              <div className="pf-team-h">
+                <b>{t("فريقه", "Their team")}</b>
+                <span className="pf-team-n">{t(`${team.length} من قطاعه`, `${team.length}`)}</span>
+                <span className="pf-team-tag">{t("الضغط يفتح صفحة الموظف", "Click to open")}</span>
+              </div>
+              <div className="cr-podium pf-team-c">
+                {cards.map((x, i) => (
+                  <button
+                    key={x.id}
+                    className="cr-p tm-card"
+                    style={{ ["--c" as string]: TM_RAMP[Math.min(i, TM_RAMP.length - 1)] }}
+                    title={t(
+                      `${x.pct === null ? "لم يُرصد مؤشرٌ بعد" : `${x.have} مؤشرات مرصودة`} · ${x.ents} جهة`,
+                      `${x.have} recorded`,
+                    )}
+                    onClick={() =>
+                      setOpen({
+                        g: { userId: String(x.id), name: x.name, jobTitle: x.jobTitle || "", scopes: ["*"] },
+                        score: { pct: x.pct, have: x.have },
+                      })
+                    }
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img className="mark" src={asset("/adaa-mark.png")} alt="" aria-hidden />
+                    <span className="av2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      {x.photoUrl ? <img src={x.photoUrl} alt="" /> : (x.name || "?").trim().charAt(0)}
+                    </span>
+                    <b>{x.name}</b>
+                    <em>{x.pct === null ? "—" : `${x.pct}%`}</em>
+                    <i>{t("تحقيق الأهداف الفردية", "Individual goals")}</i>
+                    <span className="rk">{x.jobTitle || t("عضو فريق إدارة عمليات الأداء", "Team member")}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="sh-sec">
+            <h3>
+              {t("جهات فريقه", "Team entities")} <b>{teamEnts.size}</b>
+            </h3>
+            <div className="tblwrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>{t("الجهة", "Entity")}</th>
+                    <th>{t("نقطة التواصل", "Owner")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ents
+                    .filter((e) => teamEnts.has(nrm(txt(e.name))))
+                    .sort((a, b) => txt(a.name).localeCompare(txt(b.name), "ar"))
+                    .map((e) => (
+                      <tr key={txt(e.name)}>
+                        <td>{txt(e.name)}</td>
+                        <td>{owners.get(nrm(txt(e.name)))?.name || "—"}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function Portfolio({
   me,
   t,
@@ -5083,6 +5360,9 @@ export default function Portfolio({
   const [viewing, setViewing] = useState<Grant | null>(null);
   /** نسبة أهداف من أفتح صفحته من بطاقات «فريقي» */
   const [viewScore, setViewScore] = useState<{ pct: number | null; have: number } | null>(null);
+  /* صفحةٌ تجريبية: معاينة محفظة مديرٍ كما يراها هو — لصاحب
+     الصلاحية الكاملة وحده، وتُحذف متى استُغني عنها */
+  const [leadPrev, setLeadPrev] = useState(false);
   /* فريقي: موظفو قطاعي — للمدير وحده، وبحكم الإدارة لا بمنحٍ منهم */
   const [team, setTeam] = useState<TeamRow[]>([]);
   /* ومن يطّلع على محفظتي بحكم الإدارة — يُقال لصاحبها صراحةً */
@@ -5875,6 +6155,7 @@ export default function Portfolio({
     );
   }
 
+  if (leadPrev) return <LeadPreview t={t} onBack={() => setLeadPrev(false)} />;
   if (viewing)
     return (
       <SharedView
@@ -6011,6 +6292,11 @@ export default function Portfolio({
             صارت داخل «تخصيص» — والرأس لا يحتمل شريط أدوات.
             و«تم الترتيب» يظهر وقت السحب وحده ليُخرَج منه. */}
         <div className="acts">
+          {me.role === "admin" && (
+            <button className="btn2 lp-btn" onClick={() => setLeadPrev(true)}>
+              {t("معاينة صفحة مدير", "Manager preview")} <i>{t("تجريبية", "Preview")}</i>
+            </button>
+          )}
           <button className="btn2 solid" onClick={() => setCustom(true)}>
             <IconGear size={15} /> {t("تخصيص", "Customize")}
           </button>
