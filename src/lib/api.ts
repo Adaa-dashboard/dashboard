@@ -1242,11 +1242,13 @@ export async function apiFetch(path: string, init: Init = {}) {
         if (!cur.at || String(r.updated_at) > cur.at) cur.at = String(r.updated_at);
         stat.set(k, cur);
       }
-      type TeamRow = { userId: string; name: string; jobTitle: string; count: number; lastAt: string };
-      const list: TeamRow[] = team.map((u: { id: string; name: string; jobTitle: string }) => ({
+      type TeamRow = { userId: string; name: string; jobTitle: string; photo: string; count: number; lastAt: string };
+      const list: TeamRow[] = team.map((u: { id: string; name: string; jobTitle: string; photoUrl?: string }) => ({
         userId: String(u.id),
         name: String(u.name || ""),
         jobTitle: u.jobTitle || "",
+        /* صورة الموظف كما رفعها لنفسه — تظهر في بطاقته عند مديره */
+        photo: String(u.photoUrl || ""),
         count: stat.get(String(u.id))?.n || 0,
         lastAt: stat.get(String(u.id))?.at || "",
       }));

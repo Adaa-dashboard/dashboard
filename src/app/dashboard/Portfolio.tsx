@@ -4033,8 +4033,57 @@ function EntitiesModal({
    المحفظة خاصة بصاحبها: لا يراها مديره ولا أي أحد إلا بمنحٍ منه.
    المنح للاطّلاع فقط — لا يكتب الممنوح له شيئاً، والحراسة في RLS. */
 type Grant = { userId: string; name: string; jobTitle?: string; scopes: string[]; at?: string };
+/* ============================================================
+   نسبة تحقيق الأهداف الفردية لموظفٍ بعينه
+   ------------------------------------------------------------
+   تُحسب من المنصة وحدها — نفس مصادر محفظة صاحبها: الاستراتيجيات
+   المؤسسية والمعتمَدة وتجربة المستفيد والتزام طلبات التغيير وجودة
+   الملاحظات، كلٌّ بوزنه في بطاقة الأهداف السنوية.
+
+   وما لا مصدر له في المنصة (الخطة التطويرية والمؤشر المُدخَل
+   يدوياً) محفوظٌ في تفضيلات صاحبه ولا يُقرأ من هنا، فلا يُحتسب
+   صفراً — كما في بطاقة الأهداف تماماً: يُرجَّح المرصود وحده،
+   ويُقال كم رُصد منه.
+   ============================================================ */
+function personGoals(a: {
+  name: string;
+  /** أسماء جهاته مُطبَّعة — هو نقطة تواصلها الأساسية */
+  ents: Set<string>;
+  all: Record<MainSec, MineRow[]>;
+  commit?: CommitRow;
+  /** صفوف آخر ربعٍ في جودة ملاحظات الأداء */
+  nq: { rows: { data: Rec }[]; q: string } | null;
+}): { pct: number | null; have: number } {
+  const mineOf = (k: MainSec) =>
+    a.all[k].filter((it) => {
+      const c = txt(it.data.consultant).trim();
+      if (c && nrm(c) === nrm(a.name)) return true;
+      return a.ents.has(nrm(txt(it.data[MAIN_ENT[k]])));
+    });
+  const nat = mineOf("natstrat").filter((r) => num(r.data.stage, 1) === 4);
+  const nqSt = a.nq && a.ents.size ? nqForEntities(a.nq.rows, [...a.ents]) : null;
+  const got: Partial<Record<string, number | null>> = {
+    inststrat: mineOf("inststrat").filter((r) => txt(r.data.live) === "مفعل").length,
+    cx: mineOf("cx").filter((r) => num(r.data.counted) === 1).length,
+    natstrat: nat.length ? Math.round(nat.reduce((x, r) => x + num(r.data.meas), 0) / nat.length) : null,
+    commit: a.commit ? a.commit.pct : null,
+    opplan: nqSt ? nqSt.pct : null,
+  };
+  const parts = ANNUAL_GOALS.filter((g) => g.from in got).map((g) => {
+    const v = got[g.from];
+    return { w: g.weight, p: v === null || v === undefined || g.target <= 0 ? null : Math.min(100, Math.round((v / g.target) * 100)) };
+  });
+  const have = parts.filter((x) => x.p !== null);
+  const w = have.reduce((x, r) => x + r.w, 0);
+  if (!w) return { pct: null, have: 0 };
+  return { pct: Math.round(have.reduce((x, r) => x + (r.p as number) * r.w, 0) / w), have: have.length };
+}
+
+/** تدرّج بطاقات الفريق — كبطاقات «أعلى الاستشاريين التزاماً» */
+const TM_RAMP = ["#006F68", "#008B84", "#5AABA2", "#90BFB7", "#BFD9D6"];
+
 /** موظف في قطاع المدير — حجم محفظته وآخر تحديث فيها */
-type TeamRow = { userId: string; name: string; jobTitle: string; count: number; lastAt: string };
+type TeamRow = { userId: string; name: string; jobTitle: string; photo: string; count: number; lastAt: string };
 
 /* خيارات المنح بأقسام perf_portfolio لا بالويدجت:
    «البرامج والاستراتيجيات» و«التقارير الربعية» يقرآن قسم entities
@@ -4290,7 +4339,15 @@ function SharedMain({
 }
 
 /* ---------------- محفظة شورِكت معي (اطّلاع فقط) ---------------- */
-function SharedView({ owner, t, onBack }: { owner: Grant; t: T; onBack: () => void }) {
+function SharedView({
+  owner, score, t, onBack,
+}: {
+  owner: Grant;
+  /** نسبة أهدافه الفردية — تأتي من بطاقته في «فريقي» */
+  score?: { pct: number | null; have: number } | null;
+  t: T;
+  onBack: () => void;
+}) {
   const pf = usePortfolio(owner.userId);
   const bySection = useMemo(() => {
     const m: Record<string, Row[]> = {};
@@ -4315,6 +4372,12 @@ function SharedView({ owner, t, onBack }: { owner: Grant; t: T; onBack: () => vo
           <b>{owner.name}</b>
           {owner.jobTitle && <em>{owner.jobTitle}</em>}
         </div>
+        {score && (
+          <span className="sh-score" title={t(`${score.have} مؤشرات مرصودة`, `${score.have} recorded`)}>
+            {t("تحقيق الأهداف الفردية", "Individual goals")}
+            <b>{score.pct === null ? "—" : `${score.pct}%`}</b>
+          </span>
+        )}
         <span className="sh-tag">{t("اطّلاع فقط", "Read only")}</span>
       </div>
 
@@ -5018,6 +5081,8 @@ export default function Portfolio({
   /* محافظ منحني أصحابها الاطّلاع عليها */
   const [shared, setShared] = useState<Grant[]>([]);
   const [viewing, setViewing] = useState<Grant | null>(null);
+  /** نسبة أهداف من أفتح صفحته من بطاقات «فريقي» */
+  const [viewScore, setViewScore] = useState<{ pct: number | null; have: number } | null>(null);
   /* فريقي: موظفو قطاعي — للمدير وحده، وبحكم الإدارة لا بمنحٍ منهم */
   const [team, setTeam] = useState<TeamRow[]>([]);
   /* ومن يطّلع على محفظتي بحكم الإدارة — يُقال لصاحبها صراحةً */
@@ -5316,24 +5381,25 @@ export default function Portfolio({
 
      ومن لا جهةَ له فيها **صفرٌ لا رقمٌ مستعار** — بطلب صاحبة المنصة.
      ============================================================ */
-  const [noteQ, setNoteQ] = useState<{ pct: number; q: string } | null>(null);
+  /* صفوف آخر ربعٍ تُقرأ مرّةً واحدة: منها رقمُ صاحب المحفظة
+     ورقمُ كل فردٍ في فريقه — فلا طلبَ لكل بطاقة */
+  const [nq, setNq] = useState<{ rows: { data: Rec }[]; q: string } | null>(null);
   useEffect(() => {
-    if (!scopeEntNames.length) {
-      setNoteQ(null);
-      return;
-    }
     void apiFetch("/api/items?section=notesq")
       .then((r) => r.json())
       .then((d) => {
         const rows = (Array.isArray(d.items) ? d.items : []) as { data: Rec }[];
         const qs = nqQuarters(rows);
         const last = qs[qs.length - 1]?.q || "";
-        if (!last) return setNoteQ(null);
-        const st = nqForEntities(nqOfQuarter(rows, last), scopeEntNames);
-        setNoteQ(st ? { pct: st.pct, q: last } : null);
+        setNq(last ? { rows: nqOfQuarter(rows, last), q: last } : null);
       })
-      .catch(() => setNoteQ(null));
-  }, [scopeEntNames]);
+      .catch(() => setNq(null));
+  }, []);
+  const noteQ = useMemo(() => {
+    if (!nq || !scopeEntNames.length) return null;
+    const st = nqForEntities(nq.rows, scopeEntNames);
+    return st ? { pct: st.pct, q: nq.q } : null;
+  }, [nq, scopeEntNames]);
   const curQ = Math.floor(new Date().getMonth() / 3) + 1;
   const qLate = entities.filter((r) => {
     const q: number[] = Array.isArray(r.data.q) ? r.data.q : [];
@@ -5461,6 +5527,45 @@ export default function Portfolio({
     });
   }, [inScope, goalWho, teamNames, commitAll, mw.loaded, myCommit, noteQ, prefs.goals, prefs.ownGoals, prefs.goalEdits, devplan, t]);
   const goalScore = useMemo(() => goalsScore(goalRows), [goalRows]);
+
+  /* ============================================================
+     بطاقات الفريق — لكل موظفٍ بطاقةٌ بنسبة أهدافه الفردية
+     ------------------------------------------------------------
+     المدير يحتاج أن يرى فريقه بلمحة: الصورة والاسم والمسمى والنسبة،
+     والضغط يفتح صفحة الموظف. والنسبة تُحسب هنا من المنصة نفسها
+     (بنود أقسامه والتزامه وجودة ملاحظات جهاته) فلا تحتاج قراءةَ
+     تفضيلاته — وهي خاصةٌ به لا تُقرأ.
+     ============================================================ */
+  /** جهات كل زميل — هو نقطة تواصلها الأساسية في سجلّ الجهات */
+  const entsByOwner = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const e of allEnts) {
+      const n = nrm(String(e.name || ""));
+      if (!n) continue;
+      const ow = nrm(entOwner.get(n)?.name || "");
+      if (!ow) continue;
+      const set = m.get(ow) || new Set<string>();
+      set.add(n);
+      m.set(ow, set);
+    }
+    return m;
+  }, [allEnts, entOwner]);
+  const teamCards = useMemo(() => {
+    if (!team.length) return [];
+    return team
+      .map((x) => ({
+        ...x,
+        ...personGoals({
+          name: x.name,
+          ents: entsByOwner.get(nrm(x.name)) || new Set<string>(),
+          all: mw.all,
+          commit: commitAll.find((r) => nrm(r.name) === nrm(x.name)),
+          nq,
+        }),
+        ents: (entsByOwner.get(nrm(x.name)) || new Set<string>()).size,
+      }))
+      .sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1) || a.name.localeCompare(b.name, "ar"));
+  }, [team, entsByOwner, mw.all, commitAll, nq]);
   /** إضافة مؤشرٍ من عند صاحب المحفظة أو حذفه — `null` يحذف */
   const setOwnGoal = useCallback((g: OwnGoal | null, id?: string) => {
     setPrefs((old) => {
@@ -5770,7 +5875,18 @@ export default function Portfolio({
     );
   }
 
-  if (viewing) return <SharedView owner={viewing} t={t} onBack={() => setViewing(null)} />;
+  if (viewing)
+    return (
+      <SharedView
+        owner={viewing}
+        score={viewScore}
+        t={t}
+        onBack={() => {
+          setViewing(null);
+          setViewScore(null);
+        }}
+      />
+    );
 
   if (!ready || !pf.loaded) return <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>;
 
@@ -5808,23 +5924,33 @@ export default function Portfolio({
             </span>
             <span className="pf-team-tag">{t("بحكم الإدارة · اطّلاع فقط", "As manager · read only")}</span>
           </div>
-          <div className="pf-team-g">
-            {team.map((x) => (
+          <div className="cr-podium pf-team-c">
+            {teamCards.map((x, i) => (
               <button
                 key={x.userId}
-                className={`pf-tm ${x.count === 0 ? "idle" : ""}`}
-                onClick={() => setViewing({ userId: x.userId, name: x.name, jobTitle: x.jobTitle, scopes: ["*"] })}
+                className="cr-p tm-card"
+                style={{ ["--c" as string]: TM_RAMP[Math.min(i, TM_RAMP.length - 1)] }}
+                title={t(
+                  `${x.pct === null ? "لم يُرصد مؤشرٌ بعد" : `${x.have} مؤشرات مرصودة من أهدافه السنوية`} · ${x.ents} جهة · ${
+                    x.count === 0 ? "لا بنود في محفظته" : `${x.count} بنداً · آخر تحديث ${whenAr(x.lastAt)}`
+                  }`,
+                  `${x.have} indicators recorded`,
+                )}
+                onClick={() => {
+                  setViewScore({ pct: x.pct, have: x.have });
+                  setViewing({ userId: x.userId, name: x.name, jobTitle: x.jobTitle, scopes: ["*"] });
+                }}
               >
-                <span className="av">{(x.name || "?").trim().charAt(0)}</span>
-                <span className="tm-w">
-                  <b>{x.name}</b>
-                  {x.jobTitle && <em>{x.jobTitle}</em>}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img className="mark" src={asset("/adaa-mark.png")} alt="" aria-hidden />
+                <span className="av2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {x.photo ? <img src={x.photo} alt="" /> : (x.name || "?").trim().charAt(0)}
                 </span>
-                <span className="tm-m">
-                  {x.count === 0
-                    ? t("لا بنود بعد", "Nothing yet")
-                    : t(`${x.count} بنداً · آخر تحديث ${whenAr(x.lastAt)}`, `${x.count} items · ${whenAr(x.lastAt)}`)}
-                </span>
+                <b>{x.name}</b>
+                <em>{x.pct === null ? "—" : `${x.pct}%`}</em>
+                <i>{t("تحقيق الأهداف الفردية", "Individual goals")}</i>
+                <span className="rk">{x.jobTitle || t("عضو فريق إدارة عمليات الأداء", "Team member")}</span>
               </button>
             ))}
           </div>
