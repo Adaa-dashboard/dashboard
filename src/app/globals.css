@@ -12114,7 +12114,7 @@ button.cr-p.tm-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px 
 .lp-hero { margin-bottom: 10px; }
 .lp-hero .joined { pointer-events: none; }
 /* التقويم والملاحظات: مكانُهما يُشار إليه ولا يُعرض محتواه */
-.lp-priv { display: flex; gap: 10px; margin: 0 0 14px; flex-wrap: wrap; }
+.lp-priv { display: flex; gap: 10px; margin: 14px 0; flex-wrap: wrap; }
 .lp-priv > div {
   flex: 1 1 220px; border: 1px dashed var(--border); border-radius: 14px;
   padding: 12px 15px; background: var(--soft); color: var(--muted);

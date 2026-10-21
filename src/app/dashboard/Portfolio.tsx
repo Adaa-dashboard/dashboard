@@ -5520,18 +5520,6 @@ function LeadPreview({ t, onBack }: { t: T; onBack: () => void }) {
               <span className="joined">{t("تاريخ انضمامه لأداء يكتبه هو في محفظته", "Join date is his own")}</span>
             </div>
           </div>
-          {/* التقويم والملاحظات: يراهما في محفظته كما ترونهما، ولا
-              يظهر محتواهما هنا — جدولهما مقصورٌ على صاحبه */}
-          <div className="lp-priv">
-            <div>
-              <b>{t("التقويم", "Calendar")}</b>
-              {t("يظهر له في محفظته كما يظهر لكم — ومحتواه لا يظهر هنا.", "Shown to him only.")}
-            </div>
-            <div>
-              <b>{t("ملاحظاتي", "My notes")}</b>
-              {t("تظهر له وحده — في جدولٍ لا يقرؤه مديرٌ ولا مالك المنصة.", "Private to him.")}
-            </div>
-          </div>
         </>
       )}
 
@@ -5560,6 +5548,19 @@ function LeadPreview({ t, onBack }: { t: T; onBack: () => void }) {
             <div className="kp">
               <div className="k">{t("جودة ملاحظات القطاع", "Sector notes quality")}</div>
               <div className="v">{teamNq ? `${teamNq.pct}%` : "0%"}</div>
+            </div>
+          </div>
+
+          {/* التقويم والملاحظات: يراهما في محفظته كما ترونهما، ولا
+              يظهر محتواهما هنا — جدولهما مقصورٌ على صاحبه */}
+          <div className="lp-priv">
+            <div>
+              <b>{t("التقويم", "Calendar")}</b>
+              {t("يظهر له في محفظته كما يظهر لكم — ومحتواه لا يظهر هنا.", "Shown to him only.")}
+            </div>
+            <div>
+              <b>{t("ملاحظاتي", "My notes")}</b>
+              {t("تظهر له وحده — في جدولٍ لا يقرؤه مديرٌ ولا مالك المنصة.", "Private to him.")}
             </div>
           </div>
 
