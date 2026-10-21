@@ -969,6 +969,19 @@ export async function apiFetch(path: string, init: Init = {}) {
       return ok({ ok: true, id: String(data || "") });
     }
 
+    /* ربط بندٍ موجودٍ في صفحة القسم بمحفظتي — يُكتب اسمي فيه
+       استشارياً. الحارس في القاعدة: لا يُنتزع بندٌ مسندٌ لغيري. */
+    if (p === "/api/items/mine/claim" && method === "POST") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const { data, error } = await s.rpc("perf_item_mine_claim", {
+        p_section: str(body.section),
+        p_id: str(body.id),
+      });
+      if (error) return err(error.message, 403);
+      return ok({ ok: data === true });
+    }
+
     /* «تحتاج جلسة مراجعة أداء» ⇒ تُفتح للجهة بطاقة في صفحة الجلسات */
     if (p === "/api/items/session-flag" && method === "POST") {
       const me = await whoAmI();

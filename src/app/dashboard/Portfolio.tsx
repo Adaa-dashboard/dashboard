@@ -12,7 +12,10 @@ import { EMPTY_NOTES, firstLine, preview, whenAr, type NotesData } from "./Notes
 import { PIcon, IconPicker } from "./pickicons";
 import { IconGear } from "./icons";
 import { publishUndo } from "@/lib/undoBus";
-import { useLogos, logoKey, SESS_SHORT, INST_COLS, INST_SECTORS, CX_COLS, CX_QS, cxStagesOf, SECTION_TITLE } from "./Sections";
+import {
+  useLogos, logoKey, SESS_SHORT, INST_COLS, INST_SECTORS, CX_COLS, CX_QS, cxStagesOf, SECTION_TITLE,
+  NAT_TRACK, TRACK_STATE, natTrack,
+} from "./Sections";
 import { OP_OWNERS, ALL_STATUSES, statusesOf, opFix, opRoles, opStatus, opTone } from "./OpPlan";
 import { initials, toneOf } from "@/lib/entlogo";
 import {
@@ -1515,16 +1518,26 @@ function NewEntity({ t, onDone }: { t: T; onDone: () => void }) {
 /** قيمةُ خيار «جهة ليست في القائمة» — لا تُطابق اسم جهةٍ حقيقية */
 const NEW_ENT = "\u0000new";
 
+export type PoolRow = { id: string; ent: string; title: string };
+
 function AddMainEnt({
-  sec, have, busy, t, onClose, onAdd,
+  sec, have, pool, busy, t, onClose, onAdd, onLink,
 }: {
   sec: MainSec;
   have: string[];
+  /** بنود الصفحة التي ليست في محفظتي — تُربَط ولا تُنشأ من جديد */
+  pool: PoolRow[];
   busy: boolean;
   t: T;
   onClose: () => void;
   onAdd: (entity: string, title: string, fresh: boolean) => void;
+  onLink: (id: string) => void;
 }) {
+  /* الربط أولاً: البند موجودٌ في الصفحة غالباً، وإنشاءُ ثانٍ له
+     يُضاعف الاستراتيجية ويُحسب جهةً جديدة — وهو ما حدث فعلاً. */
+  const [mode, setMode] = useState<"link" | "new">(pool.length ? "link" : "new");
+  const [q, setQ] = useState("");
+  const [pick, setPick] = useState("");
   const [mine, setMine] = useState<{ name: string }[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [ent, setEnt] = useState("");
@@ -1550,6 +1563,13 @@ function AddMainEnt({
 
   const isNat = sec === "natstrat";
   const isNew = ent === NEW_ENT;
+  const poolQ = useMemo(() => {
+    const k = nrm(q.trim());
+    const list = k
+      ? pool.filter((x) => nrm(`${x.title} ${x.ent}`).includes(k))
+      : pool;
+    return [...list].sort((a, b) => (a.title || a.ent).localeCompare(b.title || b.ent, "ar"));
+  }, [pool, q]);
   const name = isNew ? fresh.trim() : ent;
   const ok = !!name && (!isNat || !!title.trim());
 
@@ -1561,7 +1581,59 @@ function AddMainEnt({
           <button className="mx" onClick={onClose} aria-label="close">✕</button>
         </div>
 
-        {!loaded ? (
+        <div className="mw-mode">
+          <button className={mode === "link" ? "on" : ""} onClick={() => setMode("link")}>
+            {t("من الموجود في الصفحة", "Already on the page")} <i>{pool.length}</i>
+          </button>
+          <button className={mode === "new" ? "on" : ""} onClick={() => setMode("new")}>
+            {t("إضافة بندٍ جديد", "Add a new one")}
+          </button>
+        </div>
+
+        {mode === "link" ? (
+          <>
+            {!pool.length ? (
+              <div className="pf-none">
+                {t(
+                  `كل بنود صفحة «${SECTION_TITLE[sec][0]}» في محفظتك بالفعل.`,
+                  "Everything on the page is already in your portfolio.",
+                )}
+              </div>
+            ) : (
+              <div className="op-f">
+                <label className="wide">
+                  <span>{t("بحث", "Search")}</span>
+                  <input value={q} placeholder={t("اكتب جزءاً من الاسم…", "Type part of the name…")}
+                    onChange={(e) => setQ(e.target.value)} />
+                </label>
+                <label className="wide">
+                  <span>{isNat ? t("الاستراتيجية", "Strategy") : t("الجهة", "Entity")}</span>
+                  <select value={pick} onChange={(e) => setPick(e.target.value)}>
+                    <option value="">{t("— اختر من بنود الصفحة —", "— pick from the page —")}</option>
+                    {poolQ.map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.title || x.ent}
+                        {isNat && x.ent ? ` — ${x.ent}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )}
+            <p className="muted" style={{ fontSize: 11.5, lineHeight: 1.7 }}>
+              {t(
+                `هذه بنود صفحة «${SECTION_TITLE[sec][0]}» نفسها. يُربَط البند بمحفظتك فيُكتب اسمُك فيه استشارياً، وكلُّ ما تحدّثه هنا يُحدَّث في الصفحة — ولا يُنشأ بندٌ ثانٍ ولا جهةٌ جديدة.`,
+                "These are the page's own items; linking one writes you in as its consultant.",
+              )}
+            </p>
+            <div className="m-f">
+              <button className="btn btn-ghost" onClick={onClose}>{t("إلغاء", "Cancel")}</button>
+              <button className="btn" disabled={!pick || busy} onClick={() => onLink(pick)}>
+                {busy ? t("يُربَط…", "Linking…") : t("ربطه بمحفظتي", "Link")}
+              </button>
+            </div>
+          </>
+        ) : !loaded ? (
           <div className="pf-none">{t("جارٍ التحميل…", "Loading…")}</div>
         ) : (
           <>
@@ -1626,12 +1698,14 @@ function AddMainEnt({
           </>
         )}
 
-        <div className="m-f">
-          <button className="btn btn-ghost" onClick={onClose}>{t("إلغاء", "Cancel")}</button>
-          <button className="btn" disabled={!ok || busy} onClick={() => onAdd(name, title.trim(), isNew)}>
-            {busy ? t("يُضاف…", "Adding…") : t("إضافة", "Add")}
-          </button>
-        </div>
+        {mode === "new" && (
+          <div className="m-f">
+            <button className="btn btn-ghost" onClick={onClose}>{t("إلغاء", "Cancel")}</button>
+            <button className="btn" disabled={!ok || busy} onClick={() => onAdd(name, title.trim(), isNew)}>
+              {busy ? t("يُضاف…", "Adding…") : t("إضافة", "Add")}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1671,6 +1745,10 @@ const MAIN_FIELDS: Record<MainSec, Fld[]> = {
     { k: "kpisTot", label: "إجمالي المؤشرات", kind: "num" },
     { k: "initRep", label: "مبادرات ممثَّلة", kind: "num" },
     { k: "initTot", label: "إجمالي المبادرات", kind: "num" },
+    /* الفترة وتاريخ الاعتماد يظهران في بطاقة الصفحة، فيُحرَّران من
+       هنا أيضاً — وإلا بقي في البطاقة ما لا يُحدَّث من المحفظة */
+    { k: "period", label: "فترة الاستراتيجية" },
+    { k: "approvedAt", label: "تاريخ الاعتماد" },
   ],
   inststrat: fldOf(INST_COLS, ["rep", "meet", "meetAt", "docs", "docsState", "target", "live", "phase"]),
   cx: fldOf(CX_COLS, ["meet", "survey", "card", "l1", "freq", "servTot", "servPlan", "counted", "countedQ2"]),
@@ -2119,11 +2197,13 @@ function DevPlan({
 
 
 function MainWork({
-  sec, rows, sess, loaded, extras, canEdit, t, onExtra, onPatch, onReload, full,
+  sec, rows, all, sess, loaded, extras, canEdit, t, onExtra, onPatch, onReload, full,
 }: {
   sec: MainSec;
   /** بنود جهاتي في هذا القسم — تُقرأ مرّةً في الصفحة وتُمرَّر هنا */
   rows: MineRow[];
+  /** بنود القسم كلها — منها تُربَط استراتيجيةٌ موجودةٌ بالمحفظة */
+  all: MineRow[];
   /** بنود صفحة جلسات مراجعة الأداء — تُطابَق بالجهة */
   sess: MineRow[];
   loaded: boolean;
@@ -2215,6 +2295,33 @@ function MainWork({
     onReload();
   }
 
+  /* ربط بندٍ موجودٍ في الصفحة بمحفظتي: يُكتب اسمي فيه استشارياً،
+     فيصير من أعمالي ويصل تحديثي إلى الصفحة نفسها. لا بندٌ جديد
+     ولا جهةٌ جديدة — وهما ما كان يحدث قبل هذا المسار. */
+  async function linkItem(id: string) {
+    setAdding(true);
+    const r = await apiFetch("/api/items/mine/claim", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ section: sec, id }),
+    });
+    setAdding(false);
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      setMsg(txt(d.error) || t("تعذّر الربط", "Could not link"));
+      return;
+    }
+    const nm = all.find((x) => x.id === id);
+    setAdd(null);
+    setMsg(
+      t(
+        `رُبط «${txt(nm?.data[MAIN_TITLE[sec]]) || txt(nm?.data[MAIN_ENT[sec]]) || ""}» بمحفظتك — ما تحدّثه هنا يظهر في صفحة ${SECTION_TITLE[sec][0]}`,
+        "Linked to your portfolio",
+      ),
+    );
+    onReload();
+  }
+
   async function flagSession(entity: string, on: boolean, key: string, ex: Rec, seed: Rec) {
     onExtra(key, { ...ex, needSess: on ? 1 : 0 });
     if (!on) return;
@@ -2258,14 +2365,14 @@ function MainWork({
           </select>
           <b>{t(`${rows.length} جهة`, `${rows.length} entities`)}</b>
           <button className="mw-add" onClick={() => setAdd({ entity: "", title: "" })}>
-            + {t("إضافة جهة", "Add entity")}
+            + {t("إضافة أو ربط", "Add or link")}
           </button>
         </div>
       )}
       {!rows.length && (
         <div className="pf-none">
           {t(
-            "لا توجد بنود مسندة إليك — تُسنَد بأن تكون نقطة التواصل الأساسية لجهتها في «الجهات ونقاط التواصل»، أو تُضاف من زرّ «إضافة جهة».",
+            "لا توجد بنود مسندة إليك — تُسنَد بأن تكون نقطة التواصل الأساسية لجهتها في «الجهات ونقاط التواصل»، أو تُربَط بندٌ موجودٌ في الصفحة من زرّ «إضافة أو ربط».",
             "Nothing assigned to you yet.",
           )}
         </div>
@@ -2274,10 +2381,14 @@ function MainWork({
         <AddMainEnt
           sec={sec}
           have={rows.map((r) => txt(r.data[MAIN_ENT[sec]]))}
+          pool={all
+            .filter((x) => !rows.some((r) => r.id === x.id))
+            .map((x) => ({ id: x.id, ent: txt(x.data[MAIN_ENT[sec]]), title: txt(x.data[MAIN_TITLE[sec]]) }))}
           busy={adding}
           t={t}
           onClose={() => setAdd(null)}
           onAdd={addEntity}
+          onLink={(id) => void linkItem(id)}
         />
       )}
       {shown.map((it) => {
@@ -2353,6 +2464,43 @@ function MainWork({
                 <FldBox key={f.k} f={f} v={it.data[f.k]} dis={ro} onPut={(v) => void put(it.id, { [f.k]: v })} />
               ))}
             </div>
+
+            {/* محطات المراجعة الأربع — هي نفسها التي في بطاقة صفحة
+                الاستراتيجيات الوطنية، ومنها تُشتقّ «مقبولة فنياً».
+                كانت تُحرَّر من الصفحة وحدها، فتبقى المحفظةُ تعرض
+                أرقاماً وتعجز عن تحريك المحطة التي تخصّها. */}
+            {sec === "natstrat" && (
+              <div className="mw-trk">
+                <span className="k">{t("محطات المراجعة", "Review stages")}</span>
+                <div className="r">
+                  {NAT_TRACK.map((n, i) => (
+                    <label key={n}>
+                      <span>{n}</span>
+                      <select
+                        value={String(natTrack(it.data)[i])}
+                        disabled={ro}
+                        onChange={(e) => {
+                          const cur = [...natTrack(it.data)];
+                          cur[i] = Number(e.target.value) || 0;
+                          void put(it.id, { track: cur });
+                        }}
+                      >
+                        {TRACK_STATE.map((lab, v) => (
+                          <option key={lab} value={v}>
+                            {lab}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                </div>
+                <em>
+                  {natTrack(it.data).filter((v) => v === 2).length === NAT_TRACK.length
+                    ? t("مقبولة فنياً — اكتملت المحطات الأربع", "Accepted")
+                    : t("تصبح «مقبولة فنياً» باكتمال المحطات الأربع", "Accepted once all four complete")}
+                </em>
+              </div>
+            )}
 
             {/* تجربة المستفيد: مرحلةُ الجهة **محسوبة** من هذه الحقول
                 كما في ورقة Dashboard، فلا تُختار اختياراً — تُعرض
@@ -5459,6 +5607,7 @@ export default function Portfolio({
         <MainWork
           sec={k}
           rows={mw.mine[k]}
+          all={mw.all[k]}
           sess={mw.sess}
           loaded={mw.loaded}
           extras={mainx}
