@@ -15,7 +15,10 @@ import { publishUndo } from "@/lib/undoBus";
 import { useLogos, logoKey, SESS_SHORT, INST_COLS, INST_SECTORS, CX_COLS, CX_QS, cxStagesOf, SECTION_TITLE } from "./Sections";
 import { OP_OWNERS, ALL_STATUSES, statusesOf, opFix, opRoles, opStatus, opTone } from "./OpPlan";
 import { initials, toneOf } from "@/lib/entlogo";
-import { ANNUAL_GOALS, GOALS_WEIGHT, goalsScore, ownAsGoal, type GoalRow, type OwnGoal } from "@/lib/goals";
+import {
+  ANNUAL_GOALS, GOALS_WEIGHT, goalsScore, ownAsGoal, editedGoal,
+  type GoalRow, type OwnGoal, type GoalEdit,
+} from "@/lib/goals";
 import { asset } from "@/lib/base";
 
 /* ============================================================
@@ -180,6 +183,8 @@ type Prefs = {
   /** أرقام الأهداف السنوية التي لا مصدر لها في المنصة — بالمعرّف
       في `ANNUAL_GOALS`. المحسوب آلياً لا يُحفظ هنا فلا يتجمّد. */
   goals?: Record<string, number>;
+  /** تعديل صاحب المحفظة على المؤشرات السبعة المشتركة */
+  goalEdits?: Record<string, GoalEdit>;
   /** مؤشرات يضيفها صاحب المحفظة فوق السبعة المشتركة — للمدير
       مؤشراتٌ زائدة على مؤشرات موظفيه */
   ownGoals?: OwnGoal[];
@@ -4313,6 +4318,8 @@ function GoalsModal({
   onSet,
   own,
   onOwn,
+  edits,
+  onEdit,
 }: {
   rows: GoalRow[];
   score: { pct: number | null; have: number; weight: number };
@@ -4322,9 +4329,14 @@ function GoalsModal({
   /** مؤشرات صاحب المحفظة الزائدة — تُعرف لتُحذف وتُعدَّل */
   own: OwnGoal[];
   onOwn: (g: OwnGoal | null, id?: string) => void;
+  /** ما غيّره صاحب المحفظة في السبعة المشتركة */
+  edits: Record<string, GoalEdit>;
+  onEdit: (id: string, e: GoalEdit | null) => void;
 }) {
   const mine = new Set(own.map((x) => x.id));
   const [add, setAdd] = useState(false);
+  /** المؤشر المفتوح للتعديل — نصّه ومستهدفه ووزنه */
+  const [ed, setEd] = useState<string | null>(null);
   const [f, setF] = useState<{ kpi: string; target: string; weight: string; unit: "عدد" | "%" }>({
     kpi: "", target: "100", weight: "10", unit: "%",
   });
@@ -4368,7 +4380,18 @@ function GoalsModal({
               <div className="gl-t">
                 <span className="n">{i + 1}. {g.kpi}</span>
                 <span className="w">{t("الوزن", "Weight")} {g.weight}</span>
-                {mine.has(g.id) && (
+                {/* السبعة المشتركة تُعدَّل أيضاً: نصّها ومستهدفها
+                    ووزنها — فمؤشرات المدير قد تخالف مؤشرات الموظف */}
+                {!mine.has(g.id) && (
+                  <button
+                    className="gl-x"
+                    title={t("تعديل المؤشر", "Edit")}
+                    onClick={() => setEd(ed === g.id ? null : g.id)}
+                  >
+                    ✎
+                  </button>
+                )}
+                {mine.has(g.id) ? (
                   <button
                     className="gl-x"
                     title={t("حذف هذا المؤشر", "Remove")}
@@ -4378,8 +4401,58 @@ function GoalsModal({
                   >
                     ✕
                   </button>
+                ) : (
+                  <button
+                    className="gl-x"
+                    title={t("هذا المؤشر لا يخصّني — أخفِه", "Not mine — hide it")}
+                    onClick={() => {
+                      if (confirm(t("إخفاء هذا المؤشر من أهدافك؟ لن يدخل الحساب.", "Hide this KPI?")))
+                        onEdit(g.id, { off: true });
+                    }}
+                  >
+                    ✕
+                  </button>
                 )}
               </div>
+
+              {ed === g.id && (
+                <div className="gl-ed">
+                  <label className="wide">
+                    <span>{t("نصّ المؤشر", "KPI")}</span>
+                    <input
+                      defaultValue={g.kpi}
+                      onBlur={(e) => onEdit(g.id, { kpi: e.target.value })}
+                    />
+                  </label>
+                  <label>
+                    <span>{t("المستهدف", "Target")}</span>
+                    <input
+                      type="number"
+                      min={1}
+                      defaultValue={g.target}
+                      onBlur={(e) => onEdit(g.id, { target: Math.max(1, num(e.target.value, g.target)) })}
+                    />
+                  </label>
+                  <label>
+                    <span>{t("الوزن", "Weight")}</span>
+                    <input
+                      type="number"
+                      min={0}
+                      defaultValue={g.weight}
+                      onBlur={(e) => onEdit(g.id, { weight: Math.max(0, num(e.target.value, g.weight)) })}
+                    />
+                  </label>
+                  <button
+                    className="gl-rst"
+                    onClick={() => {
+                      onEdit(g.id, null);
+                      setEd(null);
+                    }}
+                  >
+                    {t("إرجاع الأصل", "Reset")}
+                  </button>
+                </div>
+              )}
               <div className="gl-m">
                 <em>
                   {t("المستهدف", "Target")} <b>{g.target}{g.unit === "%" ? "%" : ""}</b>
@@ -4450,6 +4523,21 @@ function GoalsModal({
         ) : (
           <button className="gl-addb" onClick={() => setAdd(true)}>
             + {t("إضافة مؤشر من عندي", "Add my own KPI")}
+          </button>
+        )}
+
+        {/* ما أُخفي يبقى معروفاً ويُعاد بضغطة — فلا يضيع مؤشرٌ بلا رجعة */}
+        {Object.values(edits).some((e) => e?.off) && (
+          <button
+            className="gl-rst wide"
+            onClick={() => {
+              for (const [id, e] of Object.entries(edits)) if (e?.off) onEdit(id, { off: false });
+            }}
+          >
+            {t(
+              `إظهار ${Object.values(edits).filter((e) => e?.off).length} مؤشراً مخفياً`,
+              "Show hidden KPIs",
+            )}
           </button>
         )}
 
@@ -4965,6 +5053,9 @@ export default function Portfolio({
      لتجميع أرقام فريقه */
   const [commitAll, setCommitAll] = useState<CommitRow[]>([]);
   const [myChanges, setMyChanges] = useState<MyChange[]>([]);
+  /* سجلّ الجهات كاملاً وكلُّ الطلبات — منهما تُشتقّ أرقام الفريق لمديره */
+  const [allEnts, setAllEnts] = useState<{ name?: string }[]>([]);
+  const [myChangesAll, setMyChangesAll] = useState<MyChange[]>([]);
   useEffect(() => {
     void (async () => {
       const [ch, en] = await Promise.all([
@@ -4972,14 +5063,61 @@ export default function Portfolio({
         apiFetch("/api/entities").then((r) => r.json()).catch(() => ({})),
       ]);
       const list: MyChange[] = Array.isArray(ch.changes) ? ch.changes : [];
-      const owners = ownerMap(Array.isArray(en.entities) ? en.entities : []);
+      const ents = Array.isArray(en.entities) ? en.entities : [];
+      const owners = ownerMap(ents);
       setEntOwner(owners);
       const rows = commitStats(list, owners);
       setCommitAll(rows);
       setMyCommit(rows.find((r) => nrm(r.name) === nrm(me.name)) || null);
       setMyChanges(list.filter((c) => nrm(owners.get(nrm(c.owner))?.name || "") === nrm(me.name)));
+      setMyChangesAll(list);
+      setAllEnts(ents as { name?: string }[]);
     })();
   }, [me.name]);
+
+  /** مدير الإدارة: المنصة كلها · مدير قطاع: جهات فريقه · غيرهما: جهاته */
+  const goalWho: "all" | "team" | "me" =
+    me.role === "admin" ? "all" : team.length ? "team" : "me";
+  /* ============================================================
+     **أرقام المدير أرقامُ فريقه** — لا أرقامه هو
+     ------------------------------------------------------------
+     المدير ليس نقطةَ تواصل لجهةٍ غالباً، فكانت مربّعاته تُظهر صفراً
+     بينما هدفه السنوي يُحسب على فريقه. فمربّعا «طلبات التغيير»
+     و«جودة الملاحظات» وقائمةُ الجهات تتبع نطاق الأهداف نفسه:
+     مدير الإدارة المنصةَ كلها، ومدير القطاع فريقَه، وغيرهما جهاته.
+     ============================================================ */
+  /** أسماء جهات النطاق — جهاتي، أو جهات فريقي، أو كل الجهات */
+  const scopeEntNames = useMemo(() => {
+    if (goalWho === "me") return regNames;
+    const all = allEnts.map((e) => String(e.name || "")).filter(Boolean);
+    if (goalWho === "all") return all;
+    return all.filter((n) => teamNames.has(nrm(entOwner.get(nrm(n))?.name || "")));
+  }, [goalWho, regNames, allEnts, teamNames, entOwner]);
+  /** التزام النطاق — رقمٌ واحد يجمع من يعنيه */
+  const scopeCommit = useMemo(() => {
+    if (goalWho === "me") return myCommit;
+    const rows = goalWho === "all" ? commitAll : commitAll.filter((r) => teamNames.has(nrm(r.name)));
+    if (!rows.length) return null;
+    const total = rows.reduce((a, r) => a + r.total, 0);
+    const late = rows.reduce((a, r) => a + r.late, 0);
+    const ok = total - late;
+    return {
+      name: "",
+      photo: "",
+      total,
+      late,
+      ok,
+      raw: total ? Math.round((ok / total) * 100) : 0,
+      pct: total ? Math.round((ok / total) * 100) : 0,
+      avg: 0,
+    } as CommitRow;
+  }, [goalWho, myCommit, commitAll, teamNames]);
+  /** طلبات النطاق — للمدير طلبات فريقه */
+  const scopeChanges = useMemo(() => {
+    if (goalWho === "me") return myChanges;
+    const names = new Set(scopeEntNames.map((n) => nrm(n)));
+    return myChangesAll.filter((c) => names.has(nrm(c.owner)));
+  }, [goalWho, myChanges, myChangesAll, scopeEntNames]);
   /* سنةُ طلبات جهاتي المعروضة — الجارية افتراضاً، و«الكل» متاحة */
   const [crYr, setCrYr] = useState(String(YR_NOW));
   const reverse = pf.of("reverse");
@@ -5032,7 +5170,7 @@ export default function Portfolio({
      ============================================================ */
   const [noteQ, setNoteQ] = useState<{ pct: number; q: string } | null>(null);
   useEffect(() => {
-    if (!regNames.length) {
+    if (!scopeEntNames.length) {
       setNoteQ(null);
       return;
     }
@@ -5043,11 +5181,11 @@ export default function Portfolio({
         const qs = nqQuarters(rows);
         const last = qs[qs.length - 1]?.q || "";
         if (!last) return setNoteQ(null);
-        const st = nqForEntities(nqOfQuarter(rows, last), regNames);
+        const st = nqForEntities(nqOfQuarter(rows, last), scopeEntNames);
         setNoteQ(st ? { pct: st.pct, q: last } : null);
       })
       .catch(() => setNoteQ(null));
-  }, [regNames]);
+  }, [scopeEntNames]);
   const curQ = Math.floor(new Date().getMonth() / 3) + 1;
   const qLate = entities.filter((r) => {
     const q: number[] = Array.isArray(r.data.q) ? r.data.q : [];
@@ -5072,9 +5210,7 @@ export default function Portfolio({
      الإدارة بالمنصة كلها. فلا يُعرض للمدير صفرٌ لأنه ليس نقطة
      تواصل جهةٍ بنفسه — عملُه عمل من تحته.
      ============================================================ */
-  /** مدير الإدارة: المنصة كلها · مدير قطاع: جهات فريقه · غيرهما: جهاته */
-  const goalWho: "all" | "team" | "me" =
-    me.role === "admin" ? "all" : team.length ? "team" : "me";
+
   /** صفوف قسمٍ بحسب النطاق — مالك الجهة من سجلّ الجهات، أو اسم
       الاستشاري المكتوب في الصفّ نفسه */
   const inScope = useCallback(
@@ -5117,7 +5253,11 @@ export default function Portfolio({
 
     const devDone = devplan.filter((r) => txt(r.data.state) === "مكتملة").length;
 
-    return [...ANNUAL_GOALS, ...(prefs.ownGoals || []).map(ownAsGoal)].map((g) => {
+    /* تعديلات صاحب المحفظة على السبعة: ما أطفأه يسقط، وما غيّر
+       نصّه أو مستهدفه أو وزنه يُؤخذ منه */
+    const ed = prefs.goalEdits || {};
+    const base = ANNUAL_GOALS.filter((g) => !ed[g.id]?.off).map((g) => editedGoal(g, ed[g.id]));
+    return [...base, ...(prefs.ownGoals || []).map(ownAsGoal)].map((g) => {
       let got: number | null = null;
       let typed = false;
       let src = g.how;
@@ -5171,7 +5311,7 @@ export default function Portfolio({
       }
       return { ...g, got, typed, pct: got === null ? null : cap(got, g.target), src };
     });
-  }, [inScope, goalWho, teamNames, commitAll, mw.loaded, myCommit, noteQ, prefs.goals, prefs.ownGoals, devplan, t]);
+  }, [inScope, goalWho, teamNames, commitAll, mw.loaded, myCommit, noteQ, prefs.goals, prefs.ownGoals, prefs.goalEdits, devplan, t]);
   const goalScore = useMemo(() => goalsScore(goalRows), [goalRows]);
   /** إضافة مؤشرٍ من عند صاحب المحفظة أو حذفه — `null` يحذف */
   const setOwnGoal = useCallback((g: OwnGoal | null, id?: string) => {
@@ -5185,6 +5325,18 @@ export default function Portfolio({
       const vals = { ...(old.goals || {}) };
       if (!g && id) delete vals[id];
       const out = { ...old, ownGoals: list, goals: vals };
+      void saveUserData("portfolio", out);
+      return out;
+    });
+  }, []);
+
+  /** تعديل مؤشرٍ من السبعة — أو إطفاؤه إن لم يكن من عمله */
+  const setGoalEdit = useCallback((id: string, e: GoalEdit | null) => {
+    setPrefs((old) => {
+      const ed = { ...(old.goalEdits || {}) };
+      if (!e) delete ed[id];
+      else ed[id] = { ...(ed[id] || {}), ...e };
+      const out = { ...old, goalEdits: ed };
       void saveUserData("portfolio", out);
       return out;
     });
@@ -5235,12 +5387,14 @@ export default function Portfolio({
       }
       case "changes": {
         /* ما لم تُربط جهاتي بعد، يبقى المحسوب من بنود المحفظة */
-        if (myCommit)
+        if (scopeCommit)
           return {
-            count: myCommit.total,
-            pct: myCommit.pct,
-            sub: `${t("التزام", "On time")} ${myCommit.pct}%`,
-            warn: myCommit.late ? `${myCommit.late} ${t("متأخرة", "late")}` : undefined,
+            count: scopeCommit.total,
+            pct: scopeCommit.pct,
+            sub:
+              `${t("التزام", "On time")} ${scopeCommit.pct}%` +
+              (goalWho === "me" ? "" : ` · ${goalWho === "all" ? t("المنصة", "Platform") : t("فريقك", "Your team")}`),
+            warn: scopeCommit.late ? `${scopeCommit.late} ${t("متأخرة", "late")}` : undefined,
           };
         return {
           count: changes.length,
@@ -5351,7 +5505,7 @@ export default function Portfolio({
     return (
       <>
         {k === "changes" && (
-          <CrBox rows={myChanges} yr={crYr} setYr={setCrYr} t={t} />
+          <CrBox rows={scopeChanges} yr={crYr} setYr={setCrYr} t={t} />
         )}
         <SectionTable
         section={base}
@@ -5734,6 +5888,8 @@ export default function Portfolio({
           onSet={setGoal}
           own={prefs.ownGoals || []}
           onOwn={setOwnGoal}
+          edits={prefs.goalEdits || {}}
+          onEdit={setGoalEdit}
         />
       )}
 

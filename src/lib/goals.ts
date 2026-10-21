@@ -129,6 +129,28 @@ export const ownAsGoal = (g: OwnGoal): Goal => ({
   how: "مؤشر أضفته بنفسك — رقمه يُدخل يدوياً",
 });
 
+/* ============================================================
+   تعديل صاحب المحفظة على المؤشرات السبعة
+   ------------------------------------------------------------
+   السبعة تعريفٌ مشترك، لكنّ مؤشرات المدير قد تختلف عن مؤشرات
+   الموظف نصّاً ومستهدفاً ووزناً. فيُحفظ لكل حساب **ما غيّره هو
+   وحده** فوق التعريف المشترك — لا نسخةٌ كاملة: ما لم يُغيَّر يبقى
+   تابعاً للتعريف، فإن تحدّث في النظام تحدّث عنده.
+   ومؤشرٌ لا يخصّه يُطفأ (`off`) فلا يدخل حسابه ولا يُحتسب صفراً.
+   ============================================================ */
+export type GoalEdit = { kpi?: string; target?: number; weight?: number; off?: boolean };
+
+/** التعريف المشترك وقد طُبّق عليه تعديل صاحب المحفظة */
+export function editedGoal(g: Goal, e?: GoalEdit): Goal {
+  if (!e) return g;
+  return {
+    ...g,
+    kpi: e.kpi && e.kpi.trim() ? e.kpi.trim() : g.kpi,
+    target: typeof e.target === "number" && e.target > 0 ? e.target : g.target,
+    weight: typeof e.weight === "number" && e.weight >= 0 ? e.weight : g.weight,
+  };
+}
+
 export type GoalRow = Goal & {
   /** المحقّق — null إن لم يُرصد بعد */
   got: number | null;

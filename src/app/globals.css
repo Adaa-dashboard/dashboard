@@ -13905,6 +13905,37 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
   margin-top: 10px; padding: 11px 13px;
   background: var(--soft); border: 1px solid var(--line2); border-radius: 12px;
 }
+/* تعديل مؤشرٍ من السبعة — يُفتح في صفّه لا في نافذةٍ ثانية */
+.gl-ed {
+  display: grid;
+  grid-template-columns: 1fr 90px 90px auto;
+  gap: 8px;
+  align-items: end;
+  margin-top: 9px;
+  padding: 9px 10px;
+  background: var(--panel);
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+}
+.gl-ed label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.gl-ed label.wide { grid-column: 1 / 2; }
+.gl-ed span { font-size: 10px; color: var(--muted); }
+.gl-ed input {
+  font: inherit; font-size: 12px; width: 100%;
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px 9px;
+  background: var(--panel); color: var(--ink);
+}
+.gl-rst {
+  font: inherit; font-size: 10.5px; font-weight: 700; cursor: pointer;
+  color: var(--muted); background: var(--soft);
+  border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px;
+}
+.gl-rst:hover { color: var(--gt-700); border-color: var(--gt-600); }
+.gl-rst.wide { width: 100%; margin-top: 8px; }
+@media (max-width: 720px) {
+  .gl-ed { grid-template-columns: 1fr 1fr; }
+  .gl-ed label.wide { grid-column: 1 / -1; }
+}
 .gl-add .m-f { margin-top: 10px; }
 
 /* ============================================================
