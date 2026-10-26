@@ -18,7 +18,7 @@
 import { useState } from "react";
 import { asset } from "@/lib/base";
 import {
-  listOf, CYCLE_FIELDS, QUARTER_AR, quarterOf, quarterText, cycKey, type WeeklyPrefs,
+  listOf, CYCLE_FIELDS, QUARTER_AR, quarterOf, cycleTitle, cycKey, type WeeklyPrefs,
 } from "@/lib/weeklyPrefs";
 import type { Dom, WeekReport } from "@/lib/weekReport";
 import { DonutRing, DonutLegend } from "./DonutCard";
@@ -382,7 +382,7 @@ function CycleCard({
   return (
     <div className="wk-card cyc">
       <div className="cyc-h">
-        <span className="ar">دورة القياس · {quarterText(q)}</span>
+        <span className="ar">حصيلة الدورة</span>
         <span className="pick">
           {QUARTER_AR.map((lab, i) => {
             const k = `${year}Q${i + 1}`;
@@ -485,7 +485,10 @@ export default function WeeklyReportView({
         <header className="wkx-head">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={asset("/adaa-logo.png")} alt="أداء" className="wkx-logo" />
-          <h2>الإنجاز الأسبوعي</h2>
+          {/* عنوان التقرير: دورة القياس وربعُها — بطلب صاحبة المنصة،
+              بدل «الإنجاز الأسبوعي». والربع هو المختار في مربّع
+              الحصيلة، وإلا ربعُ أسبوع التقرير */}
+          <h2>{cycleTitle((prefs.texts || {})["cyc:q"] || quarterOf(r.weekStart))}</h2>
           <div className="wkx-dept">{dept}</div>
           <div className="wkx-dt">
             <PIcon id="calendar" size={14} />

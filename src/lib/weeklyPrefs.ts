@@ -151,5 +151,11 @@ export function quarterText(q: string): string {
   const m = /^(\d{4})Q([1-4])$/.exec(q || "");
   return m ? `${QUARTER_AR[Number(m[2]) - 1]} لعام ${m[1]}` : "";
 }
+/** عنوان التقرير — «دورة القياس للربع الثالث لعام 2026» */
+export function cycleTitle(q: string): string {
+  const m = /^(\d{4})Q([1-4])$/.exec(q || "");
+  return m ? `دورة القياس للربع ${QUARTER_AR[Number(m[2]) - 1].replace("الربع ", "")} لعام ${m[1]}` : "دورة القياس";
+}
+
 /** مفتاح حقلٍ من حقول الدورة في `texts` */
 export const cycKey = (q: string, f: string) => `cyc:${q}:${f}`;
