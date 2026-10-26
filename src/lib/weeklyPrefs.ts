@@ -131,14 +131,57 @@ export const listOf = (s: string): string[] =>
    ولا مصدر لها في المنصة: هي حصيلةُ عملٍ يجمعه صاحب التقرير من
    دورة القياس نفسها — بطلب صاحبة المنصة صريحاً.
    ============================================================ */
-export const CYCLE_FIELDS: { k: string; label: string; icon: string; tone?: "warn" }[] = [
-  { k: "n1", label: "المؤشرات التي تم توثيقها", icon: "line" },
-  { k: "n2", label: "المبادرات التي تم توثيقها", icon: "milestone" },
-  { k: "n3", label: "مؤشرات الالتزام", icon: "shield" },
-  { k: "n4", label: "ملاحظات الأداء للمبادرات المتعثرة", icon: "flag", tone: "warn" },
-  { k: "n5", label: "ملاحظات الأداء للمؤشرات المتعثرة", icon: "alert", tone: "warn" },
-  { k: "n6", label: "التقارير الصادرة للجهات", icon: "report" },
+export type CycField = { k: string; label: string; icon: string; tone?: "warn" };
+export type CycGroup = {
+  /** عنوان المجموعة — بلا عنوانٍ للمربّعين الأولين في الصدارة */
+  title?: string;
+  /** عنوانٌ يذكر الربع، فيُكمَل باسمه عند العرض */
+  withQ?: boolean;
+  fields: CycField[];
+};
+
+/* ترتيب الورقة كما طلبته صاحبة المنصة: مربّعان في الصدارة، ثم
+   أربع مجموعاتٍ معنونة تحت كلٍّ منها تفصيلُها */
+export const CYCLE_GROUPS: CycGroup[] = [
+  {
+    fields: [
+      { k: "t1", label: "التقارير الصادرة هذا الربع", icon: "report" },
+      { k: "t2", label: "مؤشرات الالتزام التي تم توثيقها", icon: "shield" },
+    ],
+  },
+  {
+    title: "المؤشرات التي راجعناها",
+    fields: [
+      { k: "k1", label: "مؤشرات رؤية السعودية 2030", icon: "vision" },
+      { k: "k2", label: "مؤشرات الاستراتيجيات الوطنية", icon: "bank" },
+      { k: "k3", label: "مؤشرات المخرجات الوطنية", icon: "target" },
+    ],
+  },
+  {
+    title: "المبادرات التي راجعناها",
+    fields: [
+      { k: "b1", label: "مبادرات رؤية السعودية 2030", icon: "rocket" },
+      { k: "b2", label: "مبادرات الاستراتيجيات الوطنية", icon: "milestone" },
+    ],
+  },
+  {
+    title: "ملاحظات الأداء للعناصر المتعثرة خلال",
+    withQ: true,
+    fields: [
+      { k: "w1", label: "ملاحظات الأداء للمؤشرات المتعثرة", icon: "alert", tone: "warn" },
+      { k: "w2", label: "ملاحظات الأداء للمبادرات المتعثرة", icon: "flag", tone: "warn" },
+    ],
+  },
+  {
+    title: "نتائج قياس تجربة المستفيد",
+    withQ: true,
+    fields: [{ k: "x1", label: "الجهات التي تم قياسها خلال الربع", icon: "user-check" }],
+  },
 ];
+
+/** كل الحقول مسطَّحةً — لمعرفة هل في الربع رقمٌ مكتوب */
+export const CYCLE_FIELDS: CycField[] = CYCLE_GROUPS.flatMap((g) => g.fields);
+
 export const QUARTER_AR = ["الربع الأول", "الربع الثاني", "الربع الثالث", "الربع الرابع"];
 /** رمز ربع تاريخٍ بعينه — `2026Q3` */
 export function quarterOf(iso: string): string {

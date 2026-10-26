@@ -18,7 +18,8 @@
 import { useState } from "react";
 import { asset } from "@/lib/base";
 import {
-  listOf, CYCLE_FIELDS, QUARTER_AR, quarterOf, quarterRange, cycleTitle, cycKey, type WeeklyPrefs,
+  listOf, CYCLE_GROUPS, QUARTER_AR, quarterOf, quarterRange, quarterText, cycleTitle, cycKey,
+  type WeeklyPrefs,
 } from "@/lib/weeklyPrefs";
 import type { Dom, WeekReport } from "@/lib/weekReport";
 import { DonutRing, DonutLegend } from "./DonutCard";
@@ -373,6 +374,46 @@ function CycleBody({
   const val = (f: string) => draft[cycKey(q, f)] ?? texts[cycKey(q, f)] ?? "";
   const put = (f: string, v: string) => onText?.(cycKey(q, f), v.trim());
 
+  /** بطاقةُ رقمٍ واحد — رقمُه وعنوانُه وسطرٌ يوضّحه */
+  const box = (f: { k: string; label: string; icon: string; tone?: "warn" }, lead = false) => {
+    const sk = `s${f.k}`;
+    const n = texts[cycKey(q, f.k)] || "";
+    const sub = texts[cycKey(q, sk)] || "";
+    return (
+      <div className={`wk-card cyc-b ${f.tone || ""} ${lead ? "lead" : ""}`} key={f.k}>
+        <span className={`wk-ci ${f.tone || ""}`}>
+          <PIcon id={f.icon} size={lead ? 30 : 26} />
+        </span>
+        {onText ? (
+          <input
+            className="cyc-n"
+            value={val(f.k)}
+            placeholder="—"
+            onChange={(e) => setDraft((x) => ({ ...x, [cycKey(q, f.k)]: e.target.value }))}
+            onBlur={(e) => put(f.k, e.target.value)}
+          />
+        ) : (
+          <b className="cyc-n">{n || "—"}</b>
+        )}
+        <span className="cyc-l">{f.label}</span>
+        {onText ? (
+          <input
+            className="cyc-s"
+            value={val(sk)}
+            placeholder="سطر توضيحي…"
+            onChange={(e) => setDraft((x) => ({ ...x, [cycKey(q, sk)]: e.target.value }))}
+            onBlur={(e) => put(sk, e.target.value)}
+          />
+        ) : (
+          sub && <em className="cyc-s">{sub}</em>
+        )}
+      </div>
+    );
+  };
+
+  /* المجموعة الأولى بلا عنوان — مربّعا الصدارة. وما بعدها معنونٌ
+     مرقَّم، وعنوانان منها يُذيَّلان باسم الربع */
+  let n = 0;
   return (
     <>
       {onText && (
@@ -389,43 +430,24 @@ function CycleBody({
         </div>
       )}
 
-      <div className="cyc-g">
-        {CYCLE_FIELDS.map((f) => {
-          const sk = `s${f.k.slice(1)}`;
-          const n = texts[cycKey(q, f.k)] || "";
-          const sub = texts[cycKey(q, sk)] || "";
-          return (
-            <div className={`wk-card cyc-b ${f.tone || ""}`} key={f.k}>
-              <span className={`wk-ci ${f.tone || ""}`}>
-                <PIcon id={f.icon} size={26} />
-              </span>
-              {onText ? (
-                <input
-                  className="cyc-n"
-                  value={val(f.k)}
-                  placeholder="—"
-                  onChange={(e) => setDraft((x) => ({ ...x, [cycKey(q, f.k)]: e.target.value }))}
-                  onBlur={(e) => put(f.k, e.target.value)}
-                />
-              ) : (
-                <b className="cyc-n">{n || "—"}</b>
-              )}
-              <span className="cyc-l">{f.label}</span>
-              {onText ? (
-                <input
-                  className="cyc-s"
-                  value={val(sk)}
-                  placeholder="سطر توضيحي…"
-                  onChange={(e) => setDraft((x) => ({ ...x, [cycKey(q, sk)]: e.target.value }))}
-                  onBlur={(e) => put(sk, e.target.value)}
-                />
-              ) : (
-                sub && <em className="cyc-s">{sub}</em>
-              )}
+      {CYCLE_GROUPS.map((g, gi) => {
+        const lead = !g.title;
+        if (g.title) n += 1;
+        return (
+          <section className="cyc-sec" key={gi}>
+            {g.title && (
+              <h3 className="cyc-sh">
+                <i>{"١٢٣٤٥٦٧٨٩".charAt(n - 1)}</i>
+                {g.title}
+                {g.withQ ? ` ${quarterText(q)}` : ""}
+              </h3>
+            )}
+            <div className="cyc-g" data-n={g.fields.length}>
+              {g.fields.map((f) => box(f, lead))}
             </div>
-          );
-        })}
-      </div>
+          </section>
+        );
+      })}
     </>
   );
 }
