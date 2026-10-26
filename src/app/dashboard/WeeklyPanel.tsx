@@ -207,6 +207,27 @@ export default function WeeklyPanel({
     [prefs, week, t],
   );
 
+  /* أرقام دورة القياس — تُحفظ في **الافتراضي** لا في استثناء
+     الأسبوع: الدورةُ ربعية، فرقمُها واحدٌ في أسابيع الربع كلها،
+     ولو كُتب في استثناء أسبوعٍ لاختفى من بقيتها. */
+  const saveCycle = useCallback(
+    async (key: string, text: string) => {
+      const b = mergePrefs(base, null);
+      if ((b.texts?.[key] || "") === text) return;
+      const next: WeeklyPrefs = { ...b, texts: { ...b.texts, [key]: text } };
+      setBase(next);
+      const r = await apiFetch("/api/weekly", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scope: "default", week, prefs: next }),
+      })
+        .then((x) => x.json())
+        .catch(() => ({ error: "تعذّر الحفظ" }));
+      setMsg(r?.error ? String(r.error) : t("حُفظ ✓", "Saved ✓"));
+    },
+    [base, week, t],
+  );
+
   async function save(next: WeeklyPrefs, scope: "default" | "week") {
     setBusy(true);
     setMsg("");
@@ -311,6 +332,7 @@ export default function WeeklyPanel({
           prefs={prefs}
           onPick={canEdit ? pickRow : undefined}
           onTaskText={canEdit ? saveTaskText : undefined}
+          onCycleText={canEdit ? saveCycle : undefined}
         />
       )}
 

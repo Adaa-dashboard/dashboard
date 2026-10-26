@@ -2595,6 +2595,47 @@ table.matrix thead th {
 }
 
 /* صف الحالات (التكليفات · طلبات التغيير) */
+/* ------------------------------------------------------------
+   Cycle — مربّع حصيلة دورة القياس في أعلى التقرير
+   ------------------------------------------------------------ */
+.wk-card.cyc { border-top: 3px solid var(--gold); }
+.cyc-h { display: flex; align-items: center; gap: 9px; margin-bottom: 9px; flex-wrap: wrap; }
+.cyc-h .en {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 21px; font-weight: 700; letter-spacing: 0.14em;
+  color: var(--gt-900); text-transform: uppercase;
+}
+.cyc-h .ar { font-size: 12px; font-weight: 700; color: var(--muted); }
+.cyc-h .pick { margin-inline-start: auto; display: flex; gap: 5px; }
+.cyc-h .pick button,
+.cyc-h .pick > span {
+  font: inherit; font-size: 10.5px; font-weight: 700;
+  padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--panel); color: var(--muted);
+  cursor: pointer;
+}
+.cyc-h .pick button.on,
+.cyc-h .pick > span.on { background: var(--g-800); border-color: var(--g-800); color: #fff; }
+/* الرقم يُكتب في مكانه — حقلٌ بلا إطار يشبه النصّ */
+.cyc-sts .cyc-n {
+  display: block; width: 100%; text-align: center;
+  font: inherit; font-family: "Noto Kufi Arabic", sans-serif;
+  font-size: 18px; font-weight: 800; color: var(--gt-900);
+  background: transparent; border: 0; border-bottom: 1px dashed var(--border);
+  padding: 0 0 2px;
+}
+.cyc-sts .cyc-n:focus { outline: none; border-bottom-color: var(--g-700); }
+.cyc-sts .cyc-s {
+  display: block; width: 100%; text-align: center; margin-top: 2px;
+  font: inherit; font-size: 9px; color: var(--muted);
+  background: transparent; border: 0; padding: 1px 0;
+}
+.cyc-sts .cyc-s:focus { outline: none; color: var(--gt-700); }
+/* في الطباعة والمشاركة: الحقول نصٌّ لا صناديق */
+@media print {
+  .cyc-sts .cyc-n { border-bottom: 0; }
+}
+
 .wk-sts {
   display: flex;
 }

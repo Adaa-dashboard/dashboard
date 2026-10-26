@@ -17,7 +17,9 @@
 
 import { useState } from "react";
 import { asset } from "@/lib/base";
-import { listOf, type WeeklyPrefs } from "@/lib/weeklyPrefs";
+import {
+  listOf, CYCLE_FIELDS, QUARTER_AR, quarterOf, quarterText, cycKey, type WeeklyPrefs,
+} from "@/lib/weeklyPrefs";
 import type { Dom, WeekReport } from "@/lib/weekReport";
 import { DonutRing, DonutLegend } from "./DonutCard";
 import { PIcon } from "./pickicons";
@@ -347,6 +349,91 @@ function DomCard({
   );
 }
 
+/* ============================================================
+   Cycle — حصيلة دورة القياس في أعلى التقرير
+   ------------------------------------------------------------
+   ستة أرقامٍ لكل ربع، تُكتب يدوياً وتبقى محفوظةً لذلك الربع
+   وحده: فالتقرير الأسبوعي يمرّ، والدورة تبقى. ولكل رقمٍ سطرٌ
+   صغيرٌ تحته يُكتب فيه ما يوضّحه («من ٦٩ جهة» مثلاً).
+
+   ولا تُقرأ من المنصة — هي حصيلةُ الدورة يجمعها صاحب التقرير،
+   بطلب صاحبة المنصة صريحاً. والمربّع لا يظهر لمن يقرأ إن لم
+   يُكتب فيه شيء، فلا تُطبع أصفارٌ ولا خاناتٌ فارغة.
+   ============================================================ */
+function CycleCard({
+  weekStart, texts, onText,
+}: {
+  weekStart: string;
+  texts: Record<string, string>;
+  /** يُمرَّر لمن يملك تحرير التقرير وحده */
+  onText?: (key: string, value: string) => void;
+}) {
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const year = Number((quarterOf(weekStart) || "").slice(0, 4)) || new Date().getFullYear();
+  /* الربع المعروض: ما اختير، وإلا ربعُ أسبوع التقرير */
+  const q = texts["cyc:q"] || quarterOf(weekStart);
+  const val = (f: string) => draft[cycKey(q, f)] ?? texts[cycKey(q, f)] ?? "";
+  const put = (f: string, v: string) => onText?.(cycKey(q, f), v.trim());
+  const some = CYCLE_FIELDS.some(
+    (f) => (texts[cycKey(q, f.k)] || "").trim() || (texts[cycKey(q, `s${f.k.slice(1)}`)] || "").trim(),
+  );
+  if (!onText && !some) return null;
+
+  return (
+    <div className="wk-card cyc">
+      <div className="cyc-h">
+        <span className="en">Cycle</span>
+        <span className="ar">دورة القياس · {quarterText(q)}</span>
+        <span className="pick">
+          {QUARTER_AR.map((lab, i) => {
+            const k = `${year}Q${i + 1}`;
+            if (!onText) return k === q ? <span key={k} className="on">Q{i + 1}</span> : null;
+            return (
+              <button key={k} className={k === q ? "on" : ""} title={lab} onClick={() => onText("cyc:q", k)}>
+                Q{i + 1}
+              </button>
+            );
+          })}
+        </span>
+      </div>
+      <div className="wk-sts five cyc-sts">
+        {CYCLE_FIELDS.map((f) => {
+          const sk = `s${f.k.slice(1)}`;
+          return (
+            <div key={f.k}>
+              {onText ? (
+                <input
+                  className="cyc-n"
+                  value={val(f.k)}
+                  placeholder="—"
+                  onChange={(e) => setDraft((x) => ({ ...x, [cycKey(q, f.k)]: e.target.value }))}
+                  onBlur={(e) => put(f.k, e.target.value)}
+                />
+              ) : (
+                <b>{texts[cycKey(q, f.k)] || "—"}</b>
+              )}
+              <span>
+                {f.label}
+                {onText ? (
+                  <input
+                    className="cyc-s"
+                    value={val(sk)}
+                    placeholder="سطر توضيحي…"
+                    onChange={(e) => setDraft((x) => ({ ...x, [cycKey(q, sk)]: e.target.value }))}
+                    onBlur={(e) => put(sk, e.target.value)}
+                  />
+                ) : (
+                  texts[cycKey(q, sk)] && <em className="sub">{texts[cycKey(q, sk)]}</em>
+                )}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* المجالات التي تُعرض بطاقتين في الصف — وما عداها بعرض الصفحة */
 const PAIRED = new Set(["nat", "inst", "ses", "cx"]);
 
@@ -355,6 +442,7 @@ export default function WeeklyReportView({
   prefs,
   onPick,
   onTaskText,
+  onCycleText,
 }: {
   report: WeekReport;
   prefs: WeeklyPrefs;
@@ -363,6 +451,8 @@ export default function WeeklyReportView({
   /** خانتا «التحديث» و«الدعم المطلوب» تُكتبان في جدول التكاليف
       مباشرة — المفتاح `upd:<id>` أو `sup:<id>` */
   onTaskText?: (key: string, text: string) => void;
+  /** أرقام دورة القياس — تُحفظ افتراضاً لكل الأسابيع لا لأسبوعٍ */
+  onCycleText?: (key: string, text: string) => void;
 }) {
   const { dir, band, dept } = prefs.layout;
   const r = report;
@@ -403,6 +493,10 @@ export default function WeeklyReportView({
             {rangeText2(r.weekStart, r.weekEnd)}
           </div>
         </header>
+
+        {prefs.on.cycle !== false && (
+          <CycleCard weekStart={r.weekStart} texts={prefs.texts || {}} onText={onCycleText} />
+        )}
 
         <div className="wk-kpi">
           <div>
