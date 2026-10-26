@@ -10,7 +10,7 @@ import { weekStartOf, shiftDays } from "@/lib/weeklyReport";
 import { mergePrefs, type WeeklyPrefs } from "@/lib/weeklyPrefs";
 import type { ChangeLite, ContactLite, LogRow, TaskLite } from "@/lib/achievements";
 import { buildWeekReport, type ItemLite, type WeekReport } from "@/lib/weekReport";
-import { listOf } from "@/lib/weeklyPrefs";
+import { listOf, QUARTER_AR, quarterOf } from "@/lib/weeklyPrefs";
 
 type ShareRow = {
   token: string;
@@ -313,6 +313,23 @@ export default function WeeklyPanel({
           <button className="btn btn-ghost" onClick={() => setTune(true)}>
             ⚙️ {t("إعدادات التقرير", "Report settings")}
           </button>
+          {/* اختيار الربع خارج الورقة: شريطُه كان يُطبع معها */}
+          {view === "cycle" && canEdit && (
+            <select
+              className="wk-qsel"
+              value={(prefs.texts || {})["cyc:q"] || quarterOf(week)}
+              onChange={(e) => void saveCycle("cyc:q", e.target.value)}
+            >
+              {[0, 1].flatMap((back) => {
+                const y = Number(quarterOf(week).slice(0, 4)) - back;
+                return QUARTER_AR.map((lab, i) => (
+                  <option key={`${y}Q${i + 1}`} value={`${y}Q${i + 1}`}>
+                    {lab} {y}
+                  </option>
+                ));
+              })}
+            </select>
+          )}
           {/* مربّعٌ يقلب المعروض بين التقريرين — والأساسي الأسبوعي */}
           <button
             className={`btn btn-ghost wk-swx ${view === "cycle" ? "on" : ""}`}

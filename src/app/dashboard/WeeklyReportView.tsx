@@ -18,8 +18,8 @@
 import { useState } from "react";
 import { asset } from "@/lib/base";
 import {
-  listOf, CYCLE_GROUPS, QUARTER_AR, quarterOf, quarterRange, quarterText, cycleTitle, cycKey,
-  type WeeklyPrefs,
+  listOf, CYCLE_GROUPS, quarterOf, quarterRange, quarterText, cycleTitle, cycKey,
+  type CycField, type WeeklyPrefs,
 } from "@/lib/weeklyPrefs";
 import type { Dom, WeekReport } from "@/lib/weekReport";
 import { DonutRing, DonutLegend } from "./DonutCard";
@@ -370,20 +370,21 @@ function CycleBody({
   onText?: (key: string, value: string) => void;
 }) {
   const [draft, setDraft] = useState<Record<string, string>>({});
-  const year = Number((q || "").slice(0, 4)) || new Date().getFullYear();
   const val = (f: string) => draft[cycKey(q, f)] ?? texts[cycKey(q, f)] ?? "";
   const put = (f: string, v: string) => onText?.(cycKey(q, f), v.trim());
 
   /** بطاقةُ رقمٍ واحد — رقمُه وعنوانُه وسطرٌ يوضّحه */
-  const box = (f: { k: string; label: string; icon: string; tone?: "warn" }, lead = false) => {
+  const box = (f: CycField, lead = false) => {
     const sk = `s${f.k}`;
     const n = texts[cycKey(q, f.k)] || "";
     const sub = texts[cycKey(q, sk)] || "";
     return (
       <div className={`wk-card cyc-b ${f.tone || ""} ${lead ? "lead" : ""}`} key={f.k}>
-        <span className={`wk-ci ${f.tone || ""}`}>
-          <PIcon id={f.icon} size={lead ? 30 : 26} />
-        </span>
+        {f.icon && (
+          <span className={`wk-ci ${f.tone || ""}`}>
+            <PIcon id={f.icon} size={lead ? 30 : 26} />
+          </span>
+        )}
         {onText ? (
           <input
             className="cyc-n"
@@ -413,31 +414,19 @@ function CycleBody({
 
   /* المجموعة الأولى بلا عنوان — مربّعا الصدارة. وما بعدها معنونٌ
      مرقَّم، وعنوانان منها يُذيَّلان باسم الربع */
-  let n = 0;
   return (
     <>
-      {onText && (
-        <div className="cyc-pick no-print">
-          <span>الربع المعروض</span>
-          {QUARTER_AR.map((lab, i) => {
-            const k = `${year}Q${i + 1}`;
-            return (
-              <button key={k} className={k === q ? "on" : ""} onClick={() => onText("cyc:q", k)}>
-                {lab}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
       {CYCLE_GROUPS.map((g, gi) => {
         const lead = !g.title;
-        if (g.title) n += 1;
         return (
           <section className="cyc-sec" key={gi}>
             {g.title && (
-              <h3 className="cyc-sh">
-                <i>{"١٢٣٤٥٦٧٨٩".charAt(n - 1)}</i>
+              <h3 className={`cyc-sh ${g.tone || ""}`}>
+                {g.icon && (
+                  <i>
+                    <PIcon id={g.icon} size={19} />
+                  </i>
+                )}
                 {g.title}
                 {g.withQ ? ` ${quarterText(q)}` : ""}
               </h3>

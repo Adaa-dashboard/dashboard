@@ -131,17 +131,20 @@ export const listOf = (s: string): string[] =>
    ولا مصدر لها في المنصة: هي حصيلةُ عملٍ يجمعه صاحب التقرير من
    دورة القياس نفسها — بطلب صاحبة المنصة صريحاً.
    ============================================================ */
-export type CycField = { k: string; label: string; icon: string; tone?: "warn" };
+export type CycField = { k: string; label: string; icon?: string; tone?: "warn" };
 export type CycGroup = {
   /** عنوان المجموعة — بلا عنوانٍ للمربّعين الأولين في الصدارة */
   title?: string;
+  /** أيقونة العنوان — المربّعات تحته بلا أيقونات */
+  icon?: string;
   /** عنوانٌ يذكر الربع، فيُكمَل باسمه عند العرض */
   withQ?: boolean;
+  tone?: "warn";
   fields: CycField[];
 };
 
-/* ترتيب الورقة كما طلبته صاحبة المنصة: مربّعان في الصدارة، ثم
-   أربع مجموعاتٍ معنونة تحت كلٍّ منها تفصيلُها */
+/* ترتيب الورقة كما طلبته صاحبة المنصة: مربّعان في الصدارة لهما
+   أيقونتاهما، ثم أربع مجموعاتٍ أيقونتُها في عنوانها لا في مربّعاتها */
 export const CYCLE_GROUPS: CycGroup[] = [
   {
     fields: [
@@ -150,32 +153,37 @@ export const CYCLE_GROUPS: CycGroup[] = [
     ],
   },
   {
-    title: "المؤشرات التي راجعناها",
+    title: "المؤشرات",
+    icon: "line",
     fields: [
-      { k: "k1", label: "مؤشرات رؤية السعودية 2030", icon: "vision" },
-      { k: "k2", label: "مؤشرات الاستراتيجيات الوطنية", icon: "bank" },
-      { k: "k3", label: "مؤشرات المخرجات الوطنية", icon: "target" },
+      { k: "k1", label: "مؤشرات رؤية السعودية 2030" },
+      { k: "k2", label: "مؤشرات الاستراتيجيات الوطنية" },
+      { k: "k3", label: "مؤشرات المخرجات الوطنية" },
     ],
   },
   {
-    title: "المبادرات التي راجعناها",
+    title: "المبادرات",
+    icon: "milestone",
     fields: [
-      { k: "b1", label: "مبادرات رؤية السعودية 2030", icon: "rocket" },
-      { k: "b2", label: "مبادرات الاستراتيجيات الوطنية", icon: "milestone" },
+      { k: "b1", label: "مبادرات رؤية السعودية 2030" },
+      { k: "b2", label: "مبادرات الاستراتيجيات الوطنية" },
     ],
   },
   {
     title: "ملاحظات الأداء للعناصر المتعثرة خلال",
+    icon: "alert",
     withQ: true,
+    tone: "warn",
     fields: [
-      { k: "w1", label: "ملاحظات الأداء للمؤشرات المتعثرة", icon: "alert", tone: "warn" },
-      { k: "w2", label: "ملاحظات الأداء للمبادرات المتعثرة", icon: "flag", tone: "warn" },
+      { k: "w1", label: "ملاحظات الأداء للمؤشرات المتعثرة", tone: "warn" },
+      { k: "w2", label: "ملاحظات الأداء للمبادرات المتعثرة", tone: "warn" },
     ],
   },
   {
     title: "نتائج قياس تجربة المستفيد",
+    icon: "user-check",
     withQ: true,
-    fields: [{ k: "x1", label: "الجهات التي تم قياسها خلال الربع", icon: "user-check" }],
+    fields: [{ k: "x1", label: "الجهات التي تم قياسها خلال الربع" }],
   },
 ];
 

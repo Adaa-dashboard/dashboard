@@ -2598,16 +2598,12 @@ table.matrix thead th {
 /* ------------------------------------------------------------
    تقرير دورة القياس — ورقةٌ مستقلة ببطاقاتٍ موزّعة
    ------------------------------------------------------------ */
-/* شرائح اختيار الربع — لمن يحرّر، ولا تدخل الملف المصدَّر */
-.cyc-pick { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
-.cyc-pick > span { font-size: 11px; font-weight: 700; color: var(--muted); }
-.cyc-pick button {
-  font: inherit; font-size: 11px; font-weight: 700; cursor: pointer;
-  padding: 4px 12px; border-radius: 999px;
-  border: 1px solid var(--border); background: rgba(255, 255, 255, 0.75); color: var(--muted);
+/* اختيار الربع في شريط الأدوات — خارج الورقة فلا يُطبع معها */
+.wk-qsel {
+  font: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+  padding: 7px 12px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--panel); color: var(--gt-900);
 }
-.cyc-pick button.on { background: var(--g-800); border-color: var(--g-800); color: #fff; }
-.wk-shot .cyc-pick { display: none !important; }
 
 /* عناوين الأجزاء ومربّعاتها */
 .cyc-sec { margin-bottom: 14px; }
@@ -2616,11 +2612,13 @@ table.matrix thead th {
   margin: 0 2px 8px; font-size: 13.5px; font-weight: 800; color: var(--gt-900);
   font-family: "Noto Kufi Arabic", sans-serif; line-height: 1.6;
 }
+/* أيقونة الجزء بدل رقمه — خضراء، وذهبيةٌ لجزء المتعثّر */
 .cyc-sh > i {
-  flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%;
-  display: grid; place-items: center; font-style: normal; font-size: 11px;
-  background: var(--g-800); color: #fff;
+  flex: 0 0 auto; display: grid; place-items: center;
+  width: 30px; height: 30px; border-radius: 10px;
+  background: var(--tint); color: var(--g-700);
 }
+.cyc-sh.warn > i { background: #fdf4dd; color: var(--gold); }
 /* عددُ المربّعات يحدّد الأعمدة — فالثلاثة ثلاثةٌ والواحد يملأ نصف الورقة */
 .cyc-g { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .cyc-g[data-n="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
