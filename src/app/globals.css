@@ -2600,12 +2600,11 @@ table.matrix thead th {
    ------------------------------------------------------------ */
 .wk-card.cyc { border-top: 3px solid var(--gold); }
 .cyc-h { display: flex; align-items: center; gap: 9px; margin-bottom: 9px; flex-wrap: wrap; }
-.cyc-h .en {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 21px; font-weight: 700; letter-spacing: 0.14em;
-  color: var(--gt-900); text-transform: uppercase;
+/* العنوان بالعربية وحده — «Cycle» أُزيلت بطلب صاحبة المنصة */
+.cyc-h .ar {
+  font-family: "Noto Kufi Arabic", sans-serif;
+  font-size: 14px; font-weight: 800; color: var(--gt-900);
 }
-.cyc-h .ar { font-size: 12px; font-weight: 700; color: var(--muted); }
 .cyc-h .pick { margin-inline-start: auto; display: flex; gap: 5px; }
 .cyc-h .pick button,
 .cyc-h .pick > span {

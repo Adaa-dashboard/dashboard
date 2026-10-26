@@ -146,10 +146,10 @@ export function quarterOf(iso: string): string {
   if (Number.isNaN(d.getTime())) return "";
   return `${d.getFullYear()}Q${Math.floor(d.getMonth() / 3) + 1}`;
 }
-/** نصُّ الرمز بالعربية — «الربع الثالث 2026» */
+/** نصُّ الرمز بالعربية — «الربع الثالث لعام 2026» */
 export function quarterText(q: string): string {
   const m = /^(\d{4})Q([1-4])$/.exec(q || "");
-  return m ? `${QUARTER_AR[Number(m[2]) - 1]} ${m[1]}` : "";
+  return m ? `${QUARTER_AR[Number(m[2]) - 1]} لعام ${m[1]}` : "";
 }
 /** مفتاح حقلٍ من حقول الدورة في `texts` */
 export const cycKey = (q: string, f: string) => `cyc:${q}:${f}`;

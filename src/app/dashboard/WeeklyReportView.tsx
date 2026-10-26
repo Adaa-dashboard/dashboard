@@ -382,7 +382,6 @@ function CycleCard({
   return (
     <div className="wk-card cyc">
       <div className="cyc-h">
-        <span className="en">Cycle</span>
         <span className="ar">دورة القياس · {quarterText(q)}</span>
         <span className="pick">
           {QUARTER_AR.map((lab, i) => {
