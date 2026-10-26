@@ -46,12 +46,25 @@ async function makePdf(week: string, pick: PdfPick) {
     .filter((x): x is HTMLElement => !!x);
   if (!els.length) return;
   const [h2c, jsp] = await Promise.all([import("html2canvas-pro"), import("jspdf")]);
-  /* أدوات التحرير ليست من التقرير — تُخفى أثناء التصوير */
+  /* أدوات التحرير ليست من التقرير — تُخفى أثناء التصوير. ومعها
+     تُستعاد قيمُ اللابتوب للورقة، فملفُ الجوال كملف اللابتوب. */
   document.body.classList.add("wk-shot");
+  /* إطارٌ واحد حتى يُطبَّق الترتيب الجديد قبل القياس */
+  await new Promise((r) => requestAnimationFrame(() => r(null)));
   const canvases: HTMLCanvasElement[] = [];
   try {
     for (const el of els)
-      canvases.push(await h2c.default(el, { scale: 2, backgroundColor: "#ffffff", useCORS: true }));
+      canvases.push(
+        await h2c.default(el, {
+          scale: 2,
+          backgroundColor: "#ffffff",
+          useCORS: true,
+          /* النسخةُ المصوَّرة تُرسم في إطارٍ بعرض اللابتوب، فلا
+             تنطبق عليها استعلاماتُ الشاشات الصغيرة */
+          windowWidth: Math.max(document.documentElement.clientWidth, 1400),
+          windowHeight: Math.max(document.documentElement.clientHeight, 1800),
+        }),
+      );
   } finally {
     document.body.classList.remove("wk-shot");
   }

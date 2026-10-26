@@ -14888,3 +14888,31 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
   font-family: "Noto Kufi Arabic", sans-serif; font-size: 12px; font-weight: 800;
   color: var(--g-700); flex: none; min-width: 36px; text-align: left;
 }
+
+/* ============================================================
+   تصوير الورقة من الجوال بترتيب اللابتوب
+   ------------------------------------------------------------
+   قواعدُ الشاشات الصغيرة تُعيد ترتيب التقرير عموداً واحداً وتُلغي
+   هامش الموجة، فيخرج ملفُ الـPDF من الجوال مخالفاً لما يُرى على
+   اللابتوب. أثناء التصوير وحده (`wk-shot`) تُستعاد قيمُ اللابتوب
+   للورقة — ولا تمسّ بقيةَ الصفحة ولا ما يُعرض على الشاشة.
+   ============================================================ */
+.wk-shot .wkx { width: 900px !important; max-width: 900px !important; }
+.wk-shot .wkx-h { width: 1240px !important; max-width: 1240px !important; }
+.wk-shot .wkx.has-band .wkx-in {
+  padding-inline-end: 17% !important;
+  background: transparent !important;
+}
+.wk-shot .wkx-h.has-band .wkx-in { padding-inline-end: 13% !important; }
+.wk-shot .wkx .wk-two,
+.wk-shot .wkx .wk-kpi { flex-direction: row !important; }
+.wk-shot .wkx .wk-lst { grid-template-columns: 1fr 1fr !important; }
+.wk-shot .wkx .cyc-g { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+.wk-shot .wkx .cyc-g[data-n="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+.wk-shot .wkx .cyc-g[data-n="1"] > * { grid-column: 1 / 2 !important; }
+/* حقول الورقة: قاعدةُ الجوال تفرض 16px وارتفاعَ لمسٍ 44px */
+.wk-shot .wkx input,
+.wk-shot .wkx textarea,
+.wk-shot .wkx select { font-size: inherit !important; min-height: 0 !important; }
+.wk-shot .wkx .cyc-b .cyc-n { font-size: 30px !important; }
+.wk-shot .wkx .cyc-b.lead .cyc-n { font-size: 36px !important; }
