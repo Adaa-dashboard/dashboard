@@ -436,8 +436,17 @@ function usePortfolio(userId?: string) {
 type Task = {
   id: string; title: string; description?: string; assigneeId: string; createdById: string;
   dueDate: string; state: string; kind?: string; priority: string;
+  completedAt?: string;
   updates?: { by?: string; byName?: string; text: string; at: string }[];
 };
+
+/** الأولويات الثلاث — القيمة في القاعدة والنصّ المعروض */
+const PRIOS: { k: string; ar: string; en: string }[] = [
+  { k: "high", ar: "عالية", en: "High" },
+  { k: "mid", ar: "متوسطة", en: "Medium" },
+  { k: "low", ar: "منخفضة", en: "Low" },
+];
+const prioOf = (v: string) => PRIOS.find((x) => x.k === v) || PRIOS[1];
 
 function dueTone(d: string, state: string) {
   if (state === "done" || state === "hold") return "";
@@ -445,7 +454,21 @@ function dueTone(d: string, state: string) {
   const days = Math.round((new Date(d).getTime() - Date.now()) / 86400000);
   return days < 0 ? "r" : days <= 2 ? "a" : "";
 }
-function dueLabel(d: string, t: T) {
+/* ============================================================
+   نصّ الموعد في بطاقة المهمة — **بحسب حالتها لا بتاريخها وحده**
+   ------------------------------------------------------------
+   كان يُحسب من التاريخ فقط، فالمهمة المكتملة التي مضى موعدها
+   تُكتب «متأخرة 6 يوم» وهي منجَزة. الحالة أولاً: المكتملة تعرض
+   تاريخ إنجازها، والمعلَّقة تُقال معلَّقة، ثم يُحسب التأخير لما
+   بقي مفتوحاً.
+   ============================================================ */
+function dueLabel(x: { dueDate: string; state: string; completedAt?: string }, t: T) {
+  if (x.state === "done") {
+    const at = txt(x.completedAt).slice(0, 10);
+    return at ? `✓ ${t("اكتملت", "Done")} ${at}` : t("اكتملت", "Done");
+  }
+  if (x.state === "hold") return t("معلَّقة", "On hold");
+  const d = x.dueDate;
   if (!d) return t("بلا موعد", "No due date");
   const days = Math.round((new Date(d).getTime() - new Date(new Date().toISOString().slice(0, 10)).getTime()) / 86400000);
   if (days === 0) return t("اليوم", "Today");
@@ -461,7 +484,12 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
   const [open, setOpen] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [adding, setAdding] = useState(false);
-  const [newT, setNewT] = useState({ title: "", dueDate: "" });
+  const [newT, setNewT] = useState({ title: "", dueDate: "", priority: "mid" });
+  /** المهمة المفتوحة للتعديل — كل تفاصيلها خلف القلم */
+  const [edit, setEdit] = useState<{
+    id: string; title: string; description: string; dueDate: string; priority: string;
+  } | null>(null);
+  const [editMsg, setEditMsg] = useState("");
   /* ما زاد عن الحدّ خلف زر. والعمود **اثنتان** لا خمس: البطاقة في
      المحفظة لمحةٌ لا قائمة، وثلاثة أعمدةٍ بخمسٍ تطيل الصفحة حتى
      يُدفع ما تحتها بعيداً — بطلب صاحبة المنصة. وتحديثات المهمة
@@ -558,10 +586,42 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
     await apiFetch("/api/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, assigneeId: me.id, dueDate: newT.dueDate || null, priority: "normal" }),
+      body: JSON.stringify({
+        title, assigneeId: me.id, dueDate: newT.dueDate || null, priority: newT.priority,
+      }),
     });
-    setNewT({ title: "", dueDate: "" });
+    setNewT({ title: "", dueDate: "", priority: "mid" });
     setAdding(false);
+    await load();
+  }
+
+  /* حفظ ما عُدّل خلف القلم — والخطأ يُقال في مكانه لا يُبتلع */
+  async function saveEdit() {
+    if (!edit) return;
+    const title = edit.title.trim();
+    if (!title) {
+      setEditMsg(t("العنوان مطلوب", "Title required"));
+      return;
+    }
+    setBusy(true);
+    setEditMsg("");
+    const r = await apiFetch(`/api/tasks/${edit.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title,
+        description: edit.description,
+        dueDate: edit.dueDate || null,
+        priority: edit.priority,
+      }),
+    });
+    setBusy(false);
+    if (!r.ok) {
+      const d = await r.json().catch(() => ({}));
+      setEditMsg(txt(d.error) || t("تعذّر الحفظ", "Could not save"));
+      return;
+    }
+    setEdit(null);
     await load();
   }
 
@@ -596,13 +656,86 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
   function TaskCard({ x }: { x: Task }) {
     const boss = isBoss(x);
     const ups = Array.isArray(x.updates) ? x.updates : [];
+    const pr = prioOf(x.priority);
     return (
       <div className={`tk2c ${boss ? "boss" : ""}`}>
-        <div className="ttl">{x.title}</div>
+        <div className="ttl">
+          {x.title}
+          {/* كل التعديل خلف القلم: العنوان والتفاصيل والموعد والأولوية */}
+          <button
+            className="tk-pen"
+            title={t("تعديل تفاصيل المهمة", "Edit task")}
+            onClick={() => {
+              setEdit(
+                edit?.id === x.id
+                  ? null
+                  : {
+                      id: x.id,
+                      title: x.title,
+                      description: txt(x.description),
+                      dueDate: txt(x.dueDate).slice(0, 10),
+                      priority: pr.k,
+                    },
+              );
+              setOpen(null);
+            }}
+          >
+            ✎
+          </button>
+        </div>
         <div className="mt">
           <span className="from">{boss ? t("من مديري", "From manager") : t("ذاتية", "Self")}</span>
-          <span className="due">{dueLabel(x.dueDate, t)}</span>
+          <span className={`pr2 ${pr.k}`}>{t(pr.ar, pr.en)}</span>
+          <span className={`due ${x.state === "done" ? "done" : ""}`}>{dueLabel(x, t)}</span>
         </div>
+        {txt(x.description) && <div className="desc">{txt(x.description)}</div>}
+        {edit?.id === x.id && (
+          <div className="tk-ed">
+            <label>
+              <span>{t("عنوان المهمة", "Title")}</span>
+              <input value={edit.title} onChange={(e) => setEdit({ ...edit, title: e.target.value })} />
+            </label>
+            <label>
+              <span>{t("التفاصيل", "Details")}</span>
+              <textarea
+                rows={2}
+                value={edit.description}
+                placeholder={t("تفاصيل المهمة…", "Details…")}
+                onChange={(e) => setEdit({ ...edit, description: e.target.value })}
+              />
+            </label>
+            <div className="two">
+              <label>
+                <span>{t("تاريخ الاستحقاق", "Due date")}</span>
+                <input
+                  type="date"
+                  dir="ltr"
+                  value={edit.dueDate}
+                  onChange={(e) => setEdit({ ...edit, dueDate: e.target.value })}
+                />
+              </label>
+              <label>
+                <span>{t("الأولوية", "Priority")}</span>
+                <select value={edit.priority} onChange={(e) => setEdit({ ...edit, priority: e.target.value })}>
+                  {PRIOS.map((o) => (
+                    <option key={o.k} value={o.k}>
+                      {t(o.ar, o.en)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            {editMsg && <div className="tk-err">{editMsg}</div>}
+            <div className="f">
+              <button className="btn btn-ghost btn-sm" onClick={() => setEdit(null)}>
+                {t("إلغاء", "Cancel")}
+              </button>
+              <button className="btn btn-sm" disabled={busy} onClick={() => void saveEdit()}>
+                {t("حفظ", "Save")}
+              </button>
+            </div>
+          </div>
+        )}
         <div className="acts">
           <span className="ac2" onClick={() => setOpen(open === x.id ? null : x.id)}>
             {ups.length ? `${ups.length} ${t("تحديثات", "updates")}` : `+ ${t("تحديث", "Update")}`}
@@ -703,6 +836,17 @@ function TasksWidget({ me, t, onCount }: { me: Me; t: T; onCount?: (n: number) =
             onChange={(e) => setNewT({ ...newT, dueDate: e.target.value })}
             style={{ maxWidth: 150 }}
           />
+          <select
+            value={newT.priority}
+            onChange={(e) => setNewT({ ...newT, priority: e.target.value })}
+            style={{ maxWidth: 120 }}
+          >
+            {PRIOS.map((o) => (
+              <option key={o.k} value={o.k}>
+                {t(o.ar, o.en)}
+              </option>
+            ))}
+          </select>
           <button className="btn btn-sm" onClick={create}>
             {t("إضافة", "Add")}
           </button>

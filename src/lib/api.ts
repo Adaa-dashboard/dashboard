@@ -491,7 +491,7 @@ export async function apiFetch(path: string, init: Init = {}) {
       const { error } = await s.from("perf_tasks").insert({
         id: "tsk-" + newId(), title: body.title, description: body.description || "",
         assignee_id: body.assigneeId,
-        priority: body.priority === "high" ? "high" : "mid",
+        priority: ["high", "mid", "low"].includes(String(body.priority)) ? String(body.priority) : "mid",
         due_date: body.dueDate, indicator_id: body.indicatorId || null,
         assigned_at: body.assignedAt || null,
         kind: body.kind === "assignment" ? "assignment" : "task",
@@ -600,6 +600,16 @@ export async function apiFetch(path: string, init: Init = {}) {
         }
         const patch: Record<string, unknown> = { updates };
         if (body.assignedAt !== undefined) patch.assigned_at = body.assignedAt || null;
+        /* تفاصيل المهمة تُعدَّل من بطاقتها: العنوان والشرح والموعد
+           والأولوية. والحارس سياسةُ القاعدة — صاحبها أو من أسندها. */
+        if (typeof body.title === "string" && body.title.trim()) patch.title = body.title.trim();
+        if (body.description !== undefined) patch.description = String(body.description ?? "");
+        if (body.dueDate) patch.due_date = body.dueDate;
+        if (body.priority !== undefined) {
+          const pr = String(body.priority);
+          if (!["high", "mid", "low"].includes(pr)) return err("أولوية غير معروفة", 400);
+          patch.priority = pr;
+        }
         if (body.state) {
           // الحالات الأربع لا غيرها — قيد القاعدة يرفض ما عداها برسالة غامضة
           if (!["ok", "risk", "hold", "done"].includes(String(body.state)))

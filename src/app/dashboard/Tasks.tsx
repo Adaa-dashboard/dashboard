@@ -7,7 +7,7 @@ import { IconReply } from "./icons";
 import { publishUndo } from "@/lib/undoBus";
 
 type State = "ok" | "risk" | "hold" | "done";
-type Priority = "high" | "mid";
+type Priority = "high" | "mid" | "low";
 
 type Kind = "task" | "assignment";
 type Reply = { id: string; text: string; byName: string; at: string };
@@ -363,8 +363,12 @@ export default function Tasks({
                     <span className="tk-m">
                       <span className="av s">{(nameOf(x.assigneeId) || "?").trim().charAt(0)}</span>
                       {nameOf(x.assigneeId)}
-                      <span className={`pr ${x.priority === "high" ? "hi" : ""}`}>
-                        {x.priority === "high" ? t("مهمة جداً", "High") : t("متوسطة", "Medium")}
+                      <span className={`pr ${x.priority === "high" ? "hi" : x.priority === "low" ? "lo" : ""}`}>
+                        {x.priority === "high"
+                          ? t("عالية", "High")
+                          : x.priority === "low"
+                            ? t("منخفضة", "Low")
+                            : t("متوسطة", "Medium")}
                       </span>
                       {x.assigneeId === meId && <span className="mineflag">{t("مسندة لك", "Yours")}</span>}
                     </span>
@@ -485,8 +489,12 @@ function TaskDetail({
               <span className="av s">{(who || "?").trim().charAt(0)}</span>
               {who}
             </span>
-            <span className={`pr ${task.priority === "high" ? "hi" : ""}`}>
-              {task.priority === "high" ? t("مهمة جداً", "High") : t("متوسطة", "Medium")}
+            <span className={`pr ${task.priority === "high" ? "hi" : task.priority === "low" ? "lo" : ""}`}>
+              {task.priority === "high"
+                ? t("عالية", "High")
+                : task.priority === "low"
+                  ? t("منخفضة", "Low")
+                  : t("متوسطة", "Medium")}
             </span>
             <span className="ltr">📅 {task.dueDate}</span>
             <span style={{ fontWeight: 700, color: late ? "#b13636" : "var(--ink-2)" }}>{leftText(task)}</span>
@@ -717,10 +725,13 @@ function NewTask({
           <label>{t("الأهمية", "Priority")}</label>
           <div className="segs">
             <button className={`sg ${priority === "high" ? "on hi" : ""}`} onClick={() => setPriority("high")}>
-              {t("مهمة جداً", "High")}
+              {t("عالية", "High")}
             </button>
             <button className={`sg ${priority === "mid" ? "on" : ""}`} onClick={() => setPriority("mid")}>
               {t("متوسطة", "Medium")}
+            </button>
+            <button className={`sg ${priority === "low" ? "on" : ""}`} onClick={() => setPriority("low")}>
+              {t("منخفضة", "Low")}
             </button>
           </div>
 
