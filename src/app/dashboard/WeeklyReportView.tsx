@@ -370,8 +370,14 @@ function CycleBody({
   onText?: (key: string, value: string) => void;
 }) {
   const [draft, setDraft] = useState<Record<string, string>>({});
+  /* الأرقام والأسطر: **لكل ربعٍ قيمتُه** */
   const val = (f: string) => draft[cycKey(q, f)] ?? texts[cycKey(q, f)] ?? "";
   const put = (f: string, v: string) => onText?.(cycKey(q, f), v.trim());
+  /* العناوين والمسمّيات: **واحدةٌ لكل الأرباع** — فهي بناء الورقة
+     لا أرقامُ ربعٍ بعينه، ولو حُفظت لكل ربعٍ لأُعيدت كتابتُها
+     أربع مرات في السنة. مفاتيحها بلا ربع */
+  const lbl = (k: string, dflt: string) => draft[k] ?? texts[k] ?? dflt;
+  const putL = (k: string, v: string, dflt: string) => onText?.(k, v.trim() === dflt ? "" : v.trim());
 
   /** بطاقةُ رقمٍ واحد — رقمُه وعنوانُه وسطرٌ يوضّحه */
   const box = (f: CycField, lead = false) => {
@@ -396,7 +402,24 @@ function CycleBody({
         ) : (
           <b className="cyc-n">{n || "—"}</b>
         )}
-        <span className="cyc-l">{f.label}</span>
+        {onText ? (
+          /* مسمّى المربّع يلتفّ على أكثر من سطر، فهو `textarea`
+             يكبر بمحتواه — والحقل المفرد كان يقتطع آخر الاسم */
+          <textarea
+            className="cyc-l cyc-in cyc-ta"
+            rows={1}
+            ref={grow}
+            value={lbl(`cycL:${f.k}`, f.label)}
+            placeholder={f.label}
+            onChange={(e) => {
+              grow(e.target);
+              setDraft((x) => ({ ...x, [`cycL:${f.k}`]: e.target.value }));
+            }}
+            onBlur={(e) => putL(`cycL:${f.k}`, e.target.value, f.label)}
+          />
+        ) : (
+          <span className="cyc-l">{texts[`cycL:${f.k}`] || f.label}</span>
+        )}
         {onText ? (
           <input
             className="cyc-s"
@@ -427,8 +450,22 @@ function CycleBody({
                     <PIcon id={g.icon} size={19} />
                   </i>
                 )}
-                {g.title}
-                {g.withQ ? ` ${quarterText(q)}` : ""}
+                {onText ? (
+                  /* الغلاف يتّخذ عرض النصّ نفسه (نسخةٌ خفيّة منه في
+                     `::after`) فيبقى اسم الربع ملاصقاً للعنوان */
+                  <span className="cyc-hw" data-v={lbl(`cycG:${gi}`, g.title)}>
+                    <input
+                      className="cyc-in cyc-hin"
+                      value={lbl(`cycG:${gi}`, g.title)}
+                      placeholder={g.title}
+                      onChange={(e) => setDraft((x) => ({ ...x, [`cycG:${gi}`]: e.target.value }))}
+                      onBlur={(e) => putL(`cycG:${gi}`, e.target.value, g.title as string)}
+                    />
+                  </span>
+                ) : (
+                  <span>{texts[`cycG:${gi}`] || g.title}</span>
+                )}
+                {g.withQ ? <span className="cyc-hq">{quarterText(q)}</span> : null}
               </h3>
             )}
             <div className="cyc-g" data-n={g.fields.length}>

@@ -988,6 +988,12 @@ table.matrix thead th {
      من 16px. الأزرار لا تُقرِّب شيئاً، وتكبيرها بـ !important كان
      يفرض 16px على الشريط السفلي والشرائح فتتزاحم وتُقتطع. */
   input, select, textarea { font-size: 16px !important; }
+  /* حقول الورقة نصُّها جزءٌ من التصميم: تكبيرُها يقتطع العناوين
+     ويكسر قياس عرضها — فتبقى بحجم نصّها */
+  .wkx .cyc-in, .wkx .cyc-n, .wkx .cyc-s { font-size: inherit !important; }
+  .wkx .cyc-b .cyc-n { font-size: 30px !important; }
+  .wkx .cyc-b.lead .cyc-n { font-size: 36px !important; }
+  .wkx input { min-height: 0; }
   input, select { min-height: 44px; }
   .btn { min-height: 44px; }
   .btn-sm { min-height: 40px; }
@@ -2652,6 +2658,34 @@ table.matrix thead th {
   font-size: 12px; font-weight: 700; color: var(--gt-800); line-height: 1.6;
   margin-top: 4px;
 }
+/* حقولُ النصّ في الورقة تبدو نصّاً: بلا إطارٍ ولا خلفية، وخطٌّ
+   منقّطٌ خفيف يدلّ على أنها تُكتب — ويختفي في الملف المصدَّر */
+.cyc-in {
+  font: inherit; width: 100%; text-align: center;
+  background: transparent; border: 0; border-bottom: 1px dashed transparent;
+  padding: 1px 2px; color: inherit;
+}
+.cyc-b .cyc-l.cyc-in { text-align: center; }
+/* المسمّى `textarea` ليلتفّ — بلا مقبض تكبير ولا تمرير */
+.cyc-ta { resize: none; overflow: hidden; line-height: 1.6; display: block; }
+.cyc-in:hover { border-bottom-color: var(--border); }
+.cyc-in:focus { outline: none; border-bottom-color: var(--g-700); }
+.cyc-hin { width: 100%; text-align: start; }
+/* غلافٌ بعرض النصّ: نسخةٌ خفيّة منه تحدّد العرض والحقل فوقها */
+.cyc-hw {
+  position: relative; display: inline-grid; flex: 0 1 auto;
+  max-width: 100%; min-width: 90px;
+}
+.cyc-hw::after {
+  content: attr(data-v); grid-area: 1 / 1;
+  visibility: hidden; white-space: pre; font: inherit;
+  /* فسحةٌ زائدة: قياس الحرف في الحقل يختلف قليلاً عن قياسه نصّاً،
+     فبلا هذه الفسحة تُقتطع آخر كلمة من العنوان */
+  padding: 1px 2px 1px 6px;
+}
+.cyc-hw > input { grid-area: 1 / 1; }
+.cyc-sh .cyc-hq { flex: 0 1 auto; margin-inline-start: -6px; }
+.wk-shot .cyc-in { border-bottom-color: transparent !important; }
 .cyc-b .cyc-s {
   display: block; width: 100%; text-align: center; margin-top: 2px;
   font: inherit; font-style: normal; font-size: 10px; color: var(--muted);
