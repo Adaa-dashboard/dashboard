@@ -131,13 +131,13 @@ export const listOf = (s: string): string[] =>
    ولا مصدر لها في المنصة: هي حصيلةُ عملٍ يجمعه صاحب التقرير من
    دورة القياس نفسها — بطلب صاحبة المنصة صريحاً.
    ============================================================ */
-export const CYCLE_FIELDS: { k: string; label: string }[] = [
-  { k: "n1", label: "مؤشرات موثَّقة" },
-  { k: "n2", label: "مبادرات موثَّقة" },
-  { k: "n3", label: "مؤشرات الالتزام" },
-  { k: "n4", label: "ملاحظات أداء لمبادرات متعثرة" },
-  { k: "n5", label: "ملاحظات أداء لمؤشرات متعثرة" },
-  { k: "n6", label: "تقارير صدرت للجهات" },
+export const CYCLE_FIELDS: { k: string; label: string; icon: string; tone?: "warn" }[] = [
+  { k: "n1", label: "المؤشرات التي تم توثيقها", icon: "line" },
+  { k: "n2", label: "المبادرات التي تم توثيقها", icon: "milestone" },
+  { k: "n3", label: "مؤشرات الالتزام", icon: "shield" },
+  { k: "n4", label: "ملاحظات الأداء للمبادرات المتعثرة", icon: "flag", tone: "warn" },
+  { k: "n5", label: "ملاحظات الأداء للمؤشرات المتعثرة", icon: "alert", tone: "warn" },
+  { k: "n6", label: "التقارير الصادرة للجهات", icon: "report" },
 ];
 export const QUARTER_AR = ["الربع الأول", "الربع الثاني", "الربع الثالث", "الربع الرابع"];
 /** رمز ربع تاريخٍ بعينه — `2026Q3` */
@@ -155,6 +155,18 @@ export function quarterText(q: string): string {
 export function cycleTitle(q: string): string {
   const m = /^(\d{4})Q([1-4])$/.exec(q || "");
   return m ? `دورة القياس للربع ${QUARTER_AR[Number(m[2]) - 1].replace("الربع ", "")} لعام ${m[1]}` : "دورة القياس";
+}
+
+/** مدى أشهر الربع — «يوليو – سبتمبر 2026» */
+export function quarterRange(q: string): string {
+  const M = [
+    "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+    "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
+  ];
+  const m = /^(\d{4})Q([1-4])$/.exec(q || "");
+  if (!m) return "";
+  const i = (Number(m[2]) - 1) * 3;
+  return `${M[i]} – ${M[i + 2]} ${m[1]}`;
 }
 
 /** مفتاح حقلٍ من حقول الدورة في `texts` */

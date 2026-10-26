@@ -18,7 +18,7 @@
 import { useState } from "react";
 import { asset } from "@/lib/base";
 import {
-  listOf, CYCLE_FIELDS, QUARTER_AR, quarterOf, cycleTitle, cycKey, type WeeklyPrefs,
+  listOf, CYCLE_FIELDS, QUARTER_AR, quarterOf, quarterRange, cycleTitle, cycKey, type WeeklyPrefs,
 } from "@/lib/weeklyPrefs";
 import type { Dom, WeekReport } from "@/lib/weekReport";
 import { DonutRing, DonutLegend } from "./DonutCard";
@@ -350,56 +350,55 @@ function DomCard({
 }
 
 /* ============================================================
-   Cycle — حصيلة دورة القياس في أعلى التقرير
+   تقرير دورة القياس — صفحةٌ مستقلة بترويسة التقرير نفسها
    ------------------------------------------------------------
    ستة أرقامٍ لكل ربع، تُكتب يدوياً وتبقى محفوظةً لذلك الربع
    وحده: فالتقرير الأسبوعي يمرّ، والدورة تبقى. ولكل رقمٍ سطرٌ
    صغيرٌ تحته يُكتب فيه ما يوضّحه («من ٦٩ جهة» مثلاً).
 
    ولا تُقرأ من المنصة — هي حصيلةُ الدورة يجمعها صاحب التقرير،
-   بطلب صاحبة المنصة صريحاً. والمربّع لا يظهر لمن يقرأ إن لم
-   يُكتب فيه شيء، فلا تُطبع أصفارٌ ولا خاناتٌ فارغة.
+   بطلب صاحبة المنصة صريحاً. وبطاقةٌ لكل رقمٍ بأيقونتها، موزّعةً
+   على الصفحة لا في سطرٍ واحد.
    ============================================================ */
-function CycleCard({
-  weekStart, texts, onText,
+function CycleBody({
+  q, texts, onText,
 }: {
-  weekStart: string;
+  q: string;
   texts: Record<string, string>;
   /** يُمرَّر لمن يملك تحرير التقرير وحده */
   onText?: (key: string, value: string) => void;
 }) {
   const [draft, setDraft] = useState<Record<string, string>>({});
-  const year = Number((quarterOf(weekStart) || "").slice(0, 4)) || new Date().getFullYear();
-  /* الربع المعروض: ما اختير، وإلا ربعُ أسبوع التقرير */
-  const q = texts["cyc:q"] || quarterOf(weekStart);
+  const year = Number((q || "").slice(0, 4)) || new Date().getFullYear();
   const val = (f: string) => draft[cycKey(q, f)] ?? texts[cycKey(q, f)] ?? "";
   const put = (f: string, v: string) => onText?.(cycKey(q, f), v.trim());
-  const some = CYCLE_FIELDS.some(
-    (f) => (texts[cycKey(q, f.k)] || "").trim() || (texts[cycKey(q, `s${f.k.slice(1)}`)] || "").trim(),
-  );
-  if (!onText && !some) return null;
 
   return (
-    <div className="wk-card cyc">
-      <div className="cyc-h">
-        <span className="ar">حصيلة الدورة</span>
-        <span className="pick">
+    <>
+      {onText && (
+        <div className="cyc-pick no-print">
+          <span>الربع المعروض</span>
           {QUARTER_AR.map((lab, i) => {
             const k = `${year}Q${i + 1}`;
-            if (!onText) return k === q ? <span key={k} className="on">Q{i + 1}</span> : null;
             return (
-              <button key={k} className={k === q ? "on" : ""} title={lab} onClick={() => onText("cyc:q", k)}>
-                Q{i + 1}
+              <button key={k} className={k === q ? "on" : ""} onClick={() => onText("cyc:q", k)}>
+                {lab}
               </button>
             );
           })}
-        </span>
-      </div>
-      <div className="wk-sts five cyc-sts">
+        </div>
+      )}
+
+      <div className="cyc-g">
         {CYCLE_FIELDS.map((f) => {
           const sk = `s${f.k.slice(1)}`;
+          const n = texts[cycKey(q, f.k)] || "";
+          const sub = texts[cycKey(q, sk)] || "";
           return (
-            <div key={f.k}>
+            <div className={`wk-card cyc-b ${f.tone || ""}`} key={f.k}>
+              <span className={`wk-ci ${f.tone || ""}`}>
+                <PIcon id={f.icon} size={26} />
+              </span>
               {onText ? (
                 <input
                   className="cyc-n"
@@ -409,27 +408,25 @@ function CycleCard({
                   onBlur={(e) => put(f.k, e.target.value)}
                 />
               ) : (
-                <b>{texts[cycKey(q, f.k)] || "—"}</b>
+                <b className="cyc-n">{n || "—"}</b>
               )}
-              <span>
-                {f.label}
-                {onText ? (
-                  <input
-                    className="cyc-s"
-                    value={val(sk)}
-                    placeholder="سطر توضيحي…"
-                    onChange={(e) => setDraft((x) => ({ ...x, [cycKey(q, sk)]: e.target.value }))}
-                    onBlur={(e) => put(sk, e.target.value)}
-                  />
-                ) : (
-                  texts[cycKey(q, sk)] && <em className="sub">{texts[cycKey(q, sk)]}</em>
-                )}
-              </span>
+              <span className="cyc-l">{f.label}</span>
+              {onText ? (
+                <input
+                  className="cyc-s"
+                  value={val(sk)}
+                  placeholder="سطر توضيحي…"
+                  onChange={(e) => setDraft((x) => ({ ...x, [cycKey(q, sk)]: e.target.value }))}
+                  onBlur={(e) => put(sk, e.target.value)}
+                />
+              ) : (
+                sub && <em className="cyc-s">{sub}</em>
+              )}
             </div>
           );
         })}
       </div>
-    </div>
+    </>
   );
 }
 
@@ -442,6 +439,7 @@ export default function WeeklyReportView({
   onPick,
   onTaskText,
   onCycleText,
+  mode = "week",
 }: {
   report: WeekReport;
   prefs: WeeklyPrefs;
@@ -452,9 +450,14 @@ export default function WeeklyReportView({
   onTaskText?: (key: string, text: string) => void;
   /** أرقام دورة القياس — تُحفظ افتراضاً لكل الأسابيع لا لأسبوعٍ */
   onCycleText?: (key: string, text: string) => void;
+  /** أيّ تقرير يُعرض: الأسبوعي، أم تقرير دورة القياس */
+  mode?: "week" | "cycle";
 }) {
   const { dir, band, dept } = prefs.layout;
   const r = report;
+  const cyc = mode === "cycle";
+  /* ربع الدورة المعروض: ما اختير، وإلا ربعُ أسبوع التقرير */
+  const cq = (prefs.texts || {})["cyc:q"] || quarterOf(r.weekStart);
   const next = r.next.length ? r.next : listOf((prefs.texts || {}).next || "");
   /* الإنجازات المحققة تُكتب يدويًا — ما تراه الإدارة جديراً بالذكر
      فوق ما قرأته المنصة من سجلّها */
@@ -471,7 +474,10 @@ export default function WeeklyReportView({
   }
 
   return (
-    <div className={`wkx ${dir === "h" ? "wkx-h" : "wkx-v"} ${band ? "has-band" : ""}`}>
+    <div
+      id={cyc ? "wkx-cycle" : "wkx-week"}
+      className={`wkx ${dir === "h" ? "wkx-h" : "wkx-v"} ${band ? "has-band" : ""}`}
+    >
       {band && (
         /* eslint-disable-next-line @next/next/no-img-element */
         <img
@@ -485,21 +491,20 @@ export default function WeeklyReportView({
         <header className="wkx-head">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={asset("/adaa-logo.png")} alt="أداء" className="wkx-logo" />
-          {/* عنوان التقرير: دورة القياس وربعُها — بطلب صاحبة المنصة،
-              بدل «الإنجاز الأسبوعي». والربع هو المختار في مربّع
-              الحصيلة، وإلا ربعُ أسبوع التقرير */}
-          <h2>{cycleTitle((prefs.texts || {})["cyc:q"] || quarterOf(r.weekStart))}</h2>
+          {/* التقريران يتشاركان الترويسة: الأسبوعي باسمه ومدى
+              أسبوعه، وتقرير الدورة باسم ربعه ومدى أشهره */}
+          <h2>{cyc ? cycleTitle(cq) : "الإنجاز الأسبوعي"}</h2>
           <div className="wkx-dept">{dept}</div>
           <div className="wkx-dt">
-            <PIcon id="calendar" size={14} />
-            {rangeText2(r.weekStart, r.weekEnd)}
+            <PIcon id={cyc ? "cycle" : "calendar"} size={14} />
+            {cyc ? quarterRange(cq) : rangeText2(r.weekStart, r.weekEnd)}
           </div>
         </header>
 
-        {prefs.on.cycle !== false && (
-          <CycleCard weekStart={r.weekStart} texts={prefs.texts || {}} onText={onCycleText} />
-        )}
-
+        {cyc ? (
+          <CycleBody q={cq} texts={prefs.texts || {}} onText={onCycleText} />
+        ) : (
+          <>
         <div className="wk-kpi">
           <div>
             <span className="wk-ci lg">
@@ -598,6 +603,9 @@ export default function WeeklyReportView({
               </div>
             )}
           </div>
+        )}
+
+        </>
         )}
 
         <footer className="wkx-foot">

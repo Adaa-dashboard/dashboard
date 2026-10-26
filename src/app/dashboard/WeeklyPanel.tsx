@@ -29,30 +29,46 @@ type ShareRow = {
    فنرسم الورقة بأنفسنا إلى صورة ثم نقطّعها صفحاتِ A4 في ملف PDF
    يُنزَّل مباشرة. المكتبتان تُحمَّلان عند الضغط لا مع الصفحة.
    ============================================================ */
-async function makePdf(week: string) {
-  const el = document.querySelector(".wkx") as HTMLElement | null;
-  if (!el) return;
+/** ما يُصدَّر: الأسبوعي · تقرير الدورة · كلاهما في ملف واحد */
+type PdfPick = "week" | "cycle" | "all";
+const PDF_NAME: Record<PdfPick, string> = {
+  week: "الإنجاز-الأسبوعي",
+  cycle: "تقرير-دورة-القياس",
+  all: "تقارير-الأداء",
+};
+
+async function makePdf(week: string, pick: PdfPick) {
+  /* الورقتان مرسومتان في الصفحة دائماً — غير المعروضة خارج الشاشة
+     لا مخفيّة، فتُصوَّر كما هي. و«الكل» يبدأ بالأسبوعي ثم الدورة. */
+  const ids = pick === "all" ? ["wkx-week", "wkx-cycle"] : [`wkx-${pick}`];
+  const els = ids
+    .map((id) => document.getElementById(id) as HTMLElement | null)
+    .filter((x): x is HTMLElement => !!x);
+  if (!els.length) return;
   const [h2c, jsp] = await Promise.all([import("html2canvas-pro"), import("jspdf")]);
   /* أدوات التحرير ليست من التقرير — تُخفى أثناء التصوير */
   document.body.classList.add("wk-shot");
-  let canvas: HTMLCanvasElement;
+  const canvases: HTMLCanvasElement[] = [];
   try {
-    canvas = await h2c.default(el, { scale: 2, backgroundColor: "#ffffff", useCORS: true });
+    for (const el of els)
+      canvases.push(await h2c.default(el, { scale: 2, backgroundColor: "#ffffff", useCORS: true }));
   } finally {
     document.body.classList.remove("wk-shot");
   }
-  /* **صفحةٌ واحدة بمقاس الورقة نفسها**: لا تقطيع إلى صفحات A4 ولا
-     هامشٌ أبيض حولها — الملف صورة التقرير كما يُرى على الشاشة */
-  const w = canvas.width;
-  const h = canvas.height;
+  /* **صفحةٌ بمقاس كل ورقة**: لا تقطيع إلى A4 ولا هامشٌ أبيض —
+     الملف صورةُ التقرير كما يُرى على الشاشة */
+  const first = canvases[0];
   const pdf = new jsp.jsPDF({
-    orientation: w > h ? "l" : "p",
+    orientation: first.width > first.height ? "l" : "p",
     unit: "px",
-    format: [w, h],
+    format: [first.width, first.height],
     compress: true,
   });
-  pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, w, h);
-  pdf.save(`الإنجاز-الأسبوعي-${week}.pdf`);
+  canvases.forEach((c, i) => {
+    if (i > 0) pdf.addPage([c.width, c.height], c.width > c.height ? "l" : "p");
+    pdf.addImage(c.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, c.width, c.height);
+  });
+  pdf.save(`${PDF_NAME[pick]}-${week}.pdf`);
 }
 
 export default function WeeklyPanel({
@@ -77,6 +93,10 @@ export default function WeeklyPanel({
   const [base, setBase] = useState<unknown>(null);
   const [over, setOver] = useState<unknown>(null);
   const [pdfBusy, setPdfBusy] = useState(false);
+  /* التقرير المعروض: الأسبوعي افتراضاً، وتقرير دورة القياس بضغطة */
+  const [view, setView] = useState<"week" | "cycle">("week");
+  /* قائمة التنزيل الثلاثية */
+  const [pdfMenu, setPdfMenu] = useState(false);
   const [canShare, setCanShare] = useState(false);
   const [loading, setLoading] = useState(true);
   const [tune, setTune] = useState(false);
@@ -293,23 +313,50 @@ export default function WeeklyPanel({
           <button className="btn btn-ghost" onClick={() => setTune(true)}>
             ⚙️ {t("إعدادات التقرير", "Report settings")}
           </button>
+          {/* مربّعٌ يقلب المعروض بين التقريرين — والأساسي الأسبوعي */}
           <button
-            className="btn"
-            disabled={pdfBusy}
-            onClick={async () => {
-              setPdfBusy(true);
-              setMsg(t("جارٍ تجهيز الملف…", "Preparing the file…"));
-              try {
-                await makePdf(week);
-                setMsg(t("نُزِّل الملف ✓", "Downloaded ✓"));
-              } catch (e) {
-                setMsg(`${t("تعذّر التصدير", "Export failed")}: ${(e as Error)?.message || e}`);
-              }
-              setPdfBusy(false);
-            }}
+            className={`btn btn-ghost wk-swx ${view === "cycle" ? "on" : ""}`}
+            onClick={() => setView(view === "cycle" ? "week" : "cycle")}
           >
-            {pdfBusy ? t("جارٍ التجهيز…", "Preparing…") : t("تنزيل PDF", "Download PDF")}
+            {view === "cycle"
+              ? t("الإنجاز الأسبوعي", "Weekly report")
+              : t("تقرير دورات القياس", "Cycle report")}
           </button>
+          <div className="wk-pdf">
+            <button className="btn" disabled={pdfBusy} onClick={() => setPdfMenu(!pdfMenu)}>
+              {pdfBusy ? t("جارٍ التجهيز…", "Preparing…") : t("تنزيل PDF", "Download PDF")}
+              <i className="ar">▾</i>
+            </button>
+            {pdfMenu && !pdfBusy && (
+              <div className="wk-pdfm">
+                {(
+                  [
+                    ["week", t("الإنجاز الأسبوعي", "Weekly report")],
+                    ["cycle", t("دورة القياس", "Cycle report")],
+                    ["all", t("الكل — ورقتان", "Both")],
+                  ] as [PdfPick, string][]
+                ).map(([k, lab]) => (
+                  <button
+                    key={k}
+                    onClick={async () => {
+                      setPdfMenu(false);
+                      setPdfBusy(true);
+                      setMsg(t("جارٍ تجهيز الملف…", "Preparing the file…"));
+                      try {
+                        await makePdf(week, k);
+                        setMsg(t("نُزِّل الملف ✓", "Downloaded ✓"));
+                      } catch (e) {
+                        setMsg(`${t("تعذّر التصدير", "Export failed")}: ${(e as Error)?.message || e}`);
+                      }
+                      setPdfBusy(false);
+                    }}
+                  >
+                    {lab}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -324,16 +371,29 @@ export default function WeeklyPanel({
         </div>
       )}
 
+      {/* الورقتان مرسومتان معاً: المعروضة في مكانها، والأخرى خارج
+          الشاشة — فيلتقطهما «الكل» في ملفٍ واحد بلا إعادة رسم */}
       {loading ? (
         <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>
       ) : (
-        <WeeklyReportView
-          report={report}
-          prefs={prefs}
-          onPick={canEdit ? pickRow : undefined}
-          onTaskText={canEdit ? saveTaskText : undefined}
-          onCycleText={canEdit ? saveCycle : undefined}
-        />
+        <>
+          <div className={view === "week" ? "" : "wk-off"} aria-hidden={view !== "week"}>
+            <WeeklyReportView
+              report={report}
+              prefs={prefs}
+              onPick={canEdit && view === "week" ? pickRow : undefined}
+              onTaskText={canEdit && view === "week" ? saveTaskText : undefined}
+            />
+          </div>
+          <div className={view === "cycle" ? "" : "wk-off"} aria-hidden={view !== "cycle"}>
+            <WeeklyReportView
+              report={report}
+              prefs={prefs}
+              mode="cycle"
+              onCycleText={canEdit && view === "cycle" ? saveCycle : undefined}
+            />
+          </div>
+        </>
       )}
 
     </div>
