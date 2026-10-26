@@ -2,10 +2,16 @@
 #
 # مجلد site/ يحتوي ملفات اللوحة وحدها، ولا يحتوي package.json —
 # وهذا مقصود: المستودع فيه مشروع Next.js لا علاقة له باللوحة، وكان
-# Netlify يكتشفه ويحاول بناءه فيفشل النشر. جعل site/ قاعدة البناء
-# يمنع اكتشاف أي إطار عمل من الأساس.
+# Netlify يكتشفه ويحاول بناءه فيفشل النشر بـ:
+#   "Deploy failed due to an error in @netlify/plugin-nextjs plugin"
+#
+# base = "site" وحده لم يكفِ لأن Netlify يربط إضافة Next.js بالمشروع
+# وقت إنشائه، فتعمل بغض النظر عن قاعدة البناء. المتغير أدناه يوقفها.
 
 [build]
   base    = "site"
   publish = "."
   command = "echo 'static site — no build step'"
+
+[build.environment]
+  NETLIFY_NEXT_PLUGIN_SKIP = "true"
