@@ -391,21 +391,28 @@ function CycleBody({
             <PIcon id={f.icon} size={lead ? 30 : 26} />
           </span>
         )}
+        {/* الحقل للكتابة، ونسخةٌ نصّية تحلّ محلّه في الملف المصدَّر:
+            `html2canvas` لا يرسم نصّ الحقول رسماً موثوقاً، فكانت
+            المربّعات تخرج في الـPDF فارغة */}
         {onText ? (
-          <input
-            className="cyc-n"
-            value={val(f.k)}
-            placeholder="—"
-            onChange={(e) => setDraft((x) => ({ ...x, [cycKey(q, f.k)]: e.target.value }))}
-            onBlur={(e) => put(f.k, e.target.value)}
-          />
+          <>
+            <input
+              className="cyc-n"
+              value={val(f.k)}
+              placeholder="—"
+              onChange={(e) => setDraft((x) => ({ ...x, [cycKey(q, f.k)]: e.target.value }))}
+              onBlur={(e) => put(f.k, e.target.value)}
+            />
+            <b className="cyc-n cyc-pt">{val(f.k) || "—"}</b>
+          </>
         ) : (
           <b className="cyc-n">{n || "—"}</b>
         )}
         {onText ? (
           /* مسمّى المربّع يلتفّ على أكثر من سطر، فهو `textarea`
              يكبر بمحتواه — والحقل المفرد كان يقتطع آخر الاسم */
-          <textarea
+          <>
+            <textarea
             className="cyc-l cyc-in cyc-ta"
             rows={1}
             ref={grow}
@@ -417,17 +424,22 @@ function CycleBody({
             }}
             onBlur={(e) => putL(`cycL:${f.k}`, e.target.value, f.label)}
           />
+            <span className="cyc-l cyc-pt">{lbl(`cycL:${f.k}`, f.label)}</span>
+          </>
         ) : (
           <span className="cyc-l">{texts[`cycL:${f.k}`] || f.label}</span>
         )}
         {onText ? (
-          <input
-            className="cyc-s"
-            value={val(sk)}
-            placeholder="سطر توضيحي…"
-            onChange={(e) => setDraft((x) => ({ ...x, [cycKey(q, sk)]: e.target.value }))}
-            onBlur={(e) => put(sk, e.target.value)}
-          />
+          <>
+            <input
+              className="cyc-s"
+              value={val(sk)}
+              placeholder="سطر توضيحي…"
+              onChange={(e) => setDraft((x) => ({ ...x, [cycKey(q, sk)]: e.target.value }))}
+              onBlur={(e) => put(sk, e.target.value)}
+            />
+            {!!val(sk).trim() && <em className="cyc-s cyc-pt">{val(sk)}</em>}
+          </>
         ) : (
           sub && <em className="cyc-s">{sub}</em>
         )}
@@ -453,15 +465,18 @@ function CycleBody({
                 {onText ? (
                   /* الغلاف يتّخذ عرض النصّ نفسه (نسخةٌ خفيّة منه في
                      `::after`) فيبقى اسم الربع ملاصقاً للعنوان */
-                  <span className="cyc-hw" data-v={lbl(`cycG:${gi}`, g.title)}>
-                    <input
-                      className="cyc-in cyc-hin"
-                      value={lbl(`cycG:${gi}`, g.title)}
-                      placeholder={g.title}
-                      onChange={(e) => setDraft((x) => ({ ...x, [`cycG:${gi}`]: e.target.value }))}
-                      onBlur={(e) => putL(`cycG:${gi}`, e.target.value, g.title as string)}
-                    />
-                  </span>
+                  <>
+                    <span className="cyc-hw" data-v={lbl(`cycG:${gi}`, g.title)}>
+                      <input
+                        className="cyc-in cyc-hin"
+                        value={lbl(`cycG:${gi}`, g.title)}
+                        placeholder={g.title}
+                        onChange={(e) => setDraft((x) => ({ ...x, [`cycG:${gi}`]: e.target.value }))}
+                        onBlur={(e) => putL(`cycG:${gi}`, e.target.value, g.title as string)}
+                      />
+                    </span>
+                    <span className="cyc-pt">{lbl(`cycG:${gi}`, g.title)}</span>
+                  </>
                 ) : (
                   <span>{texts[`cycG:${gi}`] || g.title}</span>
                 )}

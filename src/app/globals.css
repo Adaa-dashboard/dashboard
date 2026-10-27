@@ -14916,3 +14916,18 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
 .wk-shot .wkx select { font-size: inherit !important; min-height: 0 !important; }
 .wk-shot .wkx .cyc-b .cyc-n { font-size: 30px !important; }
 .wk-shot .wkx .cyc-b.lead .cyc-n { font-size: 36px !important; }
+
+/* النسخة النصّية لحقول الورقة: مخفيّةٌ على الشاشة، وتحلّ محلّ
+   الحقول أثناء التصوير — `html2canvas` لا يرسم نصّ الحقول رسماً
+   موثوقاً، فكانت المربّعات تخرج في الـPDF فارغة */
+.cyc-pt { display: none; }
+.wk-shot .cyc-pt { display: block; }
+.wk-shot .cyc-sh .cyc-pt { display: inline; }
+.wk-shot .cyc-b input.cyc-n,
+.wk-shot .cyc-b textarea.cyc-l,
+.wk-shot .cyc-b input.cyc-s,
+.wk-shot .cyc-sh .cyc-hw { display: none !important; }
+/* النسخة النصّية تأخذ قياس الحقل نفسه */
+.wk-shot .cyc-b b.cyc-n { width: 100%; text-align: center; }
+.wk-shot .cyc-b .cyc-l.cyc-pt { text-align: center; }
+.wk-shot .cyc-b em.cyc-s { text-align: center; font-style: normal; }
