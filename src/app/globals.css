@@ -14920,9 +14920,12 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
 /* النسخة النصّية لحقول الورقة: مخفيّةٌ على الشاشة، وتحلّ محلّ
    الحقول أثناء التصوير — `html2canvas` لا يرسم نصّ الحقول رسماً
    موثوقاً، فكانت المربّعات تخرج في الـPDF فارغة */
-.cyc-pt { display: none; }
-.wk-shot .cyc-pt { display: block; }
-.wk-shot .cyc-sh .cyc-pt { display: inline; }
+/* الإخفاء بمحدّدٍ أقوى من `.cyc-b .cyc-n` و`.cyc-b .cyc-s` اللتين
+   تجعلانها `block` — وإلا ظهر الرقم مرّتين على الشاشة */
+.cyc-b .cyc-pt,
+.cyc-sh .cyc-pt { display: none !important; }
+.wk-shot .cyc-b .cyc-pt { display: block !important; }
+.wk-shot .cyc-sh .cyc-pt { display: inline !important; }
 .wk-shot .cyc-b input.cyc-n,
 .wk-shot .cyc-b textarea.cyc-l,
 .wk-shot .cyc-b input.cyc-s,
