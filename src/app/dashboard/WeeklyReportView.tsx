@@ -550,6 +550,9 @@ export default function WeeklyReportView({
           aria-hidden
         />
       )}
+      {/* فاصلٌ صفريُّ العرض يطفو بنسبة الورقة: يُبقي الصفحة بطولها
+          الطبيعي مهما قلّ محتواها، وتطول إن زاد */}
+      <i className="wkx-sz" aria-hidden />
       <div className="wkx-in">
         <header className="wkx-head">
           {/* eslint-disable-next-line @next/next/no-img-element */}

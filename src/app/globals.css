@@ -2390,12 +2390,23 @@ table.matrix thead th {
   display: block;
   z-index: 0;
 }
+/* مقاسُ الورقة ثابتٌ مهما قلّ محتواها — نسبة A4.
+   فاصلٌ صفريُّ العرض بارتفاع النسبة (حشوةٌ مئوية من عرض الورقة)
+   يمدّ الورقةَ إلى طولها الطبيعي، والمحتوى يتمدّد بجانبه فيستقرّ
+   الذيلُ في أسفلها. وإن زاد المحتوى طالت الورقةُ معه. */
+.wkx { display: flex; align-items: stretch; }
+.wkx-sz { flex: 0 0 0px; width: 0; padding-top: 141.4%; }
+.wkx-h .wkx-sz { padding-top: 70.7%; }
+
 .wkx-in {
   position: relative;
   z-index: 1;
   display: flex;
   flex-direction: column;
   padding: 28px 28px 18px;
+  /* يملأ الورقة فيستقرّ الذيل في أسفلها */
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .has-band .wkx-in {
   /* المحتوى في جهة البياض من التصميم — وحُجز له 24% فبدت البطاقات
@@ -3358,6 +3369,7 @@ textarea.wk-updin:focus {
 }
 
 .wkx-foot {
+  margin-top: auto;
   display: flex;
   justify-content: space-between;
   gap: 10px;

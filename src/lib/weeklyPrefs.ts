@@ -163,7 +163,7 @@ export const CYCLE_GROUPS: CycGroup[] = [
   },
   {
     title: "المبادرات",
-    icon: "milestone",
+    icon: "puzzle",
     fields: [
       { k: "b1", label: "مبادرات رؤية السعودية 2030" },
       { k: "b2", label: "مبادرات الاستراتيجيات الوطنية" },
