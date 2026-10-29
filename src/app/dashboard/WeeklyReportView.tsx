@@ -109,6 +109,25 @@ function DomCard({
 }) {
   /* ما يُكتب الآن — قبل أن يصل الحفظ ويعود في `texts` */
   const [draft, setDraft] = useState<Record<string, string>>({});
+
+  /* أعدادُ الحلقة قد تُكتب يدوياً في التقرير — `dn:<المجال>:<الشريحة>`.
+     تصحيحٌ عاجل يخصّ هذا الأسبوع وحده: ما إن تُحدَّث بيانات الصفحة
+     نفسها حتى يعود العدد محسوباً منها (الخانة الفارغة = لا تجاوز) */
+  const dnK = (i: number) => `dn:${d.k}:${i}`;
+  const dnOver = (i: number) => (draft[dnK(i)] ?? texts[dnK(i)] ?? "").trim();
+  const donut = d.donut && {
+    ...d.donut,
+    slices: d.donut.slices.map((s, i) => {
+      const v = dnOver(i);
+      return v === "" ? s : { ...s, n: Math.max(0, Number(v.replace(/[^\d]/g, "")) || 0) };
+    }),
+  };
+  /* الإجمالي في وسط الحلقة يتبع الشرائح — إلا حين تكون متداخلة أو
+     منسوبةً إلى قاعدةٍ أخرى، فمجموعها ليس إجمالها أصلاً */
+  const dnTotal =
+    donut && !donut.nested && !donut.base
+      ? donut.slices.reduce((n, x) => n + x.n, 0)
+      : donut?.total || 0;
   /* عمود «الدعم المطلوب» يُخفى بضغطة × ويُعاد بزرّه — واختياره
      محفوظٌ مع بقية مفاتيح الأسبوع */
   const sup = on["col:sup"] !== false;
@@ -144,15 +163,34 @@ function DomCard({
         </div>
       )}
 
-      {d.donut && (
+      {donut && (
         <div className="wk-dw">
-          <DonutLegend slices={d.donut.slices} />
+          <DonutLegend
+            slices={donut.slices}
+            edit={
+              onTaskText
+                ? {
+                    val: (i) => {
+                      const v = dnOver(i);
+                      return v === "" ? String(donut.slices[i].n) : v;
+                    },
+                    set: (i, v) => {
+                      /* ما طابق المحسوب لا يُحفظ تجاوزاً: الخانة
+                         تبقى تابعةً للبيانات فتتحدّث معها */
+                      const n = v.replace(/[^\d]/g, "");
+                      setDraft((x) => ({ ...x, [dnK(i)]: n }));
+                      onTaskText(dnK(i), n === String(d.donut?.slices[i].n ?? "") ? "" : n);
+                    },
+                  }
+                : undefined
+            }
+          />
           <DonutRing
-            slices={d.donut.slices}
-            total={d.donut.total}
-            unit={d.donut.unit}
-            base={d.donut.base}
-            nested={d.donut.nested}
+            slices={donut.slices}
+            total={dnTotal}
+            unit={donut.unit}
+            base={donut.base}
+            nested={donut.nested}
           />
         </div>
       )}

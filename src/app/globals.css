@@ -3055,6 +3055,42 @@ textarea.wk-updin:focus {
   color: var(--gt-900);
   font-variant-numeric: tabular-nums;
 }
+/* عددُ الأسطورة قابلٌ للكتابة في التقرير الأسبوعي — تصحيحٌ عاجل
+   ريثما تُحدَّث بيانات الصفحة نفسها؛ الخانة الفارغة تعني «احسبه» */
+.wk-lg u.dn-w {
+  display: inline-flex;
+  align-items: center;
+}
+.wk-lg .dn-in {
+  width: 38px;
+  min-height: 0;
+  padding: 1px 3px;
+  border: 1px dashed var(--line2);
+  border-radius: 5px;
+  background: none;
+  font: inherit;
+  font-weight: 700;
+  color: var(--gt-900);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.wk-lg .dn-in:focus {
+  outline: none;
+  border-style: solid;
+  border-color: var(--g-600);
+}
+.wk-lg .dn-pt {
+  display: none;
+}
+/* في التصوير والطباعة: النصّ بدل الحقل — html2canvas لا يرسم
+   نصّ الحقول رسماً موثوقاً */
+.wk-shot .wk-lg .dn-in {
+  display: none !important;
+}
+.wk-shot .wk-lg .dn-pt {
+  display: inline !important;
+}
+
 /* سهم الزيادة في الأسطورة — «+٢» بالأخضر جنب اسم المرحلة */
 /* `upx` لا `up`: الأخيرة صنفٌ معرَّفٌ في الملف (صفُّ تحديثٍ
    بحشوة 11px) فكان يضاعف ارتفاع سطر الأسطورة */
@@ -3723,8 +3759,12 @@ textarea.wk-updin:focus {
   .wk-tb th .colx,
   .wk-tb th.colback,
   .wk-tb td.colback,
+  .wk-lg .dn-in,
   .wk-tb td.sup .wk-supin {
     display: none !important;
+  }
+  .wk-lg .dn-pt {
+    display: inline !important;
   }
   .wk-tb td.sup .sup-txt {
     display: block !important;

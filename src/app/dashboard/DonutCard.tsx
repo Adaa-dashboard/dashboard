@@ -65,16 +65,37 @@ export function DonutRing({
   );
 }
 
-export function DonutLegend({ slices }: { slices: Slice[] }) {
+export function DonutLegend({
+  slices,
+  edit,
+}: {
+  slices: Slice[];
+  /** أعدادُ الأسطورة تُكتب يدوياً في التقرير — تصحيحٌ عاجل ريثما
+      تُحدَّث بيانات الصفحة نفسها. `val` العددُ المعروض و`set` حفظُه */
+  edit?: { val: (i: number) => string; set: (i: number, v: string) => void };
+}) {
   return (
     <div className="wk-lg">
-      {slices.map((s) => (
+      {slices.map((s, i) => (
         <div key={s.label}>
           <i style={{ background: s.color }} />
           {s.label}
           {/* ما زاد في هذه المرحلة هذا الأسبوع — سهمٌ أخضر عقب اسمها */}
           {s.up ? <em className="upx">+{s.up} ▲</em> : null}
-          <u>{s.n}</u>
+          {edit ? (
+            <u className="dn-w">
+              <input
+                className="dn-in"
+                inputMode="numeric"
+                value={edit.val(i)}
+                onChange={(e) => edit.set(i, e.target.value)}
+              />
+              {/* نصّاً لا حقلاً في الملف المصدَّر */}
+              <b className="dn-pt">{s.n}</b>
+            </u>
+          ) : (
+            <u>{s.n}</u>
+          )}
         </div>
       ))}
     </div>
