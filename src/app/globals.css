@@ -2836,6 +2836,28 @@ table.matrix thead th {
 .wk-tb th.sup {
   width: 24%;
 }
+/* بلا عمود «الدعم المطلوب»: «التحديث» ينزاح إلى يسار البطاقة
+   ويتّسع اسمُ التكليف بما خلا — بدل أن تبقى مساحةٌ بيضاء يساره.
+   و`pk` = وضع التحرير، فيه عمودا الاختيار وزرّ إعادة العمود */
+.wk-tb.nosup th.nm {
+  width: 62%;
+}
+.wk-tb.nosup th.upd {
+  width: 38%;
+}
+.wk-tb.nosup.pk th.nm {
+  width: 52%;
+}
+.wk-tb.nosup.pk th.upd {
+  width: 34%;
+}
+/* ويلتصق بيسار البطاقة: الفراغ كان كلّه في الطرف الأيسر */
+.wk-tb.nosup th.upd,
+.wk-tb.nosup td.upd,
+.wk-tb.nosup td.upd .wk-updin,
+.wk-tb.nosup td.upd .sup-txt {
+  text-align: end;
+}
 .wk-tb th {
   text-align: start;
   font-size: 9.5px;
@@ -3616,6 +3638,12 @@ textarea.wk-updin:focus {
 .wk-shot .wk-tb td.colback {
   display: none !important;
 }
+.wk-shot .wk-tb.nosup.pk th.nm {
+  width: 62%;
+}
+.wk-shot .wk-tb.nosup.pk th.upd {
+  width: 38%;
+}
 .wk-shot .wk-tb tr.off,
 .wk-shot .wk-pr.off {
   display: none !important;
@@ -3700,6 +3728,12 @@ textarea.wk-updin:focus {
   }
   .wk-tb td.sup .sup-txt {
     display: block !important;
+  }
+  .wk-tb.nosup.pk th.nm {
+    width: 62%;
+  }
+  .wk-tb.nosup.pk th.upd {
+    width: 38%;
   }
   .wk-tb tr.off,
   .wk-pr.off {
