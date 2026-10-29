@@ -2399,6 +2399,12 @@ table.matrix thead th {
 .wkx { display: flex; align-items: stretch; }
 .wkx-sz { flex: 0 0 0px; width: 0; padding-top: 141.4%; }
 .wkx-h .wkx-sz { padding-top: 70.7%; }
+/* أثناء التصوير يُخفى الفاصل ويُستبدل بارتفاعٍ ثابت: مكتبةُ
+   التصوير لا تُنفّذ الحشوة المئوية داخل صفٍّ مرن، فتحسبها كتلةً
+   تدفع التقريرَ إلى أسفل الورقة ويخرج الملفُّ فارغاً */
+.wk-shot .wkx-sz { display: none !important; }
+.wk-shot .wkx { min-height: 1272px !important; }
+.wk-shot .wkx-h { min-height: 877px !important; }
 
 .wkx-in {
   position: relative;
