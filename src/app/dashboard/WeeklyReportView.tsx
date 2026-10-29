@@ -48,12 +48,13 @@ export function arDate2(iso: string): string {
 }
 
 /** عدد الطلبات الواردة في الأسبوع بصيغةٍ عربية سليمة */
-function crNewText(n: number): string {
-  if (!n) return "لم يرد طلبٌ هذا الأسبوع";
-  if (n === 1) return "طلبٌ واحد ورد هذا الأسبوع";
-  if (n === 2) return "طلبان وردا هذا الأسبوع";
-  if (n <= 10) return `${n} طلبات وردت هذا الأسبوع`;
-  return `${n} طلباً ورد هذا الأسبوع`;
+/* أعدادُ الطلبات في شريط الملخّص: القائمة وما ورد وما أُغلق.
+   كان السطر يقول «لم يرد طلبٌ هذا الأسبوع» وحدها، فلا يُعرف من
+   التقرير كم طلباً على الإدارة أصلاً. */
+function crCountsText(r: { crOpen: number; crNew: number; crClosed: number }): string {
+  const out = [`القائمة: ${r.crOpen}`, `الوارد هذا الأسبوع: ${r.crNew}`];
+  if (r.crClosed) out.push(`المُغلق: ${r.crClosed}`);
+  return out.join(" · ");
 }
 
 export function rangeText2(a: string, b: string): string {
@@ -586,7 +587,7 @@ export default function WeeklyReportView({
             <Ring pct={r.crPct ?? 0} />
             <span className="tx">
               <b className="sm">نسبة الالتزام في مراجعة طلبات التغيير</b>
-              <span>{crNewText(r.crNew)}</span>
+              <span>{crCountsText(r)}</span>
               {r.crPctPrev != null && <em>مقابل {r.crPctPrev}% الأسبوع الماضي</em>}
             </span>
           </div>
