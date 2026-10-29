@@ -3130,7 +3130,8 @@ textarea.wk-updin:focus {
   justify-content: space-between;
   column-gap: 8px;
 }
-.wk-ups.two li {
+.wk-ups.two li,
+.wk-ups.sm li {
   white-space: nowrap;
   align-items: center;
   gap: 4px;
@@ -3138,7 +3139,8 @@ textarea.wk-updin:focus {
   line-height: 1.8;
   min-width: 0;
 }
-.wk-ups.two li i {
+.wk-ups.two li i,
+.wk-ups.sm li i {
   width: 4px;
   height: 4px;
 }
@@ -3685,7 +3687,8 @@ textarea.wk-updin:focus {
     grid-template-columns: 1fr;
   }
   /* عمودٌ واحد بعرض الشاشة ⇒ لا حاجة لتصغير الخط */
-  .wk-ups.two li {
+  .wk-ups.two li,
+  .wk-ups.sm li {
     font-size: 10px;
     white-space: normal;
   }
