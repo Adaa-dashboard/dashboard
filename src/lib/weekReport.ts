@@ -143,6 +143,8 @@ export type WeekReport = {
   crOpen: number;
   /** ما ورد من طلبات في الأسبوع نفسه */
   crNew: number;
+  /** كل الطلبات في الملف — المفتوح والمغلق معاً */
+  crTotal: number;
   doms: Dom[];
   /** الخطوات القادمة — تُكتب يدوياً في الإعدادات */
   next: string[];
@@ -768,6 +770,7 @@ export function buildWeekReport(args: {
     crClosed: cr.n,
     crOpen: open,
     crNew,
+    crTotal: args.changes.length,
     doms,
     next: args.next || [],
   };

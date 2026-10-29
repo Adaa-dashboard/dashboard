@@ -47,14 +47,10 @@ export function arDate2(iso: string): string {
   return `${d} ${AR_MONTHS[m - 1]} ${y}`;
 }
 
-/** عدد الطلبات الواردة في الأسبوع بصيغةٍ عربية سليمة */
-/* أعدادُ الطلبات في شريط الملخّص: القائمة وما ورد وما أُغلق.
-   كان السطر يقول «لم يرد طلبٌ هذا الأسبوع» وحدها، فلا يُعرف من
-   التقرير كم طلباً على الإدارة أصلاً. */
-function crCountsText(r: { crOpen: number; crNew: number; crClosed: number }): string {
-  const out = [`القائمة: ${r.crOpen}`, `الوارد هذا الأسبوع: ${r.crNew}`];
-  if (r.crClosed) out.push(`المُغلق: ${r.crClosed}`);
-  return out.join(" · ");
+/* سطرُ الطلبات في شريط الملخّص: **العدد الكامل وحده** — بطلب
+   المستخدمة؛ التفصيل (القائمة · الوارد · المُغلق) لا يظهر في التقرير */
+function crCountsText(r: { crTotal: number }): string {
+  return `إجمالي الطلبات: ${r.crTotal}`;
 }
 
 export function rangeText2(a: string, b: string): string {
