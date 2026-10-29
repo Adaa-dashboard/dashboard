@@ -1560,6 +1560,15 @@ function NatCard({
     if (e) setTrkErr(e);
   }
 
+  /* حالة الاعتماد تُختار في مكانها — كانت تُغيَّر بتنزيل ملف
+     الإكسل وتحديثه ورفعه، وهي أكثر ما يتغيّر في الصفحة */
+  async function setStage(n: number) {
+    if (!canEdit || !save) return;
+    setTrkErr("");
+    const e = await save(it.id, { ...natNoLegacy(d), stage: n, demo: false }, it.ord);
+    if (e) setTrkErr(e);
+  }
+
   /** خليةٌ تُكتب في مكانها لمن يملك التعديل، ونصٌّ لغيره */
   const cell = (k: "period" | "approvedAt", ph: string) =>
     canEdit && save ? (
@@ -1596,7 +1605,23 @@ function NatCard({
         {/* القطاع إلى جوار الجهة المالكة — وكان يقع بعد المرحلة
             فيظهر في بعض البطاقات ويغيب في غيرها */}
         {txt(d.owner) || "—"}
-        {txt(d.sector) ? ` · ${txt(d.sector)}` : ""} · {NAT_STEPS[natStage(d) - 1]}
+        {txt(d.sector) ? ` · ${txt(d.sector)}` : ""} ·{" "}
+        {canEdit && save ? (
+          <select
+            className="n-stg"
+            value={String(natStage(d))}
+            title={t("حالة الاعتماد", "Approval stage")}
+            onChange={(e) => void setStage(Number(e.target.value))}
+          >
+            {NAT_STEPS.map((s, i) => (
+              <option key={s} value={i + 1}>
+                {s}
+              </option>
+            ))}
+          </select>
+        ) : (
+          NAT_STEPS[natStage(d) - 1]
+        )}
       </div>
 
       <div className="bd">
@@ -2137,6 +2162,31 @@ function NationalDetail({
         <div className="box">
           <div className="k">{t("اسم الاستراتيجية", "Strategy")}</div>
           <div className="v">{txt(d.name)}</div>
+        </div>
+        {/* حالة الاعتماد تُختار هنا كما تُختار في البطاقة */}
+        <div className="box">
+          <div className="k">{t("حالة الاعتماد", "Approval stage")}</div>
+          {canEdit && save ? (
+            <select
+              className="n-stg lg"
+              value={String(natStage(d))}
+              onChange={(e) =>
+                void save(
+                  it.id,
+                  { ...natNoLegacy(d), stage: Number(e.target.value), demo: false },
+                  it.ord,
+                )
+              }
+            >
+              {NAT_STEPS.map((x, i) => (
+                <option key={x} value={i + 1}>
+                  {x}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div className="v">{NAT_STEPS[natStage(d) - 1]}</div>
+          )}
         </div>
         <div className="box">
           <div className="k">{t("مراحل المراجعة", "Review stages")}</div>

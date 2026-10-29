@@ -994,6 +994,8 @@ table.matrix thead th {
   .wkx .cyc-b .cyc-n { font-size: 30px !important; }
   .wkx .cyc-b.lead .cyc-n { font-size: 36px !important; }
   .wkx input { min-height: 0; }
+  /* قائمة حالة الاعتماد تبقى سطراً واحداً داخل نصّ البطاقة */
+  .ncard .n-stg { font-size: 11.5px !important; min-height: 0; padding: 2px 8px; }
   input, select { min-height: 44px; }
   .btn { min-height: 44px; }
   .btn-sm { min-height: 40px; }
@@ -6405,6 +6407,33 @@ textarea.wk-updin:focus {
   padding: 1px 2px 2px;
   border-radius: 0;
 }
+/* حالة الاعتماد في مكانها: قائمةٌ بهيئة النصّ المحيط بها.
+   `width:auto` ضرورية — القاعدة العامة للحقول تمدّها بعرض السطر */
+.n-stg {
+  width: auto;
+  min-height: 0;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--gt-700);
+  background: var(--soft);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 1px 8px;
+  max-width: 100%;
+  cursor: pointer;
+}
+.n-stg:hover { border-color: var(--g-400); color: var(--gt-900); }
+.n-stg:focus { outline: none; border-color: var(--g-700); }
+.n-stg.lg {
+  font-size: 13px;
+  width: 100%;
+  padding: 7px 11px;
+  border-radius: 10px;
+  background: var(--panel);
+  width: 100%;
+}
+
 .ncard .n-in::placeholder {
   color: var(--muted);
   opacity: 0.55;
