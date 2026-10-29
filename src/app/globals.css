@@ -3119,19 +3119,28 @@ textarea.wk-updin:focus {
   grid-template-columns: 1fr;
   gap: 0;
 }
-/* عمودان للقائمة الطويلة (`two`): الاسم يلتفّ على سطرين بدل أن
-   يُقصّ، والنقطة تعلو مع سطره الأول */
+/* عمودان للقائمة الطويلة (`two`): **كل اسم سطرٌ واحد** ولو صغر
+   خطّه — الالتفاف على سطرين كان يُربك القائمة في الـPDF.
+   والعمودان بعرض محتواهما لا نصفين متساويين، فالعمود ذو الأسماء
+   الطويلة يأخذ ما يحتاجه ويكفيه خطُّ 8px دون قصّ */
 .wk-ups.two {
-  grid-template-columns: 1fr 1fr;
-  column-gap: 14px;
+  /* `minmax(0, …)` شبكةُ أمان: اسمٌ أطول من المتوقَّع يُقلَّص
+     عموده بدل أن يتجاوز البطاقة */
+  grid-template-columns: repeat(2, minmax(0, max-content));
+  justify-content: space-between;
+  column-gap: 8px;
 }
 .wk-ups.two li {
-  white-space: normal;
-  overflow: visible;
-  align-items: flex-start;
+  white-space: nowrap;
+  align-items: center;
+  gap: 4px;
+  font-size: 8px;
+  line-height: 1.8;
+  min-width: 0;
 }
 .wk-ups.two li i {
-  margin-top: 5px;
+  width: 4px;
+  height: 4px;
 }
 
 /* سطرٌ واحد لكل جهة — العمود بعرض البطاقة كلها فيسع الاسم كاملاً،
@@ -3674,6 +3683,11 @@ textarea.wk-updin:focus {
   .wk-ups.two,
   .wk-lst {
     grid-template-columns: 1fr;
+  }
+  /* عمودٌ واحد بعرض الشاشة ⇒ لا حاجة لتصغير الخط */
+  .wk-ups.two li {
+    font-size: 10px;
+    white-space: normal;
   }
   .wcx-f {
     flex-wrap: wrap;
