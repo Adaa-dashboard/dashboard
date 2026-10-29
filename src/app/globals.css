@@ -3119,6 +3119,21 @@ textarea.wk-updin:focus {
   grid-template-columns: 1fr;
   gap: 0;
 }
+/* عمودان للقائمة الطويلة (`two`): الاسم يلتفّ على سطرين بدل أن
+   يُقصّ، والنقطة تعلو مع سطره الأول */
+.wk-ups.two {
+  grid-template-columns: 1fr 1fr;
+  column-gap: 14px;
+}
+.wk-ups.two li {
+  white-space: normal;
+  overflow: visible;
+  align-items: flex-start;
+}
+.wk-ups.two li i {
+  margin-top: 5px;
+}
+
 /* سطرٌ واحد لكل جهة — العمود بعرض البطاقة كلها فيسع الاسم كاملاً،
    والقصُّ بالنقاط لا يقع إلا على اسمٍ طويلٍ طولاً غير معهود */
 .wk-ups li {
@@ -3656,6 +3671,7 @@ textarea.wk-updin:focus {
     flex-direction: column;
   }
   .wk-ups,
+  .wk-ups.two,
   .wk-lst {
     grid-template-columns: 1fr;
   }

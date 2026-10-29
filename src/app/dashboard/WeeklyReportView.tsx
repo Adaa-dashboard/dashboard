@@ -197,7 +197,7 @@ function DomCard({
 
       {/* ما تقدّم هذا الأسبوع — نقطةٌ بلون مرحلته الجديدة ثم اسمه */}
       {d.ups && d.ups.length > 0 && (
-        <ul className="wk-ups">
+        <ul className={`wk-ups${d.upsTwo ? " two" : ""}`}>
           {d.ups.slice(0, 12).map((l) => (
             <li key={l.name} title={l.name}>
               <i style={{ background: l.color }} />
