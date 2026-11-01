@@ -15214,3 +15214,16 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
   border-color: #e3b7b7;
   background: #fff5f5;
 }
+
+/* الربع الجاري في شريط الأرباع — نسبته جزئية حتى ينتهي */
+.nq-q .nq-now {
+  display: inline-block;
+  margin-inline-start: 5px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--g-50);
+  border-radius: 20px;
+  padding: 1px 6px;
+  vertical-align: middle;
+}

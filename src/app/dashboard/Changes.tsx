@@ -313,10 +313,31 @@ export default function Changes({
   );
   const qRows = useMemo(() => roundQuarters(rounds), [rounds]);
   /* جولات الاستشاري المفتوح — بالجهة المالكة كما في الترتيب */
-  const whoRounds = useMemo(
-    () => (who ? spanRounds.filter((r) => ownerOf.get(nrm(r.owner))?.name === who) : []),
-    [who, spanRounds, ownerOf],
-  );
+  /* سطور نافذة الاستشاري: من الجولات إن وُجدت، وإلا من الطلبات
+     المسجَّلة — فالرقم في البطاقة يُفسَّر من مصدره هو لا من غيره.
+     ومعيار التأخّر يتبع المصدر كذلك: الجولة تحمل التزامها
+     محسوباً، والطلب يُقاس كما في حسبة الترتيب (بلغ المدة ⇒ متأخر). */
+  const whoRows = useMemo(() => {
+    if (!who) return [];
+    if (rounds.length)
+      return spanRounds
+        .filter((r) => ownerOf.get(nrm(r.owner))?.name === who)
+        .map((r) => ({
+          id: r.id, code: r.code, owner: r.owner, itemName: r.itemName,
+          kindTxt: [r.kind, r.review].filter(Boolean).join(" · "),
+          days: r.days, sla: r.sla, date: r.leftAt, late: r.onTime === false,
+        }));
+    return items
+      .filter((c) => ownerOf.get(nrm(c.owner))?.name === who)
+      .map((c) => ({
+        id: c.code, code: c.code, owner: c.owner, itemName: c.itemName,
+        kindTxt: [c.reviewType, c.status === "closed" ? "تمت مراجعته" : "مفتوح"]
+          .filter(Boolean).join(" · "),
+        days: c.workDays, sla: c.sla, date: c.closedAt || c.lastSeen || "",
+        late: c.sla != null && c.workDays != null && c.workDays >= c.sla,
+      }))
+      .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  }, [who, rounds, spanRounds, items, ownerOf]);
 
   const shown = useMemo(() => {
     const open = items.filter((x) => x.status === "open");
@@ -675,7 +696,7 @@ export default function Changes({
             <span className="muted" style={{ fontSize: 11 }}>
               {rounds.length
                 ? t(`${spanRounds.length} جولة مراجعة مكتملة`, `${spanRounds.length} rounds`)
-                : t("إغلاق الطلبات ضمن مدّتها", "Requests closed within SLA")}
+                : t("من الطلبات المسجَّلة — حتى تتراكم جولات المراجعة", "From stored requests")}
             </span>
             {rounds.length > 0 && (
               <span className="cr-span">
@@ -698,9 +719,9 @@ export default function Changes({
           <div className="cr-podium">
             {tops.slice(0, 5).map((x, i) => (
               <div
-                className={`cr-p${rounds.length ? " clk" : ""}`}
+                className="cr-p clk"
                 key={x.name}
-                onClick={() => rounds.length && setWho(who === x.name ? "" : x.name)}
+                onClick={() => setWho(who === x.name ? "" : x.name)}
                 style={{ ["--c" as string]: RANK[i].c }}
                 title={t(
                   `${x.ok} من ${x.total} ضمن مدّتها (${x.raw}%) — والنسبة الظاهرة مرجَّحة بعدد الطلبات`,
@@ -737,15 +758,17 @@ export default function Changes({
                 {who}
                 <span className="muted" style={{ fontSize: 11, marginInlineStart: 8 }}>
                   {t(
-                    `${whoRounds.length} جولة · ${whoRounds.filter((r) => r.onTime).length} ضمن المدة`,
-                    `${whoRounds.length} rounds`,
+                    rounds.length
+                      ? `${whoRows.length} جولة · ${whoRows.filter((r) => !r.late).length} ضمن المدة`
+                      : `${whoRows.length} طلباً · ${whoRows.filter((r) => !r.late).length} ضمن المدة`,
+                    `${whoRows.length} rows`,
                   )}
                 </span>
               </h3>
               <button className="mx" onClick={() => setWho("")}>✕</button>
             </div>
             <div className="m-b">
-              {whoRounds.length === 0 ? (
+              {whoRows.length === 0 ? (
                 <div className="muted">{t("لا جولات في هذا المدى", "No rounds in this span")}</div>
               ) : (
                 <table className="cr-tbl">
@@ -757,23 +780,21 @@ export default function Changes({
                       <th>{t("النوع", "Type")}</th>
                       <th>{t("الأيام", "Days")}</th>
                       <th>{t("المدة", "SLA")}</th>
-                      <th>{t("خرج في", "Left")}</th>
+                      <th>{rounds.length ? t("خرج في", "Left") : t("آخر تحديث", "Updated")}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {whoRounds.map((r) => (
-                      <tr key={r.id} className={r.onTime === false ? "cr-late" : ""}>
+                    {whoRows.map((r) => (
+                      <tr key={r.id} className={r.late ? "cr-late" : ""}>
                         <td className="ltr cr-code">{r.code}</td>
                         <td>{r.owner}</td>
                         <td className="cr-name">{r.itemName}</td>
-                        <td>
-                          {r.kind} · {r.review}
-                        </td>
+                        <td>{r.kindTxt}</td>
                         <td>
                           <b>{r.days ?? "—"}</b>
                         </td>
                         <td>{r.sla ?? "—"}</td>
-                        <td className="ltr">{r.leftAt}</td>
+                        <td className="ltr">{r.date}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -916,7 +937,14 @@ export default function Changes({
                     )}
                   </b>
                   <i style={gap ? undefined : { borderColor: CR_TONE[tone] }} />
-                  <span>{q.label}</span>
+                  <span>
+                    {q.label}
+                    {/* الربع الجاري نسبته جزئية بطبعها — تُقرأ «حتى
+                        اليوم» لا نتيجةً نهائية للربع */}
+                    {q.label === qOf(new Date().toISOString().slice(0, 10)) && (
+                      <b className="nq-now">{t("حتى اليوم", "to date")}</b>
+                    )}
+                  </span>
                   <em>{gap ? t("لا طلبات", "No requests") : t(arReq(q.stat.n), `${q.stat.n} requests`)}</em>
                 </div>
               );
