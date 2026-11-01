@@ -149,6 +149,9 @@ export type WeekReport = {
   crNew: number;
   /** كل الطلبات في الملف — المفتوح والمغلق معاً */
   crTotal: number;
+  /** ما تحرّك منها هذا الأسبوع: وردَ أو أُغلق فيه. صفرٌ ⇒ أسبوعٌ
+      بلا طلبات، فيختفي مربّعها من التقرير بدل أن يعرض رقماً جامداً */
+  crWeek: number;
   doms: Dom[];
   /** الخطوات القادمة — تُكتب يدوياً في الإعدادات */
   next: string[];
@@ -772,6 +775,13 @@ export function buildWeekReport(args: {
   const open = args.changes.filter((c) => !day(txt(c.closedAt))).length;
   /* ما ورد هذا الأسبوع — `first_seen` أول ظهورٍ للطلب في الملف اليومي */
   const crNew = args.changes.filter((c) => inRange(txt(c.firstSeen), a, b)).length;
+  /* طلبات الأسبوع: ما ورد فيه أو أُغلق فيه — بالرمز فلا يُعدّ
+     الطلب الذي ورد وأُغلق في الأسبوع نفسه مرتين */
+  const crWeek = new Set(
+    args.changes
+      .filter((c) => inRange(txt(c.firstSeen), a, b) || inRange(txt(c.closedAt), a, b))
+      .map((c) => txt(c.code) || txt(c.itemName)),
+  ).size;
   /* النسبة الكلية لكل ما أُغلق — تُعرض حين لا يُغلق شيءٌ هذا الأسبوع،
      فالحلقة لا تظهر صفراً وكأن الالتزام انهار */
   let crAllN = 0, crAllOk = 0;
@@ -805,6 +815,7 @@ export function buildWeekReport(args: {
     crOpen: open,
     crNew,
     crTotal: args.changes.length,
+    crWeek,
     doms,
     next: args.next || [],
   };

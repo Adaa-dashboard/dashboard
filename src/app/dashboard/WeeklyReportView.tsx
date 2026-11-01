@@ -47,10 +47,13 @@ export function arDate2(iso: string): string {
   return `${d} ${AR_MONTHS[m - 1]} ${y}`;
 }
 
-/* سطرُ الطلبات في شريط الملخّص: **العدد الكامل وحده** — بطلب
-   المستخدمة؛ التفصيل (القائمة · الوارد · المُغلق) لا يظهر في التقرير */
-function crCountsText(r: { crTotal: number }): string {
-  return `إجمالي الطلبات: ${r.crTotal}`;
+/* سطرُ الطلبات في شريط الملخّص: **عدد طلبات الأسبوع وحده** —
+   بطلب المستخدمة؛ التفصيل (القائمة · الوارد · المُغلق) لا يظهر.
+   ويختفي المربّع كله في أسبوعٍ بلا طلبات. */
+function crCountsText(r: { crWeek: number }): string {
+  const n = r.crWeek;
+  const w = n === 1 ? "طلب واحد" : n === 2 ? "طلبان" : n <= 10 ? `${n} طلبات` : `${n} طلباً`;
+  return `${w} هذا الأسبوع`;
 }
 
 export function rangeText2(a: string, b: string): string {
@@ -619,6 +622,9 @@ export default function WeeklyReportView({
               {r.totalPrev != null && <em>مقابل {r.totalPrev} الأسبوع الماضي</em>}
             </span>
           </div>
+          {/* بلا طلبٍ تحرّك هذا الأسبوع يختفي المربّع — نسبةٌ بلا
+              طلبات رقمٌ جامدٌ يُقرأ خطأً */}
+          {r.crWeek > 0 && (
           <div>
             <Ring pct={r.crPct ?? 0} />
             <span className="tx">
@@ -627,6 +633,7 @@ export default function WeeklyReportView({
               {r.crPctPrev != null && <em>مقابل {r.crPctPrev}% الأسبوع الماضي</em>}
             </span>
           </div>
+          )}
         </div>
 
         {rows.map((row, i) => (
