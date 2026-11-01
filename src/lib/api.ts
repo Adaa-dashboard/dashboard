@@ -1498,7 +1498,7 @@ export async function apiFetch(path: string, init: Init = {}) {
            مدّتها أقصر — والمؤشر يَعُدّ الجولات لا الطلبات. */
         const { data: left } = await s
           .from("perf_change_requests")
-          .select("code,program,item_name,owner_entity,classification,req_kind,review_type,sla_days,work_days,arrived_at,first_seen")
+          .select("code,program,item_name,owner_entity,classification,req_kind,review_type,sla_days,work_days,arrived_at,first_seen,last_seen")
           .in("code", gone);
         const rows = (left || []).map((c) => {
           const arrived = String(c.arrived_at || c.first_seen || today).slice(0, 10);
@@ -1517,7 +1517,11 @@ export async function apiFetch(path: string, init: Init = {}) {
             work_days: days,
             on_time: days == null || sla == null ? null : days <= sla,
             arrived_at: arrived,
-            left_at: today,
+            /* **آخر يوم ظهر فيه الطلب في ملفٍ مرفوع** لا يوم اكتشاف
+               غيابه: مع الرفع اليومي الفرق يومٌ على الأكثر، أما طلبٌ
+               بقي مفتوحاً أسابيع بلا رفع فتُسجَّل جولته بتاريخها
+               الصحيح بدل أن تقفز إلى تاريخ أول رفعةٍ بعدها */
+            left_at: isDay(c.last_seen) ? String(c.last_seen).slice(0, 10) : today,
             updated_at: nowISO,
             updated_by: me.name || "",
           };
