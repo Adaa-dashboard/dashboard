@@ -296,7 +296,7 @@ export default function Changes({
   async function send(grid: string[][]) {
     setErr("");
     setMsg("");
-    const { rows, skipped, full, all } = mapRows(grid);
+    const { rows, skipped, full, all, stages } = mapRows(grid);
     if (!rows.length && !all) {
       setErr(
         t(
@@ -313,6 +313,11 @@ export default function Changes({
       t(
         full
           ? `قرأت ${all} طلباً، منها ${rows.length} ${CR_ADAA_STAGE} الآن.\n\n` +
+            (rows.length
+              ? ""
+              : `المراحل الموجودة في الملف:\n${stages
+                  .map(([k, n]) => `· ${k} (${n})`)
+                  .join("\n")}\n\nإن لم تكن فيها «${CR_ADAA_STAGE}» فالتصدير من تقريرٍ آخر — ألغي الرفع.\n\n`) +
             "سيُحدَّث الموجود، ويُضاف الجديد، وتُغلق جولة كل طلبٍ لم يعد عند أداء.\n\nمتابعة؟"
           : `الملف فيه ${rows.length} طلباً. سيُحدَّث الموجود، ويُضاف الجديد، ويُعدّ ما لم يعد في الملف طلباً تمت مراجعته.\n\nمتابعة؟`,
         `${rows.length} requests ${where}. Continue?`

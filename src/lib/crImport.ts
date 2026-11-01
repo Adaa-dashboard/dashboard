@@ -84,6 +84,9 @@ export type Parsed = {
   full: boolean;
   /** كم صفاً كان في الملف قبل الفلترة */
   all: number;
+  /** أكثر «المراحل الحالية» وروداً في الملف — تُعرض حين لا يطابق
+      شيءٌ مرحلة أداء، فيُعرف أن التصدير من تقريرٍ آخر */
+  stages: [string, number][];
 };
 
 /** يجد صف العناوين ثم يحوّل ما بعده إلى صفوف بأسماء الحقول */
@@ -98,7 +101,7 @@ export function mapRows(grid: string[][]): Parsed {
       break;
     }
   }
-  if (headIdx < 0) return { rows: [], skipped: 0, full: false, all: 0 };
+  if (headIdx < 0) return { rows: [], skipped: 0, full: false, all: 0, stages: [] };
 
   /* الملف اليومي يسمّي عمودَي المبادرة وعمودَي المؤشر بالاسم
      نفسه («اسم المبادرة / المؤشر» مرّتين)، فالثاني يطمس الأول.
@@ -162,6 +165,13 @@ export function mapRows(grid: string[][]): Parsed {
       adaaAt: String(o.adaaAt || "").slice(0, 10),
     };
   });
-  return { rows, skipped, full, all: raw.length };
+  const seenStages = new Map<string, number>();
+  if (full)
+    for (const o of raw) {
+      const k = String(o.stage || "").trim() || "—";
+      seenStages.set(k, (seenStages.get(k) || 0) + 1);
+    }
+  const stages = [...seenStages.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
+  return { rows, skipped, full, all: raw.length, stages };
 }
 
