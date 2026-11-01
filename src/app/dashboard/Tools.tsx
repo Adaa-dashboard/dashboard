@@ -506,7 +506,23 @@ export default function Tools({
 
   return (
     <div className="tools" ref={wrap}>
-      <Bell alerts={bell.alerts} unread={bell.unread} markSeen={bell.markSeen} t={t} onGo={onGo} />
+      <Bell
+        alerts={bell.alerts}
+        unread={bell.unread}
+        markSeen={bell.markSeen}
+        t={t}
+        onGo={onGo}
+        /* «ليست جهتي»: يُسجَّل النفي ثم يُعاد تحميل التنبيهات
+           فتختفي طلبات تلك الجهة من قائمته */
+        onDisown={async (entity) => {
+          await apiFetch("/api/cr/disown", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ entity }),
+          }).catch(() => undefined);
+          bell.reload?.();
+        }}
+      />
       <button
         className={`tl-b ${open === "calc" ? "on" : ""}`}
         onClick={() => setOpen(open === "calc" ? "" : "calc")}

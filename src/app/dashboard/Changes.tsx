@@ -9,6 +9,7 @@ import {
   type CrRow, type CrKind, type CrStat,
 } from "@/lib/crq";
 import { readDelimited, readXlsx } from "@/lib/sheet";
+import { weekStartOf, shiftDays } from "@/lib/weeklyReport";
 import { CR_ADAA_STAGE } from "@/lib/crSla";
 import { mapRows } from "@/lib/crImport";
 
@@ -134,6 +135,14 @@ export default function Changes({
   /* جولات المراجعة المكتملة: كل مرّة دخل فيها طلبٌ قائمةَ أداء
      وخرج منها، بمدّتها واتفاقيتها. عليها يُحسب المؤشر. */
   const [rounds, setRounds] = useState<CrRound[]>([]);
+  /* المدى الذي يُرتَّب عليه الاستشاريون — **الأسبوع افتراضاً**:
+     الإدارة تقرأ أداءها أسبوعاً بأسبوع، والتراكم يخفي الحديث */
+  const [span, setSpan] = useState<"week" | "quarter" | "all">("week");
+  /* الاستشاري المفتوحة قائمته — الضغط على بطاقته يعرض جولاته */
+  const [who, setWho] = useState<string>("");
+  /* جهاتٌ نفى استشاريوها نسبتها إليهم — تُسقَط من الإسناد وتُعرض
+     لمن يرفع الملف ليصحّح سجلّ الجهات */
+  const [disown, setDisown] = useState<{ id: string; entity: string; user: string }[]>([]);
   /* سجلّ الجهات كاملاً — لنافذة مطابقة الأسماء غير المعروفة */
   type Ent = { id: string; name: string; sector?: string };
   const [ents, setEnts] = useState<Ent[]>([]);
@@ -142,16 +151,20 @@ export default function Changes({
   const [fixMsg, setFixMsg] = useState("");
 
   const loadEnts = useCallback(async () => {
-    const [entRes, ppl] = await Promise.all([
+    const [entRes, ppl, dis] = await Promise.all([
       apiFetch("/api/entities").then((x) => x.json()).catch(() => ({})),
       apiFetch("/api/people").then((x) => x.json()).catch(() => ({})),
+      apiFetch("/api/cr/disown").then((x) => x.json()).catch(() => ({})),
     ]);
+    const dl = Array.isArray(dis.disown) ? dis.disown : [];
+    setDisown(dl);
+    const dset = new Set<string>(dl.map((d: { entity: string; user: string }) => `${nrm(d.entity)}|${nrm(d.user)}`));
     const photo = new Map<string, string>();
     for (const u of Array.isArray(ppl.people) ? ppl.people : [])
       if (u?.name) photo.set(nrm(String(u.name)), String(u.photoUrl || ""));
     const list = Array.isArray(entRes.entities) ? entRes.entities : [];
     setEnts(list.map((e: Ent) => ({ id: String(e.id), name: String(e.name || ""), sector: e.sector })));
-    setOwnerOf(ownerMap(list, photo));
+    setOwnerOf(ownerMap(list, photo, dset));
   }, []);
 
   const load = useCallback(async () => {
@@ -275,14 +288,35 @@ export default function Changes({
   /* الترتيب من **الجولات المكتملة** ما إن تتراكم — فهي المقياس
      الرسمي (مدّة الجولة مقابل اتفاقيتها). وقبلها يُرتَّب بلقطة
      الطلبات المفتوحة كما كان، فلا تبقى الصفحة بلا ترتيب. */
+  /* جولات المدى المختار — يُحسب عليها الترتيب وتُعرض عند الضغط */
+  const spanRounds = useMemo(() => {
+    if (span === "all") return rounds;
+    const today = new Date().toISOString().slice(0, 10);
+    if (span === "week") {
+      const a = weekStartOf(today);
+      const b = shiftDays(a, 6);
+      return rounds.filter((r) => r.leftAt >= a && r.leftAt <= b);
+    }
+    const q = qOf(today);
+    return rounds.filter((r) => qOf(r.leftAt) === q);
+  }, [rounds, span]);
+
   const tops = useMemo(
     () =>
       rounds.length
-        ? commitStats(rounds.map((r) => ({ owner: r.owner, sla: r.sla, workDays: r.days })), ownerOf)
+        ? commitStats(
+            spanRounds.map((r) => ({ owner: r.owner, sla: r.sla, workDays: r.days })),
+            ownerOf,
+          )
         : commitStats(items, ownerOf),
-    [items, rounds, ownerOf],
+    [items, rounds, spanRounds, ownerOf],
   );
   const qRows = useMemo(() => roundQuarters(rounds), [rounds]);
+  /* جولات الاستشاري المفتوح — بالجهة المالكة كما في الترتيب */
+  const whoRounds = useMemo(
+    () => (who ? spanRounds.filter((r) => ownerOf.get(nrm(r.owner))?.name === who) : []),
+    [who, spanRounds, ownerOf],
+  );
 
   const shown = useMemo(() => {
     const open = items.filter((x) => x.status === "open");
@@ -444,8 +478,45 @@ export default function Changes({
     { label: "الخامس", en: "5th", c: "#BFD9D6" },
   ];
 
+  async function clearDisown(id: string) {
+    await apiFetch(`/api/cr/disown?id=${encodeURIComponent(id)}`, { method: "DELETE" })
+      .then((x) => x.json())
+      .catch(() => ({}));
+    await loadEnts();
+  }
+
   return (
     <div className="cr">
+      {/* جهاتٌ نفى استشاريوها نسبتها إليهم — طلباتها بلا استشاري
+          حتى يُصحَّح سجلّ الجهات، فتظهر هنا لمن يرفع الملف */}
+      {page && canLink && disown.length > 0 && (
+        <div className="cr-unmatched cr-dis">
+          <b>
+            {t(
+              `${disown.length} جهة بلا استشاري واضح`,
+              `${disown.length} entities without a clear consultant`,
+            )}
+          </b>
+          <span>
+            {t(
+              "نفى الاستشاري نسبتها إليه، فطلباتها لا تُحتسب على أحد حتى تُسند في سجلّ الجهات",
+              "A consultant said these are not theirs",
+            )}
+          </span>
+          <div className="cr-dis-l">
+            {disown.map((d) => (
+              <span className="cr-dis-i" key={d.id}>
+                <b>{d.entity}</b>
+                <em>{t(`نفاها ${d.user}`, d.user)}</em>
+                <button title={t("أُسندت — احذفي النفي", "Clear")} onClick={() => clearDisown(d.id)}>
+                  ✕
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {page && canLink && unmatched.length > 0 && (
         <div className="cr-unmatched">
           <b>
@@ -603,15 +674,33 @@ export default function Changes({
             <h3>{t("أعلى الاستشاريين التزاماً", "Most on-time consultants")}</h3>
             <span className="muted" style={{ fontSize: 11 }}>
               {rounds.length
-                ? t(`من ${rounds.length} جولة مراجعة مكتملة`, `${rounds.length} completed rounds`)
+                ? t(`${spanRounds.length} جولة مراجعة مكتملة`, `${spanRounds.length} rounds`)
                 : t("إغلاق الطلبات ضمن مدّتها", "Requests closed within SLA")}
             </span>
+            {rounds.length > 0 && (
+              <span className="cr-span">
+                {([
+                  ["week", t("هذا الأسبوع", "This week")],
+                  ["quarter", t("هذا الربع", "This quarter")],
+                  ["all", t("الكل", "All")],
+                ] as const).map(([k, lb]) => (
+                  <button
+                    key={k}
+                    className={span === k ? "on" : ""}
+                    onClick={() => { setSpan(k); setWho(""); }}
+                  >
+                    {lb}
+                  </button>
+                ))}
+              </span>
+            )}
           </div>
           <div className="cr-podium">
             {tops.slice(0, 5).map((x, i) => (
               <div
-                className="cr-p"
+                className={`cr-p${rounds.length ? " clk" : ""}`}
                 key={x.name}
+                onClick={() => rounds.length && setWho(who === x.name ? "" : x.name)}
                 style={{ ["--c" as string]: RANK[i].c }}
                 title={t(
                   `${x.ok} من ${x.total} ضمن مدّتها (${x.raw}%) — والنسبة الظاهرة مرجَّحة بعدد الطلبات`,
@@ -638,6 +727,67 @@ export default function Changes({
         </div>
       )}
 
+
+      {/* قائمة جولات الاستشاري — تُفتح بالضغط على بطاقته */}
+      {who && (
+        <div className="modal-overlay" onClick={() => setWho("")}>
+          <div className="modal" style={{ maxWidth: 820 }} onClick={(e) => e.stopPropagation()}>
+            <div className="m-h">
+              <h3>
+                {who}
+                <span className="muted" style={{ fontSize: 11, marginInlineStart: 8 }}>
+                  {t(
+                    `${whoRounds.length} جولة · ${whoRounds.filter((r) => r.onTime).length} ضمن المدة`,
+                    `${whoRounds.length} rounds`,
+                  )}
+                </span>
+              </h3>
+              <button className="mx" onClick={() => setWho("")}>✕</button>
+            </div>
+            <div className="m-b">
+              {whoRounds.length === 0 ? (
+                <div className="muted">{t("لا جولات في هذا المدى", "No rounds in this span")}</div>
+              ) : (
+                <table className="cr-tbl">
+                  <thead>
+                    <tr>
+                      <th>{t("الرمز", "Code")}</th>
+                      <th>{t("الجهة المالكة", "Entity")}</th>
+                      <th>{t("البند", "Item")}</th>
+                      <th>{t("النوع", "Type")}</th>
+                      <th>{t("الأيام", "Days")}</th>
+                      <th>{t("المدة", "SLA")}</th>
+                      <th>{t("خرج في", "Left")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {whoRounds.map((r) => (
+                      <tr key={r.id} className={r.onTime === false ? "cr-late" : ""}>
+                        <td className="ltr cr-code">{r.code}</td>
+                        <td>{r.owner}</td>
+                        <td className="cr-name">{r.itemName}</td>
+                        <td>
+                          {r.kind} · {r.review}
+                        </td>
+                        <td>
+                          <b>{r.days ?? "—"}</b>
+                        </td>
+                        <td>{r.sla ?? "—"}</td>
+                        <td className="ltr">{r.leftAt}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+            <div className="m-f">
+              <button className="btn btn-ghost btn-sm" onClick={() => setWho("")}>
+                {t("إغلاق", "Close")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {page && err && <div className="alert alert-error">{err}</div>}
       {page && msg && <div className="alert alert-ok">{msg}</div>}

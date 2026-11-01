@@ -26,17 +26,25 @@ export type EntityLite = {
 };
 export type Owner = { name: string; photo: string };
 
-/** اسم الجهة ⇒ استشاريها الأساسي */
-export function ownerMap(entities: EntityLite[], photoOf?: Map<string, string>): Map<string, Owner> {
+/** اسم الجهة ⇒ استشاريها الأساسي.
+    `disown` نفيُ الاستشاري نسبةَ جهةٍ إليه — مفاتيحه
+    `<الجهة>|<الاسم>` بعد التوحيد. السجلّ قد يتأخّر عن الواقع،
+    وصاحب الشأن أدرى، فطلبات جهةٍ نفاها لا تُحسب عليه. */
+export function ownerMap(
+  entities: EntityLite[],
+  photoOf?: Map<string, string>,
+  disown?: Set<string>,
+): Map<string, Owner> {
   const m = new Map<string, Owner>();
+  const no = (ent: string, who: string) => !!disown?.has(`${nrm(ent)}|${nrm(who)}`);
   for (const e of entities || []) {
     const ours = Array.isArray(e.ours) ? e.ours : [];
     const c = ours.find((x) => (x.role || "أساسي") === "أساسي");
     const name = String(c?.userName || c?.name || "").trim();
     if (!name) continue;
     const who = { name, photo: photoOf?.get(nrm(name)) || "" };
-    m.set(nrm(e.name), who);
-    for (const a of e.aliases || []) if (a) m.set(nrm(a), who);
+    if (!no(e.name, name)) m.set(nrm(e.name), who);
+    for (const a of e.aliases || []) if (a && !no(a, name)) m.set(nrm(a), who);
   }
   return m;
 }

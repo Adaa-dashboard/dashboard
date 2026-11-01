@@ -15124,3 +15124,93 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* مدى ترتيب الاستشاريين — أسبوع · ربع · الكل */
+.cr-span {
+  display: inline-flex;
+  gap: 2px;
+  margin-inline-start: auto;
+  background: var(--g-50);
+  border-radius: 10px;
+  padding: 2px;
+}
+.cr-span button {
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 11px;
+  color: var(--muted);
+  padding: 3px 9px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.cr-span button.on {
+  background: var(--panel);
+  color: var(--gt-900);
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 40, 34, 0.12);
+}
+/* بطاقة الاستشاري تُفتح قائمتها بالضغط */
+.cr-p.clk {
+  cursor: pointer;
+}
+.cr-p.clk:hover {
+  transform: translateY(-2px);
+}
+.cr-tbl tr.cr-late td {
+  color: #a33;
+}
+
+/* جهات بلا استشاري واضح — نفاها استشاريوها */
+.cr-dis .cr-dis-l {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.cr-dis-i {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--panel);
+  border: 1px solid var(--line2);
+  border-radius: 20px;
+  padding: 4px 6px 4px 12px;
+  font-size: 12px;
+}
+.cr-dis-i em {
+  font-style: normal;
+  color: var(--muted);
+  font-size: 11px;
+}
+.cr-dis-i button {
+  border: none;
+  background: var(--g-50);
+  color: var(--muted);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+}
+.cr-dis-i button:hover {
+  background: #fbe6e6;
+  color: #a33;
+}
+/* زرّ «ليست جهتي» داخل سطر التنبيه */
+.bell-no {
+  margin-inline-start: auto;
+  align-self: center;
+  font-size: 10.5px;
+  color: var(--muted);
+  border: 1px dashed var(--line2);
+  border-radius: 20px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+.bell-no:hover {
+  color: #a33;
+  border-color: #e3b7b7;
+  background: #fff5f5;
+}

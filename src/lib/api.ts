@@ -1534,6 +1534,42 @@ export async function apiFetch(path: string, init: Init = {}) {
       return ok({ ok: true, saved: payload.length, closed: gone.length, rounds });
     }
 
+    /* «ليست جهتي» — نفيُ نسبة جهةٍ إلى استشاري */
+    if (p === "/api/cr/disown" && method === "GET") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const { data, error } = await s.from("perf_cr_disown").select("*").order("at", { ascending: false });
+      if (error) return ok({ disown: [], ready: false });
+      return ok({
+        ready: true,
+        disown: (data || []).map((r) => ({
+          id: str(r.id), entity: str(r.entity), user: str(r.user_name), at: str(r.at),
+        })),
+      });
+    }
+    if (p === "/api/cr/disown" && method === "POST") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const entity = str(body.entity);
+      if (!entity) return err("لا جهة", 400);
+      const who = me.name || "";
+      const { error } = await s.from("perf_cr_disown").upsert(
+        { id: `${nrm(entity)}|${nrm(who)}`, entity, user_name: who, note: str(body.note) },
+        { onConflict: "id" },
+      );
+      if (error) return err(error.message, 403);
+      return ok({ ok: true });
+    }
+    if (p === "/api/cr/disown" && method === "DELETE") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const id = q.get("id") || "";
+      if (!id) return err("لا سطر", 400);
+      const { error } = await s.from("perf_cr_disown").delete().eq("id", id);
+      if (error) return err(error.message, 403);
+      return ok({ ok: true });
+    }
+
     /* جولات المراجعة المكتملة — عليها تُحسب نسبة الالتزام */
     if (p === "/api/cr/rounds" && method === "GET") {
       const me = await whoAmI();

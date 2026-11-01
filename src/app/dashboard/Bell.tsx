@@ -41,6 +41,8 @@ export type Alert = {
   days: number | null;
   /** التبويب الذي يفتحه الضغط */
   tab?: string;
+  /** الجهة المالكة — وجودها يُظهر زرّ «ليست جهتي» على التنبيه */
+  entity?: string;
 };
 
 const SEEN_KEY = "adaa_bell_seen";
@@ -180,6 +182,7 @@ export function useBell(meId: string, meName: string, extra: Alert[] = []) {
           .join(" · "),
         days: left,
         tab: "changes",
+        entity: String(c.owner || "").trim(),
       };
     });
     /* الأكثر إلحاحاً أولاً، والبقيّة في سطرٍ واحد — لئلّا تغرق
@@ -289,6 +292,7 @@ export default function Bell({
   markSeen,
   t,
   onGo,
+  onDisown,
 }: {
   alerts: Alert[];
   unread: number;
@@ -296,8 +300,19 @@ export default function Bell({
   t: T;
   /** فتح التبويب الذي يعالج التنبيه */
   onGo?: (tab: string) => void;
+  /** «ليست جهتي» — يُمرَّر اسم الجهة كما ورد في ملف المنصة */
+  onDisown?: (entity: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  /* ما نُفيت نسبته الآن: يختفي تنبيهه فوراً بلا انتظار التحديث */
+  const [gone, setGone] = useState<string[]>([]);
+  const disown = (entity: string) => {
+    if (!entity) return;
+    if (!window.confirm(t(`إيقاف احتساب طلبات «${entity}» عليك؟`, `Stop counting ${entity} for you?`)))
+      return;
+    setGone((g) => [...g, nrm(entity)]);
+    onDisown?.(entity);
+  };
   const wrap = useRef<HTMLDivElement | null>(null);
   const btn = useRef<HTMLButtonElement | null>(null);
 
@@ -351,9 +366,12 @@ export default function Bell({
   /* المجموعات بترتيب أول تنبيهٍ فيها — فالمتأخر يصدّر مجموعته */
   const groups = useMemo(() => {
     const m = new Map<string, Alert[]>();
-    for (const a of alerts) m.set(a.group, [...(m.get(a.group) || []), a]);
+    for (const a of alerts) {
+      if (a.entity && gone.includes(nrm(a.entity))) continue;
+      m.set(a.group, [...(m.get(a.group) || []), a]);
+    }
     return [...m.entries()];
-  }, [alerts]);
+  }, [alerts, gone]);
 
   return (
     <div className="bell" ref={wrap}>
@@ -399,6 +417,29 @@ export default function Bell({
                       <i />
                       <span className="n">{a.title}</span>
                       {a.sub && <em>{a.sub}</em>}
+                      {/* نسبةُ الجهة قد تكون خطأً — والاستشاري أدرى.
+                          نفيُها يوقف احتساب طلباتها عليه ويُظهرها في
+                          صفحة طلبات التغيير جهةً بلا استشاري واضح */}
+                      {a.entity && (
+                        <span
+                          className="bell-no"
+                          role="button"
+                          tabIndex={0}
+                          title={t("لا أراجع هذه الجهة", "Not my entity")}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            disown(a.entity || "");
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.stopPropagation();
+                              disown(a.entity || "");
+                            }
+                          }}
+                        >
+                          {t("ليست جهتي", "Not mine")}
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>
