@@ -68,6 +68,8 @@ const num = (v: unknown): number | null => {
 import { nrm } from "./commit";
 
 const str = (v: unknown): string => (v === null || v === undefined ? "" : String(v).trim());
+/** تاريخٌ صالح بصيغة YYYY-MM-DD في أوّله */
+const isDay = (v: unknown): boolean => /^\d{4}-\d{2}-\d{2}/.test(str(v));
 const newId = () =>
   Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 
@@ -1427,10 +1429,14 @@ export async function apiFetch(path: string, init: Init = {}) {
       const me = await whoAmI();
       if (!me) return err("غير مصرّح", 401);
       const rows: Record<string, unknown>[] = Array.isArray(body.rows) ? body.rows : [];
+      /* `full` = التصدير الكامل مفلتراً على «مركز أداء (مقيم)».
+         خلوّه حالةٌ صحيحة تعني أن قائمة أداء فرغت اليوم، فتُغلق
+         الجولات المفتوحة كلها — بخلاف ملفٍ لم تُقرأ أعمدته */
+      const fullFile = body.full === true;
       const clean: { row: Record<string, unknown>; code: string }[] = rows
         .map((r) => ({ row: r, code: String(r.code ?? "").trim() }))
         .filter((x) => x.code);
-      if (!clean.length) return err("لم يُقرأ أي صف فيه «الرمز» من الملف", 400);
+      if (!clean.length && !fullFile) return err("لم يُقرأ أي صف فيه «الرمز» من الملف", 400);
 
       const today = new Date().toISOString().slice(0, 10);
       const nowISO = new Date().toISOString();
@@ -1454,6 +1460,10 @@ export async function apiFetch(path: string, init: Init = {}) {
         classification: str(r.classification),
         sla_days: num(r.sla),
         work_days: num(r.workDays),
+        /* متى سُلّم الطلب إلى أداء في جولته هذه، وعلى ماذا هو —
+           يُشتقّان من التصدير الكامل، وفارغان مع الملف القديم */
+        arrived_at: isDay(r.arrivedAt) ? String(r.arrivedAt).slice(0, 10) : null,
+        req_kind: str(r.kind),
         status: "open",
         first_seen: firstSeen.get(code) || today,
         last_seen: today,
@@ -1462,7 +1472,16 @@ export async function apiFetch(path: string, init: Init = {}) {
         updated_by: me.name || "",
       }));
 
-      const { error } = await s.from("perf_change_requests").upsert(payload, { onConflict: "code" });
+      let { error } = payload.length
+        ? await s.from("perf_change_requests").upsert(payload, { onConflict: "code" })
+        : { error: null as { message: string } | null };
+      /* العمودان الجديدان (`arrived_at` · `req_kind`) يصلان مع
+         `supabase/perf-cr-rounds.sql`. قبل تشغيله يُرفَع الملف
+         بلا الحقلين بدل أن يفشل الرفع كله */
+      if (error && /arrived_at|req_kind/.test(error.message)) {
+        const bare = payload.map(({ arrived_at: _a, req_kind: _k, ...rest }) => rest);
+        ({ error } = await s.from("perf_change_requests").upsert(bare, { onConflict: "code" }));
+      }
       if (error) return err(error.message, 403);
 
       // ما كان مفتوحاً ولم يعد في الملف ⇒ تمت مراجعته
@@ -1472,13 +1491,73 @@ export async function apiFetch(path: string, init: Init = {}) {
         .eq("status", "open");
       const inFile = new Set(codes);
       const gone = (openRows || []).map((r) => r.code as string).filter((c) => !inFile.has(c));
+      let rounds = 0;
       if (gone.length) {
+        /* **جولة مراجعة اكتملت**: الطلب خرج من قائمة أداء. نسجّلها
+           بصفّها قبل أن يُغلق السجلّ، فالطلب قد يعود بجولةٍ ثانية
+           مدّتها أقصر — والمؤشر يَعُدّ الجولات لا الطلبات. */
+        const { data: left } = await s
+          .from("perf_change_requests")
+          .select("code,program,item_name,owner_entity,classification,req_kind,review_type,sla_days,work_days,arrived_at,first_seen")
+          .in("code", gone);
+        const rows = (left || []).map((c) => {
+          const arrived = String(c.arrived_at || c.first_seen || today).slice(0, 10);
+          const days = c.work_days === null ? null : Number(c.work_days);
+          const sla = c.sla_days === null ? null : Number(c.sla_days);
+          return {
+            id: `${c.code}:${arrived}`,
+            code: String(c.code),
+            program: str(c.program),
+            item_name: str(c.item_name),
+            owner_entity: str(c.owner_entity),
+            axis: str(c.classification),
+            req_kind: str(c.req_kind),
+            review: str(c.review_type),
+            sla_days: sla,
+            work_days: days,
+            on_time: days == null || sla == null ? null : days <= sla,
+            arrived_at: arrived,
+            left_at: today,
+            updated_at: nowISO,
+            updated_by: me.name || "",
+          };
+        });
+        if (rows.length) {
+          const { error: rErr } = await s.from("perf_cr_rounds").upsert(rows, { onConflict: "id" });
+          if (!rErr) rounds = rows.length;
+        }
         await s
           .from("perf_change_requests")
           .update({ status: "closed", closed_at: today, updated_at: nowISO, updated_by: me.name || "" })
           .in("code", gone);
       }
-      return ok({ ok: true, saved: payload.length, closed: gone.length });
+      return ok({ ok: true, saved: payload.length, closed: gone.length, rounds });
+    }
+
+    /* جولات المراجعة المكتملة — عليها تُحسب نسبة الالتزام */
+    if (p === "/api/cr/rounds" && method === "GET") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const { data, error } = await s
+        .from("perf_cr_rounds")
+        .select("*")
+        .order("left_at", { ascending: false })
+        .limit(5000);
+      /* الجدول يصل مع `supabase/perf-cr-rounds.sql` — قبل تشغيله
+         تُعرض الصفحة بلا هذا القسم بدل أن تنكسر */
+      if (error) return ok({ rounds: [], ready: false });
+      return ok({
+        ready: true,
+        rounds: (data || []).map((r) => ({
+          id: str(r.id), code: str(r.code), program: str(r.program),
+          itemName: str(r.item_name), owner: str(r.owner_entity),
+          axis: str(r.axis), kind: str(r.req_kind), review: str(r.review),
+          sla: r.sla_days === null ? null : Number(r.sla_days),
+          days: r.work_days === null ? null : Number(r.work_days),
+          onTime: r.on_time === null ? null : r.on_time === true,
+          arrivedAt: str(r.arrived_at), leftAt: str(r.left_at),
+        })),
+      });
     }
 
     /* ---------------- الملاحظات ---------------- */

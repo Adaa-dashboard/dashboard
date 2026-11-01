@@ -9,6 +9,8 @@ import {
   type CrRow, type CrKind, type CrStat,
 } from "@/lib/crq";
 import { readDelimited, readXlsx } from "@/lib/sheet";
+import { CR_ADAA_STAGE } from "@/lib/crSla";
+import { mapRows } from "@/lib/crImport";
 
 /* ============================================================
    طلبات التغيير الواردة من منصة الرؤية.
@@ -53,16 +55,6 @@ const TONE_COLOR: Record<Tone, string> = {
   done: "#8a9a95",
 };
 
-/* ---------- مطابقة عناوين الأعمدة عربياً ---------- */
-function norm(s: string): string {
-  return s
-    .replace(/[ً-ْـ]/g, "")
-    .replace(/[إأآٱ]/g, "ا")
-    .replace(/ى/g, "ي")
-    .replace(/ة/g, "ه")
-    .replace(/[\s/\\_-]+/g, " ")
-    .trim();
-}
 /** صيغة العدد العربية: طلب واحد · طلبان · ٣-١٠ طلبات · ما زاد طلباً */
 function arReq(n: number): string {
   if (n === 1) return "طلب واحد";
@@ -71,71 +63,36 @@ function arReq(n: number): string {
   return `${n} طلباً`;
 }
 
-function digits(s: string): string {
-  return s.replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)));
-}
-function toNum(s: string): number | null {
-  const v = digits(String(s)).replace(/[^\d.-]/g, "");
-  if (!v) return null;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-}
+/** جولة مراجعة مكتملة عند أداء */
+export type CrRound = {
+  id: string; code: string; owner: string; itemName: string;
+  axis: string; kind: string; review: string;
+  sla: number | null; days: number | null; onTime: boolean | null;
+  arrivedAt: string; leftAt: string;
+};
 
-type Field = keyof Pick<
-  Change,
-  "code" | "program" | "itemCode" | "itemName" | "owner" | "category" | "reviewType" | "classification"
-> | "sla" | "workDays";
+const Q_WORDS = ["الأول", "الثاني", "الثالث", "الرابع"];
+const qOf = (iso: string) => {
+  const m = Number(String(iso || "").slice(5, 7));
+  return m ? `الربع ${Q_WORDS[Math.floor((m - 1) / 3)]} ${String(iso).slice(0, 4)}` : "";
+};
 
-function fieldOf(headRaw: string): Field | null {
-  const h = norm(headRaw);
-  if (!h) return null;
-  if (h.includes("رمز")) return "code";
-  if (h.includes("كود")) return "itemCode";
-  if (h.includes("ايام")) return "workDays";
-  if (h.includes("اتفاقيه") || h.includes("مستوي الخدمه")) return "sla";
-  if (h.includes("جهه")) return "owner";
-  if (h.includes("فئه")) return "category";
-  if (h.includes("نوع")) return "reviewType";
-  if (h.includes("تصنيف")) return "classification";
-  if (h.includes("برنامج") || h.includes("استراتيجيه")) return "program";
-  if (h.includes("اسم")) return "itemName";
-  return null;
-}
-
-type Parsed = { rows: Record<string, string | number | null>[]; skipped: number };
-
-/** يجد صف العناوين ثم يحوّل ما بعده إلى صفوف بأسماء الحقول */
-function mapRows(grid: string[][]): Parsed {
-  let headIdx = -1;
-  let map: (Field | null)[] = [];
-  for (let i = 0; i < Math.min(grid.length, 20); i++) {
-    const m = grid[i].map(fieldOf);
-    if (m.includes("code") && m.filter(Boolean).length >= 4) {
-      headIdx = i;
-      map = m;
-      break;
-    }
+/** تجميع الجولات في أرباع — الأحدث أولاً */
+function roundQuarters(rounds: CrRound[]) {
+  const by = new Map<string, { q: string; n: number; ok: number; days: number }>();
+  for (const r of rounds) {
+    if (r.onTime === null || r.days === null) continue;
+    const q = qOf(r.leftAt);
+    if (!q) continue;
+    const a = by.get(q) || { q, n: 0, ok: 0, days: 0 };
+    a.n++;
+    if (r.onTime) a.ok++;
+    a.days += r.days;
+    by.set(q, a);
   }
-  if (headIdx < 0) return { rows: [], skipped: 0 };
-
-  const rows: Record<string, string | number | null>[] = [];
-  let skipped = 0;
-  for (let i = headIdx + 1; i < grid.length; i++) {
-    const r = grid[i];
-    if (!r.some((c) => c.trim() !== "")) continue;
-    const o: Record<string, string | number | null> = {};
-    map.forEach((f, ci) => {
-      if (!f) return;
-      const v = (r[ci] ?? "").trim();
-      o[f] = f === "sla" || f === "workDays" ? toNum(v) : v;
-    });
-    if (!String(o.code || "").trim()) {
-      skipped++;
-      continue;
-    }
-    rows.push(o);
-  }
-  return { rows, skipped };
+  return [...by.values()]
+    .map((a) => ({ ...a, pct: Math.round((a.ok / a.n) * 100), avg: Math.round((a.days / a.n) * 10) / 10 }))
+    .sort((x, y) => (x.q < y.q ? 1 : -1));
 }
 
 export default function Changes({
@@ -174,6 +131,9 @@ export default function Changes({
      وسجلّ الجهات يقول من نقطة تواصلها من المركز. فلا عمود جديد في
      ملف المنصة ولا إدخال يدوي. */
   const [ownerOf, setOwnerOf] = useState<Map<string, { name: string; photo: string }>>(new Map());
+  /* جولات المراجعة المكتملة: كل مرّة دخل فيها طلبٌ قائمةَ أداء
+     وخرج منها، بمدّتها واتفاقيتها. عليها يُحسب المؤشر. */
+  const [rounds, setRounds] = useState<CrRound[]>([]);
   /* سجلّ الجهات كاملاً — لنافذة مطابقة الأسماء غير المعروفة */
   type Ent = { id: string; name: string; sector?: string };
   const [ents, setEnts] = useState<Ent[]>([]);
@@ -198,6 +158,12 @@ export default function Changes({
     const r = await apiFetch("/api/changes").then((x) => x.json());
     setItems(r.changes || []);
     setLoaded(true);
+    /* الجولات المكتملة — مصدر نسبة الالتزام الحقيقية. تُقرأ بعد
+       الطلبات فلا تؤخّر ظهور الجدول، وغيابها لا يكسر الصفحة */
+    apiFetch("/api/cr/rounds")
+      .then((x) => x.json())
+      .then((d) => setRounds(Array.isArray(d.rounds) ? d.rounds : []))
+      .catch(() => setRounds([]));
   }, []);
 
   /* النِّسب المُدخَلة: أرباعٌ وأشهرٌ وقطاعاتٌ مضت قبل أن تدخل
@@ -306,7 +272,17 @@ export default function Changes({
 
   /* الحسبة في `lib/commit.ts` — يشترك فيها هذا الجدول ومحفظة
      الموظف، فالرقم واحد في المكانين */
-  const tops = useMemo(() => commitStats(items, ownerOf), [items, ownerOf]);
+  /* الترتيب من **الجولات المكتملة** ما إن تتراكم — فهي المقياس
+     الرسمي (مدّة الجولة مقابل اتفاقيتها). وقبلها يُرتَّب بلقطة
+     الطلبات المفتوحة كما كان، فلا تبقى الصفحة بلا ترتيب. */
+  const tops = useMemo(
+    () =>
+      rounds.length
+        ? commitStats(rounds.map((r) => ({ owner: r.owner, sla: r.sla, workDays: r.days })), ownerOf)
+        : commitStats(items, ownerOf),
+    [items, rounds, ownerOf],
+  );
+  const qRows = useMemo(() => roundQuarters(rounds), [rounds]);
 
   const shown = useMemo(() => {
     const open = items.filter((x) => x.status === "open");
@@ -320,20 +296,26 @@ export default function Changes({
   async function send(grid: string[][]) {
     setErr("");
     setMsg("");
-    const { rows, skipped } = mapRows(grid);
-    if (!rows.length) {
+    const { rows, skipped, full, all } = mapRows(grid);
+    if (!rows.length && !all) {
       setErr(
         t(
-          "لم أتعرّف على أعمدة الجدول. تأكدي أن الصف الأول يحمل العناوين: الرمز · الجهة المالكة · اتفاقية مستوى الخدمة · أيام العمل …",
+          "لم أتعرّف على أعمدة الجدول. تأكدي أن الصف الأول يحمل العناوين: الرمز · الجهة المالكة · المرحلة الحالية للطلب · آخر إجراء تم منذ …",
           "Could not recognise the table headers."
         )
       );
       return;
     }
+    /* التصدير الكامل بلا طلبٍ عند أداء حالةٌ صحيحة لا خطأ: تعني
+       أن القائمة خلت، فتُغلق الجولات المفتوحة كلها */
+    const where = full ? t("عند أداء", "at Adaa") : t("في الملف", "in the file");
     const okToGo = window.confirm(
       t(
-        `الملف فيه ${rows.length} طلباً. سيُحدَّث الموجود، ويُضاف الجديد، ويُعدّ ما لم يعد في الملف طلباً تمت مراجعته.\n\nمتابعة؟`,
-        `${rows.length} requests found. Continue?`
+        full
+          ? `قرأت ${all} طلباً، منها ${rows.length} ${CR_ADAA_STAGE} الآن.\n\n` +
+            "سيُحدَّث الموجود، ويُضاف الجديد، وتُغلق جولة كل طلبٍ لم يعد عند أداء.\n\nمتابعة؟"
+          : `الملف فيه ${rows.length} طلباً. سيُحدَّث الموجود، ويُضاف الجديد، ويُعدّ ما لم يعد في الملف طلباً تمت مراجعته.\n\nمتابعة؟`,
+        `${rows.length} requests ${where}. Continue?`
       )
     );
     if (!okToGo) return;
@@ -342,7 +324,7 @@ export default function Changes({
     const r = await apiFetch("/api/changes", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ rows }),
+      body: JSON.stringify({ rows, full }),
     }).then((x) => x.json());
     setBusy(false);
     if (r.error) {
@@ -351,9 +333,10 @@ export default function Changes({
     }
     setMsg(
       t(
-        `حُفظ ${r.saved} طلباً${r.closed ? ` · أُغلق ${r.closed} طلباً تمت مراجعته` : ""}${
-          skipped ? ` · تُخطّي ${skipped} صفاً بلا رمز` : ""
-        }`,
+        `حُفظ ${r.saved} طلباً${full ? ` عند أداء (من ${all} في الملف)` : ""}` +
+          `${r.closed ? ` · أُغلق ${r.closed} طلباً تمت مراجعته` : ""}` +
+          `${r.rounds ? ` · سُجّلت ${r.rounds} جولة مراجعة` : ""}` +
+          `${skipped ? ` · تُخطّي ${skipped} صفاً بلا رمز` : ""}`,
         `Saved ${r.saved}`
       )
     );
@@ -581,12 +564,42 @@ export default function Changes({
         )}
       </div>
 
+      {/* نسبة الالتزام من الجولات المكتملة — معادلة بطاقة المؤشر
+          نفسها: الملتزم ÷ الإجمالي × 100، ربعاً ربعاً. تظهر حين
+          تتراكم جولات، فقبل أول رفعٍ للتصدير الكامل لا شيء تقوله. */}
+      {page && qRows.length > 0 && (
+        <div className="card cr-sla">
+          <div className="card-top">
+            <h3>{t("الالتزام باتفاقيات مستوى الخدمة", "SLA compliance")}</h3>
+            <span className="muted" style={{ fontSize: 11 }}>
+              {t("مدّة كل جولة عند أداء مقابل اتفاقيتها", "Each round at Adaa vs its SLA")}
+            </span>
+          </div>
+          <div className="cr-qs">
+            {qRows.slice(0, 4).map((r) => (
+              <div className="cr-q" key={r.q}>
+                <span className="q">{r.q}</span>
+                <b style={{ color: r.pct >= 90 ? "#1a9d5c" : r.pct >= 70 ? "#e0971a" : "#d34a4a" }}>
+                  {r.pct}%
+                </b>
+                <span className="s">
+                  {t(`${r.ok} من ${r.n} جولة`, `${r.ok} of ${r.n}`)} · {t("متوسط", "avg")} {r.avg}{" "}
+                  {t("يوم عمل", "wd")}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {tops.length > 0 && (
         <div className="card cr-top">
           <div className="card-top">
             <h3>{t("أعلى الاستشاريين التزاماً", "Most on-time consultants")}</h3>
             <span className="muted" style={{ fontSize: 11 }}>
-              {t("إغلاق الطلبات ضمن مدّتها", "Requests closed within SLA")}
+              {rounds.length
+                ? t(`من ${rounds.length} جولة مراجعة مكتملة`, `${rounds.length} completed rounds`)
+                : t("إغلاق الطلبات ضمن مدّتها", "Requests closed within SLA")}
             </span>
           </div>
           <div className="cr-podium">
