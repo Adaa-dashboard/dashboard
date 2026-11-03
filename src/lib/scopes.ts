@@ -206,6 +206,19 @@ export const DEFAULT_SCOPES: Scope[] = ["overview", "tasks", "docs", "entities"]
    يُمنح لحسابٍ من خارج الإدارة يُراد له اطّلاعٌ واسع بلا تحكّم */
 export const ADMIN_ONLY: Scope[] = ["users", "structure", "audit"];
 
+/* كل ما يكتب شيئاً: التحرير بأنواعه، ورفع الملفات، وإدارة
+   الحسابات والهيكل. تُطرح من `ALL_SCOPES` فيبقى اطّلاعٌ كامل
+   بلا قلمٍ واحد — وهو المطلوب لحسابٍ يُراجع المنصة لا يشغّلها.
+   والحارس صلاحياتُ القاعدة نفسها لا إخفاءُ الأزرار. */
+const WRITE_SCOPES: Scope[] = [
+  "weekly:edit", "docs:edit", "entities:edit", "sessions:edit", "natstrat:edit",
+  "inststrat:edit", "outputs:edit", "cx:edit", "projects:edit", "notesq:edit",
+  "opplan:edit", "opplan:mine", "targets", "changes:upload", "users", "structure",
+  "sticky", "announce",
+];
+/** اطّلاعٌ على كل شيء بلا أي تعديل */
+export const READONLY_SCOPES: Scope[] = ALL_SCOPES.filter((k) => !WRITE_SCOPES.includes(k));
+
 export const scopeLabel = (k: string): string =>
   SCOPE_GROUPS.flatMap((g) => g.items).find((i) => i.key === k)?.label || k;
 

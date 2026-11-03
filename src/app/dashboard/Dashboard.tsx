@@ -24,6 +24,7 @@ import {
   ADMIN_ONLY,
   ALL_SCOPES,
   DEFAULT_SCOPES,
+  READONLY_SCOPES,
   PAGE_ROWS,
   type PageRow,
   can as hasScope,
@@ -2640,6 +2641,14 @@ function ScopePicker({
           onClick={() => onChange(ALL_SCOPES.filter((k) => !ADMIN_ONLY.includes(k)))}
         >
           {t("كل شيء عدا الإعدادات", "All but settings")}
+        </button>
+        {/* يرى كل شيء ولا يكتب شيئاً — لحسابٍ يراجع المنصة */}
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={() => onChange([...READONLY_SCOPES])}
+        >
+          {t("اطّلاع فقط", "Read-only")}
         </button>
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => onChange([])}>
           {t("مسح", "None")}
