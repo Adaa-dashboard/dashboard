@@ -202,6 +202,10 @@ export const PAGE_ROWS: { title: string; rows: PageRow[] }[] = [
    والإنجاز الأسبوعي وصفحات الأقسام تُمنح لمن يخصّه */
 export const DEFAULT_SCOPES: Scope[] = ["overview", "tasks", "docs", "entities"];
 
+/* مفاتيح الإدارة: تُستثنى من «كل شيء عدا الإعدادات» — وهو ما
+   يُمنح لحسابٍ من خارج الإدارة يُراد له اطّلاعٌ واسع بلا تحكّم */
+export const ADMIN_ONLY: Scope[] = ["users", "structure", "audit"];
+
 export const scopeLabel = (k: string): string =>
   SCOPE_GROUPS.flatMap((g) => g.items).find((i) => i.key === k)?.label || k;
 

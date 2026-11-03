@@ -13,6 +13,8 @@ type Sector = { id: string; name: string };
 type Person = {
   id: string; name: string; role: string; sectorIds: string[];
   isLead?: boolean; jobTitle?: string;
+  /** حسابٌ من خارج الإدارة — لا يدخل الهيكل */
+  isExternal?: boolean;
 };
 
 export default function Structure({
@@ -34,7 +36,9 @@ export default function Structure({
 
   const load = useCallback(async () => {
     const d = await apiFetch("/api/people").then((r) => r.json());
-    setPeople(d.people || []);
+    /* الحساب الخارجي يدخل المنصة ولا يُعدّ من موظفي الإدارة،
+       فلا موضع له في الهيكل التنظيمي */
+    setPeople((d.people || []).filter((p: Person) => p.isExternal !== true));
     setLoaded(true);
   }, []);
 

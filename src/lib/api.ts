@@ -128,11 +128,16 @@ async function people() {
   // perf_people متاحة لكل مسجَّل — قائمة الأسماء يحتاجها الجميع،
   // بخلاف perf_list_users المحصورة بصلاحية «المستخدمون والصلاحيات»
   const { data } = await sb().rpc("perf_people");
-  return (data || []).map((u: Record<string, unknown>) => ({
+  /* الحسابات الخارجية تُستثنى من قوائم الأشخاص كلها — الهيكل
+     وقوائم الفريق ومنتقي المسؤولين والإشارات. فهي حساباتُ اطّلاع
+     لا موظفون، وإدارتها من شاشة «المستخدمون والصلاحيات» وحدها. */
+  return (data || []).filter((u: Record<string, unknown>) => u.is_external !== true)
+    .map((u: Record<string, unknown>) => ({
     id: String(u.id), name: u.name, username: String(u.username || ""),
     role: u.role, sectorIds: u.sector_ids || [],
     isLead: u.is_lead === true, jobTitle: u.job_title || "",
     photoUrl: String(u.photo_url || ""),
+    isExternal: u.is_external === true,
   }));
 }
 
@@ -424,6 +429,7 @@ export async function apiFetch(path: string, init: Init = {}) {
           role: u.role, sectorIds: u.sector_ids || [], active: u.active,
           hasPassword: u.has_password, scopes: u.scopes || [],
           isLead: u.is_lead === true, jobTitle: u.job_title || "",
+          isExternal: u.is_external === true,
         })),
       });
     }
@@ -435,6 +441,7 @@ export async function apiFetch(path: string, init: Init = {}) {
         p_scopes: Array.isArray(body.scopes) ? body.scopes : null,
         p_is_lead: body.isLead === true,
         p_job_title: typeof body.jobTitle === "string" ? body.jobTitle : null,
+        p_is_external: body.isExternal === true,
       });
       if (error) return err("غير مصرّح", 403);
       if (data?.error === "dup_username") return err("اسم المستخدم مستخدَم مسبقًا", 400);
@@ -468,6 +475,7 @@ export async function apiFetch(path: string, init: Init = {}) {
           p_scopes: Array.isArray(body.scopes) ? body.scopes : null,
           p_is_lead: typeof body.isLead === "boolean" ? body.isLead : null,
           p_job_title: typeof body.jobTitle === "string" ? body.jobTitle : null,
+          p_is_external: typeof body.isExternal === "boolean" ? body.isExternal : null,
         });
         if (error) return err("غير مصرّح", 403);
         if (data?.error === "dup_username") return err("اسم المستخدم مستخدَم مسبقًا", 400);

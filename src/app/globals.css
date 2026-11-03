@@ -15227,3 +15227,16 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
   padding: 1px 6px;
   vertical-align: middle;
 }
+
+/* وسم الحساب الخارجي في جدول المستخدمين */
+.u-ext {
+  display: inline-block;
+  margin-inline-start: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #8a6a06;
+  background: #fcf1dc;
+  border-radius: 20px;
+  padding: 1px 8px;
+  vertical-align: middle;
+}

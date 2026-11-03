@@ -21,6 +21,7 @@ import Assistant, { PinnedBar, usePins } from "./Assistant";
 import Notes from "./Notes";
 import Structure from "./Structure";
 import {
+  ADMIN_ONLY,
   ALL_SCOPES,
   DEFAULT_SCOPES,
   PAGE_ROWS,
@@ -2631,6 +2632,15 @@ function ScopePicker({
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => onChange([...ALL_SCOPES])}>
           {t("الكل", "All")}
         </button>
+        {/* للاطّلاع الواسع بلا مفاتيح الإدارة: الصفحات والأقسام كلها
+            عدا المستخدمين والهيكل وسجل النشاط */}
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={() => onChange(ALL_SCOPES.filter((k) => !ADMIN_ONLY.includes(k)))}
+        >
+          {t("كل شيء عدا الإعدادات", "All but settings")}
+        </button>
         <button type="button" className="btn btn-ghost btn-sm" onClick={() => onChange([])}>
           {t("مسح", "None")}
         </button>
@@ -2694,6 +2704,8 @@ interface UserRow {
   /** مدير القطاع — يظهر أولاً في الهيكل التنظيمي */
   isLead?: boolean;
   jobTitle?: string;
+  /** حسابٌ من خارج الإدارة: يدخل ولا يُعدّ من موظفيها */
+  isExternal?: boolean;
 }
 /** الجوال جاهز للتفعيل: إمّا فارغ (يكتبه صاحبه) أو رقم مكتمل.
     ما بينهما — نصٌّ مثل «لم يُسجَّل» — يمنع التفعيل بلا أن يُفهم سببه. */
@@ -2715,6 +2727,7 @@ function UsersManager({ refData }: { refData: RefData }) {
   const [scopes, setScopes] = useState<string[]>([...DEFAULT_SCOPES]);
   const [isLead, setIsLead] = useState(false);
   const [jobTitle, setJobTitle] = useState("");
+  const [isExternal, setIsExternal] = useState(false);
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
   const [editing, setEditing] = useState<UserRow | null>(null);
@@ -2749,6 +2762,7 @@ function UsersManager({ refData }: { refData: RefData }) {
         scopes,
         isLead,
         jobTitle,
+        isExternal,
       }),
     });
     const d = await res.json();
@@ -2905,6 +2919,19 @@ function UsersManager({ refData }: { refData: RefData }) {
             </div>
           </div>
 
+          <div className="field" style={{ marginTop: 10 }}>
+            <label className="checkbox-inline">
+              <input type="checkbox" checked={isExternal} onChange={(e) => setIsExternal(e.target.checked)} />
+              {t("من خارج الإدارة", "External")}
+            </label>
+            <p className="muted" style={{ margin: "4px 0 0", fontSize: 12 }}>
+              {t(
+                "يدخل بصلاحياته، ولا يُعدّ من موظفي الإدارة: لا يظهر في الهيكل التنظيمي ولا في قوائم الفريق ولا في ترتيب الاستشاريين.",
+                "Signs in, but is not counted as a department employee.",
+              )}
+            </p>
+          </div>
+
           <ScopePicker value={scopes} onChange={setScopes} t={t} />
 
           <button className="btn" style={{ marginTop: 12 }}>
@@ -2955,6 +2982,7 @@ function UsersManager({ refData }: { refData: RefData }) {
                 <td className="u-name">
                   {u.name}
                   {u.isLead && <span className="u-lead">{t("مدير قطاع", "Lead")}</span>}
+                  {u.isExternal && <span className="u-ext">{t("من خارج الإدارة", "External")}</span>}
                   {u.jobTitle && <span className="u-job">{u.jobTitle}</span>}
                 </td>
                 <td dir="ltr" style={{ textAlign: "right" }} data-l={t("اسم المستخدم", "Username")}>
@@ -3043,6 +3071,7 @@ function EditUserModal({
   const [scopes, setScopes] = useState<string[]>(user.scopes || []);
   const [isLead, setIsLead] = useState(user.isLead === true);
   const [jobTitle, setJobTitle] = useState(user.jobTitle || "");
+  const [isExternal, setIsExternal] = useState(user.isExternal === true);
   /* الجوال كان يُكتب عند إنشاء الحساب وحده، فمن نسي كلمته ولا جوال
      له تعذّرت استعادته ولا سبيل لتصحيحه من الواجهة */
   const [phone, setPhone] = useState(user.phone || "");
@@ -3085,6 +3114,7 @@ function EditUserModal({
         scopes,
         isLead,
         jobTitle,
+        isExternal,
         phone,
         password: pw || undefined,
       },
@@ -3143,6 +3173,11 @@ function EditUserModal({
             onChange={(e) => setJobTitle(e.target.value)}
             placeholder={t("مثال: أخصائي قياس أداء", "e.g. Performance Analyst")}
           />
+
+          <label className="checkbox-inline" style={{ marginTop: 10 }}>
+            <input type="checkbox" checked={isExternal} onChange={(e) => setIsExternal(e.target.checked)} />
+            {t("من خارج الإدارة", "External")}
+          </label>
 
           <label>{t("المنصب", "Position")}</label>
           <select
