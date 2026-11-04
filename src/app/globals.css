@@ -15240,3 +15240,38 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
   padding: 1px 8px;
   vertical-align: middle;
 }
+
+/* أرقام مربّعات التقرير قابلة للكتابة — تصحيحٌ عاجل كأعداد الحلقة */
+.wk-sts .st-in {
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  border-bottom: 1px dashed var(--line2);
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.wk-sts .st-in:focus {
+  outline: none;
+  border-bottom-color: var(--g-600);
+}
+.wk-sts .st-pt {
+  display: none;
+}
+.wk-shot .wk-sts .st-in {
+  display: none !important;
+}
+.wk-shot .wk-sts .st-pt {
+  display: inline !important;
+}
+@media print {
+  .wk-sts .st-in {
+    display: none !important;
+  }
+  .wk-sts .st-pt {
+    display: inline !important;
+  }
+}

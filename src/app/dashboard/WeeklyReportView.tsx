@@ -117,6 +117,9 @@ function DomCard({
      تصحيحٌ عاجل يخصّ هذا الأسبوع وحده: ما إن تُحدَّث بيانات الصفحة
      نفسها حتى يعود العدد محسوباً منها (الخانة الفارغة = لا تجاوز) */
   const dnK = (i: number) => `dn:${d.k}:${i}`;
+  /* وأرقام المربّعات كذلك — `st:<المجال>:<المربّع>` */
+  const stK = (i: number) => `st:${d.k}:${i}`;
+  const stOver = (i: number) => (draft[stK(i)] ?? texts[stK(i)] ?? "").trim();
   const dnOver = (i: number) => (draft[dnK(i)] ?? texts[dnK(i)] ?? "").trim();
   const donut = d.donut && {
     ...d.donut,
@@ -147,7 +150,7 @@ function DomCard({
       {d.stats && (
         /* خمسة مربّعات أو أكثر: خطٌّ أصغر وإلا انكسرت العناوين */
         <div className={`wk-sts ${d.stats.length > 4 ? "five" : ""}`}>
-          {d.stats.map((s) => (
+          {d.stats.map((s, i) => (
             <div key={s.label} className={s.big ? "big" : ""}>
               {/* المربّع بلا أيقونة لا يُترك فراغُها: الرقم يرتفع
                   إلى أعلى المربّع فلا تبقى مساحةٌ بيضاء فوقه */}
@@ -156,7 +159,25 @@ function DomCard({
                   <PIcon id={s.icon} size={s.big ? 25 : 21} />
                 </span>
               )}
-              <b className={s.tone}>{s.n}</b>
+              {onTaskText ? (
+                <b className={s.tone}>
+                  <input
+                    className="st-in"
+                    inputMode="numeric"
+                    value={stOver(i) === "" ? String(s.n) : stOver(i)}
+                    onChange={(e) => {
+                      const n = e.target.value.replace(/[^\d]/g, "");
+                      setDraft((x) => ({ ...x, [stK(i)]: n }));
+                      /* ما طابق المحسوب لا يُحفظ تجاوزاً */
+                      onTaskText(stK(i), n === String(s.n) ? "" : n);
+                    }}
+                  />
+                  {/* نصّاً لا حقلاً في الملف المصدَّر */}
+                  <span className="st-pt">{stOver(i) === "" ? s.n : stOver(i)}</span>
+                </b>
+              ) : (
+                <b className={s.tone}>{stOver(i) === "" ? s.n : stOver(i)}</b>
+              )}
               <span>
                 {s.label}
                 {s.sub && <em className="sub">{s.sub}</em>}
