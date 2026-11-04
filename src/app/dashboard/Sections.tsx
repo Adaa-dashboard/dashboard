@@ -3575,7 +3575,10 @@ export function CxPage({ t, canEdit, add, gear }: SecPageProps) {
 /* مراحل المشروع الأربع — الافتراضي حين لا تُكتب مراحلُ المشروع
    صراحةً في بيانه. ويُكتب بدلها ما شاءت الإدارة: سطرٌ لكل مرحلة
    أو مخرج، ونسبته بعد نقطتين («المخرج الثاني:100») */
-const PJ_STAGES = ["التهيئة", "التخطيط", "التنفيذ", "الإغلاق"];
+/* ~~مراحل افتراضية أربع~~ **أُزيلت بطلب المستخدمة**: كانت تُرسم
+   لكل مشروع بلا مخرجاتٍ مكتوبة، فتقول عن مشروعٍ بمخرجٍ واحد إنه
+   أربع مراحل. البديل سطرٌ واحد بالإنجاز الفعلي حتى تُكتب مخرجاته */
+const PJ_ONE = "إنجاز المشروع";
 const PJ_COLORS = ["#0b6b50", "#1b9c74", "#5bb594", "#9ecdbb"];
 
 type PjStage = { name: string; pct: number; done?: number; total?: number; unit?: string };
@@ -3612,12 +3615,8 @@ function pjStages(d: Rec, actual: number): PjStage[] {
         };
       });
   }
-  /* بلا بيانٍ صريح: المراحل الأربع تُملأ من الإنجاز الفعلي —
-     كل مرحلةٍ ربعُ المشروع */
-  return PJ_STAGES.map((name, i) => ({
-    name,
-    pct: Math.max(0, Math.min(100, Math.round((actual - i * 25) * 4))),
-  }));
+  /* بلا مخرجاتٍ مكتوبة: سطرٌ واحد بنسبة الإنجاز الفعلي */
+  return [{ name: PJ_ONE, pct: Math.max(0, Math.min(100, actual)) }];
 }
 
 /** حلقة نسبةٍ واحدة — الإنجاز الفعلي في وسط بطاقة المشروع */
@@ -4781,8 +4780,8 @@ function ItemForm({
                 {outs.length === 0 && (
                   <p className="muted">
                     {t(
-                      "بلا مخرجات تُعرض البطاقة بأربع مراحل افتراضية. أضيفي مخرجاً ليحلّ محلّها.",
-                      "With none, four default stages are shown.",
+                      "بلا مخرجاتٍ مكتوبة يُعرض سطرٌ واحد بنسبة الإنجاز الفعلي. أضيفي مخرجاً ليحلّ محلّه.",
+                      "With none, a single line shows actual progress.",
                     )}
                   </p>
                 )}
