@@ -49,6 +49,10 @@ function dictatable(el: Element | null): el is Field {
   const i = el as HTMLInputElement;
   if (i.disabled || i.readOnly) return false;
   if (i.hasAttribute("data-nomic")) return false;
+  /* حقلٌ للأرقام وإن كان نوعه نصّاً: الإملاء لا يُفيد فيه، وزرّ
+     المايك يغطّي خانةً صغيرة كخانات أعداد التقرير */
+  const im = (i.inputMode || i.getAttribute("inputmode") || "").toLowerCase();
+  if (im === "numeric" || im === "decimal" || im === "tel") return false;
   return !NO_TYPE.has((i.type || "text").toLowerCase());
 }
 
