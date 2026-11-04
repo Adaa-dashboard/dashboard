@@ -4531,7 +4531,51 @@ export function SectionPage({
 /* جدول تحرير مبسّط أسفل الصفحة — لمن يملك «تحرير بيانات هذه الأقسام» */
 
 /* ---------------- نافذة إدخال/تعديل بند ---------------- */
-type Field = { k: string; label: string; kind?: "num" | "text" | "date" | "bool" | "area" | "trk" };
+type Field = {
+  k: string;
+  label: string;
+  kind?: "num" | "text" | "date" | "bool" | "area" | "trk" | "outs";
+};
+
+/* ------------------------------------------------------------
+   مخرجات المشروع — صفٌّ لكل مخرج بمستهدفه وما تحقّق منه.
+   تُخزَّن نصّاً كما كانت (`اسم:محقق/مستهدف وحدة` سطراً لكل مخرج)
+   فتقرؤها البطاقة والتقرير بلا تغيير، وإنما تُحرَّر صفوفاً بدل
+   أن يكتب المستخدم الصيغة بيده. ومن كتب نسبةً مجرّدة (`اسم:60`)
+   يبقى سطره كما هو: المستهدف يُترك فارغاً فيُحفظ نسبةً.
+   ------------------------------------------------------------ */
+export type PjOut = { n: string; d: string; t: string; u: string };
+
+export function parseOuts(raw: unknown): PjOut[] {
+  return txt(raw)
+    .split(/[\n·,،]+/)
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .map((x) => {
+      const i = x.lastIndexOf(":");
+      const val = i > 0 ? x.slice(i + 1).trim() : "";
+      const n = (i > 0 ? x.slice(0, i) : x).trim();
+      const q = val.match(/^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s*(.*)$/);
+      if (q) return { n, d: q[1], t: q[2], u: q[3].trim() };
+      return /^\d+(\.\d+)?\s*%?$/.test(val)
+        ? { n, d: val.replace("%", "").trim(), t: "", u: "" }
+        : { n: x.trim(), d: "", t: "", u: "" };
+    });
+}
+
+export function joinOuts(rows: PjOut[]): string {
+  return rows
+    .filter((r) => r.n.trim() || r.d.trim() || r.t.trim())
+    .map((r) => {
+      const n = r.n.trim() || "مخرج";
+      const d = r.d.trim();
+      const t = r.t.trim();
+      if (!d && !t) return n;
+      if (!t) return `${n}:${d || 0}`;
+      return `${n}:${d || 0}/${t}${r.u.trim() ? " " + r.u.trim() : ""}`;
+    })
+    .join("\n");
+}
 
 const FIELDS: Record<Exclude<SectionKey, "outputs" | "opplan">, Field[]> = {
   /* صفٌّ واحد يصلح للصورتين: عنصرٌ متعثر بمعاييره الأربعة، أو جهةٌ
@@ -4625,11 +4669,8 @@ const FIELDS: Record<Exclude<SectionKey, "outputs" | "opplan">, Field[]> = {
     },
     {
       k: "stages",
-      label:
-        "مراحل المشروع أو مخرجاته — سطر لكل واحد. بعد النقطتين: نسبة " +
-        "(المخرج الثاني:100) أو محقق/مستهدف ووحدته (المخرج الأول:31/60 تقرير) " +
-        "فتُحسب النسبة ويظهر العددان",
-      kind: "area",
+      label: "مخرجات المشروع",
+      kind: "outs",
     },
     { k: "note", label: "أبرز المستجدات (سطر لكل مستجد)", kind: "area" },
   ],
@@ -4658,6 +4699,10 @@ function ItemForm({
   /* محطات الاستراتيجية الوطنية — تُحرَّر من النموذج كما تُحرَّر
      بالضغط على نقاط البطاقة، والقبول الفنّي يُشتقّ منها */
   const [trk, setTrk] = useState<number[]>(() => natTrack(item?.data || {}));
+  /* مخرجات المشروع صفوفاً — تُحفظ نصّاً بالصيغة نفسها */
+  const [outs, setOuts] = useState<PjOut[]>(() =>
+    fields.some((f) => f.kind === "outs") ? parseOuts(item?.data?.stages) : [],
+  );
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const { save } = useItems(section, false);
@@ -4669,6 +4714,7 @@ function ItemForm({
     const data: Rec = { ...form };
     for (const f of fields) if (f.kind === "num") data[f.k] = numOf(data[f.k]);
     if (section === "sessions") data.stages = stages;
+    for (const f of fields) if (f.kind === "outs") data[f.k] = joinOuts(outs);
     if (fields.some((f) => f.kind === "trk")) {
       /* المصفوفة وحدها، وتُمحى المفاتيح المفردة القديمة */
       Object.assign(data, natNoLegacy(data), { track: trk });
@@ -4718,6 +4764,75 @@ function ItemForm({
                     </label>
                   ))}
                 </div>
+              </div>
+            ) : f.kind === "outs" ? (
+              <div key={f.k} className="sx-outs">
+                <div className="hd">
+                  {f.label}
+                  <button
+                    type="button"
+                    className="add"
+                    title={t("إضافة مخرج", "Add output")}
+                    onClick={() => setOuts([...outs, { n: "", d: "", t: "", u: "" }])}
+                  >
+                    +
+                  </button>
+                </div>
+                {outs.length === 0 && (
+                  <p className="muted">
+                    {t(
+                      "بلا مخرجات تُعرض البطاقة بأربع مراحل افتراضية. أضيفي مخرجاً ليحلّ محلّها.",
+                      "With none, four default stages are shown.",
+                    )}
+                  </p>
+                )}
+                {outs.map((o, i) => (
+                  <div className="rw" key={i}>
+                    <input
+                      className="nm"
+                      placeholder={t("اسم المخرج", "Output")}
+                      value={o.n}
+                      onChange={(e) =>
+                        setOuts(outs.map((x, j) => (j === i ? { ...x, n: e.target.value } : x)))
+                      }
+                    />
+                    <input
+                      className="q"
+                      inputMode="decimal"
+                      placeholder={t("المحقق", "Done")}
+                      value={o.d}
+                      onChange={(e) =>
+                        setOuts(outs.map((x, j) => (j === i ? { ...x, d: e.target.value } : x)))
+                      }
+                    />
+                    <span className="sl">/</span>
+                    <input
+                      className="q"
+                      inputMode="decimal"
+                      placeholder={t("المستهدف", "Target")}
+                      value={o.t}
+                      onChange={(e) =>
+                        setOuts(outs.map((x, j) => (j === i ? { ...x, t: e.target.value } : x)))
+                      }
+                    />
+                    <input
+                      className="u"
+                      placeholder={t("الوحدة", "Unit")}
+                      value={o.u}
+                      onChange={(e) =>
+                        setOuts(outs.map((x, j) => (j === i ? { ...x, u: e.target.value } : x)))
+                      }
+                    />
+                    <button
+                      type="button"
+                      className="del"
+                      title={t("حذف", "Delete")}
+                      onClick={() => setOuts(outs.filter((_, j) => j !== i))}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
               </div>
             ) : f.kind === "bool" ? (
               <label key={f.k} className="ck">

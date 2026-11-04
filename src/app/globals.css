@@ -15275,3 +15275,83 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
     display: inline !important;
   }
 }
+
+/* مخرجات المشروع في نموذج البند — صفٌّ لكل مخرج */
+.sx-outs {
+  grid-column: 1 / -1;
+  border: 1px solid var(--line2);
+  border-radius: 12px;
+  padding: 10px 12px 12px;
+}
+.sx-outs .hd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--gt-900);
+  margin-bottom: 8px;
+}
+.sx-outs .hd .add {
+  margin-inline-start: auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--g-600);
+  background: none;
+  color: var(--g-600);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.sx-outs .hd .add:hover {
+  background: var(--g-600);
+  color: #fff;
+}
+.sx-outs .muted {
+  margin: 0;
+  font-size: 11.5px;
+}
+.sx-outs .rw {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.sx-outs .rw .nm {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.sx-outs .rw .q {
+  flex: 0 0 72px;
+  text-align: center;
+}
+.sx-outs .rw .u {
+  flex: 0 0 92px;
+}
+.sx-outs .rw .sl {
+  color: var(--muted);
+}
+.sx-outs .rw .del {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: var(--g-50);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 11px;
+}
+.sx-outs .rw .del:hover {
+  background: #fbe6e6;
+  color: #a33;
+}
+@media (max-width: 620px) {
+  .sx-outs .rw {
+    flex-wrap: wrap;
+  }
+  .sx-outs .rw .nm {
+    flex: 1 1 100%;
+  }
+}
