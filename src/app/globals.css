@@ -15355,3 +15355,21 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
     flex: 1 1 100%;
   }
 }
+
+/* النسخة النصّية لرقم المربّع ترث قياس الرقم لا قياس عنوانه:
+   `.wk-sts span` و`.big span` تُصغّران كل span داخل المربّع،
+   فكان الرقم يخرج في الـPDF بحجم العنوان */
+.wk-sts .st-pt {
+  font: inherit !important;
+  color: inherit !important;
+  margin: 0 !important;
+  display: none;
+}
+.wk-shot .wk-sts .st-pt {
+  display: inline !important;
+}
+@media print {
+  .wk-sts .st-pt {
+    display: inline !important;
+  }
+}

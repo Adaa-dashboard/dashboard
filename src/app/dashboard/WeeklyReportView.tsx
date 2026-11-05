@@ -56,6 +56,18 @@ function crCountsText(r: { crWeek: number }): string {
   return `${w} هذا الأسبوع`;
 }
 
+/** نهاية أسبوع العمل: الخميس. التقرير يقول مدّته كما تُعاش —
+    الأحد إلى الخميس — لا الأسبوع التقويمي المنتهي بالسبت.
+    والمدى المحسوب يبقى سبعة أيام، فعملُ الجمعة أو السبت يُعدّ في
+    أسبوعه ولا يسقط من التقرير. */
+export function workEnd(a: string, b: string): string {
+  if (!a || !b) return b;
+  const d = new Date(`${a}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 4);
+  const thu = d.toISOString().slice(0, 10);
+  return thu <= b ? thu : b;
+}
+
 export function rangeText2(a: string, b: string): string {
   if (!a || !b) return "—";
   return a.slice(0, 7) === b.slice(0, 7)
@@ -624,7 +636,7 @@ export default function WeeklyReportView({
           <div className="wkx-dept">{dept}</div>
           <div className="wkx-dt">
             <PIcon id={cyc ? "cycle" : "calendar"} size={14} />
-            {cyc ? quarterRange(cq) : rangeText2(r.weekStart, r.weekEnd)}
+            {cyc ? quarterRange(cq) : rangeText2(r.weekStart, workEnd(r.weekStart, r.weekEnd))}
           </div>
         </header>
 
