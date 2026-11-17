@@ -15386,7 +15386,9 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
 }
 /* النصّ وحده يَبهت — لا البطاقة، وإلا بهت إطارها وخلفيتها معه */
 .op-it.done > * {
-  opacity: 0.68;
+  /* شفافيةٌ أعمق بطلب صاحبة المنصة: المنجَز يتنحّى عن الصفّ الأول
+     في العرض، ويعود كاملاً بمرور الفأرة لمن أراد قراءته */
+  opacity: 0.45;
   transition: opacity 0.12s;
 }
 .op-it.done:hover > * {
