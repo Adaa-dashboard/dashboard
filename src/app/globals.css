@@ -15388,8 +15388,18 @@ select.qsel:hover { border-color: color-mix(in srgb, var(--g-700) 35%, var(--lin
 .op-it.done > * {
   /* شفافيةٌ أعمق بطلب صاحبة المنصة: المنجَز يتنحّى عن الصفّ الأول
      في العرض، ويعود كاملاً بمرور الفأرة لمن أراد قراءته */
-  opacity: 0.45;
+  opacity: 0.32;
   transition: opacity 0.12s;
+}
+/* وكلامه رماديٌّ كذلك: الشفافية وحدها تُبقي الأسود أسود فيزاحم
+   ما هو قائمٌ بعدُ في صفّ النظر */
+.op-it.done,
+.op-it.done .t,
+.op-it.done .mt em b,
+.op-it.done .op-dt b,
+.op-it.done .op-nt,
+.op-it.done .yt b {
+  color: var(--muted);
 }
 .op-it.done:hover > * {
   opacity: 1;

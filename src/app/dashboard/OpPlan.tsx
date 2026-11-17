@@ -645,7 +645,13 @@ export default function OpPlan({
   const isMine = (d: Rec) => canMine && !canEdit && !!meName && opRoles(d, meName).length > 0;
 
   const shown = own ? rows.filter((r) => txt(r.data.owner) === own) : rows;
-  const of = (k: string) => shown.filter((r) => txt(r.data.kind) === k);
+  /* المكتمل في ذيل العمود: العرض يبدأ بما هو قائمٌ ويُسأل عنه،
+     والمنجَز يُقرأ آخراً. والترتيب مستقرّ فما سواه يبقى بترتيبه */
+  const of = (k: string) =>
+    shown
+      .filter((r) => txt(r.data.kind) === k)
+      .slice()
+      .sort((a, b) => Number(opStatus(a.data) === "مكتملة") - Number(opStatus(b.data) === "مكتملة"));
   const cnt = (o: string, k: string) => (byOwner[o] || []).filter((r) => txt(r.data.kind) === k).length;
 
   if (!loaded) return <div className="empty">{t("جارٍ التحميل...", "Loading...")}</div>;
@@ -1415,7 +1421,11 @@ export function OpPlanCard({ t }: { t: T }) {
   const rows = useMemo(() => items.map((x) => opFix(x.data as Rec)), [items]);
   if (!loaded || !rows.length) return null;
 
-  const of = (k: string) => rows.filter((d) => txt(d.kind) === k);
+  const of = (k: string) =>
+    rows
+      .filter((d) => txt(d.kind) === k)
+      .slice()
+      .sort((a, b) => Number(opStatus(a) === "مكتملة") - Number(opStatus(b) === "مكتملة"));
 
   return (
     /* العنوان و«المزيد من التفاصيل» في رأس القسم بنظرة عامة — كبقيّة
