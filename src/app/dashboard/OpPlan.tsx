@@ -1015,7 +1015,9 @@ function OpCard({
   const unit = txt(d.unit) === "عدد" ? "" : "٪";
 
   return (
-    <div className={`op-it ${ok === false ? "off" : ""}`}>
+    /* البند المكتمل يُميَّز بالبطاقة كلها لا بالشارة وحدها: عند
+       العرض كان يُقرأ كأنه قائمٌ بعدُ، فيُسأل عنه ويُشرح كل مرة */
+    <div className={`op-it ${ok === false ? "off" : ""} ${st === "مكتملة" ? "done" : ""}`}>
       <span className="t">{txt(d.name)}</span>
       <div className="mt">
         <em>
