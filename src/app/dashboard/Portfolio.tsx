@@ -2934,11 +2934,13 @@ function CrBox({
   all?: CrRow[];
   /** رموز ما أُسند إليّ — يحمل ✕ لفكّه */
   mineCodes?: Set<string>;
-  onAdd?: (code: string) => void;
+  /** يُرجع نصّ الخطأ إن تعذّر الحفظ — وإلا سلسلةً فارغة */
+  onAdd?: (code: string) => Promise<string>;
   onDrop?: (code: string) => void;
 }) {
   const [pick, setPick] = useState(false);
   const [q, setQ] = useState("");
+  const [err, setErr] = useState("");
   const found = useMemo(() => {
     const s = nrm(q);
     if (!s || !all) return [];
@@ -2997,6 +2999,7 @@ function CrBox({
             placeholder={t("ابحثي بالرمز أو باسم البند أو الجهة…", "Search by code, item or entity…")}
             onChange={(e) => setQ(e.target.value)}
           />
+          {err && <div className="alert alert-error sm">{err}</div>}
           {q.trim() && !found.length && (
             <div className="pf-none sm">{t("لا نتائج", "No matches")}</div>
           )}
@@ -3004,8 +3007,13 @@ function CrBox({
             <button
               key={c.code}
               className="cr-pk"
-              onClick={() => {
-                onAdd(String(c.code));
+              onClick={async () => {
+                const e = await onAdd(String(c.code));
+                if (e) {
+                  setErr(e);
+                  return;
+                }
+                setErr("");
                 setQ("");
                 setPick(false);
               }}
@@ -6802,12 +6810,22 @@ export default function Portfolio({
             all={myChangesAll}
             mineCodes={new Set([...crMine.keys()].filter((k) => crMine.get(k) === nrm(me.name)))}
             onAdd={async (code) => {
-              await apiFetch("/api/cr/mine", {
+              /* الفشل يُقال لا يُبتلع: الجدول قد لا يكون منصَّباً بعد،
+                 فكان الضغط لا يفعل شيئاً بلا سبب ظاهر */
+              const r = await apiFetch("/api/cr/mine", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ code }),
-              }).catch(() => undefined);
+              }).catch(() => null);
+              if (!r || !r.ok) {
+                const d = r ? await r.json().catch(() => ({})) : {};
+                return (
+                  (d as { error?: string }).error ||
+                  t("تعذّر الحفظ — تأكدي من تنصيب جدول الإسناد", "Could not save")
+                );
+              }
               await loadCrMine();
+              return "";
             }}
             onDrop={async (code) => {
               await apiFetch(`/api/cr/mine?code=${encodeURIComponent(code)}`, { method: "DELETE" })
