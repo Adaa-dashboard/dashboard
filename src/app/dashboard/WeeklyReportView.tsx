@@ -173,13 +173,11 @@ function DomCard({
         <div className={`wk-sts ${d.stats.length > 4 ? "five" : ""}`}>
           {d.stats.map((s, i) => (
             <div key={s.label} className={s.big ? "big" : ""}>
-              {/* المربّع بلا أيقونة لا يُترك فراغُها: الرقم يرتفع
-                  إلى أعلى المربّع فلا تبقى مساحةٌ بيضاء فوقه */}
-              {s.icon && (
-                <span className={`wk-ci ${s.tone}`}>
-                  <PIcon id={s.icon} size={s.big ? 25 : 21} />
-                </span>
-              )}
+              {/* صفّ الأيقونة يُرسم دائماً ولو خلا منها: هو ما
+                  يُنزل الأرقام كلَّها في مستوى واحد */}
+              <span className={`wk-ci ${s.tone}`}>
+                {s.icon ? <PIcon id={s.icon} size={21} /> : null}
+              </span>
               {onTaskText && !s.fixed ? (
                 <b className={s.tone}>
                   <input

@@ -2767,39 +2767,43 @@ table.matrix thead th {
   color: var(--muted);
   margin-top: 1px;
 }
+/* المربّع الأبرز: أعرضُ قليلاً وعنوانه أغمق — **ورقمه بحجم
+   إخوته**: الحجمان المختلفان كانا يُنزلان الأرقام في مستويين
+   فيبدو الصفّ مبعثراً، بطلب صاحبة المنصة */
 .wk-sts > div.big {
-  /* أعرضُ قليلاً: عنوانه أطول من إخوته فلا ينكسر ثلاثة أسطر */
   flex: 1.4;
-  /* الفراغ فوق الرقم مقدَّرٌ ليستوي عنوانه مع عناوين إخوته:
-     عندهم أيقونة ٢١ + هامش ٦ ثم رقمٌ ٢١، وعنده رقمٌ ٢٧ بلا
-     أيقونة — فالفرق ٢١ بكسل */
-  padding-top: 21px;
-}
-.wk-sts > div.big b {
-  font-size: 27px;
 }
 .wk-sts > div.big span {
-  font-size: 11px;
   color: var(--gt-700);
   font-weight: 700;
 }
+/* **ثلاثة صفوف ثابتة في كل مربّع**: الأيقونة ثم الرقم ثم العنوان.
+   فتستوي الأرقام في مستوى واحد وتبدأ العناوين تحتها في مستوى
+   واحد — ولو غابت الأيقونة أو طال عنوانٌ سطرين وآخر ثلاثة.
+   وصفّ الأيقونة يبقى محجوزاً فارغاً لمن لا أيقونة له */
 .wk-sts > div {
   flex: 1;
   text-align: center;
   padding: 2px 4px;
   border-inline-start: 1px solid var(--line2);
+  display: grid;
+  grid-template-rows: 22px auto 1fr;
+  justify-items: center;
+  align-content: start;
 }
 .wk-sts > div:last-child {
   border-inline-start: none;
 }
 .wk-sts .wk-ci {
-  margin: 0 auto 6px;
+  margin: 0;
+  height: 22px;
 }
 .wk-sts b {
   display: block;
   font-family: "Noto Kufi Arabic", sans-serif;
-  font-size: 21px;
-  line-height: 1;
+  font-size: 22px;
+  line-height: 1.1;
+  margin-top: 4px;
   color: var(--gt-900);
   font-variant-numeric: tabular-nums;
 }
@@ -2817,8 +2821,9 @@ table.matrix thead th {
 .wk-sts span {
   display: block;
   font-size: 10.5px;
+  line-height: 1.5;
   color: var(--ink-2);
-  margin-top: 3px;
+  margin-top: 5px;
 }
 
 /* جدول التكليفات — العناوين فوق والتحديث تحتها */
