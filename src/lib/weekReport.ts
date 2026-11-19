@@ -461,7 +461,22 @@ export function cxTarget(items: ItemLite[]): number {
     تقرير بنتائج    = صدر تقريرٌ معتمد في ربعٍ ما ومعه مؤشر رضا
     تقرير بلا نتائج = صدر التقرير ولم يُسجَّل له مؤشر رضا في أيّ ربع
     والأخيرتان تقسمان «صدر له تقرير» قسمين لا ثالث لهما. */
-function cxStats(items: ItemLite[]): Stat[] {
+const Q_AR = ["الأول", "الثاني", "الثالث", "الرابع"];
+/** الربع الذي صدرت عنه تقارير الرضا: **آخر ربعٍ اكتمل** قبل تاريخ
+    التقرير — فالتقارير تصدر بعد انتهاء الربع لا في أثنائه.
+    محسوبٌ من التاريخ لا مكتوباً، وإلا بقي العنوان على ربعه الأول
+    كما بقي «الربع الثاني» ربعاً كاملاً بعد انقضائه. */
+export function cxRepQText(iso: string): string {
+  const d = new Date(`${day(iso) || new Date().toISOString().slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return "";
+  let q = Math.floor(d.getUTCMonth() / 3);
+  let y = d.getUTCFullYear();
+  /* في الربع الأول لا ربعَ مكتملاً في سنته، فالمكتمل رابعُ ما قبلها */
+  if (q === 0) { q = 4; y -= 1; }
+  return `للربع ${Q_AR[q - 1]} ${y}م`;
+}
+
+function cxStats(items: ItemLite[], asOf: string): Stat[] {
   const rows = items.filter((it) => it.id !== "cx-meta");
   const ok = (v: unknown) => txt(v) === CX_OK;
   let prep = 0, plan = 0, repRes = 0, repNo = 0;
@@ -477,7 +492,7 @@ function cxStats(items: ItemLite[]): Stat[] {
       else repNo++;
     }
   }
-  /* عدد تقارير الربع الثاني — من صفّ الإعدادات `cx-meta` (الحقل
+  /* عدد تقارير الربع — من صفّ الإعدادات `cx-meta` (الحقل
      `repQ2`) فيُغيَّر من صفحة القسم بلا تعديل برمجي، وإلا ٦٠ وهو
      المعتمد الآن. بيانات مؤشر الرضا في الملف ناقصة، فالعدّ منها
      (repRes + repNo) لا يُعتمد بعد — وهو محسوبٌ أعلاه وجاهز */
@@ -499,7 +514,7 @@ function cxStats(items: ItemLite[]): Stat[] {
     {
       n: repQ2,
       label: "صدرت لها تقارير الرضا",
-      sub: "للربع الثاني 2026م",
+      sub: cxRepQText(asOf),
       tone: "ok",
       icon: "report",
     },
@@ -778,7 +793,7 @@ export function buildWeekReport(args: {
       updates: cx.length || cxT.length,
       /* المربّعات وحدها — لا حلقة ولا قائمة أسماء تحتها، بطلب
          المستخدمة: الأعداد تقول ما تقوله الحلقة وزيادة */
-      stats: cxStats(sec("cx")),
+      stats: cxStats(sec("cx"), b),
       upsOnly: true,
       lines,
     });

@@ -228,12 +228,52 @@ export default function WeeklyPanel({
     [prefs, week],
   );
 
+  /* أرقام المربّعات والحلقات (`st:` و`dn:`) — تُحفظ في **الافتراضي**
+     لا في استثناء الأسبوع: الرقم المكتوب تصحيحٌ يقوله التقرير كل
+     أسبوع حتى تلحق به بيانات الصفحة، فلو حُفظ لأسبوعٍ بعينه لعاد
+     الرقم القديم في الأسبوع التالي — بطلب صاحبة المنصة.
+     وأيُّ استثناءٍ أسبوعيٍّ قديم لنفس المفتاح يُرفع، وإلا غلب
+     الدائمَ فبقي الرقم الأول ظاهراً رغم تغييره. */
+  const saveLasting = useCallback(
+    async (key: string, text: string) => {
+      const b = mergePrefs(base, null);
+      const nb: WeeklyPrefs = { ...b, texts: { ...b.texts, [key]: text } };
+      setBase(nb);
+      const o = (over || null) as { texts?: Record<string, string> } | null;
+      const hadWeek = !!(o && o.texts && key in o.texts);
+      let nw: unknown = null;
+      if (hadWeek) {
+        const texts = { ...(o!.texts as Record<string, string>) };
+        delete texts[key];
+        nw = { ...(o as object), texts };
+        setOver(nw);
+      }
+      const put = (scope: "default" | "week", prefs: unknown) =>
+        apiFetch("/api/weekly", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ scope, week, prefs }),
+        })
+          .then((x) => x.json())
+          .catch(() => ({ error: "تعذّر الحفظ" }));
+      const r = await put("default", nb);
+      if (hadWeek) await put("week", nw);
+      setMsg(r?.error ? String(r.error) : t("حُفظ — ويتكرر كل أسبوع ✓", "Saved for every week ✓"));
+    },
+    [base, over, week, t],
+  );
+
   /* خانتا «التحديث» و«الدعم المطلوب» في جدول التكاليف — تُكتبان
      في مكانهما وتُحفظان لهذا الأسبوع وحده. التحديث المكتوب هنا
      يغلب المنقولَ من صفحة التكاليف، وإفراغُه يُرجع المنقول.
      و«الدعم المطلوب» العام في آخر التقرير شيءٌ آخر يُكتب من ⚙️ */
   const saveTaskText = useCallback(
     async (key: string, text: string) => {
+      /* الأرقام المكتوبة فوق المحسوب تبقى أسبوعاً بعد أسبوع —
+         إلا مربّعات التكاليف (`st:task:`): أعدادُ هذا الأسبوع نفسه،
+         فتثبيتها يُجمّد التقرير على حالٍ مضت */
+      if ((key.startsWith("st:") || key.startsWith("dn:")) && !key.startsWith("st:task:"))
+        return saveLasting(key, text);
       if ((prefs.texts?.[key] || "") === text) return;
       const next: WeeklyPrefs = { ...prefs, texts: { ...prefs.texts, [key]: text } };
       setOver(next);
@@ -252,7 +292,7 @@ export default function WeeklyPanel({
             : t("حُفظ الدعم المطلوب ✓", "Saved ✓"),
       );
     },
-    [prefs, week, t],
+    [prefs, week, t, saveLasting],
   );
 
   /* أرقام دورة القياس — تُحفظ في **الافتراضي** لا في استثناء
