@@ -1969,7 +1969,8 @@ export async function apiFetch(path: string, init: Init = {}) {
          الصفحة. والبوّابة واحدةٌ هنا لا شروطٌ متفرّقة في كل مُنتج.
          ============================================================ */
       const OV_SECTIONS = new Set([
-        "natstrat", "inststrat", "cx", "projects", "changes", "opplan", "outputs", "assignments",
+        "natstrat", "inststrat", "cx", "projects", "changes", "opplan", "outputs",
+        "assignments", "sessions",
       ]);
       const onOverview = (x: Item) => {
         /* المهام الشخصية وصفحتها ليستا في نظرة عامة */
@@ -1980,8 +1981,11 @@ export async function apiFetch(path: string, init: Init = {}) {
         if (x.kind === "sticky") return x.section === "overview" || OV_SECTIONS.has(x.section || "");
         /* بند قسم: إن كان قسمه معروضاً في الصفحة */
         if (x.kind === "section") return OV_SECTIONS.has(x.section || "");
-        /* المؤشرات ومستهدفاتها وتعليقاتها وطلبات التغيير والتكاليف */
-        return ["measurement", "target", "note", "change", "assignment"].includes(x.kind);
+        /* **بنود الصفحة وحدها** — بطلب صاحبة المنصة: طلبات التغيير
+           والتكاليف. وما كان من صفحة «المؤشرات التفصيلية» (قياسٌ
+           أو مستهدفٌ أو تعليقٌ على مؤشر) لا يصل هذا الصندوق: هو
+           عملُ تلك الصفحة، وكان يغرق تحديثات الأقسام بكثرته */
+        return ["change", "assignment"].includes(x.kind);
       };
       const shown = items.filter(onOverview);
       shown.sort((a, b) => (b.at || "").localeCompare(a.at || ""));
