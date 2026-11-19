@@ -205,6 +205,7 @@ export default function WeeklyPanel({
         on: prefs.on,
         next: listOf(prefs.texts?.next || ""),
         pdashPct: pdPct,
+        nums: prefs.texts,
       }),
     [week, weekEnd, log, logPrev, changes, tasks, contacts, items, prefs.on, prefs.texts, pdPct],
   );

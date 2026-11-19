@@ -117,6 +117,7 @@ function Shared() {
           on: p.on,
           next: listOf(p.texts?.next || ""),
           pdashPct: pd ? pd.pct : null,
+          nums: p.texts,
         }),
       );
       setState("ready");

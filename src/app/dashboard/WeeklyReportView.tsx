@@ -31,6 +31,7 @@ const DOM_ICON: Record<string, string> = {
   task: "clipboard",
   nat: "bank",
   inst: "building",
+  out: "line",
   ses: "bars",
   cx: "users",
   proj: "gantt",
@@ -172,7 +173,7 @@ function DomCard({
                   <PIcon id={s.icon} size={s.big ? 25 : 21} />
                 </span>
               )}
-              {onTaskText ? (
+              {onTaskText && !s.fixed ? (
                 <b className={s.tone}>
                   <input
                     className="st-in"
@@ -187,9 +188,15 @@ function DomCard({
                   />
                   {/* نصّاً لا حقلاً في الملف المصدَّر */}
                   <span className="st-pt">{stOver(i) === "" ? s.n : stOver(i)}</span>
+                  {s.suffix}
                 </b>
               ) : (
-                <b className={s.tone}>{stOver(i) === "" ? s.n : stOver(i)}</b>
+                /* المحسوب (`fixed`) نصٌّ لا خانة: النسبة تتبع
+                   مربّعيها، فلا تُكتب فوقهما */
+                <b className={s.tone}>
+                  {stOver(i) === "" || s.fixed ? s.n : stOver(i)}
+                  {s.suffix}
+                </b>
               )}
               <span>
                 {s.label}

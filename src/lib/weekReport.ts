@@ -90,6 +90,11 @@ export type Stat = {
   /** مربّعٌ أبرز من إخوته — الرقم أكبر، كالمستهدف الذي تُنسب إليه
       بقيةُ الأعداد */
   big?: boolean;
+  /** ما يلحق الرقم — «%» مثلاً. يُكتب نصّاً بعده فلا يدخل الخانة */
+  suffix?: string;
+  /** رقمٌ محسوبٌ لا يُكتب: لا خانة تحرير فوقه. النسبةُ تُشتقّ من
+      مربّعين قبلها، فتحريرها يجعلها تكذب عليهما */
+  fixed?: boolean;
 };
 export type Line = { name: string; detail?: string; id?: string };
 /** بندٌ تقدّم هذا الأسبوع — لونه لون شريحته في الحلقة */
@@ -158,7 +163,7 @@ export type WeekReport = {
 };
 
 /** مفاتيح المجالات — هي نفسها مفاتيح التفضيلات، فلا قائمتان تفترقان */
-export const DOM_KEYS = ["task", "nat", "inst", "ses", "cx", "proj"] as const;
+export const DOM_KEYS = ["task", "nat", "inst", "out", "ses", "cx", "proj"] as const;
 export type DomKey = (typeof DOM_KEYS)[number];
 
 /* الأيقونة ليست هنا: الواجهة ترسمها بأيقونات المنصة نفسها
@@ -167,6 +172,7 @@ export const DOM_META: Record<DomKey, { title: string }> = {
   task: { title: "حالة التكليفات" },
   nat: { title: "الاستراتيجيات الوطنية" },
   inst: { title: "الاستراتيجيات المؤسسية" },
+  out: { title: "المخرجات الوطنية" },
   ses: { title: "جلسات مراجعة الأداء" },
   cx: { title: "أعمال قياس تجربة المستفيد" },
   proj: { title: "حالة المشاريع الاستراتيجية" },
@@ -663,6 +669,34 @@ function withUps<T extends { slices: Slice[] }>(donut: T, count: Record<string, 
   };
 }
 
+/** بطاقة «المخرجات الوطنية» — ثلاثة مربّعات: عدد المؤشرات،
+    والقابل منها للقياس، ونسبة القابلية **محسوبةً** من الاثنين.
+    المفاتيح `st:out:0` و`st:out:1` هي نفسها مفاتيح خانات التحرير
+    في العرض، فما يُكتب في المربّع هو ما يُقرأ هنا. */
+export function outDom(nums: Record<string, string>): Dom | null {
+  const of = (k: string) => {
+    const v = txt(nums[k]).replace(/[^\d]/g, "");
+    return v === "" ? 0 : Number(v);
+  };
+  const tot = of("st:out:0");
+  const ok = of("st:out:1");
+  if (tot <= 0 && ok <= 0) return null;
+  const pct = tot > 0 ? Math.round((Math.min(ok, tot) / tot) * 100) : 0;
+  return {
+    k: "out",
+    ...DOM_META.out,
+    updates: 0,
+    stats: [
+      /* الرقمان يُكتبان، و`n` صفرٌ عمداً: العرض يقارن المكتوب به
+         ليعرف أهو تجاوزٌ أم لا، فلو وضعنا المكتوب نفسه لمُحي
+         بمجرّد إعادة كتابته كما هو. والمعروض هو المكتوب دائماً */
+      { n: 0, label: "مؤشرات المخرجات الوطنية", tone: "ok", big: true },
+      { n: 0, label: "قابلة للقياس", tone: "ok", icon: "check" },
+      { n: pct, suffix: "%", fixed: true, label: "نسبة قابلية القياس", tone: "ok", icon: "gauge" },
+    ],
+  };
+}
+
 /* ---------------- البناء ---------------- */
 export function buildWeekReport(args: {
   weekStart: string;
@@ -680,6 +714,9 @@ export function buildWeekReport(args: {
   next?: string[];
   /** نسبة لوحة متابعة المشروع للمشروع المربوط بها */
   pdashPct?: number | null;
+  /** الأرقام المكتوبة في التقرير (`texts`) — منها بطاقة المخرجات
+      الوطنية، فهي وحدها بلا مصدرٍ في المنصة */
+  nums?: Record<string, string>;
 }): WeekReport {
   const { weekStart: a, weekEnd: b } = args;
   const ach = achFromLog(args.log);
@@ -764,6 +801,13 @@ export function buildWeekReport(args: {
       lines,
     });
   }
+
+  /* ٣.٥) المخرجات الوطنية — **أرقامٌ تُكتب في التقرير نفسه**:
+     صفحة القسم في المنصة قيد الإعداد ولا بنود فيها، فلا مصدر
+     يُقرأ منه. والمكتوب يُحفظ في الافتراضي فيتكرر كل أسبوع حتى
+     يُغيَّر، ومتى بُنيت الصفحة قُرئت منها بدل الكتابة.
+     ولا تُطبع البطاقة ما لم يُكتب عددٌ — فالصفر لا يقول شيئاً. */
+  add(outDom(args.nums || {}));
 
   /* ٤) جلسات مراجعة الأداء */
   const sesA = domAch("ses");
