@@ -6834,6 +6834,10 @@ export default function Portfolio({
             }}
           />
         )}
+        {/* **طلبات التغيير بلا جدولٍ يدوي**: مصدرها ملف منصة الرؤية
+            اليومي، فجدولُ الإدخال تحتها كان فارغاً أبداً ويدعو إلى
+            كتابةٍ تُخالف المصدر. والإسناد يُضاف من «+ إضافة طلب» */}
+        {k !== "changes" && (
         <SectionTable
         section={base}
         sectionKey={sec}
@@ -6857,6 +6861,7 @@ export default function Portfolio({
         onImport={() => setImp(sec)}
         onCols={(next) => setCols(sec, next)}
       />
+        )}
       </>
     );
   }
