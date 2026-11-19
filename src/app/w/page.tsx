@@ -8,6 +8,7 @@ import { ensureAnon, sb } from "@/lib/supa";
 import { mergePrefs, type WeeklyPrefs } from "@/lib/weeklyPrefs";
 import type { ChangeLite, ContactLite, LogRow, TaskLite } from "@/lib/achievements";
 import { buildWeekReport, type ItemLite, type WeekReport } from "@/lib/weekReport";
+import { loadProjectOutputs } from "@/lib/pdash";
 import { listOf } from "@/lib/weeklyPrefs";
 import WeeklyReportView from "@/app/dashboard/WeeklyReportView";
 
@@ -104,12 +105,18 @@ function Shared() {
         });
       }
 
+      /* نسبة لوحة متابعة المشروع — كما تقرؤها صفحة المشاريع
+         والتقرير في المنصة، فالنسخة المشتركة لا تتخلّف عنهما.
+         دالّتها مصرّحٌ بها لـ anon وتُرجع أعداداً مجمّعة لا غير */
+      const pd = await loadProjectOutputs().catch(() => null);
+
       setPrefs(p);
       setReport(
         buildWeekReport({
           weekStart, weekEnd, log, changes, tasks, contacts, items,
           on: p.on,
           next: listOf(p.texts?.next || ""),
+          pdashPct: pd ? pd.pct : null,
         }),
       );
       setState("ready");

@@ -376,11 +376,24 @@ function arDays(n: number): string {
 /* ---------------- المشاريع ---------------- */
 /** كل المشاريع بأشرطتها — الحالة الآن، ويُذكر فوقها ما تقدّم منها
     هذا الأسبوع إن وُجد */
-function projDom(items: ItemLite[], moved: Ach[], touched: Line[]): Dom | null {
+/** مشروعٌ مربوطٌ بلوحة متابعته: نسبته تُقرأ منها لا من الحقل
+    المكتوب — كما في صفحة المشاريع تماماً */
+const isPdash = (d: Rec) => /^(نعم|yes|y|1|true)$/i.test(txt(d.pdash).trim());
+
+function projDom(
+  items: ItemLite[],
+  moved: Ach[],
+  touched: Line[],
+  /** نسبة لوحة متابعة المشروع — `null` إن تعذّرت قراءتها */
+  pdashPct?: number | null,
+): Dom | null {
   if (!items.length && !moved.length) return null;
   const bars: Bar[] = items
     .map((it) => {
-      const actual = num(it.data.actual);
+      /* **النسبة الحيّة تسبق المكتوبة**: الصفحة تقرؤها من اللوحة،
+         فكان التقرير يعرض رقماً أقدم منها ويبدو أنه لا يتحدّث */
+      const actual =
+        isPdash(it.data) && pdashPct != null ? pdashPct : num(it.data.actual);
       const planned = num(it.data.planned);
       return {
         name: txt(it.data.name),
@@ -650,6 +663,8 @@ export function buildWeekReport(args: {
   on: Record<string, boolean>;
   /** الخطوات القادمة — سطرٌ لكل خطوة */
   next?: string[];
+  /** نسبة لوحة متابعة المشروع للمشروع المربوط بها */
+  pdashPct?: number | null;
 }): WeekReport {
   const { weekStart: a, weekEnd: b } = args;
   const ach = achFromLog(args.log);
@@ -770,7 +785,7 @@ export function buildWeekReport(args: {
   }
 
   /* ٦) المشاريع */
-  add(projDom(sec("projects"), of("proj"), tch("projects")));
+  add(projDom(sec("projects"), of("proj"), tch("projects"), args.pdashPct));
 
   /* طلبات التغيير **بلا بطاقة**: نسبتها وأعدادها في شريط الملخّص
      أعلى الصفحة وحده — بطلب المستخدمة، فلا تتكرر المعلومة */

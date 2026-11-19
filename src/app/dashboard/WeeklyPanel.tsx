@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import WeeklyReportView, { arDate2 } from "./WeeklyReportView";
 import WeeklyCustomize from "./WeeklyCustomize";
 import { weekStartOf, shiftDays } from "@/lib/weeklyReport";
+import { loadProjectOutputs } from "@/lib/pdash";
 import { mergePrefs, type WeeklyPrefs } from "@/lib/weeklyPrefs";
 import type { ChangeLite, ContactLite, LogRow, TaskLite } from "@/lib/achievements";
 import { buildWeekReport, type ItemLite, type WeekReport } from "@/lib/weekReport";
@@ -91,6 +92,19 @@ export default function WeeklyPanel({
   t: (ar: string, en: string) => string;
   canEdit?: boolean;
 }) {
+  /* نسبة لوحة متابعة المشروع — الصفحة تقرؤها، فالتقرير يقرؤها
+     كذلك وإلا عرض رقماً أقدم منها. وتعذُّرها لا يكسر شيئاً:
+     يعود إلى النسبة المكتوبة في البند */
+  const [pdPct, setPdPct] = useState<number | null>(null);
+  useEffect(() => {
+    let on = true;
+    void loadProjectOutputs().then((x) => {
+      if (on && x) setPdPct(x.pct);
+    });
+    return () => {
+      on = false;
+    };
+  }, []);
   const thisWeek = weekStartOf(new Date().toISOString().slice(0, 10));
   const [week, setWeek] = useState(thisWeek);
   const weekEnd = shiftDays(week, 6);
@@ -190,8 +204,9 @@ export default function WeeklyPanel({
         items,
         on: prefs.on,
         next: listOf(prefs.texts?.next || ""),
+        pdashPct: pdPct,
       }),
-    [week, weekEnd, log, logPrev, changes, tasks, contacts, items, prefs.on, prefs.texts],
+    [week, weekEnd, log, logPrev, changes, tasks, contacts, items, prefs.on, prefs.texts, pdPct],
   );
 
   /* اختيار ما يظهر من التكاليف والمشاريع — يُحفظ لهذا الأسبوع
