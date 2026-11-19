@@ -83,7 +83,9 @@ export type Bar = { name: string; pct: number; plan: number; late: boolean };
 export type Stat = {
   n: number;
   label: string;
-  tone: "ok" | "warn" | "mute";
+  /** `ok` الأخضر الغامق للرقم الأول، و`ok2` درجةٌ ثانية منه لبقية
+      أرقام البطاقة — فيُعرف الأصل من المنسوب إليه بلمحة */
+  tone: "ok" | "ok2" | "warn" | "mute";
   icon?: string;
   /** سطرٌ صغير تحت العنوان — كالفترة التي يخصّها الرقم */
   sub?: string;
@@ -519,13 +521,13 @@ function cxStats(items: ItemLite[], asOf: string): Stat[] {
       /* أيقونةٌ له كإخوته — صفُّ الأيقونات لا يُترك فيه فراغ */
       icon: "target",
     },
-    { n: prep, label: "أنهت مرحلة التهيئة", tone: "mute", icon: "user-check" },
-    { n: plan, label: "أنهت مرحلة التخطيط", tone: "mute", icon: "map" },
+    { n: prep, label: "أنهت مرحلة التهيئة", tone: "ok2", icon: "user-check" },
+    { n: plan, label: "أنهت مرحلة التخطيط", tone: "ok2", icon: "map" },
     {
       n: repQ2,
       label: "صدرت لها تقارير الرضا",
       sub: cxRepQText(asOf),
-      tone: "ok",
+      tone: "ok2",
       icon: "report",
     },
   ];
@@ -703,8 +705,8 @@ export function outDom(nums: Record<string, string>, always = false): Dom | null
          قوسٌ لا يملأ إلا نصفه فيبدو أصغر وأعلى من إخوته، و`percent`
          يكرّر علامة «%» المكتوبة تحته */
       { n: 0, blank: true, label: "مؤشرات المخرجات الوطنية", tone: "ok", big: true, icon: "line" },
-      { n: 0, blank: true, label: "قابلة للقياس", tone: "ok", icon: "check" },
-      { n: pct, suffix: "%", fixed: true, label: "نسبة قابلية القياس", tone: "ok", icon: "pie" },
+      { n: 0, blank: true, label: "قابلة للقياس", tone: "ok2", icon: "check" },
+      { n: pct, suffix: "%", fixed: true, label: "نسبة قابلية القياس", tone: "ok2", icon: "pie" },
     ],
   };
 }
