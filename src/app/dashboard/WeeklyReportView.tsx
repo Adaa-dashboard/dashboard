@@ -647,30 +647,24 @@ export default function WeeklyReportView({
           <CycleBody q={cq} texts={prefs.texts || {}} onText={onCycleText} />
         ) : (
           <>
-        <div className="wk-kpi">
-          <div>
-            <span className="wk-ci lg">
-              <PIcon id="report" size={30} />
-            </span>
-            <span className="tx">
-              <b>{r.total}</b>
-              <span>تحديثاً هذا الأسبوع</span>
-              {r.totalPrev != null && <em>مقابل {r.totalPrev} الأسبوع الماضي</em>}
-            </span>
+        {/* ~~مربّع «ن تحديثاً هذا الأسبوع»~~ **أُزيل بطلب صاحبة
+            المنصة**: كان يَعُدّ كل تعديلٍ في المنصة، فيقيس نشاط
+            الإدخال لا الإنجاز — ويهبط من 43 إلى 3 في أسبوعٍ عُمل
+            فيه ولم يُكتب. وبقية أرقام التقرير مؤشرات حقيقية.
+            وبلا طلبٍ تحرّك هذا الأسبوع يختفي الشريط كلّه: نسبةٌ
+            بلا طلبات رقمٌ جامدٌ يُقرأ خطأً */}
+        {r.crWeek > 0 && (
+          <div className="wk-kpi">
+            <div>
+              <Ring pct={r.crPct ?? 0} />
+              <span className="tx">
+                <b className="sm">نسبة الالتزام في مراجعة طلبات التغيير</b>
+                <span>{crCountsText(r)}</span>
+                {r.crPctPrev != null && <em>مقابل {r.crPctPrev}% الأسبوع الماضي</em>}
+              </span>
+            </div>
           </div>
-          {/* بلا طلبٍ تحرّك هذا الأسبوع يختفي المربّع — نسبةٌ بلا
-              طلبات رقمٌ جامدٌ يُقرأ خطأً */}
-          {r.crWeek > 0 && (
-          <div>
-            <Ring pct={r.crPct ?? 0} />
-            <span className="tx">
-              <b className="sm">نسبة الالتزام في مراجعة طلبات التغيير</b>
-              <span>{crCountsText(r)}</span>
-              {r.crPctPrev != null && <em>مقابل {r.crPctPrev}% الأسبوع الماضي</em>}
-            </span>
-          </div>
-          )}
-        </div>
+        )}
 
         {rows.map((row, i) => (
           <div className={row.length > 1 ? "wk-two" : ""} key={i}>
