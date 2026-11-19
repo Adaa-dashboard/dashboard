@@ -521,13 +521,11 @@ function cxStats(items: ItemLite[], asOf: string): Stat[] {
       /* أيقونةٌ له كإخوته — صفُّ الأيقونات لا يُترك فيه فراغ */
       icon: "target",
     },
-    /* العناوين قصيرةٌ عمداً: المربّع الواحد في بطاقةٍ بأربعة مربّعات
-       لا يسع أكثر من ذلك في سطرٍ واحد */
-    { n: prep, label: "أنهت التهيئة", tone: "ok2", icon: "user-check" },
-    { n: plan, label: "أنهت التخطيط", tone: "ok2", icon: "map" },
+    { n: prep, label: "أنهت مرحلة التهيئة", tone: "ok2", icon: "user-check" },
+    { n: plan, label: "أنهت مرحلة التخطيط", tone: "ok2", icon: "map" },
     {
       n: repQ2,
-      label: "صدرت تقارير الرضا",
+      label: "صدرت لها تقارير الرضا",
       sub: cxRepQText(asOf),
       tone: "ok2",
       icon: "report",

@@ -2764,7 +2764,7 @@ table.matrix thead th {
 .wk-sts span em.sub {
   display: block;
   font-style: normal;
-  font-size: 8.5px;
+  font-size: 7.5px;
   white-space: nowrap;
   color: var(--muted);
   margin-top: 2px;
@@ -2843,6 +2843,12 @@ table.matrix thead th {
    سطرين لأنه أطولها («الأجهزة المستهدف قياسها») */
 .wk-sts > div:not(.big) > span {
   white-space: nowrap;
+  /* بخطّ أسماء الاستراتيجيات نفسه (8px) — فيسع العنوانُ كاملاً
+     في سطرٍ واحد بلا اختصارٍ في كلماته */
+  font-size: 8px;
+}
+/* وعنوان المربّع الأبرز درجةً أصغر كذلك */
+.wk-sts > div.big > span {
   font-size: 9.5px;
 }
 
