@@ -587,7 +587,7 @@ function CycleBody({
 }
 
 /* المجالات التي تُعرض بطاقتين في الصف — وما عداها بعرض الصفحة */
-const PAIRED = new Set(["nat", "inst", "ses", "cx"]);
+const PAIRED = new Set(["nat", "inst", "out", "ses", "cx"]);
 
 export default function WeeklyReportView({
   report,

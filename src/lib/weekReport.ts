@@ -600,26 +600,10 @@ const INST_FIX: Record<string, number> | null = {
   "الوثائق المستلمة": 21,
   "فُعِّل القياس": 10,
 };
-/** أسماء مَن فُعِّل قياسها — **تصحيحٌ مؤقّت** كأعداد `INST_FIX`:
-    ملف القسم لم يُحدَّث بعد، والقائمة اليوم تسع جهات بطلب
-    المستخدمة. يُحذف الثابت فور تحديث صفحة القسم فتعود الأسماء
-    مقروءةً من الجدول وحده. (`null` = بلا تصحيح) */
 /** سهم الزيادة في الأسطورة — ثابتٌ مؤقّت استُعمل مرّةً لإظهار
     الثماني التي فُعِّل قياسها دفعةً واحدة. أُعيد إلى `null`:
     السهم يقول **ما زاد هذا الأسبوع**، فإن لم يزد شيء لا يظهر. */
 const INST_UP_FIX: Record<string, number> | null = null;
-const INST_LIVE_FIX: string[] | null = [
-  "الهيئة العامة للأوقاف",
-  "الهيئة السعودية للملكية الفكرية",
-  "هيئة المحتوى المحلي والمشتريات الحكومية",
-  "هيئة المواصفات والمقاييس والجودة",
-  "معهد الإدارة",
-  "المركز الوطني لتنمية القطاع غير الربحي",
-  "هيئة الغذاء والدواء",
-  "الهيئة السعودية للمدن الصناعية ومناطق التقنية",
-  "وزارة النقل والخدمات اللوجستية",
-  "الهيئة العامة للنقل",
-];
 /** **أعدادُ المؤسسية متداخلة لا متقاسمة**: الجهات ٤٤ وكلها عُقد
     لها الاجتماع التعريفي، ومنها ٢١ استُلمت وثائقها، ومنها جهتان
     فُعِّل قياسهما. فالحلقة تُرسم قُمعاً (`nested`) ووسطُها أكبر
@@ -642,27 +626,6 @@ function instFunnel(items: ItemLite[]) {
   return { total: base, unit: "جهة", slices, base, nested: true };
 }
 
-/** أسماء **كل** مَن بلغ المرحلة المطلوبة — لا ما تحرّك منها هذا
-    الأسبوع وحده: الجهة التي فُعِّل قياسها الأسبوع الماضي لا تغيب
-    من تقرير هذا الأسبوع. ولون كلٍّ لون شريحتها في الحلقة. */
-function stageNames(
-  items: ItemLite[],
-  label: (d: Rec) => string,
-  slices: Slice[],
-  /** المراحل المطلوبة بترتيب ذكرها */
-  only: string[],
-): Up[] {
-  const color = new Map(slices.map((x) => [x.label, x.color]));
-  const out: Up[] = [];
-  for (const lab of only) {
-    for (const it of items) {
-      if (label(it.data) !== lab) continue;
-      const nm = txt(it.data.name) || txt(it.data.entity) || txt(it.data.owner);
-      if (nm) out.push({ name: nm, label: lab, color: color.get(lab) || "#9aa6a2" });
-    }
-  }
-  return out;
-}
 
 /** الحلقة نفسها، وقد وُسمت شرائحها بما زاد فيها هذا الأسبوع */
 function withUps<T extends { slices: Slice[] }>(donut: T, count: Record<string, number>): T {
@@ -686,7 +649,9 @@ export function outDom(nums: Record<string, string>, always = false): Dom | null
   /* بلا رقمٍ مكتوب لا تُطبع البطاقة — إلا لمن يحرّر التقرير،
      وإلا لم يجد خانةً يكتب فيها أول رقم أصلاً */
   if (tot <= 0 && ok <= 0 && !always) return null;
-  const pct = tot > 0 ? Math.round((Math.min(ok, tot) / tot) * 100) : 0;
+  /* بالاقتطاع لا بالتقريب: 58 من 60 = 96% كما في مصدر الرقم،
+     والتقريب كان يرفعها إلى 97% فتخالفه */
+  const pct = tot > 0 ? Math.floor((Math.min(ok, tot) / tot) * 100) : 0;
   return {
     k: "out",
     ...DOM_META.out,
@@ -766,13 +731,9 @@ export function buildWeekReport(args: {
       ...DOM_META.nat,
       updates: nat.length || natT.length,
       donut: withUps(dn, up.count),
-      /* **كل** المعتمدة تُذكر بأسمائها لا ما تحرّك منها هذا الأسبوع
-         وحده: المعتمدة من مجلس الوزراء أولاً ثم المعتمدة من اللجنة الاستراتيجية —
-         وهي أهمّ ما في التقرير، فلا تغيب لأنها لم تتغيّر */
-      ups: stageNames(sec("natstrat"), natLabel, dn.slices, [NAT_STEPS[3]]),
-      /* أسماء الاستراتيجيات طويلة، فبخطّ المؤسسية نفسه تبقى
-         كلُّ واحدةٍ في سطر */
-      upsSm: true,
+      /* **بلا أسماءٍ تحت الحلقة** — بطلب صاحبة المنصة: الحلقة
+         وأعدادُها تكفيان، والقائمة كانت تملأ البطاقة بما لا يتغيّر
+         من أسبوع لآخر. و`upsOnly` تمنع سطر «أبرزها» وقائمة ما تحرّك */
       upsOnly: true,
       lines,
     });
@@ -795,17 +756,7 @@ export function buildWeekReport(args: {
       ...DOM_META.inst,
       updates: inst.length || instT.length,
       donut: withUps(dn, INST_UP_FIX || up.count),
-      /* أسماؤها في عمودين — القائمة طالت فصارت تمدّ البطاقة */
-      upsTwo: true,
-      /* **كل** جهة فُعِّل قياسها تُذكر بالاسم لا ما تحرّك منها هذا
-         الأسبوع وحده — فالجهة التي فُعِّلت قبل أسبوع كانت تغيب */
-      ups: INST_LIVE_FIX
-        ? INST_LIVE_FIX.map((name) => ({
-            name,
-            label: INST_STAGES[3],
-            color: INST_RAMP[3],
-          }))
-        : stageNames(sec("inststrat"), instLabel, dn.slices, [INST_STAGES[3]]),
+      /* بلا أسماءٍ تحت الحلقة كذلك — بطلب صاحبة المنصة */
       upsOnly: true,
       lines,
     });
