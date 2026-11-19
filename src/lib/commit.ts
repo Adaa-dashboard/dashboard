@@ -16,7 +16,13 @@ export const nrm = (v: unknown) =>
     .replace(/[\s/\\_-]+/g, " ")
     .trim();
 
-export type ChangeLite = { owner: string; sla: number | null; workDays: number | null };
+export type ChangeLite = {
+  owner: string;
+  sla: number | null;
+  workDays: number | null;
+  /** رمز الطلب — به يُعرف ما أُسند إلى مراجِعه بعينه */
+  code?: string;
+};
 export type EntityLite = {
   id?: string;
   name: string;
@@ -63,12 +69,23 @@ export type CommitRow = {
    فقليلُ الطلبات يقترب من المتوسط حتى يتراكم عنده عددٌ يدلّ عليه،
    وكثيرُها تدلّ نسبته على نفسها. والطلب بلا مدة أو بلا أيام لا
    يُحتسب، فلا يُظلم أحد بصفٍّ ناقص في الملف. */
-export function commitStats(items: ChangeLite[], owners: Map<string, Owner>): CommitRow[] {
+/** الطلب الذي راجعه غيرُ صاحب الجهة: `claims` يُسند الرمز إلى
+    مراجِعه، فيُحتسب له ويخرج من حساب صاحب الجهة — ولا يُعدّ مرّتين */
+export function commitStats(
+  items: ChangeLite[],
+  owners: Map<string, Owner>,
+  claims?: Map<string, string>,
+): CommitRow[] {
   type Acc = { name: string; photo: string; total: number; late: number; days: number };
   const by = new Map<string, Acc>();
+  const photoOf = new Map<string, string>();
+  for (const o of owners.values()) photoOf.set(nrm(o.name), o.photo);
   for (const c of items || []) {
     if (c.sla == null || c.workDays == null) continue;
-    const o = owners.get(nrm(c.owner));
+    const claimed = c.code ? claims?.get(String(c.code)) : "";
+    const o = claimed
+      ? { name: claimed, photo: photoOf.get(nrm(claimed)) || "" }
+      : owners.get(nrm(c.owner));
     if (!o?.name) continue;
     const r = by.get(o.name) || { name: o.name, photo: o.photo, total: 0, late: 0, days: 0 };
     r.total++;

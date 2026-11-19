@@ -2924,13 +2924,32 @@ const crLate = (c: CrRow) => c.sla != null && c.workDays != null && c.workDays >
 const crYear = (c: CrRow) => txt(c.firstSeen).slice(0, 4);
 
 function CrBox({
-  rows, yr, setYr, t,
+  rows, yr, setYr, t, all, mineCodes, onAdd, onDrop,
 }: {
   rows: CrRow[];
   yr: string;
   setYr: (v: string) => void;
   t: T;
+  /** كل الطلبات — منها يُختار ما راجعتُه من طلبات زملائي */
+  all?: CrRow[];
+  /** رموز ما أُسند إليّ — يحمل ✕ لفكّه */
+  mineCodes?: Set<string>;
+  onAdd?: (code: string) => void;
+  onDrop?: (code: string) => void;
 }) {
+  const [pick, setPick] = useState(false);
+  const [q, setQ] = useState("");
+  const found = useMemo(() => {
+    const s = nrm(q);
+    if (!s || !all) return [];
+    const have = new Set(rows.map((r) => String(r.code)));
+    return all
+      .filter((c) => !have.has(String(c.code)))
+      .filter((c) =>
+        [c.code, c.itemName, c.owner, c.program].some((v) => nrm(String(v || "")).includes(s)),
+      )
+      .slice(0, 8);
+  }, [q, all, rows]);
   const years = useMemo(() => {
     const set = new Set(rows.map(crYear).filter(Boolean));
     set.add(String(YR_NOW));
@@ -2963,7 +2982,47 @@ function CrBox({
             `${list.length} requests — from the daily file, read-only`,
           )}
         </span>
+        {/* طلبٌ راجعتُه وجهتُه لزميل: يُضاف هنا فيُحتسب لي */}
+        {onAdd && (
+          <button className="cr-add" onClick={() => setPick(!pick)}>
+            {pick ? t("إغلاق", "Close") : t("+ إضافة طلب", "+ Add")}
+          </button>
+        )}
       </div>
+      {pick && onAdd && (
+        <div className="cr-pick">
+          <input
+            autoFocus
+            value={q}
+            placeholder={t("ابحثي بالرمز أو باسم البند أو الجهة…", "Search by code, item or entity…")}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          {q.trim() && !found.length && (
+            <div className="pf-none sm">{t("لا نتائج", "No matches")}</div>
+          )}
+          {found.map((c) => (
+            <button
+              key={c.code}
+              className="cr-pk"
+              onClick={() => {
+                onAdd(String(c.code));
+                setQ("");
+                setPick(false);
+              }}
+            >
+              <b>{c.itemName || c.code}</b>
+              <em>{c.owner}</em>
+              <span className="ltr">{c.code}</span>
+            </button>
+          ))}
+          <p className="muted">
+            {t(
+              "الطلب الذي تضيفينه يُحتسب لك في ترتيب الاستشاريين ونسبة الالتزام، ويخرج من حساب صاحب الجهة.",
+              "A request you add counts for you instead of the entity's consultant.",
+            )}
+          </p>
+        </div>
+      )}
       {!list.length ? (
         <div className="pf-none sm">{t("لا توجد طلبات لجهاتك في هذه السنة.", "No requests this year.")}</div>
       ) : (
@@ -2979,6 +3038,15 @@ function CrBox({
               <span className="d">
                 {c.workDays ?? "—"}/{c.sla ?? "—"} {t("يوم", "d")}
               </span>
+              {mineCodes?.has(String(c.code)) && onDrop && (
+                <button
+                  className="cr-x"
+                  title={t("أُضيف يدوياً — فكّ الإسناد", "Added manually — remove")}
+                  onClick={() => onDrop(String(c.code))}
+                >
+                  ✕
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -6156,17 +6224,40 @@ export default function Portfolio({
   /* سجلّ الجهات كاملاً وكلُّ الطلبات — منهما تُشتقّ أرقام الفريق لمديره */
   const [allEnts, setAllEnts] = useState<{ name?: string }[]>([]);
   const [myChangesAll, setMyChangesAll] = useState<MyChange[]>([]);
+  /* إسناد طلبٍ بعينه إلى مراجِعه — الرمز ⇒ الاسم مُوحَّداً */
+  const [crMine, setCrMine] = useState<Map<string, string>>(new Map());
+  const loadCrMine = useCallback(async () => {
+    const d = await apiFetch("/api/cr/mine").then((r) => r.json()).catch(() => ({}));
+    setCrMine(
+      new Map(
+        (Array.isArray(d.mine) ? d.mine : []).map((m: { code: string; user: string }) => [
+          String(m.code),
+          nrm(String(m.user)),
+        ]),
+      ),
+    );
+  }, []);
+  useEffect(() => {
+    void loadCrMine();
+  }, [loadCrMine]);
   useEffect(() => {
     void (async () => {
-      const [ch, en] = await Promise.all([
+      const [ch, en, mn] = await Promise.all([
         apiFetch("/api/changes").then((r) => r.json()).catch(() => ({})),
         apiFetch("/api/entities").then((r) => r.json()).catch(() => ({})),
+        apiFetch("/api/cr/mine").then((r) => r.json()).catch(() => ({})),
       ]);
       const list: MyChange[] = Array.isArray(ch.changes) ? ch.changes : [];
       const ents = Array.isArray(en.entities) ? en.entities : [];
       const owners = ownerMap(ents);
       setEntOwner(owners);
-      const rows = commitStats(list, owners);
+      const claims = new Map<string, string>(
+        (Array.isArray(mn.mine) ? mn.mine : []).map((m: { code: string; user: string }) => [
+          String(m.code),
+          String(m.user),
+        ]),
+      );
+      const rows = commitStats(list, owners, claims);
       setCommitAll(rows);
       setMyCommit(rows.find((r) => nrm(r.name) === nrm(me.name)) || null);
       setMyChanges(list.filter((c) => nrm(owners.get(nrm(c.owner))?.name || "") === nrm(me.name)));
@@ -6212,12 +6303,20 @@ export default function Portfolio({
       avg: 0,
     } as CommitRow;
   }, [goalWho, myCommit, commitAll, teamNames]);
-  /** طلبات النطاق — للمدير طلبات فريقه */
+  /* ============================================================
+     **طلباتي أنا** في المحفظة — لا طلبات فريقي ولا المنصة
+     ------------------------------------------------------------
+     المربّع عنوانه «طلبات جهاتي»، وكان يتبع نطاق الأهداف فيعرض
+     لمدير القطاع طلبات فريقه ولمدير الإدارة كل الطلبات — فتظهر
+     طلباتٌ ليست له. نطاق الفريق والمنصة موضعه صفحة طلبات التغيير.
+     ويُضاف إليها ما أسندتُه لنفسي من طلبات زملائي: راجعتُه فهو لي.
+     ============================================================ */
   const scopeChanges = useMemo(() => {
-    if (goalWho === "me") return myChanges;
-    const names = new Set(scopeEntNames.map((n) => nrm(n)));
-    return myChangesAll.filter((c) => names.has(nrm(c.owner)));
-  }, [goalWho, myChanges, myChangesAll, scopeEntNames]);
+    const mineNames = new Set(regNames.map((n) => nrm(n)));
+    return myChangesAll.filter(
+      (c) => mineNames.has(nrm(c.owner)) || crMine.get(String(c.code)) === nrm(me.name),
+    );
+  }, [myChangesAll, regNames, crMine, me.name]);
   /* سنةُ طلبات جهاتي المعروضة — الجارية افتراضاً، و«الكل» متاحة */
   const [crYr, setCrYr] = useState(String(YR_NOW));
   const reverse = pf.of("reverse");
@@ -6695,7 +6794,27 @@ export default function Portfolio({
     return (
       <>
         {k === "changes" && (
-          <CrBox rows={scopeChanges} yr={crYr} setYr={setCrYr} t={t} />
+          <CrBox
+            rows={scopeChanges}
+            yr={crYr}
+            setYr={setCrYr}
+            t={t}
+            all={myChangesAll}
+            mineCodes={new Set([...crMine.keys()].filter((k) => crMine.get(k) === nrm(me.name)))}
+            onAdd={async (code) => {
+              await apiFetch("/api/cr/mine", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ code }),
+              }).catch(() => undefined);
+              await loadCrMine();
+            }}
+            onDrop={async (code) => {
+              await apiFetch(`/api/cr/mine?code=${encodeURIComponent(code)}`, { method: "DELETE" })
+                .catch(() => undefined);
+              await loadCrMine();
+            }}
+          />
         )}
         <SectionTable
         section={base}

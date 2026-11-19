@@ -143,6 +143,8 @@ export default function Changes({
   /* جهاتٌ نفى استشاريوها نسبتها إليهم — تُسقَط من الإسناد وتُعرض
      لمن يرفع الملف ليصحّح سجلّ الجهات */
   const [disown, setDisown] = useState<{ id: string; entity: string; user: string }[]>([]);
+  /* طلباتٌ أُسندت إلى مراجِعها بعينه — تُحتسب له لا لصاحب الجهة */
+  const [claims, setClaims] = useState<Map<string, string>>(new Map());
   /* سجلّ الجهات كاملاً — لنافذة مطابقة الأسماء غير المعروفة */
   type Ent = { id: string; name: string; sector?: string };
   const [ents, setEnts] = useState<Ent[]>([]);
@@ -151,11 +153,20 @@ export default function Changes({
   const [fixMsg, setFixMsg] = useState("");
 
   const loadEnts = useCallback(async () => {
-    const [entRes, ppl, dis] = await Promise.all([
+    const [entRes, ppl, dis, mn] = await Promise.all([
       apiFetch("/api/entities").then((x) => x.json()).catch(() => ({})),
       apiFetch("/api/people").then((x) => x.json()).catch(() => ({})),
       apiFetch("/api/cr/disown").then((x) => x.json()).catch(() => ({})),
+      apiFetch("/api/cr/mine").then((x) => x.json()).catch(() => ({})),
     ]);
+    setClaims(
+      new Map(
+        (Array.isArray(mn.mine) ? mn.mine : []).map((m: { code: string; user: string }) => [
+          String(m.code),
+          String(m.user),
+        ]),
+      ),
+    );
     const dl = Array.isArray(dis.disown) ? dis.disown : [];
     setDisown(dl);
     const dset = new Set<string>(dl.map((d: { entity: string; user: string }) => `${nrm(d.entity)}|${nrm(d.user)}`));
@@ -305,11 +316,12 @@ export default function Changes({
     () =>
       rounds.length
         ? commitStats(
-            spanRounds.map((r) => ({ owner: r.owner, sla: r.sla, workDays: r.days })),
+            spanRounds.map((r) => ({ owner: r.owner, sla: r.sla, workDays: r.days, code: r.code })),
             ownerOf,
+            claims,
           )
-        : commitStats(items, ownerOf),
-    [items, rounds, spanRounds, ownerOf],
+        : commitStats(items, ownerOf, claims),
+    [items, rounds, spanRounds, ownerOf, claims],
   );
   const qRows = useMemo(() => roundQuarters(rounds), [rounds]);
   /* جولات الاستشاري المفتوح — بالجهة المالكة كما في الترتيب */
@@ -319,16 +331,18 @@ export default function Changes({
      محسوباً، والطلب يُقاس كما في حسبة الترتيب (بلغ المدة ⇒ متأخر). */
   const whoRows = useMemo(() => {
     if (!who) return [];
+    const whoOf = (code: string, owner: string) =>
+      claims.get(String(code)) || ownerOf.get(nrm(owner))?.name || "";
     if (rounds.length)
       return spanRounds
-        .filter((r) => ownerOf.get(nrm(r.owner))?.name === who)
+        .filter((r) => whoOf(r.code, r.owner) === who)
         .map((r) => ({
           id: r.id, code: r.code, owner: r.owner, itemName: r.itemName,
           kindTxt: [r.kind, r.review].filter(Boolean).join(" · "),
           days: r.days, sla: r.sla, date: r.leftAt, late: r.onTime === false,
         }));
     return items
-      .filter((c) => ownerOf.get(nrm(c.owner))?.name === who)
+      .filter((c) => whoOf(c.code, c.owner) === who)
       .map((c) => ({
         id: c.code, code: c.code, owner: c.owner, itemName: c.itemName,
         kindTxt: [c.reviewType, c.status === "closed" ? "تمت مراجعته" : "مفتوح"]
@@ -337,7 +351,7 @@ export default function Changes({
         late: c.sla != null && c.workDays != null && c.workDays >= c.sla,
       }))
       .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-  }, [who, rounds, spanRounds, items, ownerOf]);
+  }, [who, rounds, spanRounds, items, ownerOf, claims]);
 
   const shown = useMemo(() => {
     const open = items.filter((x) => x.status === "open");

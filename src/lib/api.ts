@@ -1582,6 +1582,44 @@ export async function apiFetch(path: string, init: Init = {}) {
       return ok({ ok: true });
     }
 
+    /* «طلبٌ راجعتُه» — إسناد طلبٍ بعينه إلى مراجِعه */
+    if (p === "/api/cr/mine" && method === "GET") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const { data, error } = await s.from("perf_cr_mine").select("*").order("at", { ascending: false });
+      if (error) return ok({ mine: [], ready: false });
+      return ok({
+        ready: true,
+        mine: (data || []).map((r) => ({
+          code: str(r.code), user: str(r.user_name), by: str(r.by_name), at: str(r.at),
+        })),
+      });
+    }
+    if (p === "/api/cr/mine" && method === "POST") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const code = str(body.code);
+      if (!code) return err("لا رمز", 400);
+      /* الافتراضي: لنفسي. ويجوز الإسناد لغيري بذكر الاسم */
+      const user = str(body.user) || me.name || "";
+      if (!user) return err("لا اسم", 400);
+      const { error } = await s.from("perf_cr_mine").upsert(
+        { code, user_name: user, by_name: me.name || "", note: str(body.note) },
+        { onConflict: "code" },
+      );
+      if (error) return err(error.message, 403);
+      return ok({ ok: true });
+    }
+    if (p === "/api/cr/mine" && method === "DELETE") {
+      const me = await whoAmI();
+      if (!me) return err("غير مصرّح", 401);
+      const code = q.get("code") || "";
+      if (!code) return err("لا رمز", 400);
+      const { error } = await s.from("perf_cr_mine").delete().eq("code", code);
+      if (error) return err(error.message, 403);
+      return ok({ ok: true });
+    }
+
     /* جولات المراجعة المكتملة — عليها تُحسب نسبة الالتزام */
     if (p === "/api/cr/rounds" && method === "GET") {
       const me = await whoAmI();
