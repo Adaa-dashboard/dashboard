@@ -206,8 +206,9 @@ export default function WeeklyPanel({
         next: listOf(prefs.texts?.next || ""),
         pdashPct: pdPct,
         nums: prefs.texts,
+        canEdit,
       }),
-    [week, weekEnd, log, logPrev, changes, tasks, contacts, items, prefs.on, prefs.texts, pdPct],
+    [week, weekEnd, log, logPrev, changes, tasks, contacts, items, prefs.on, prefs.texts, pdPct, canEdit],
   );
 
   /* اختيار ما يظهر من التكاليف والمشاريع — يُحفظ لهذا الأسبوع

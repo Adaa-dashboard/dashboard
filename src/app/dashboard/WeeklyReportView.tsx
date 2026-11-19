@@ -134,6 +134,10 @@ function DomCard({
   /* وأرقام المربّعات كذلك — `st:<المجال>:<المربّع>` */
   const stK = (i: number) => `st:${d.k}:${i}`;
   const stOver = (i: number) => (draft[stK(i)] ?? texts[stK(i)] ?? "").trim();
+  /* ما يُعرض في المربّع: المكتوب، وإلا المحسوب — إلا الخانة
+     الفارغة بطبعها (`blank`) فتبقى فارغة حتى يُكتب فيها */
+  const stShow = (s: { n: number; blank?: boolean }, i: number) =>
+    stOver(i) === "" ? (s.blank ? "" : String(s.n)) : stOver(i);
   const dnOver = (i: number) => (draft[dnK(i)] ?? texts[dnK(i)] ?? "").trim();
   const donut = d.donut && {
     ...d.donut,
@@ -151,8 +155,11 @@ function DomCard({
   /* عمود «الدعم المطلوب» يُخفى بضغطة × ويُعاد بزرّه — واختياره
      محفوظٌ مع بقية مفاتيح الأسبوع */
   const sup = on["col:sup"] !== false;
+  /* بطاقة المخرجات الوطنية قبل أن يُكتب فيها رقم: تظهر لمن يحرّر
+     ليكتب، وتُحجب عن ملف الـPDF — ورقةٌ فيها «0 · 0 · 0%» لا تقول شيئاً */
+  const blank = d.k === "out" && stOver(0) === "" && stOver(1) === "";
   return (
-    <div className="wk-card">
+    <div className={`wk-card${blank ? " wk-blank" : ""}`}>
       <div className="wk-ch">
         <span className="wk-ci">
           <PIcon id={DOM_ICON[d.k] || "award"} size={18} />
@@ -178,7 +185,9 @@ function DomCard({
                   <input
                     className="st-in"
                     inputMode="numeric"
-                    value={stOver(i) === "" ? String(s.n) : stOver(i)}
+                    /* الخانة الفارغة تدعو للكتابة بشرطةٍ لا بصفر */
+                    placeholder={s.blank ? "—" : undefined}
+                    value={stShow(s, i)}
                     onChange={(e) => {
                       const n = e.target.value.replace(/[^\d]/g, "");
                       setDraft((x) => ({ ...x, [stK(i)]: n }));
@@ -187,14 +196,14 @@ function DomCard({
                     }}
                   />
                   {/* نصّاً لا حقلاً في الملف المصدَّر */}
-                  <span className="st-pt">{stOver(i) === "" ? s.n : stOver(i)}</span>
+                  <span className="st-pt">{stShow(s, i)}</span>
                   {s.suffix}
                 </b>
               ) : (
                 /* المحسوب (`fixed`) نصٌّ لا خانة: النسبة تتبع
                    مربّعيها، فلا تُكتب فوقهما */
                 <b className={s.tone}>
-                  {stOver(i) === "" || s.fixed ? s.n : stOver(i)}
+                  {s.fixed ? s.n : stShow(s, i)}
                   {s.suffix}
                 </b>
               )}

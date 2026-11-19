@@ -92,6 +92,9 @@ export type Stat = {
   big?: boolean;
   /** ما يلحق الرقم — «%» مثلاً. يُكتب نصّاً بعده فلا يدخل الخانة */
   suffix?: string;
+  /** الخانة تُعرض فارغةً ما لم يُكتب فيها: رقمٌ لا مصدر له في
+      المنصة، فـ«0» فيه دعوةٌ للكتابة فوقه لا قيمةٌ محسوبة */
+  blank?: boolean;
   /** رقمٌ محسوبٌ لا يُكتب: لا خانة تحرير فوقه. النسبةُ تُشتقّ من
       مربّعين قبلها، فتحريرها يجعلها تكذب عليهما */
   fixed?: boolean;
@@ -673,14 +676,16 @@ function withUps<T extends { slices: Slice[] }>(donut: T, count: Record<string, 
     والقابل منها للقياس، ونسبة القابلية **محسوبةً** من الاثنين.
     المفاتيح `st:out:0` و`st:out:1` هي نفسها مفاتيح خانات التحرير
     في العرض، فما يُكتب في المربّع هو ما يُقرأ هنا. */
-export function outDom(nums: Record<string, string>): Dom | null {
+export function outDom(nums: Record<string, string>, always = false): Dom | null {
   const of = (k: string) => {
     const v = txt(nums[k]).replace(/[^\d]/g, "");
     return v === "" ? 0 : Number(v);
   };
   const tot = of("st:out:0");
   const ok = of("st:out:1");
-  if (tot <= 0 && ok <= 0) return null;
+  /* بلا رقمٍ مكتوب لا تُطبع البطاقة — إلا لمن يحرّر التقرير،
+     وإلا لم يجد خانةً يكتب فيها أول رقم أصلاً */
+  if (tot <= 0 && ok <= 0 && !always) return null;
   const pct = tot > 0 ? Math.round((Math.min(ok, tot) / tot) * 100) : 0;
   return {
     k: "out",
@@ -690,8 +695,8 @@ export function outDom(nums: Record<string, string>): Dom | null {
       /* الرقمان يُكتبان، و`n` صفرٌ عمداً: العرض يقارن المكتوب به
          ليعرف أهو تجاوزٌ أم لا، فلو وضعنا المكتوب نفسه لمُحي
          بمجرّد إعادة كتابته كما هو. والمعروض هو المكتوب دائماً */
-      { n: 0, label: "مؤشرات المخرجات الوطنية", tone: "ok", big: true },
-      { n: 0, label: "قابلة للقياس", tone: "ok", icon: "check" },
+      { n: 0, blank: true, label: "مؤشرات المخرجات الوطنية", tone: "ok", big: true },
+      { n: 0, blank: true, label: "قابلة للقياس", tone: "ok", icon: "check" },
       { n: pct, suffix: "%", fixed: true, label: "نسبة قابلية القياس", tone: "ok", icon: "gauge" },
     ],
   };
@@ -717,6 +722,10 @@ export function buildWeekReport(args: {
   /** الأرقام المكتوبة في التقرير (`texts`) — منها بطاقة المخرجات
       الوطنية، فهي وحدها بلا مصدرٍ في المنصة */
   nums?: Record<string, string>;
+  /** التقرير مفتوحٌ لمن يحرّره — فتظهر بطاقة المخرجات الوطنية
+      بخاناتٍ فارغة ليُكتب فيها أول رقم. النسخة المشتركة وملف
+      الـPDF لا يُظهران الفارغة */
+  canEdit?: boolean;
 }): WeekReport {
   const { weekStart: a, weekEnd: b } = args;
   const ach = achFromLog(args.log);
@@ -807,7 +816,7 @@ export function buildWeekReport(args: {
      يُقرأ منه. والمكتوب يُحفظ في الافتراضي فيتكرر كل أسبوع حتى
      يُغيَّر، ومتى بُنيت الصفحة قُرئت منها بدل الكتابة.
      ولا تُطبع البطاقة ما لم يُكتب عددٌ — فالصفر لا يقول شيئاً. */
-  add(outDom(args.nums || {}));
+  add(outDom(args.nums || {}, !!args.canEdit));
 
   /* ٤) جلسات مراجعة الأداء */
   const sesA = domAch("ses");
