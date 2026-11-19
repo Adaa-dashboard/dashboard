@@ -68,15 +68,21 @@ export function DonutRing({
 export function DonutLegend({
   slices,
   edit,
+  hideZero,
 }: {
   slices: Slice[];
   /** أعدادُ الأسطورة تُكتب يدوياً في التقرير — تصحيحٌ عاجل ريثما
       تُحدَّث بيانات الصفحة نفسها. `val` العددُ المعروض و`set` حفظُه */
   edit?: { val: (i: number) => string; set: (i: number, v: string) => void };
+  /** مرحلةٌ خالية تُطوى عن التقرير — بطلب صاحبة المنصة: سطرٌ
+      بصفرٍ يشغل مكاناً ولا يقول شيئاً. وتعود متى امتلأت.
+      والفهرس يبقى كما هو فلا تنزاح مفاتيح التحرير */
+  hideZero?: boolean;
 }) {
   return (
     <div className="wk-lg">
-      {slices.map((s, i) => (
+      {slices.map((s, i) =>
+        hideZero && !s.n && !s.up ? null : (
         <div key={s.label}>
           <i style={{ background: s.color }} />
           {s.label}
@@ -97,7 +103,8 @@ export function DonutLegend({
             <u>{s.n}</u>
           )}
         </div>
-      ))}
+      ),
+      )}
     </div>
   );
 }

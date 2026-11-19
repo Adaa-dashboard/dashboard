@@ -203,6 +203,9 @@ function DomCard({
         <div className="wk-dw">
           <DonutLegend
             slices={donut.slices}
+            /* المرحلة الخالية تُطوى عن التقرير: سطرٌ بصفرٍ يشغل
+               مكاناً ولا يقول شيئاً. وتعود وحدها متى امتلأت */
+            hideZero
             edit={
               onTaskText
                 ? {
