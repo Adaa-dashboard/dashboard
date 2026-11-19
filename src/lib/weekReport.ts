@@ -521,11 +521,13 @@ function cxStats(items: ItemLite[], asOf: string): Stat[] {
       /* أيقونةٌ له كإخوته — صفُّ الأيقونات لا يُترك فيه فراغ */
       icon: "target",
     },
-    { n: prep, label: "أنهت مرحلة التهيئة", tone: "ok2", icon: "user-check" },
-    { n: plan, label: "أنهت مرحلة التخطيط", tone: "ok2", icon: "map" },
+    /* العناوين قصيرةٌ عمداً: المربّع الواحد في بطاقةٍ بأربعة مربّعات
+       لا يسع أكثر من ذلك في سطرٍ واحد */
+    { n: prep, label: "أنهت التهيئة", tone: "ok2", icon: "user-check" },
+    { n: plan, label: "أنهت التخطيط", tone: "ok2", icon: "map" },
     {
       n: repQ2,
-      label: "صدرت لها تقارير الرضا",
+      label: "صدرت تقارير الرضا",
       sub: cxRepQText(asOf),
       tone: "ok2",
       icon: "report",
@@ -705,7 +707,7 @@ export function outDom(nums: Record<string, string>, always = false): Dom | null
          قوسٌ لا يملأ إلا نصفه فيبدو أصغر وأعلى من إخوته، و`percent`
          يكرّر علامة «%» المكتوبة تحته */
       { n: 0, blank: true, label: "مؤشرات المخرجات الوطنية", tone: "ok", big: true, icon: "line" },
-      { n: 0, blank: true, label: "قابلة للقياس", tone: "ok2", icon: "check" },
+      { n: 0, blank: true, label: "مؤشر قابل للقياس", tone: "ok2", icon: "check" },
       { n: pct, suffix: "%", fixed: true, label: "نسبة قابلية القياس", tone: "ok2", icon: "pie" },
     ],
   };
