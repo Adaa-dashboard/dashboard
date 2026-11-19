@@ -510,13 +510,14 @@ function cxStats(items: ItemLite[], asOf: string): Stat[] {
   void repRes;
   void repNo;
   return [
-    /* المستهدف أولاً وأبرزُها: الأعداد بعده تُقرأ منسوبةً إليه —
-       بلا أيقونة، فالرقم وحده أوضح */
+    /* المستهدف أولاً وأبرزُها: الأعداد بعده تُقرأ منسوبةً إليه */
     {
       n: cxTarget(items),
       label: "الأجهزة المستهدف قياسها",
       tone: "ok",
       big: true,
+      /* أيقونةٌ له كإخوته — صفُّ الأيقونات لا يُترك فيه فراغ */
+      icon: "target",
     },
     { n: prep, label: "أنهت مرحلة التهيئة", tone: "mute", icon: "user-check" },
     { n: plan, label: "أنهت مرحلة التخطيط", tone: "mute", icon: "map" },
@@ -600,6 +601,22 @@ const INST_FIX: Record<string, number> | null = {
   "الوثائق المستلمة": 21,
   "فُعِّل القياس": 10,
 };
+/** أسماء مَن فُعِّل قياسها — **تصحيحٌ مؤقّت** كأعداد `INST_FIX`:
+    ملف القسم لم يُحدَّث بعد، والقائمة اليوم عشر جهات بطلب
+    المستخدمة. يُحذف الثابت فور تحديث صفحة القسم فتعود الأسماء
+    مقروءةً من الجدول وحده. (`null` = بلا تصحيح) */
+const INST_LIVE_FIX: string[] | null = [
+  "الهيئة العامة للأوقاف",
+  "الهيئة السعودية للملكية الفكرية",
+  "هيئة المحتوى المحلي والمشتريات الحكومية",
+  "هيئة المواصفات والمقاييس والجودة",
+  "معهد الإدارة",
+  "المركز الوطني لتنمية القطاع غير الربحي",
+  "هيئة الغذاء والدواء",
+  "الهيئة السعودية للمدن الصناعية ومناطق التقنية",
+  "وزارة النقل والخدمات اللوجستية",
+  "الهيئة العامة للنقل",
+];
 /** سهم الزيادة في الأسطورة — ثابتٌ مؤقّت استُعمل مرّةً لإظهار
     الثماني التي فُعِّل قياسها دفعةً واحدة. أُعيد إلى `null`:
     السهم يقول **ما زاد هذا الأسبوع**، فإن لم يزد شيء لا يظهر. */
@@ -626,6 +643,28 @@ function instFunnel(items: ItemLite[]) {
   return { total: base, unit: "جهة", slices, base, nested: true };
 }
 
+
+/** أسماء **كل** مَن بلغ المرحلة المطلوبة — لا ما تحرّك منها هذا
+    الأسبوع وحده: الجهة التي فُعِّل قياسها الأسبوع الماضي لا تغيب
+    من تقرير هذا الأسبوع. ولون كلٍّ لون شريحتها في الحلقة. */
+function stageNames(
+  items: ItemLite[],
+  label: (d: Rec) => string,
+  slices: Slice[],
+  /** المراحل المطلوبة بترتيب ذكرها */
+  only: string[],
+): Up[] {
+  const color = new Map(slices.map((x) => [x.label, x.color]));
+  const out: Up[] = [];
+  for (const lab of only) {
+    for (const it of items) {
+      if (label(it.data) !== lab) continue;
+      const nm = txt(it.data.name) || txt(it.data.entity) || txt(it.data.owner);
+      if (nm) out.push({ name: nm, label: lab, color: color.get(lab) || "#9aa6a2" });
+    }
+  }
+  return out;
+}
 
 /** الحلقة نفسها، وقد وُسمت شرائحها بما زاد فيها هذا الأسبوع */
 function withUps<T extends { slices: Slice[] }>(donut: T, count: Record<string, number>): T {
@@ -660,9 +699,12 @@ export function outDom(nums: Record<string, string>, always = false): Dom | null
       /* الرقمان يُكتبان، و`n` صفرٌ عمداً: العرض يقارن المكتوب به
          ليعرف أهو تجاوزٌ أم لا، فلو وضعنا المكتوب نفسه لمُحي
          بمجرّد إعادة كتابته كما هو. والمعروض هو المكتوب دائماً */
-      { n: 0, blank: true, label: "مؤشرات المخرجات الوطنية", tone: "ok", big: true },
+      /* أيقوناتٌ تملأ مربّعها بقدرٍ واحد فتستوي في العين: `gauge`
+         قوسٌ لا يملأ إلا نصفه فيبدو أصغر وأعلى من إخوته، و`percent`
+         يكرّر علامة «%» المكتوبة تحته */
+      { n: 0, blank: true, label: "مؤشرات المخرجات الوطنية", tone: "ok", big: true, icon: "line" },
       { n: 0, blank: true, label: "قابلة للقياس", tone: "ok", icon: "check" },
-      { n: pct, suffix: "%", fixed: true, label: "نسبة قابلية القياس", tone: "ok", icon: "gauge" },
+      { n: pct, suffix: "%", fixed: true, label: "نسبة قابلية القياس", tone: "ok", icon: "pie" },
     ],
   };
 }
@@ -731,9 +773,13 @@ export function buildWeekReport(args: {
       ...DOM_META.nat,
       updates: nat.length || natT.length,
       donut: withUps(dn, up.count),
-      /* **بلا أسماءٍ تحت الحلقة** — بطلب صاحبة المنصة: الحلقة
-         وأعدادُها تكفيان، والقائمة كانت تملأ البطاقة بما لا يتغيّر
-         من أسبوع لآخر. و`upsOnly` تمنع سطر «أبرزها» وقائمة ما تحرّك */
+      /* **كل** المعتمدة تُذكر بأسمائها لا ما تحرّك منها هذا الأسبوع
+         وحده: المعتمدة من مجلس الوزراء — وهي أهمّ ما في التقرير،
+         فلا تغيب لأنها لم تتغيّر */
+      ups: stageNames(sec("natstrat"), natLabel, dn.slices, [NAT_STEPS[3]]),
+      /* أسماء الاستراتيجيات طويلة، فبخطّ المؤسسية نفسه تبقى
+         كلُّ واحدةٍ في سطر */
+      upsSm: true,
       upsOnly: true,
       lines,
     });
@@ -756,7 +802,17 @@ export function buildWeekReport(args: {
       ...DOM_META.inst,
       updates: inst.length || instT.length,
       donut: withUps(dn, INST_UP_FIX || up.count),
-      /* بلا أسماءٍ تحت الحلقة كذلك — بطلب صاحبة المنصة */
+      /* أسماؤها في عمودين — القائمة طالت فصارت تمدّ البطاقة */
+      upsTwo: true,
+      /* **كل** جهة فُعِّل قياسها تُذكر بالاسم لا ما تحرّك منها هذا
+         الأسبوع وحده — فالجهة التي فُعِّلت قبل أسبوع كانت تغيب */
+      ups: INST_LIVE_FIX
+        ? INST_LIVE_FIX.map((name) => ({
+            name,
+            label: INST_STAGES[3],
+            color: INST_RAMP[3],
+          }))
+        : stageNames(sec("inststrat"), instLabel, dn.slices, [INST_STAGES[3]]),
       upsOnly: true,
       lines,
     });
